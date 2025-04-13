@@ -49,37 +49,49 @@ public static partial class Module
 
         // Check if player already exists
         var playerOpt = ctx.Db.player.identity.Find(identity);
-        if (playerOpt == null)
+        if (playerOpt is null)
         {
             Log.Info($"New player detected. Creating records for {identity}.");
 
             // 1. Create the Entity for the player
-            var newEntity = ctx.Db.entity.Insert(new Entity
+            Entity? newEntityOpt = ctx.Db.entity.Insert(new Entity
             {
                 position = new DbVector2(100, 100), // Example starting position
                 mass = 10 // Example starting mass
             });
-            if(newEntity == null)
+
+            // Check if entity insertion failed
+            if(newEntityOpt is null)
             {
-                 Log.Error($"Failed to insert new entity for {identity}!");
+                 Log.Error($"Failed to insert new entity for {identity}! Insert returned null.");
                  return;
             }
-            Log.Info($"Created new entity with ID: {newEntity.Value.entity_id} for {identity}.");
+
+            // Insertion succeeded, get the non-nullable value
+            Entity newEntity = newEntityOpt.Value;
+            Log.Info($"Created new entity with ID: {newEntity.entity_id} for {identity}.");
 
             // 2. Create the Player record, linking to the new entity
-            var newPlayer = ctx.Db.player.Insert(new Player
+            Player? newPlayerOpt = ctx.Db.player.Insert(new Player
             {
                 identity = identity,
                 name = "", // Start with an empty name, SetName will update it
-                entity_id = newEntity.Value.entity_id
+                entity_id = newEntity.entity_id // Use the non-nullable entity_id
             });
-             if(newPlayer == null)
+
+             // Check if player insertion failed
+             if(newPlayerOpt is null)
             {
-                 Log.Error($"Failed to insert new player for {identity} (entity: {newEntity.Value.entity_id})!");
+                 Log.Error($"Failed to insert new player for {identity} (entity: {newEntity.entity_id})! Insert returned null.");
                  // Consider deleting the orphaned entity? Or handle error differently.
+                 // If you delete, remember Entity deletion needs its PK.
+                 // ctx.Db.entity.entity_id.Delete(newEntity.entity_id);
                  return;
             }
-            Log.Info($"Created new player record for {identity} linked to entity {newPlayer.Value.entity_id}.");
+
+             // Insertion succeeded, get the non-nullable value
+            Player newPlayer = newPlayerOpt.Value;
+            Log.Info($"Created new player record for {identity} linked to entity {newPlayer.entity_id}.");
 
         }
         else
@@ -105,7 +117,7 @@ public static partial class Module
 
         // Find the player using the context's Db object and the primary key index (identity)
         var playerOpt = ctx.Db.player.identity.Find(identity);
-        if (playerOpt == null)
+        if (playerOpt is null)
         {
             Log.Warn($"Attempted to set name for non-existent player {identity}.");
             return;
@@ -128,7 +140,7 @@ public static partial class Module
         var identity = ctx.Sender;
         // Find the player record for the caller
         var playerOpt = ctx.Db.player.identity.Find(identity);
-        if (playerOpt == null)
+        if (playerOpt is null)
         {
             Log.Warn($"UpdatePlayerPosition called by non-existent player {identity}.");
             return;
@@ -137,7 +149,7 @@ public static partial class Module
 
         // Find the entity associated with this player
         var entityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
-        if (entityOpt == null)
+        if (entityOpt is null)
         {
             Log.Error($"Player {identity} (entity_id: {player.entity_id}) has no matching entity! Cannot update position.");
             // This indicates a data consistency issue - player exists but their entity doesn't

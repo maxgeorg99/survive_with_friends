@@ -101,7 +101,7 @@ spacetimeDBClient.onSubscriptionApplied = () => {
     console.log("Checking for existing player...");
     const localPlayer = spacetimeDBClient.sdkConnection?.db.player.identity.find(spacetimeDBClient.identity);
 
-    if (localPlayer) {
+    if (localPlayer?.name) {
         console.log(`Existing player found: ${localPlayer.name}. Starting game.`);
         startGameWorld(); // Player exists, start the game scene's initialization
     } else {

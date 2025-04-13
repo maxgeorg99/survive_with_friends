@@ -237,13 +237,13 @@ export default class GameScene extends Phaser.Scene {
 
         if (foundPlayerIdentity) {
              // This entity belongs to another player we know about
-            // console.debug(`Received entity update for other player: ${entityData.entityId}, Identity: ${foundPlayerIdentity.toHexString()}`);
+            console.debug(`Received entity update for other player: ${entityData.entityId}, Identity: ${foundPlayerIdentity.toHexString()}`);
             this.updateOtherPlayerPosition(foundPlayerIdentity, entityData.position.x, entityData.position.y);
         } else {
             // Entity update received, but we don't have a corresponding player sprite yet.
             // This might happen if Entity.onInsert arrives before Player.onInsert.
             // We could potentially trigger a check here or wait for Player.onInsert.
-            // console.warn(`Received entity update for unknown player (Entity ID: ${entityData.entityId})`);
+            console.warn(`Received entity update for unknown player (Entity ID: ${entityData.entityId})`);
         }
     }
 
