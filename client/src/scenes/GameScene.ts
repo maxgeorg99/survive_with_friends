@@ -21,6 +21,8 @@ export default class GameScene extends Phaser.Scene {
     private localPlayerSprite: Phaser.Physics.Arcade.Sprite | null = null;
     private localPlayerNameText: Phaser.GameObjects.Text | null = null;
     private otherPlayers: Map<Identity, Phaser.GameObjects.Container> = new Map();
+    // Map to hold player data waiting for corresponding entity data (keyed by entityId)
+    private pendingPlayers: Map<number, Player> = new Map();
     private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null;
     private backgroundTile: Phaser.GameObjects.TileSprite | null = null;
     private isPlayerDataReady = false;
@@ -226,6 +228,30 @@ export default class GameScene extends Phaser.Scene {
              return; // Handled local player update
          }
 
+         // Check if this entity update corresponds to a player waiting for entity data
+         if (this.pendingPlayers.has(entityData.entityId)) {
+             const pendingPlayerData = this.pendingPlayers.get(entityData.entityId)!;
+             console.log(`Entity data received for pending player ${pendingPlayerData.name} (Entity ID: ${entityData.entityId}). Creating sprite now.`);
+             this.pendingPlayers.delete(entityData.entityId); // Remove from pending
+
+             // Now create the actual player sprite using both player and entity data
+             // Ensure we don't accidentally re-add if it somehow got created between checks
+             if (!this.otherPlayers.has(pendingPlayerData.identity)) {
+                 console.log(`Creating new player sprite for pending player ${pendingPlayerData.name} at (${entityData.position.x}, ${entityData.position.y})`);
+                 const sprite = this.add.sprite(0, 0, PLAYER_ASSET_KEY);
+                 const text = this.add.text(0, -sprite.height / 2 - 10, pendingPlayerData.name || 'Player', PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
+                 const container = this.add.container(entityData.position.x, entityData.position.y, [sprite, text]);
+                 container.setData('entityId', entityData.entityId); // Store entityId
+                 this.otherPlayers.set(pendingPlayerData.identity, container);
+             } else {
+                console.warn(`Tried to create pending player ${pendingPlayerData.name}, but they already exist in otherPlayers map.`);
+                // If it already exists, maybe just update its position?
+                this.updateOtherPlayerPosition(pendingPlayerData.identity, entityData.position.x, entityData.position.y);
+             }
+             return; // Handled pending player creation
+         }
+
+         // If not a local player and not a pending player, it must be an update for an existing other player.
          // Find the other player's container associated with this entityId
          let foundPlayerIdentity: Identity | null = null;
          for (const [identity, container] of this.otherPlayers.entries()) {
@@ -248,13 +274,23 @@ export default class GameScene extends Phaser.Scene {
     }
 
     addOrUpdateOtherPlayer(playerData: Player) {
+         // Check if we are already tracking this player
          let container = this.otherPlayers.get(playerData.identity);
-         // Use the correct find method for entity
+
+         // Attempt to find the entity data in the client cache
          const entityData = this.spacetimeDBClient.sdkConnection?.db.entity.entity_id.find(playerData.entityId);
 
          if (!entityData) {
-             console.warn(`Entity not found for player ${playerData.name} (entityId: ${playerData.entityId}) when trying to add/update.`);
-             return; // Cannot display without entity data
+             // Entity data not yet available in client cache. Store player data and wait for Entity update.
+             console.warn(`Entity not found for player ${playerData.name} (entityId: ${playerData.entityId}) when trying to add/update. Storing as pending.`);
+             this.pendingPlayers.set(playerData.entityId, playerData);
+             return; // Don't create container yet
+         }
+
+         // Entity data found! Ensure player is removed from pending map if they were there
+         if (this.pendingPlayers.has(playerData.entityId)) {
+             console.log(`Entity data arrived for pending player ${playerData.name}. Removing from pending.`);
+             this.pendingPlayers.delete(playerData.entityId);
          }
 
         if (container) {
