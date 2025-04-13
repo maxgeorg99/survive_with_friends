@@ -113,14 +113,18 @@ export default class GameScene extends Phaser.Scene {
              // return; // Or simply return if you don't want to proceed further without the entity
         } else {
             console.log(`Creating local player sprite for ${localPlayerData.name} at (${localEntityData.position.x}, ${localEntityData.position.y})`);
-            this.localPlayerSprite = this.physics.add.sprite(localEntityData.position.x, localEntityData.position.y, PLAYER_ASSET_KEY);
-            this.localPlayerNameText = this.add.text(localEntityData.position.x, localEntityData.position.y - this.localPlayerSprite.height / 2 - 10, localPlayerData.name || 'Player', PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
+            const startX = Math.floor(localEntityData.position.x);
+            const startY = Math.floor(localEntityData.position.y);
+            this.localPlayerSprite = this.physics.add.sprite(startX, startY, PLAYER_ASSET_KEY);
+            this.localPlayerNameText = this.add.text(startX, startY - Math.floor(this.localPlayerSprite.height / 2) - 10, localPlayerData.name || 'Player', PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
              this.localPlayerSprite.setCollideWorldBounds(true);
 
             // --- Camera Setup (Only if sprite exists) ---
-            this.cameras.main.startFollow(this.localPlayerSprite, true, 0.1, 0.1);
+            // Make camera follow instantly (lerp = 1)
+            this.cameras.main.startFollow(this.localPlayerSprite, true, 1, 1);
             this.cameras.main.setBounds(0, 0, worldSize, worldSize);
             this.cameras.main.setZoom(1);
+            this.cameras.main.setRoundPixels(true); // Enable pixel rounding
         }
 
         // Move SpacetimeDB listener registration *before* player iteration
@@ -207,16 +211,19 @@ export default class GameScene extends Phaser.Scene {
              if (!this.localPlayerSprite) {
                  // Sprite doesn't exist yet, create it now that we have entity data
                  console.log(`Creating local player sprite (via entity update) for ${localPlayer.name} at (${entityData.position.x}, ${entityData.position.y})`);
-                 this.localPlayerSprite = this.physics.add.sprite(entityData.position.x, entityData.position.y, PLAYER_ASSET_KEY);
-                 this.localPlayerNameText = this.add.text(entityData.position.x, entityData.position.y - this.localPlayerSprite.height / 2 - 10, localPlayer.name || 'Player', PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
+                 const startX = Math.floor(entityData.position.x);
+                 const startY = Math.floor(entityData.position.y);
+                 this.localPlayerSprite = this.physics.add.sprite(startX, startY, PLAYER_ASSET_KEY);
+                 this.localPlayerNameText = this.add.text(startX, startY - Math.floor(this.localPlayerSprite.height / 2) - 10, localPlayer.name || 'Player', PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
                  this.localPlayerSprite.setCollideWorldBounds(true);
 
                 // --- Camera Setup ---
-                // Get world size (assuming it's consistent or retrieved elsewhere if dynamic)
                 const worldSize = this.physics.world.bounds.width; // Or pass it in/get from config
-                this.cameras.main.startFollow(this.localPlayerSprite, true, 0.1, 0.1);
+                // Make camera follow instantly (lerp = 1)
+                this.cameras.main.startFollow(this.localPlayerSprite, true, 1, 1);
                 this.cameras.main.setBounds(0, 0, worldSize, worldSize);
                 this.cameras.main.setZoom(1);
+                this.cameras.main.setRoundPixels(true); // Enable pixel rounding here too
                 console.log("Local player sprite and camera initialized via handleEntityUpdate.")
              } else {
                  // Sprite exists, potential server reconciliation logic could go here
@@ -239,8 +246,10 @@ export default class GameScene extends Phaser.Scene {
              if (!this.otherPlayers.has(pendingPlayerData.identity)) {
                  console.log(`Creating new player sprite for pending player ${pendingPlayerData.name} at (${entityData.position.x}, ${entityData.position.y})`);
                  const sprite = this.add.sprite(0, 0, PLAYER_ASSET_KEY);
-                 const text = this.add.text(0, -sprite.height / 2 - 10, pendingPlayerData.name || 'Player', PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
-                 const container = this.add.container(entityData.position.x, entityData.position.y, [sprite, text]);
+                 const text = this.add.text(0, -Math.floor(sprite.height / 2) - 10, pendingPlayerData.name || 'Player', PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
+                 const startX = Math.floor(entityData.position.x);
+                 const startY = Math.floor(entityData.position.y);
+                 const container = this.add.container(startX, startY, [sprite, text]);
                  container.setData('entityId', entityData.entityId); // Store entityId
                  this.otherPlayers.set(pendingPlayerData.identity, container);
              } else {
@@ -296,7 +305,8 @@ export default class GameScene extends Phaser.Scene {
         if (container) {
              // Update existing container
              container.setData('entityId', playerData.entityId); // Ensure entityId is up-to-date
-             container.setPosition(entityData.position.x, entityData.position.y); // Set initial/updated position from entity
+             // Round position when updating existing container
+             container.setPosition(Math.floor(entityData.position.x), Math.floor(entityData.position.y));
              const text = container.getAt(1) as Phaser.GameObjects.Text;
             if (text.text !== playerData.name) {
                  console.log(`Updating name for player ${playerData.identity.toHexString()} to ${playerData.name}`);
@@ -306,9 +316,12 @@ export default class GameScene extends Phaser.Scene {
              // Create new player sprite and text container
              console.log(`Adding new player sprite for ${playerData.name} at (${entityData.position.x}, ${entityData.position.y})`);
              const sprite = this.add.sprite(0, 0, PLAYER_ASSET_KEY);
-             const text = this.add.text(0, -sprite.height / 2 - 10, playerData.name || 'Player', PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
-             container = this.add.container(entityData.position.x, entityData.position.y, [sprite, text]);
-             container.setData('entityId', playerData.entityId); // Store entityId on creation
+             const text = this.add.text(0, -Math.floor(sprite.height / 2) - 10, playerData.name || 'Player', PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
+             // Round position on creation
+             const startX = Math.floor(entityData.position.x);
+             const startY = Math.floor(entityData.position.y);
+             container = this.add.container(startX, startY, [sprite, text]);
+             container.setData('entityId', entityData.entityId); // Store entityId on creation
              this.otherPlayers.set(playerData.identity, container);
          }
      }
@@ -316,11 +329,11 @@ export default class GameScene extends Phaser.Scene {
     updateOtherPlayerPosition(identity: Identity, x: number, y: number) {
          const container = this.otherPlayers.get(identity);
          if (container) {
-             // Smooth movement to the new position from the Entity table
+             // Smooth movement to the new position from the Entity table, rounding the target
              this.tweens.add({
                  targets: container,
-                 x: x,
-                 y: y,
+                 x: Math.floor(x),
+                 y: Math.floor(y),
                  duration: 100, // Short duration for smooth sync
                  ease: 'Linear'
              });
@@ -379,13 +392,21 @@ export default class GameScene extends Phaser.Scene {
             }
         }
 
-        // Update name text position
-        this.localPlayerNameText.setPosition(this.localPlayerSprite.x, this.localPlayerSprite.y - this.localPlayerSprite.height / 2 - 10);
+        // Round the sprite's position *after* physics velocity is applied
+        this.localPlayerSprite.x = Math.floor(this.localPlayerSprite.x);
+        this.localPlayerSprite.y = Math.floor(this.localPlayerSprite.y);
+
+        // Update name text position, using the now-rounded sprite coordinates
+        this.localPlayerNameText.setPosition(
+            this.localPlayerSprite.x, // Already rounded
+            this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - 10
+        );
 
         // --- Network Update ---
         const currentVelocity = this.localPlayerSprite?.body?.velocity;
         // Only send update if moving
         if (currentVelocity && (currentVelocity.x !== 0 || currentVelocity.y !== 0)) {
+            // Send the rounded position
             const newX = this.localPlayerSprite!.x;
             const newY = this.localPlayerSprite!.y;
             // Use the reducers object from the client instance
@@ -399,7 +420,8 @@ export default class GameScene extends Phaser.Scene {
         this.otherPlayers.forEach(container => {
              const text = container.getAt(1) as Phaser.GameObjects.Text;
              const sprite = container.getAt(0) as Phaser.GameObjects.Sprite;
-             text.setPosition(0, -sprite.height / 2 - 10); // Position relative to container
+             // Position relative to container, rounding the offset calculation
+             text.setPosition(0, Math.floor(-sprite.height / 2) - 10);
         });
     }
 } 
