@@ -4,6 +4,15 @@ public static partial class Module
 {
     // --- Types ---
     [SpacetimeDB.Type]
+    public enum PlayerClass
+    {
+        Fighter,
+        Rogue,
+        Mage,
+        Paladin
+    }
+
+    [SpacetimeDB.Type]
     public partial struct DbVector2
     {
         public float x;
@@ -85,6 +94,14 @@ public static partial class Module
 
         public string name;
         public uint entity_id; // Foreign key relating to an Entity row
+        
+        // New player attributes
+        public PlayerClass playerClass;
+        public uint level;
+        public uint exp;
+        public uint max_hp;
+        public uint hp;
+        public float speed;
     }
 
     // --- Lifecyle Hooks ---
@@ -120,59 +137,9 @@ public static partial class Module
             Log.Info($"Entity ID: {e.entity_id} at position ({e.position.x}, {e.position.y})");
         }
 
-        // Check if player already exists
+        // Check if player already exists - if so, reconnect them
         var playerOpt = ctx.Db.player.identity.Find(identity);
-        if (playerOpt is null)
-        {
-            Log.Info($"New player detected. Creating records for {identity}.");
-
-            // 1. Create the Entity for the player with default direction and not moving
-            Entity? newEntityOpt = ctx.Db.entity.Insert(new Entity
-            {
-                position = new DbVector2(100, 100), // Example starting position
-                mass = 10, // Example starting mass
-                direction = new DbVector2(0, 0), // Default direction
-                is_moving = false // Not moving by default
-            });
-
-            // Check if entity insertion failed
-            if(newEntityOpt is null)
-            {
-                 Log.Error($"Failed to insert new entity for {identity}! Insert returned null.");
-                 return;
-            }
-
-            // Insertion succeeded, get the non-nullable value
-            Entity newEntity = newEntityOpt.Value;
-            Log.Info($"Created new entity with ID: {newEntity.entity_id} for {identity}.");
-
-            // 2. Create the Player record, linking to the new entity
-            Player? newPlayerOpt = ctx.Db.player.Insert(new Player
-            {
-                identity = identity,
-                name = "Player", // Start with a default name instead of empty string
-                entity_id = newEntity.entity_id // Use the non-nullable entity_id
-            });
-
-             // Check if player insertion failed
-             if(newPlayerOpt is null)
-            {
-                 Log.Error($"Failed to insert new player for {identity} (entity: {newEntity.entity_id})! Insert returned null.");
-                 // Consider deleting the orphaned entity to avoid leaking
-                 ctx.Db.entity.entity_id.Delete(newEntity.entity_id);
-                 return;
-            }
-
-             // Insertion succeeded, get the non-nullable value
-            Player newPlayer = newPlayerOpt.Value;
-            Log.Info($"Created new player record for {identity} linked to entity {newPlayer.entity_id}.");
-            
-            // Debug log: Verify the newly created records
-            var verifyPlayer = ctx.Db.player.identity.Find(identity);
-            var verifyEntity = verifyPlayer != null ? ctx.Db.entity.entity_id.Find(verifyPlayer.Value.entity_id) : null;
-            Log.Info($"Verification - Player exists: {verifyPlayer != null}, Entity exists: {verifyEntity != null}");
-        }
-        else
+        if (playerOpt != null)
         {
             Log.Info($"Existing player {identity} reconnected.");
             var player = playerOpt.Value;
@@ -206,6 +173,11 @@ public static partial class Module
                 Log.Info($"Entity {player.entity_id} exists at position ({entityOpt.Value.position.x}, {entityOpt.Value.position.y})");
             }
         }
+        else
+        {
+            // No player creation happens here now - wait for EnterGame
+            Log.Info($"New connection from {identity}. Waiting for name entry...");
+        }
         
         // After processing, log the final state
         Log.Info("=== After ClientConnected Processing ===");
@@ -214,6 +186,90 @@ public static partial class Module
     }
 
     // --- Reducers ---
+    [Reducer]
+    public static void EnterGame(ReducerContext ctx, string name)
+    {
+        var identity = ctx.Sender;
+        Log.Info($"EnterGame called by identity: {identity} with name: {name}");
+
+        // Basic validation
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 16) // Example: Max 16 chars
+        {
+            Log.Warn($"Invalid name provided by {identity}: '{name}'. Name must be 1-16 characters.");
+            return;
+        }
+
+        // Check if player already exists
+        var playerOpt = ctx.Db.player.identity.Find(identity);
+        if (playerOpt != null)
+        {
+            Log.Info($"Player {identity} already exists. Updating name to: {name}");
+            
+            // Update existing player's name
+            var player = playerOpt.Value;
+            player.name = name.Trim();
+            ctx.Db.player.identity.Update(player);
+            
+            return;
+        }
+
+        // Create a new player with a random class
+        Log.Info($"Creating new player for {identity} with name: {name}");
+        
+        // Choose a random player class
+        var rng = ctx.Rng;
+        var classCount = Enum.GetValues(typeof(PlayerClass)).Length;
+        var randomClassIndex = rng.Next(0, classCount);
+        var playerClass = (PlayerClass)randomClassIndex;
+        
+        // 1. Create the Entity for the player with default direction and not moving
+        Entity? newEntityOpt = ctx.Db.entity.Insert(new Entity
+        {
+            position = new DbVector2(100, 100), // Example starting position
+            mass = 10, // Example starting mass
+            direction = new DbVector2(0, 0), // Default direction
+            is_moving = false // Not moving by default
+        });
+
+        // Check if entity insertion failed
+        if(newEntityOpt is null)
+        {
+            Log.Error($"Failed to insert new entity for {identity}! Insert returned null.");
+            return;
+        }
+
+        // Insertion succeeded, get the non-nullable value
+        Entity newEntity = newEntityOpt.Value;
+        Log.Info($"Created new entity with ID: {newEntity.entity_id} for {identity}.");
+
+        // 2. Create the Player record, linking to the new entity
+        Player? newPlayerOpt = ctx.Db.player.Insert(new Player
+        {
+            identity = identity,
+            name = name.Trim(),
+            entity_id = newEntity.entity_id,
+            playerClass = playerClass,
+            level = 1,
+            exp = 0,
+            max_hp = 100,
+            hp = 100,
+            speed = PLAYER_SPEED
+        });
+
+        // Check if player insertion failed
+        if(newPlayerOpt is null)
+        {
+            Log.Error($"Failed to insert new player for {identity} (entity: {newEntity.entity_id})! Insert returned null.");
+            // Delete the orphaned entity to avoid leaking
+            ctx.Db.entity.entity_id.Delete(newEntity.entity_id);
+            return;
+        }
+
+        // Insertion succeeded, get the non-nullable value
+        Player newPlayer = newPlayerOpt.Value;
+        Log.Info($"Created new player record for {identity} with class {playerClass} linked to entity {newPlayer.entity_id}.");
+    }
+
     [Reducer]
     public static void SetName(ReducerContext ctx, string name)
     {
@@ -291,8 +347,21 @@ public static partial class Module
             if (!entity.is_moving)
                 continue;
                 
+            // Find the player associated with this entity to get their speed
+            float moveSpeed = PLAYER_SPEED; // Default fallback speed
+            
+            // Try to find a player that owns this entity
+            foreach (var player in ctx.Db.player.Iter())
+            {
+                if (player.entity_id == entity.entity_id)
+                {
+                    moveSpeed = player.speed;
+                    break;
+                }
+            }
+            
             // Calculate new position based on direction, speed and time delta
-            float moveDistance = PLAYER_SPEED * DELTA_TIME;
+            float moveDistance = moveSpeed * DELTA_TIME;
             var moveOffset = entity.direction * moveDistance;
             
             // Update entity with new position

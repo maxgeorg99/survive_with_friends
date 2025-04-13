@@ -70,8 +70,8 @@ submitNameButton.addEventListener('click', () => {
         console.log(`Submitting name: ${name}`);
         // Use the reducer object from the client instance
         if (spacetimeDBClient.sdkConnection?.reducers) {
-            console.log(`Attempting to call setName reducer with name: ${name}`);
-            spacetimeDBClient.sdkConnection?.reducers.setName(name);
+            console.log(`Attempting to call enterGame reducer with name: ${name}`);
+            spacetimeDBClient.sdkConnection?.reducers.enterGame(name);
             // Don't call startGameWorld here directly.
             // Wait for the player update to be reflected in the cache,
             // which will be picked up by GameScene's listeners.
@@ -80,7 +80,7 @@ submitNameButton.addEventListener('click', () => {
             // Optionally hide prompt here, but GameScene needs player data.
             // hideNamePrompt();
         } else {
-            console.error("Cannot set name: SpacetimeDB reducers not available.");
+            console.error("Cannot enter game: SpacetimeDB reducers not available.");
             alert("Error setting name. Please try again.");
         }
     } else {

@@ -1,7 +1,6 @@
 import Phaser from 'phaser';
 import SpacetimeDBClient from '../SpacetimeDBClient';
-import { Player, Entity } from "../autobindings";
-import { UpdatePlayerDirection } from "../autobindings";
+import { Player, Entity, PlayerClass, UpdatePlayerDirection } from "../autobindings";
 import { Identity } from '@clockworklabs/spacetimedb-sdk';
 
 // Constants
@@ -19,6 +18,18 @@ const PLAYER_NAME_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
     color: '#ffffff',
     stroke: '#000000',
     strokeThickness: 3,
+};
+// Health bar configuration
+const HEALTH_BAR_WIDTH = 50;
+const HEALTH_BAR_HEIGHT = 6;
+const HEALTH_BAR_OFFSET_Y = 5;
+
+// Asset keys for different player classes
+const CLASS_ASSET_KEYS: Record<string, string> = {
+    "Fighter": 'player_fighter',
+    "Rogue": 'player_rogue',
+    "Mage": 'player_mage',
+    "Paladin": 'player_paladin'
 };
 
 export default class GameScene extends Phaser.Scene {
@@ -53,14 +64,31 @@ export default class GameScene extends Phaser.Scene {
     preload() {
         console.log("GameScene preload started.");
         // Load assets from the /assets path (copied from public)
-        this.load.image(PLAYER_ASSET_KEY, '/assets/class_fighter_1.png');
+        this.load.image('player_fighter', '/assets/class_fighter_1.png');
+        this.load.image('player_rogue', '/assets/class_rogue_1.png');
+        this.load.image('player_mage', '/assets/class_mage_1.png');
+        this.load.image('player_paladin', '/assets/class_paladin_1.png');
         this.load.image(GRASS_ASSET_KEY, '/assets/grass.png');
         this.load.image(SHADOW_ASSET_KEY, '/assets/shadow.png');
         
-        console.log("GameScene preload finished. Assets loaded:", 
-            this.textures.exists(PLAYER_ASSET_KEY),
-            this.textures.exists(GRASS_ASSET_KEY), 
-            this.textures.exists(SHADOW_ASSET_KEY));
+        // Add error handling for file loading errors
+        this.load.on('loaderror', (fileObj: any) => {
+            console.error(`Error loading asset: ${fileObj.key} (${fileObj.url})`, fileObj);
+            alert(`Failed to load game asset: ${fileObj.key}. Check browser console for details.`);
+        });
+        
+        // Check if assets are loaded successfully
+        this.load.on('complete', () => {
+            console.log("All assets loaded. Checking existence:");
+            console.log("player_fighter:", this.textures.exists('player_fighter'));
+            console.log("player_rogue:", this.textures.exists('player_rogue'));
+            console.log("player_mage:", this.textures.exists('player_mage'));
+            console.log("player_paladin:", this.textures.exists('player_paladin'));
+            console.log(GRASS_ASSET_KEY + ":", this.textures.exists(GRASS_ASSET_KEY));
+            console.log(SHADOW_ASSET_KEY + ":", this.textures.exists(SHADOW_ASSET_KEY));
+        });
+        
+        console.log("GameScene preload finished. Started asset loading...");
     }
 
     create() {
@@ -154,7 +182,7 @@ export default class GameScene extends Phaser.Scene {
         this.physics.world.setBounds(0, 0, worldSize, worldSize);
 
         // --- Player Initialization ---
-        const localPlayerData = this.spacetimeDBClient.sdkConnection?.db.player.identity.find(localIdentity);
+        const localPlayerData = this.spacetimeDBClient.sdkConnection?.db.player.identity.find(localIdentity) as Player;
         if (!localPlayerData) {
             console.error("Local player data not found!");
             return; // Cannot proceed without local player
@@ -181,13 +209,84 @@ export default class GameScene extends Phaser.Scene {
             console.log(`Creating local player sprite for ${localPlayerData.name} at (${localEntityData.position.x}, ${localEntityData.position.y})`);
             const startX = Math.floor(localEntityData.position.x);
             const startY = Math.floor(localEntityData.position.y);
-            this.localPlayerSprite = this.physics.add.sprite(startX, startY, PLAYER_ASSET_KEY);
-            this.localPlayerSprite.setDepth(1); // Set sprite depth explicitly
-            this.localPlayerNameText = this.add.text(startX, startY - Math.floor(this.localPlayerSprite.height / 2) - 10, localPlayerData.name || 'Player', PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
+            
+            // Get local player data for the name
+            let playerName = 'Player';
+            let playerClass = PlayerClass.Fighter; // Default class
+            let playerLevel = 1; // Default level
+            try {
+                if (this.spacetimeDBClient?.identity && this.spacetimeDBClient?.sdkConnection?.db) {
+                    const localPlayer = this.spacetimeDBClient.sdkConnection.db.player.identity.find(
+                        this.spacetimeDBClient.identity as any as Identity
+                    );
+                    if (localPlayer?.name) {
+                        playerName = localPlayer.name;
+                    }
+                    if (localPlayer?.playerClass) {
+                        playerClass = localPlayer.playerClass;
+                    }
+                    if (localPlayer?.level) {
+                        playerLevel = localPlayer.level;
+                    }
+                }
+            } catch (error) {
+                console.error("Error getting player name:", error);
+            }
+            
+            // Get class-specific sprite key
+            const classKey = this.getClassSpriteKey(playerClass);
+            console.log(`Creating local player with sprite key: ${classKey}`);
+            this.localPlayerSprite = this.physics.add.sprite(startX, startY, classKey);
+            // Debug sprite creation and properties
+            console.log("Sprite created:", 
+                this.localPlayerSprite ? "YES" : "NO",
+                "Visible:", this.localPlayerSprite?.visible,
+                "Position:", this.localPlayerSprite?.x, this.localPlayerSprite?.y,
+                "Frame:", this.localPlayerSprite?.frame?.name);
+            this.localPlayerSprite.setDepth(1);
+            this.localPlayerNameText = this.add.text(
+                startX, 
+                startY - Math.floor(this.localPlayerSprite.height / 2) - 10, 
+                `${playerName} (${playerLevel})`, 
+                PLAYER_NAME_STYLE
+            ).setOrigin(0.5, 0.5);
             this.localPlayerNameText.setDepth(2); // Ensure name is above sprite
+            
+            // Create health bar
+            const healthBarBackground = this.add.rectangle(
+                startX,
+                startY - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y,
+                HEALTH_BAR_WIDTH,
+                HEALTH_BAR_HEIGHT,
+                0x000000,
+                0.7
+            ).setOrigin(0.5, 0.5);
+            
+            const healthBar = this.add.rectangle(
+                startX,
+                startY - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y,
+                HEALTH_BAR_WIDTH * (localPlayerData.hp / localPlayerData.maxHp),
+                HEALTH_BAR_HEIGHT,
+                0x00FF00,
+                1
+            ).setOrigin(0, 0.5);
+            healthBar.x -= HEALTH_BAR_WIDTH / 2; // Adjust position to align with background
+            
+            // Set health bar properties
+            healthBarBackground.setDepth(1.5);
+            healthBar.setDepth(1.6);
+            
+            // Store health bar references
+            this.localPlayerSprite.setData('healthBarBackground', healthBarBackground);
+            this.localPlayerSprite.setData('healthBar', healthBar);
+            this.localPlayerSprite.setData('hp', localPlayerData.hp);
+            this.localPlayerSprite.setData('maxHp', localPlayerData.maxHp);
+            
+            // Shadow
             this.localPlayerShadow = this.add.image(startX, startY + SHADOW_OFFSET_Y, SHADOW_ASSET_KEY)
                 .setAlpha(SHADOW_ALPHA)
                 .setDepth(0); // Set shadow depth explicitly below sprite
+            
             this.localPlayerSprite.setCollideWorldBounds(true);
 
             // --- Camera Setup (Only if sprite exists) ---
@@ -208,7 +307,7 @@ export default class GameScene extends Phaser.Scene {
         for (const player of this.spacetimeDBClient.sdkConnection?.db.player.iter()) {
              if (!player.identity.isEqual(localIdentity)) {
                 console.log(`Found existing player: ${player.name}`);
-                this.addOrUpdateOtherPlayer(player);
+                this.addOrUpdateOtherPlayer(player as Player);
             }
         }
 
@@ -322,6 +421,8 @@ export default class GameScene extends Phaser.Scene {
                 
                 // Get local player data for the name
                 let playerName = 'Player';
+                let playerClass = PlayerClass.Fighter; // Default class
+                let playerLevel = 1; // Default level
                 try {
                     if (this.spacetimeDBClient?.identity && this.spacetimeDBClient?.sdkConnection?.db) {
                         const localPlayer = this.spacetimeDBClient.sdkConnection.db.player.identity.find(
@@ -330,15 +431,24 @@ export default class GameScene extends Phaser.Scene {
                         if (localPlayer?.name) {
                             playerName = localPlayer.name;
                         }
+                        if (localPlayer?.playerClass) {
+                            playerClass = localPlayer.playerClass;
+                        }
+                        if (localPlayer?.level) {
+                            playerLevel = localPlayer.level;
+                        }
                     }
                 } catch (error) {
                     console.error("Error getting player name:", error);
                 }
                 
-                this.localPlayerSprite = this.physics.add.sprite(startX, startY, PLAYER_ASSET_KEY);
+                // Get class-specific sprite key
+                const classKey = this.getClassSpriteKey(playerClass);
+                console.log(`Creating local player with sprite key: ${classKey}`);
+                this.localPlayerSprite = this.physics.add.sprite(startX, startY, classKey);
                 this.localPlayerSprite.setDepth(1);
                 this.localPlayerNameText = this.add.text(startX, startY - Math.floor(this.localPlayerSprite.height / 2) - 10, 
-                    playerName, PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
+                    `${playerName} (${playerLevel})`, PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
                 this.localPlayerNameText.setDepth(2);
                 this.localPlayerShadow = this.add.image(startX, startY + SHADOW_OFFSET_Y, SHADOW_ASSET_KEY)
                     .setAlpha(SHADOW_ALPHA)
@@ -369,9 +479,11 @@ export default class GameScene extends Phaser.Scene {
             return;
         }
 
-        // Try finding the owning player by entity ID in all known players
+        // Check if this entity belongs to a player we know about
         for (const player of this.spacetimeDBClient.sdkConnection?.db.player.iter() || []) {
             if (player.entityId === entityData.entityId) {
+                // Cast player to Player
+                const extendedPlayer = player as Player;
                 console.log(`Found player ${player.name} for entity ${entityData.entityId}`);
                 this.updateOtherPlayerPosition(player.identity, entityData.position.x, entityData.position.y);
                 return;
@@ -381,7 +493,46 @@ export default class GameScene extends Phaser.Scene {
         console.warn(`Entity update received for unknown entity: ${entityData.entityId}`);
     }
 
-    // New helper method to create player sprites directly from entity data
+    // Get class-specific sprite key
+    getClassSpriteKey(playerClass: any): string {
+        console.log("PlayerClass value:", playerClass);
+        console.log("PlayerClass type:", typeof playerClass);
+        
+        // Handle case when playerClass is a simple object with a tag property
+        if (playerClass && typeof playerClass === 'object' && 'tag' in playerClass) {
+            const className = playerClass.tag;
+            console.log("Found tag property:", className);
+            const spriteKey = CLASS_ASSET_KEYS[className] || 'player_fighter';
+            console.log(`Using sprite key '${spriteKey}' for class '${className}'`);
+            return spriteKey;
+        } 
+        
+        // Handle case when playerClass is just a string
+        if (typeof playerClass === 'string') {
+            console.log("PlayerClass is a string:", playerClass);
+            const spriteKey = CLASS_ASSET_KEYS[playerClass] || 'player_fighter';
+            console.log(`Using sprite key '${spriteKey}' for string class '${playerClass}'`);
+            return spriteKey;
+        }
+        
+        // Handle case when playerClass is a number (enum value)
+        if (typeof playerClass === 'number') {
+            console.log("PlayerClass is a number:", playerClass);
+            // Map numeric enum values to class names
+            const classNames = ["Fighter", "Rogue", "Mage", "Paladin"];
+            const className = classNames[playerClass] || "Fighter";
+            console.log("Mapped to class name:", className);
+            const spriteKey = CLASS_ASSET_KEYS[className] || 'player_fighter';
+            console.log(`Using sprite key '${spriteKey}' for numeric class ${playerClass} (${className})`);
+            return spriteKey;
+        }
+        
+        // Default fallback
+        console.log("Using default fighter class");
+        return 'player_fighter';
+    }
+    
+    // Update the function to properly use the player's class
     createOtherPlayerSprite(playerData: Player, entityData: Entity) {
         console.log(`Creating player sprite for ${playerData.name} at (${entityData.position.x}, ${entityData.position.y})`);
         
@@ -396,23 +547,54 @@ export default class GameScene extends Phaser.Scene {
         const shadow = this.add.image(0, SHADOW_OFFSET_Y, SHADOW_ASSET_KEY)
             .setAlpha(SHADOW_ALPHA)
             .setDepth(-1);
-        const sprite = this.add.sprite(0, 0, PLAYER_ASSET_KEY);
-        const text = this.add.text(0, -Math.floor(sprite.height / 2) - 10, 
-            playerData.name || 'Player', PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
+        
+        // Get class-specific sprite
+        const classKey = this.getClassSpriteKey(playerData.playerClass);
+        const sprite = this.add.sprite(0, 0, classKey);
+        
+        // Display name with level
+        const displayName = `${playerData.name} (${playerData.level})`;
+        const text = this.add.text(
+            0, 
+            -Math.floor(sprite.height / 2) - 10, 
+            displayName, 
+            PLAYER_NAME_STYLE
+        ).setOrigin(0.5, 0.5);
+        
+        // Health bar background
+        const healthBarBackground = this.add.rectangle(
+            0,
+            -Math.floor(sprite.height / 2) - HEALTH_BAR_OFFSET_Y,
+            HEALTH_BAR_WIDTH,
+            HEALTH_BAR_HEIGHT,
+            0x000000,
+            0.7
+        ).setOrigin(0.5, 0.5);
+        
+        // Health bar fill
+        const healthBar = this.add.rectangle(
+            -HEALTH_BAR_WIDTH / 2, // Offset to align with background
+            -Math.floor(sprite.height / 2) - HEALTH_BAR_OFFSET_Y,
+            HEALTH_BAR_WIDTH * (playerData.hp / playerData.maxHp),
+            HEALTH_BAR_HEIGHT,
+            0x00FF00,
+            1
+        ).setOrigin(0, 0.5);
         
         // Round position on creation
         const startX = Math.floor(entityData.position.x);
         const startY = Math.floor(entityData.position.y);
         
         // Create container and add all elements
-        const container = this.add.container(startX, startY, [shadow, sprite, text]);
+        const container = this.add.container(startX, startY, [shadow, sprite, text, healthBarBackground, healthBar]);
         container.setData('entityId', entityData.entityId);
+        container.setData('hp', playerData.hp);
+        container.setData('maxHp', playerData.maxHp);
         
         // Store in our players map
         this.otherPlayers.set(playerData.identity, container);
         
-        console.log(`Created container for player ${playerData.name} with ${container.length} children. Shadow: ${shadow.visible}, Sprite: ${sprite.visible}`);
-        console.log(`Total tracked other players: ${this.otherPlayers.size}`);
+        console.log(`Created container for player ${playerData.name} with ${container.length} children.`);
     }
 
     addOrUpdateOtherPlayer(playerData: Player) {
@@ -426,12 +608,23 @@ export default class GameScene extends Phaser.Scene {
             console.log(`Container exists for player ${playerData.name}, updating data`);
             container.setData('entityId', playerData.entityId);
             
-            // Update player name if needed
+            // Update player name with level
             const text = container.getAt(2) as Phaser.GameObjects.Text;
-            if (text.text !== playerData.name) {
-                console.log(`Updating name for player ${playerData.identity.toHexString()} to ${playerData.name}`);
-                text.setText(playerData.name || 'Player');
+            const displayName = `${playerData.name} (${playerData.level})`;
+            if (text.text !== displayName) {
+                console.log(`Updating name for player ${playerData.identity.toHexString()} to ${displayName}`);
+                text.setText(displayName);
             }
+            
+            // Update player health
+            container.setData('hp', playerData.hp);
+            container.setData('maxHp', playerData.maxHp);
+            
+            // Update health bar
+            const healthBar = container.getAt(4) as Phaser.GameObjects.Rectangle;
+            const healthPercentage = playerData.hp / playerData.maxHp;
+            healthBar.width = HEALTH_BAR_WIDTH * healthPercentage;
+            
             return;
         }
 
@@ -449,29 +642,6 @@ export default class GameScene extends Phaser.Scene {
         console.warn(`Entity not found for player ${playerData.name} (entityId: ${playerData.entityId}). Storing as pending.`);
         this.pendingPlayers.set(playerData.entityId, playerData);
         console.log(`Total pending players: ${this.pendingPlayers.size}`);
-    }
-
-    updateOtherPlayerPosition(identity: Identity, x: number, y: number) {
-         const container = this.otherPlayers.get(identity);
-         if (container) {
-             // Smooth movement to the new position from the Entity table, rounding the target
-             this.tweens.add({
-                 targets: container,
-                 x: Math.floor(x),
-                 y: Math.floor(y),
-                 duration: 100, // Short duration for smooth sync
-                 ease: 'Linear'
-             });
-         }
-     }
-
-    removeOtherPlayer(identity: Identity) {
-        const container = this.otherPlayers.get(identity);
-        if (container) {
-            console.log(`Removing player sprite for identity ${identity.toHexString()}`);
-            container.destroy();
-            this.otherPlayers.delete(identity);
-        }
     }
 
     updateTapMarker() {
@@ -502,151 +672,26 @@ export default class GameScene extends Phaser.Scene {
         }
     }
 
-    update(time: number, delta: number) {
-        if (!this.isPlayerDataReady || !this.localPlayerSprite || !this.localPlayerNameText || !this.cursors || !this.spacetimeDBClient?.sdkConnection?.reducers) {
-            return; // Don't run update logic until player and reducers are ready
+    updateOtherPlayerPosition(identity: Identity, x: number, y: number) {
+        const container = this.otherPlayers.get(identity);
+        if (container) {
+            // Smooth movement to the new position from the Entity table, rounding the target
+            this.tweens.add({
+                targets: container,
+                x: Math.floor(x),
+                y: Math.floor(y),
+                duration: 100, // Short duration for smooth sync
+                ease: 'Linear'
+            });
         }
-
-        // Calculate input direction
-        const inputDirection = new Phaser.Math.Vector2(0, 0);
-        let isMoving = false;
-
-        // Handle tap target if it exists
-        if (this.tapTarget && this.localPlayerSprite) {
-            // Calculate distance to target
-            const distance = Phaser.Math.Distance.Between(
-                this.localPlayerSprite.x, this.localPlayerSprite.y,
-                this.tapTarget.x, this.tapTarget.y
-            );
-            
-            // If we're close enough to the target, clear it
-            if (distance < 5) {
-                this.tapTarget = null;
-                this.updateTapMarker(); // This will hide the marker
-                console.log("Reached tap target, clearing");
-            } else {
-                // Calculate direction to the target
-                const angle = Phaser.Math.Angle.Between(
-                    this.localPlayerSprite.x, this.localPlayerSprite.y,
-                    this.tapTarget.x, this.tapTarget.y
-                );
-                
-                // Convert angle to direction vector
-                inputDirection.x = Math.cos(angle);
-                inputDirection.y = Math.sin(angle);
-                isMoving = true;
-                
-                console.log(`Moving to tap target: (${this.tapTarget.x}, ${this.tapTarget.y}), distance: ${distance.toFixed(1)}`);
-            }
-        }
-
-        // If no tap movement, check keyboard
-        if (!isMoving) {
-            // Keyboard movement
-            if (this.cursors.left?.isDown || this.input.keyboard?.addKey('A').isDown) {
-                inputDirection.x = -1;
-                isMoving = true;
-            }
-            if (this.cursors.right?.isDown || this.input.keyboard?.addKey('D').isDown) {
-                inputDirection.x = 1;
-                isMoving = true;
-            }
-            if (this.cursors.up?.isDown || this.input.keyboard?.addKey('W').isDown) {
-                inputDirection.y = -1;
-                isMoving = true;
-            }
-            if (this.cursors.down?.isDown || this.input.keyboard?.addKey('S').isDown) {
-                inputDirection.y = 1;
-                isMoving = true;
-            }
-
-            // Normalize direction if moving with keyboard
-            if (isMoving) {
-                inputDirection.normalize();
-            }
-        }
-
-        // Check if direction changed or if it's time to send an update
-        const directionChanged = this.currentDirection.x !== inputDirection.x || 
-                                this.currentDirection.y !== inputDirection.y ||
-                                this.isMoving !== isMoving;
-        
-        const timeToUpdate = time - this.lastDirectionUpdateTime >= DIRECTION_UPDATE_RATE;
-        
-        // Send direction update to server if needed
-        if ((directionChanged || (isMoving && timeToUpdate)) && this.spacetimeDBClient.sdkConnection?.reducers) {
-            this.currentDirection.copy(inputDirection);
-            this.isMoving = isMoving;
-            this.lastDirectionUpdateTime = time;
-            
-            // Send the direction to the server - using the dedicated direction reducer
-            this.spacetimeDBClient.sdkConnection.reducers.updatePlayerDirection(
-                inputDirection.x,
-                inputDirection.y
-            );
-            
-            console.debug(`Sent direction update: (${inputDirection.x.toFixed(2)}, ${inputDirection.y.toFixed(2)})`);
-        }
-        
-        // Interpolate towards server position if available
-        if (this.serverPosition && this.localPlayerSprite) {
-            const currentPos = new Phaser.Math.Vector2(this.localPlayerSprite.x, this.localPlayerSprite.y);
-            
-            // Calculate distance to server position
-            const distanceToServer = Phaser.Math.Distance.Between(
-                currentPos.x, currentPos.y,
-                this.serverPosition.x, this.serverPosition.y
-            );
-            
-            // If we're far from server position, use interpolation
-            if (distanceToServer > 2) {
-                // Interpolate position (lerp)
-                currentPos.lerp(this.serverPosition, INTERPOLATION_SPEED);
-                this.localPlayerSprite.setPosition(currentPos.x, currentPos.y);
-            }
-        }
-        
-        // Apply client-side prediction if moving
-        if (isMoving && this.localPlayerSprite) {
-            // Calculate the velocity based on input direction and speed
-            const velocity = inputDirection.clone().scale(PLAYER_SPEED);
-            
-            // Calculate the predicted movement for this frame
-            const frameVelocity = velocity.clone().scale(delta / 1000);
-            
-            // Apply prediction by moving the sprite
-            this.localPlayerSprite.x += frameVelocity.x;
-            this.localPlayerSprite.y += frameVelocity.y;
-        }
-
-        // Round the sprite's position for pixel-perfect rendering
-        if (this.localPlayerSprite) {
-            this.localPlayerSprite.x = Math.floor(this.localPlayerSprite.x);
-            this.localPlayerSprite.y = Math.floor(this.localPlayerSprite.y);
-        }
-
-        // Update local player shadow and name text position
-        if (this.localPlayerSprite && this.localPlayerShadow) {
-            this.localPlayerShadow.setPosition(this.localPlayerSprite.x, this.localPlayerSprite.y + SHADOW_OFFSET_Y);
-        }
-        
-        if (this.localPlayerSprite && this.localPlayerNameText) {
-            // Update name text position, using the rounded sprite coordinates
-            this.localPlayerNameText.setPosition(
-                this.localPlayerSprite.x,
-                this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - 10
-            );
-        }
-
-        // Keep other player names above their sprites
-        this.otherPlayers.forEach(container => {
-            // Indices shift: 0=shadow, 1=sprite, 2=text
-            const shadow = container.getAt(0) as Phaser.GameObjects.Image;
-            const sprite = container.getAt(1) as Phaser.GameObjects.Sprite;
-            
-            // Position relative to container, rounding the offset calculation
-            const text = container.getAt(2) as Phaser.GameObjects.Text;
-            text.setPosition(0, Math.floor(-sprite.height / 2) - 10);
-        });
     }
-} 
+
+    removeOtherPlayer(identity: Identity) {
+        const container = this.otherPlayers.get(identity);
+        if (container) {
+            console.log(`Removing player sprite for identity ${identity.toHexString()}`);
+            container.destroy();
+            this.otherPlayers.delete(identity);
+        }
+    }
+}
