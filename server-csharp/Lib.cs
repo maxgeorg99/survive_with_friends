@@ -76,7 +76,6 @@ public static partial class Module
         public uint entity_id;
 
         public DbVector2 position;
-        public uint mass;
         
         // Added direction and movement state directly to Entity
         public DbVector2 direction;   // Direction vector (normalized)
@@ -155,7 +154,6 @@ public static partial class Module
                 Entity? newEntityOpt = ctx.Db.entity.Insert(new Entity
                 {
                     position = new DbVector2(100, 100), 
-                    mass = 10,
                     direction = new DbVector2(0, 0),
                     is_moving = false
                 });
@@ -226,7 +224,6 @@ public static partial class Module
         Entity? newEntityOpt = ctx.Db.entity.Insert(new Entity
         {
             position = new DbVector2(100, 100), // Example starting position
-            mass = 10, // Example starting mass
             direction = new DbVector2(0, 0), // Default direction
             is_moving = false // Not moving by default
         });

@@ -694,4 +694,137 @@ export default class GameScene extends Phaser.Scene {
             this.otherPlayers.delete(identity);
         }
     }
+
+    // Add the update method to handle player movement
+    update(time: number, delta: number) {
+        // Skip if local player sprite isn't initialized yet
+        if (!this.localPlayerSprite || !this.spacetimeDBClient?.sdkConnection?.db) {
+            return;
+        }
+        
+        // Determine movement direction from input
+        let dirX = 0;
+        let dirY = 0;
+        
+        // Handle keyboard input
+        if (this.cursors) {
+            if (this.cursors.left?.isDown) dirX -= 1;
+            if (this.cursors.right?.isDown) dirX += 1;
+            if (this.cursors.up?.isDown) dirY -= 1;
+            if (this.cursors.down?.isDown) dirY += 1;
+        }
+        
+        // Handle tap target if no keyboard input
+        if (dirX === 0 && dirY === 0 && this.tapTarget) {
+            // Calculate direction toward tap target
+            const dx = this.tapTarget.x - this.localPlayerSprite.x;
+            const dy = this.tapTarget.y - this.localPlayerSprite.y;
+            
+            // Check if we're close enough to the target to stop moving
+            const distanceSquared = dx * dx + dy * dy;
+            if (distanceSquared > 100) { // Arbitrary threshold of 10 pixels squared
+                // Normalize direction vector
+                const length = Math.sqrt(distanceSquared);
+                dirX = dx / length;
+                dirY = dy / length;
+            } else {
+                // Clear tap target if we've reached it
+                this.tapTarget = null;
+                this.tapMarker?.setVisible(false);
+            }
+        }
+        
+        // Only send updates to server if direction has changed or periodically
+        const hasDirection = (dirX !== 0 || dirY !== 0);
+        const directionChanged = (this.currentDirection.x !== dirX || this.currentDirection.y !== dirY);
+        const timeForUpdate = (time - this.lastDirectionUpdateTime) > DIRECTION_UPDATE_RATE;
+        
+        if ((directionChanged || (hasDirection && timeForUpdate))) {
+            // Debug log for direction updates
+            console.log(`Sending direction update: (${dirX}, ${dirY})`);
+            
+            // Update current direction
+            this.currentDirection.set(dirX, dirY);
+            this.isMoving = hasDirection;
+            
+            // Send movement direction to server
+            try {
+                this.spacetimeDBClient.sdkConnection?.reducers.updatePlayerDirection(dirX, dirY);
+                this.lastDirectionUpdateTime = time;
+            } catch (error) {
+                console.error("Error sending direction to server:", error);
+            }
+        }
+        
+        // Client-side prediction - move sprite immediately, server will correct if needed
+        if (this.isMoving) {
+            // Calculate position delta based on direction, speed and time
+            const speed = PLAYER_SPEED * (delta / 1000); // pixels per millisecond
+            const dx = this.currentDirection.x * speed;
+            const dy = this.currentDirection.y * speed;
+            
+            // Move the player sprite
+            this.localPlayerSprite.x += dx;
+            this.localPlayerSprite.y += dy;
+            
+            // Update UI elements position
+            if (this.localPlayerNameText) {
+                this.localPlayerNameText.x = this.localPlayerSprite.x;
+                this.localPlayerNameText.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - 10;
+            }
+            
+            // Update shadow position
+            if (this.localPlayerShadow) {
+                this.localPlayerShadow.x = this.localPlayerSprite.x;
+                this.localPlayerShadow.y = this.localPlayerSprite.y + SHADOW_OFFSET_Y;
+            }
+            
+            // Update health bar position
+            const healthBarBackground = this.localPlayerSprite.getData('healthBarBackground');
+            const healthBar = this.localPlayerSprite.getData('healthBar');
+            if (healthBarBackground && healthBar) {
+                healthBarBackground.x = this.localPlayerSprite.x;
+                healthBarBackground.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
+                healthBar.x = this.localPlayerSprite.x - (HEALTH_BAR_WIDTH / 2);
+                healthBar.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
+            }
+        }
+        
+        // If server has sent an updated position that's far from our prediction, correct it
+        if (this.serverPosition && this.localPlayerSprite) {
+            const distX = this.serverPosition.x - this.localPlayerSprite.x;
+            const distY = this.serverPosition.y - this.localPlayerSprite.y;
+            const distSquared = distX * distX + distY * distY;
+            
+            // If difference is significant (more than 10 pixels), interpolate toward server position
+            if (distSquared > 100) {
+                console.log(`Correcting position. Client: (${this.localPlayerSprite.x}, ${this.localPlayerSprite.y}), Server: (${this.serverPosition.x}, ${this.serverPosition.y})`);
+                
+                // Interpolate position
+                this.localPlayerSprite.x += distX * INTERPOLATION_SPEED;
+                this.localPlayerSprite.y += distY * INTERPOLATION_SPEED;
+                
+                // Update UI elements with interpolated position
+                if (this.localPlayerNameText) {
+                    this.localPlayerNameText.x = this.localPlayerSprite.x;
+                    this.localPlayerNameText.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - 10;
+                }
+                
+                if (this.localPlayerShadow) {
+                    this.localPlayerShadow.x = this.localPlayerSprite.x;
+                    this.localPlayerShadow.y = this.localPlayerSprite.y + SHADOW_OFFSET_Y;
+                }
+                
+                // Update health bar with interpolated position
+                const healthBarBackground = this.localPlayerSprite.getData('healthBarBackground');
+                const healthBar = this.localPlayerSprite.getData('healthBar');
+                if (healthBarBackground && healthBar) {
+                    healthBarBackground.x = this.localPlayerSprite.x;
+                    healthBarBackground.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
+                    healthBar.x = this.localPlayerSprite.x - (HEALTH_BAR_WIDTH / 2);
+                    healthBar.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
+                }
+            }
+        }
+    }
 }
