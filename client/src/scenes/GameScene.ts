@@ -41,6 +41,12 @@ export default class GameScene extends Phaser.Scene {
     // Map to hold player data waiting for corresponding entity data (keyed by entityId)
     private pendingPlayers: Map<number, Player> = new Map();
     private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null;
+    private wasdKeys: {
+        W: Phaser.Input.Keyboard.Key;
+        A: Phaser.Input.Keyboard.Key;
+        S: Phaser.Input.Keyboard.Key;
+        D: Phaser.Input.Keyboard.Key;
+    } | null = null;
     private backgroundTile: Phaser.GameObjects.TileSprite | null = null;
     private isPlayerDataReady = false;
     
@@ -106,6 +112,16 @@ export default class GameScene extends Phaser.Scene {
 
         // Setup keyboard input
         this.cursors = this.input.keyboard?.createCursorKeys() ?? null;
+        
+        // Setup WASD keys
+        if (this.input.keyboard) {
+            this.wasdKeys = {
+                W: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
+                A: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
+                S: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
+                D: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D)
+            };
+        }
 
         // Setup touch input
         this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
@@ -712,6 +728,14 @@ export default class GameScene extends Phaser.Scene {
             if (this.cursors.right?.isDown) dirX += 1;
             if (this.cursors.up?.isDown) dirY -= 1;
             if (this.cursors.down?.isDown) dirY += 1;
+        }
+        
+        // Handle WASD keyboard input
+        if (this.wasdKeys) {
+            if (this.wasdKeys.A.isDown) dirX -= 1;
+            if (this.wasdKeys.D.isDown) dirX += 1;
+            if (this.wasdKeys.W.isDown) dirY -= 1;
+            if (this.wasdKeys.S.isDown) dirY += 1;
         }
         
         // Handle tap target if no keyboard input
