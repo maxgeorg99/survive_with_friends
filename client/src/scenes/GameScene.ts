@@ -39,6 +39,11 @@ export default class GameScene extends Phaser.Scene {
     private currentDirection: Phaser.Math.Vector2 = new Phaser.Math.Vector2(0, 0);
     private isMoving: boolean = false;
 
+    // Add a property to track tap target
+    private tapTarget: Phaser.Math.Vector2 | null = null;
+    // Add property for tap marker visual
+    private tapMarker: Phaser.GameObjects.Container | null = null;
+
     constructor() {
         super('GameScene');
         this.spacetimeDBClient = (window as any).spacetimeDBClient;
@@ -51,6 +56,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.image(PLAYER_ASSET_KEY, '/assets/class_fighter_1.png');
         this.load.image(GRASS_ASSET_KEY, '/assets/grass.png');
         this.load.image(SHADOW_ASSET_KEY, '/assets/shadow.png');
+        
         console.log("GameScene preload finished. Assets loaded:", 
             this.textures.exists(PLAYER_ASSET_KEY),
             this.textures.exists(GRASS_ASSET_KEY), 
@@ -76,19 +82,53 @@ export default class GameScene extends Phaser.Scene {
         // Setup touch input
         this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
             if (pointer.isDown && this.localPlayerSprite) {
-                this.movePlayerTowards(pointer.worldX, pointer.worldY);
+                this.tapTarget = new Phaser.Math.Vector2(pointer.worldX, pointer.worldY);
+                console.log(`Pointer move target set to: (${this.tapTarget.x}, ${this.tapTarget.y})`);
+                this.updateTapMarker();
             }
         });
         this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-             if (this.localPlayerSprite) {
-                this.movePlayerTowards(pointer.worldX, pointer.worldY);
+            if (this.localPlayerSprite) {
+                this.tapTarget = new Phaser.Math.Vector2(pointer.worldX, pointer.worldY);
+                console.log(`Pointer down target set to: (${this.tapTarget.x}, ${this.tapTarget.y})`);
+                this.updateTapMarker();
             }
         });
         this.input.on('pointerup', () => {
-             if (this.localPlayerSprite) {
-                 this.localPlayerSprite.setVelocity(0, 0);
-             }
+            // Don't clear tap target, we want to continue moving toward the target
         });
+
+        // Create tap marker using shape graphics instead of texture
+        // This is more reliable than the texture generation approach
+        console.log("Creating tap marker...");
+        // Make the outer circle more transparent (0.3 instead of 0.6)
+        const outerCircle = this.add.circle(0, 0, 32, 0xffffff, 0.3);
+        // Make the inner circle more transparent (0.5 instead of 0.8)
+        const innerCircle = this.add.circle(0, 0, 16, 0x00ffff, 0.5);
+        
+        // Create an X using line graphics with reduced alpha
+        const crossGraphics = this.add.graphics();
+        crossGraphics.lineStyle(4, 0xffffff, 0.7); // Reduced alpha from 1.0 to 0.7
+        crossGraphics.beginPath();
+        crossGraphics.moveTo(-8, -8);
+        crossGraphics.lineTo(8, 8);
+        crossGraphics.moveTo(8, -8);
+        crossGraphics.lineTo(-8, 8);
+        crossGraphics.closePath();
+        crossGraphics.strokePath();
+        
+        // Group them all together
+        const container = this.add.container(0, 0, [outerCircle, innerCircle, crossGraphics]);
+        this.tapMarker = container;
+        
+        if (this.tapMarker) {
+            this.tapMarker.setVisible(false);
+            // Set depth to 0.5 - above floor (0) but below players (1)
+            this.tapMarker.setDepth(0.5);
+            // Add a slight overall alpha to the entire container
+            this.tapMarker.setAlpha(0.8);
+            console.log("Tap marker created:", this.tapMarker.visible, this.tapMarker.depth);
+        }
 
         // If data is already ready when scene starts (e.g., scene restart)
         if (this.isPlayerDataReady) {
@@ -434,10 +474,32 @@ export default class GameScene extends Phaser.Scene {
         }
     }
 
-    movePlayerTowards(targetX: number, targetY: number) {
-        if (!this.localPlayerSprite) return;
-        const angle = Phaser.Math.Angle.Between(this.localPlayerSprite.x, this.localPlayerSprite.y, targetX, targetY);
-        this.physics.velocityFromRotation(angle, PLAYER_SPEED, this.localPlayerSprite.body?.velocity);
+    updateTapMarker() {
+        if (!this.tapMarker) {
+            console.warn("Cannot update tap marker - it doesn't exist!");
+            return;
+        }
+        
+        if (this.tapTarget) {
+            console.log(`Updating tap marker to position: (${this.tapTarget.x}, ${this.tapTarget.y})`);
+            // Position marker at tap target and make visible
+            // Add larger vertical offset to align with character feet (SHADOW_OFFSET_Y + 10)
+            this.tapMarker.setPosition(this.tapTarget.x, this.tapTarget.y + SHADOW_OFFSET_Y + 20);
+            this.tapMarker.setVisible(true);
+            
+            // Add a small animation to make it more noticeable
+            this.tweens.add({
+                targets: this.tapMarker,
+                scale: { from: 0.8, to: 1 },
+                duration: 300,
+                ease: 'Bounce.Out'
+            });
+            console.log("Tap marker visibility:", this.tapMarker.visible);
+        } else {
+            console.log("Hiding tap marker - no target");
+            // Hide marker when no target
+            this.tapMarker.setVisible(false);
+        }
     }
 
     update(time: number, delta: number) {
@@ -449,27 +511,59 @@ export default class GameScene extends Phaser.Scene {
         const inputDirection = new Phaser.Math.Vector2(0, 0);
         let isMoving = false;
 
-        // Keyboard movement
-        if (this.cursors.left?.isDown || this.input.keyboard?.addKey('A').isDown) {
-            inputDirection.x = -1;
-            isMoving = true;
-        }
-        if (this.cursors.right?.isDown || this.input.keyboard?.addKey('D').isDown) {
-            inputDirection.x = 1;
-            isMoving = true;
-        }
-        if (this.cursors.up?.isDown || this.input.keyboard?.addKey('W').isDown) {
-            inputDirection.y = -1;
-            isMoving = true;
-        }
-        if (this.cursors.down?.isDown || this.input.keyboard?.addKey('S').isDown) {
-            inputDirection.y = 1;
-            isMoving = true;
+        // Handle tap target if it exists
+        if (this.tapTarget && this.localPlayerSprite) {
+            // Calculate distance to target
+            const distance = Phaser.Math.Distance.Between(
+                this.localPlayerSprite.x, this.localPlayerSprite.y,
+                this.tapTarget.x, this.tapTarget.y
+            );
+            
+            // If we're close enough to the target, clear it
+            if (distance < 5) {
+                this.tapTarget = null;
+                this.updateTapMarker(); // This will hide the marker
+                console.log("Reached tap target, clearing");
+            } else {
+                // Calculate direction to the target
+                const angle = Phaser.Math.Angle.Between(
+                    this.localPlayerSprite.x, this.localPlayerSprite.y,
+                    this.tapTarget.x, this.tapTarget.y
+                );
+                
+                // Convert angle to direction vector
+                inputDirection.x = Math.cos(angle);
+                inputDirection.y = Math.sin(angle);
+                isMoving = true;
+                
+                console.log(`Moving to tap target: (${this.tapTarget.x}, ${this.tapTarget.y}), distance: ${distance.toFixed(1)}`);
+            }
         }
 
-        // Normalize direction if moving
-        if (isMoving) {
-            inputDirection.normalize();
+        // If no tap movement, check keyboard
+        if (!isMoving) {
+            // Keyboard movement
+            if (this.cursors.left?.isDown || this.input.keyboard?.addKey('A').isDown) {
+                inputDirection.x = -1;
+                isMoving = true;
+            }
+            if (this.cursors.right?.isDown || this.input.keyboard?.addKey('D').isDown) {
+                inputDirection.x = 1;
+                isMoving = true;
+            }
+            if (this.cursors.up?.isDown || this.input.keyboard?.addKey('W').isDown) {
+                inputDirection.y = -1;
+                isMoving = true;
+            }
+            if (this.cursors.down?.isDown || this.input.keyboard?.addKey('S').isDown) {
+                inputDirection.y = 1;
+                isMoving = true;
+            }
+
+            // Normalize direction if moving with keyboard
+            if (isMoving) {
+                inputDirection.normalize();
+            }
         }
 
         // Check if direction changed or if it's time to send an update
