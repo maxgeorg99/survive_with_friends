@@ -722,20 +722,30 @@ export default class GameScene extends Phaser.Scene {
         let dirX = 0;
         let dirY = 0;
         
+        // Track if any keyboard movement key was pressed
+        let keyboardInputDetected = false;
+        
         // Handle keyboard input
         if (this.cursors) {
-            if (this.cursors.left?.isDown) dirX -= 1;
-            if (this.cursors.right?.isDown) dirX += 1;
-            if (this.cursors.up?.isDown) dirY -= 1;
-            if (this.cursors.down?.isDown) dirY += 1;
+            if (this.cursors.left?.isDown) { dirX -= 1; keyboardInputDetected = true; }
+            if (this.cursors.right?.isDown) { dirX += 1; keyboardInputDetected = true; }
+            if (this.cursors.up?.isDown) { dirY -= 1; keyboardInputDetected = true; }
+            if (this.cursors.down?.isDown) { dirY += 1; keyboardInputDetected = true; }
         }
         
         // Handle WASD keyboard input
         if (this.wasdKeys) {
-            if (this.wasdKeys.A.isDown) dirX -= 1;
-            if (this.wasdKeys.D.isDown) dirX += 1;
-            if (this.wasdKeys.W.isDown) dirY -= 1;
-            if (this.wasdKeys.S.isDown) dirY += 1;
+            if (this.wasdKeys.A.isDown) { dirX -= 1; keyboardInputDetected = true; }
+            if (this.wasdKeys.D.isDown) { dirX += 1; keyboardInputDetected = true; }
+            if (this.wasdKeys.W.isDown) { dirY -= 1; keyboardInputDetected = true; }
+            if (this.wasdKeys.S.isDown) { dirY += 1; keyboardInputDetected = true; }
+        }
+        
+        // Clear tap target if keyboard input is detected
+        if (keyboardInputDetected && this.tapTarget) {
+            console.log("Keyboard input detected, clearing tap target");
+            this.tapTarget = null;
+            this.tapMarker?.setVisible(false);
         }
         
         // Handle tap target if no keyboard input
