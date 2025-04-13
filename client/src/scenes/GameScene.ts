@@ -22,7 +22,8 @@ const PLAYER_NAME_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
 // Health bar configuration
 const HEALTH_BAR_WIDTH = 50;
 const HEALTH_BAR_HEIGHT = 6;
-const HEALTH_BAR_OFFSET_Y = 5;
+const HEALTH_BAR_OFFSET_Y = 17; // Increased vertical offset for health bar
+const NAME_OFFSET_Y = HEALTH_BAR_OFFSET_Y + 15; // Increased vertical offset for player name
 
 // Asset keys for different player classes
 const CLASS_ASSET_KEYS: Record<string, string> = {
@@ -253,16 +254,10 @@ export default class GameScene extends Phaser.Scene {
             const classKey = this.getClassSpriteKey(playerClass);
             console.log(`Creating local player with sprite key: ${classKey}`);
             this.localPlayerSprite = this.physics.add.sprite(startX, startY, classKey);
-            // Debug sprite creation and properties
-            console.log("Sprite created:", 
-                this.localPlayerSprite ? "YES" : "NO",
-                "Visible:", this.localPlayerSprite?.visible,
-                "Position:", this.localPlayerSprite?.x, this.localPlayerSprite?.y,
-                "Frame:", this.localPlayerSprite?.frame?.name);
             this.localPlayerSprite.setDepth(1);
             this.localPlayerNameText = this.add.text(
                 startX, 
-                startY - Math.floor(this.localPlayerSprite.height / 2) - 10, 
+                startY - Math.floor(this.localPlayerSprite.height / 2) - NAME_OFFSET_Y, 
                 `${playerName} (${playerLevel})`, 
                 PLAYER_NAME_STYLE
             ).setOrigin(0.5, 0.5);
@@ -279,14 +274,17 @@ export default class GameScene extends Phaser.Scene {
             ).setOrigin(0.5, 0.5);
             
             const healthBar = this.add.rectangle(
-                startX,
+                startX - (HEALTH_BAR_WIDTH / 2),
                 startY - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y,
-                HEALTH_BAR_WIDTH * (localPlayerData.hp / localPlayerData.maxHp),
+                HEALTH_BAR_WIDTH * (this.spacetimeDBClient?.sdkConnection?.db.player.identity.find(
+                    this.spacetimeDBClient.identity as any as Identity
+                )?.hp || 100) / (this.spacetimeDBClient?.sdkConnection?.db.player.identity.find(
+                    this.spacetimeDBClient.identity as any as Identity
+                )?.maxHp || 100),
                 HEALTH_BAR_HEIGHT,
                 0x00FF00,
                 1
             ).setOrigin(0, 0.5);
-            healthBar.x -= HEALTH_BAR_WIDTH / 2; // Adjust position to align with background
             
             // Set health bar properties
             healthBarBackground.setDepth(1.5);
@@ -295,8 +293,12 @@ export default class GameScene extends Phaser.Scene {
             // Store health bar references
             this.localPlayerSprite.setData('healthBarBackground', healthBarBackground);
             this.localPlayerSprite.setData('healthBar', healthBar);
-            this.localPlayerSprite.setData('hp', localPlayerData.hp);
-            this.localPlayerSprite.setData('maxHp', localPlayerData.maxHp);
+            this.localPlayerSprite.setData('hp', this.spacetimeDBClient?.sdkConnection?.db.player.identity.find(
+                this.spacetimeDBClient.identity as any as Identity
+            )?.hp || 100);
+            this.localPlayerSprite.setData('maxHp', this.spacetimeDBClient?.sdkConnection?.db.player.identity.find(
+                this.spacetimeDBClient.identity as any as Identity
+            )?.maxHp || 100);
             
             // Shadow
             this.localPlayerShadow = this.add.image(startX, startY + SHADOW_OFFSET_Y, SHADOW_ASSET_KEY)
@@ -463,13 +465,50 @@ export default class GameScene extends Phaser.Scene {
                 console.log(`Creating local player with sprite key: ${classKey}`);
                 this.localPlayerSprite = this.physics.add.sprite(startX, startY, classKey);
                 this.localPlayerSprite.setDepth(1);
-                this.localPlayerNameText = this.add.text(startX, startY - Math.floor(this.localPlayerSprite.height / 2) - 10, 
+                this.localPlayerNameText = this.add.text(startX, startY - Math.floor(this.localPlayerSprite.height / 2) - NAME_OFFSET_Y, 
                     `${playerName} (${playerLevel})`, PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
                 this.localPlayerNameText.setDepth(2);
+
+                // Create health bar
+                const healthBarBackground = this.add.rectangle(
+                    startX,
+                    startY - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y,
+                    HEALTH_BAR_WIDTH,
+                    HEALTH_BAR_HEIGHT,
+                    0x000000,
+                    0.7
+                ).setOrigin(0.5, 0.5);
+                
+                const healthBar = this.add.rectangle(
+                    startX - (HEALTH_BAR_WIDTH / 2),
+                    startY - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y,
+                    HEALTH_BAR_WIDTH * (this.spacetimeDBClient?.sdkConnection?.db.player.identity.find(
+                        this.spacetimeDBClient.identity as any as Identity
+                    )?.hp || 100) / (this.spacetimeDBClient?.sdkConnection?.db.player.identity.find(
+                        this.spacetimeDBClient.identity as any as Identity
+                    )?.maxHp || 100),
+                    HEALTH_BAR_HEIGHT,
+                    0x00FF00,
+                    1
+                ).setOrigin(0, 0.5);
+                
+                // Set health bar properties
+                healthBarBackground.setDepth(1.5);
+                healthBar.setDepth(1.6);
+                
+                // Store health bar references
+                this.localPlayerSprite.setData('healthBarBackground', healthBarBackground);
+                this.localPlayerSprite.setData('healthBar', healthBar);
+                this.localPlayerSprite.setData('hp', this.spacetimeDBClient?.sdkConnection?.db.player.identity.find(
+                    this.spacetimeDBClient.identity as any as Identity
+                )?.hp || 100);
+                this.localPlayerSprite.setData('maxHp', this.spacetimeDBClient?.sdkConnection?.db.player.identity.find(
+                    this.spacetimeDBClient.identity as any as Identity
+                )?.maxHp || 100);
+                
                 this.localPlayerShadow = this.add.image(startX, startY + SHADOW_OFFSET_Y, SHADOW_ASSET_KEY)
                     .setAlpha(SHADOW_ALPHA)
                     .setDepth(0);
-                this.localPlayerSprite.setCollideWorldBounds(true);
 
                 // Camera follow
                 this.cameras.main.startFollow(this.localPlayerSprite, true, 1, 1);
@@ -572,7 +611,7 @@ export default class GameScene extends Phaser.Scene {
         const displayName = `${playerData.name} (${playerData.level})`;
         const text = this.add.text(
             0, 
-            -Math.floor(sprite.height / 2) - 10, 
+            -Math.floor(sprite.height / 2) - NAME_OFFSET_Y, 
             displayName, 
             PLAYER_NAME_STYLE
         ).setOrigin(0.5, 0.5);
@@ -804,7 +843,7 @@ export default class GameScene extends Phaser.Scene {
             // Update UI elements position
             if (this.localPlayerNameText) {
                 this.localPlayerNameText.x = this.localPlayerSprite.x;
-                this.localPlayerNameText.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - 10;
+                this.localPlayerNameText.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - NAME_OFFSET_Y;
             }
             
             // Update shadow position
@@ -841,7 +880,7 @@ export default class GameScene extends Phaser.Scene {
                 // Update UI elements with interpolated position
                 if (this.localPlayerNameText) {
                     this.localPlayerNameText.x = this.localPlayerSprite.x;
-                    this.localPlayerNameText.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - 10;
+                    this.localPlayerNameText.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - NAME_OFFSET_Y;
                 }
                 
                 if (this.localPlayerShadow) {
