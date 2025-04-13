@@ -73,6 +73,26 @@ class SpacetimeDBClient {
     // Subscription applied callback
     private handleSubscriptionApplied(/*ctx: SubscriptionEventContext*/) {
         console.log("SpacetimeDB subscription applied callback triggered.");
+        
+        // Debug info about current data state
+        if (this.sdkConnection?.db) {
+            const playerCount = Array.from(this.sdkConnection.db.player.iter()).length;
+            const entityCount = Array.from(this.sdkConnection.db.entity.iter()).length;
+            console.log(`Subscription data received: ${playerCount} players, ${entityCount} entities`);
+            
+            // Log all players received
+            console.log("=== PLAYERS RECEIVED IN SUBSCRIPTION ===");
+            Array.from(this.sdkConnection.db.player.iter()).forEach(p => {
+                console.log(`Player: ${p.name} (ID: ${p.identity.toHexString()}, EntityID: ${p.entityId})`);
+            });
+            
+            // Log all entities received
+            console.log("=== ENTITIES RECEIVED IN SUBSCRIPTION ===");
+            Array.from(this.sdkConnection.db.entity.iter()).forEach(e => {
+                console.log(`Entity ID: ${e.entityId} at (${e.position.x}, ${e.position.y})`);
+            });
+        }
+        
         if (this.onSubscriptionApplied) {
             this.onSubscriptionApplied();
         }

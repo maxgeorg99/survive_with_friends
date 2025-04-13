@@ -108,6 +108,18 @@ public static partial class Module
         var identity = ctx.Sender;
         Log.Info($"Client connected: {identity}");
 
+        // Debug log: check all existing players
+        Log.Info("=== Current Players in DB ===");
+        foreach (var p in ctx.Db.player.Iter())
+        {
+            Log.Info($"Player: {p.name} (ID: {p.identity}) with EntityID: {p.entity_id}");
+        }
+        Log.Info("=== Current Entities in DB ===");
+        foreach (var e in ctx.Db.entity.Iter())
+        {
+            Log.Info($"Entity ID: {e.entity_id} at position ({e.position.x}, {e.position.y})");
+        }
+
         // Check if player already exists
         var playerOpt = ctx.Db.player.identity.Find(identity);
         if (playerOpt is null)
@@ -138,7 +150,7 @@ public static partial class Module
             Player? newPlayerOpt = ctx.Db.player.Insert(new Player
             {
                 identity = identity,
-                name = "", // Start with an empty name, SetName will update it
+                name = "Player", // Start with a default name instead of empty string
                 entity_id = newEntity.entity_id // Use the non-nullable entity_id
             });
 
@@ -146,21 +158,59 @@ public static partial class Module
              if(newPlayerOpt is null)
             {
                  Log.Error($"Failed to insert new player for {identity} (entity: {newEntity.entity_id})! Insert returned null.");
-                 // Consider deleting the orphaned entity? Or handle error differently.
-                 // If you delete, remember Entity deletion needs its PK.
-                 // ctx.Db.entity.entity_id.Delete(newEntity.entity_id);
+                 // Consider deleting the orphaned entity to avoid leaking
+                 ctx.Db.entity.entity_id.Delete(newEntity.entity_id);
                  return;
             }
 
              // Insertion succeeded, get the non-nullable value
             Player newPlayer = newPlayerOpt.Value;
             Log.Info($"Created new player record for {identity} linked to entity {newPlayer.entity_id}.");
+            
+            // Debug log: Verify the newly created records
+            var verifyPlayer = ctx.Db.player.identity.Find(identity);
+            var verifyEntity = verifyPlayer != null ? ctx.Db.entity.entity_id.Find(verifyPlayer.Value.entity_id) : null;
+            Log.Info($"Verification - Player exists: {verifyPlayer != null}, Entity exists: {verifyEntity != null}");
         }
         else
         {
             Log.Info($"Existing player {identity} reconnected.");
-            // Optional: Handle reconnection logic if needed (e.g., update status)
+            var player = playerOpt.Value;
+            Log.Info($"Player details: Name={player.name}, EntityID={player.entity_id}");
+            
+            // Check if entity exists
+            var entityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
+            if (entityOpt == null)
+            {
+                Log.Warn($"Player {identity} has missing entity {player.entity_id}. Creating new entity.");
+                
+                // Create a new entity for reconnected player with missing entity
+                Entity? newEntityOpt = ctx.Db.entity.Insert(new Entity
+                {
+                    position = new DbVector2(100, 100), 
+                    mass = 10,
+                    direction = new DbVector2(0, 0),
+                    is_moving = false
+                });
+                
+                if (newEntityOpt != null)
+                {
+                    // Update player with new entity
+                    player.entity_id = newEntityOpt.Value.entity_id;
+                    ctx.Db.player.identity.Update(player);
+                    Log.Info($"Created replacement entity {newEntityOpt.Value.entity_id} for player {identity}");
+                }
+            }
+            else
+            {
+                Log.Info($"Entity {player.entity_id} exists at position ({entityOpt.Value.position.x}, {entityOpt.Value.position.y})");
+            }
         }
+        
+        // After processing, log the final state
+        Log.Info("=== After ClientConnected Processing ===");
+        Log.Info($"Total players: {ctx.Db.player.Iter().Count()}");
+        Log.Info($"Total entities: {ctx.Db.entity.Iter().Count()}");
     }
 
     // --- Reducers ---

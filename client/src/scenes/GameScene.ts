@@ -187,10 +187,25 @@ export default class GameScene extends Phaser.Scene {
         }
         const localIdentity = this.spacetimeDBClient.identity;
 
+        // Log all existing players and entities at startup
+        console.log("=== EXISTING PLAYERS AT STARTUP ===");
+        const existingPlayers = Array.from(this.spacetimeDBClient.sdkConnection.db.player.iter());
+        console.log(`Total player count: ${existingPlayers.length}`);
+        existingPlayers.forEach(p => {
+            console.log(`Player: ${p.name} (ID: ${p.identity.toHexString()}, EntityID: ${p.entityId})`);
+        });
+        
+        console.log("=== EXISTING ENTITIES AT STARTUP ===");
+        const existingEntities = Array.from(this.spacetimeDBClient.sdkConnection.db.entity.iter());
+        console.log(`Total entity count: ${existingEntities.length}`);
+        existingEntities.forEach(e => {
+            console.log(`Entity ID: ${e.entityId} at (${e.position.x}, ${e.position.y})`);
+        });
+
         // Use the table handle to register listeners with correct signatures
         this.spacetimeDBClient.sdkConnection?.db.player.onInsert((_ctx, player: Player) => {
             if (!this.isPlayerDataReady) return;
-            console.log(`Player.onInsert: ${player.name} (ID: ${player.identity.toHexString()})`);
+            console.log(`Player.onInsert: ${player.name} (ID: ${player.identity.toHexString()}, EntityID: ${player.entityId})`);
             if (!player.identity.isEqual(localIdentity)) {
                 this.addOrUpdateOtherPlayer(player);
             }
@@ -235,12 +250,16 @@ export default class GameScene extends Phaser.Scene {
     handleEntityUpdate(entityData: Entity) {
         console.log(`Entity update received: ID ${entityData.entityId} at pos (${entityData.position.x}, ${entityData.position.y})`);
         
-        // Get local player EntityId (inline implementation to avoid TypeScript issues)
+        // Debug: Log all entities in cache to verify state
+        const allEntities = Array.from(this.spacetimeDBClient.sdkConnection?.db.entity.iter() || []);
+        console.log(`Current entity cache has ${allEntities.length} entities:`);
+        allEntities.forEach(e => console.log(`  Entity ID: ${e.entityId} at (${e.position.x}, ${e.position.y})`));
+        
+        // Get local player EntityId
         let localPlayerEntityId: number | undefined = undefined;
         try {
             if (this.spacetimeDBClient?.identity && this.spacetimeDBClient?.sdkConnection?.db) {
                 const localPlayer = this.spacetimeDBClient.sdkConnection.db.player.identity.find(
-                    // Force type assertion here to work around the TypeScript error
                     this.spacetimeDBClient.identity as any as Identity
                 );
                 if (localPlayer) {
@@ -300,9 +319,13 @@ export default class GameScene extends Phaser.Scene {
         // Find the player who owns this entity in pending players
         const pendingPlayer = this.pendingPlayers.get(entityData.entityId);
         if (pendingPlayer) {
-            // We have player data waiting for this entity - create/update
-            console.log(`Found pending player for entity ${entityData.entityId}`);
-            this.addOrUpdateOtherPlayer(pendingPlayer);
+            console.log(`Found pending player for entity ${entityData.entityId}. Creating sprite directly.`);
+            
+            // IMPROVED: Create player sprite directly with entity data instead of trying to look it up again
+            this.createOtherPlayerSprite(pendingPlayer, entityData);
+            
+            // Remove from pending
+            this.pendingPlayers.delete(entityData.entityId);
             return;
         }
 
@@ -318,54 +341,75 @@ export default class GameScene extends Phaser.Scene {
         console.warn(`Entity update received for unknown entity: ${entityData.entityId}`);
     }
 
+    // New helper method to create player sprites directly from entity data
+    createOtherPlayerSprite(playerData: Player, entityData: Entity) {
+        console.log(`Creating player sprite for ${playerData.name} at (${entityData.position.x}, ${entityData.position.y})`);
+        
+        // Check if we already have this player
+        if (this.otherPlayers.has(playerData.identity)) {
+            console.log(`Player ${playerData.name} already has a sprite, updating position`);
+            this.updateOtherPlayerPosition(playerData.identity, entityData.position.x, entityData.position.y);
+            return;
+        }
+        
+        // Create new player container with shadow, sprite and name
+        const shadow = this.add.image(0, SHADOW_OFFSET_Y, SHADOW_ASSET_KEY)
+            .setAlpha(SHADOW_ALPHA)
+            .setDepth(-1);
+        const sprite = this.add.sprite(0, 0, PLAYER_ASSET_KEY);
+        const text = this.add.text(0, -Math.floor(sprite.height / 2) - 10, 
+            playerData.name || 'Player', PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
+        
+        // Round position on creation
+        const startX = Math.floor(entityData.position.x);
+        const startY = Math.floor(entityData.position.y);
+        
+        // Create container and add all elements
+        const container = this.add.container(startX, startY, [shadow, sprite, text]);
+        container.setData('entityId', entityData.entityId);
+        
+        // Store in our players map
+        this.otherPlayers.set(playerData.identity, container);
+        
+        console.log(`Created container for player ${playerData.name} with ${container.length} children. Shadow: ${shadow.visible}, Sprite: ${sprite.visible}`);
+        console.log(`Total tracked other players: ${this.otherPlayers.size}`);
+    }
+
     addOrUpdateOtherPlayer(playerData: Player) {
-         // Check if we are already tracking this player
-         let container = this.otherPlayers.get(playerData.identity);
+        // Check if we are already tracking this player
+        let container = this.otherPlayers.get(playerData.identity);
+        console.log(`Adding/updating player ${playerData.name} (ID: ${playerData.identity.toHexString()}, EntityID: ${playerData.entityId})`);
+        console.log(`Already tracked in otherPlayers: ${container ? 'YES' : 'NO'}`);
 
-         // Attempt to find the entity data in the client cache
-         const entityData = this.spacetimeDBClient.sdkConnection?.db.entity.entity_id.find(playerData.entityId);
-
-         if (!entityData) {
-             // Entity data not yet available in client cache. Store player data and wait for Entity update.
-             console.warn(`Entity not found for player ${playerData.name} (entityId: ${playerData.entityId}) when trying to add/update. Storing as pending.`);
-             this.pendingPlayers.set(playerData.entityId, playerData);
-             return; // Don't create container yet
-         }
-
-         // Entity data found! Ensure player is removed from pending map if they were there
-         if (this.pendingPlayers.has(playerData.entityId)) {
-             console.log(`Entity data arrived for pending player ${playerData.name}. Removing from pending.`);
-             this.pendingPlayers.delete(playerData.entityId);
-         }
-
+        // If container exists, just update the name if needed
         if (container) {
-             // Update existing container
-             container.setData('entityId', playerData.entityId); // Ensure entityId is up-to-date
-             // Round position when updating existing container
-             container.setPosition(Math.floor(entityData.position.x), Math.floor(entityData.position.y));
-             // Indices shift: 0=shadow, 1=sprite, 2=text
-             const text = container.getAt(2) as Phaser.GameObjects.Text;
+            console.log(`Container exists for player ${playerData.name}, updating data`);
+            container.setData('entityId', playerData.entityId);
+            
+            // Update player name if needed
+            const text = container.getAt(2) as Phaser.GameObjects.Text;
             if (text.text !== playerData.name) {
-                 console.log(`Updating name for player ${playerData.identity.toHexString()} to ${playerData.name}`);
-                 text.setText(playerData.name || 'Player');
-             }
-         } else {
-             // Create new player sprite and text container
-             console.log(`Adding new player sprite for ${playerData.name} at (${entityData.position.x}, ${entityData.position.y})`);
-             const shadow = this.add.image(0, SHADOW_OFFSET_Y, SHADOW_ASSET_KEY)
-                 .setAlpha(SHADOW_ALPHA)
-                 .setDepth(-1); // Depth relative to container
-             const sprite = this.add.sprite(0, 0, PLAYER_ASSET_KEY);
-             const text = this.add.text(0, -Math.floor(sprite.height / 2) - 10, playerData.name || 'Player', PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
-             // Round position on creation
-             const startX = Math.floor(entityData.position.x);
-             const startY = Math.floor(entityData.position.y);
-             container = this.add.container(startX, startY, [shadow, sprite, text]);
-             container.setData('entityId', entityData.entityId); // Store entityId on creation
-             this.otherPlayers.set(playerData.identity, container);
-             console.log(`Created container for NEW player ${playerData.name}. Shadow Visible: ${shadow.visible}`);
-         }
-     }
+                console.log(`Updating name for player ${playerData.identity.toHexString()} to ${playerData.name}`);
+                text.setText(playerData.name || 'Player');
+            }
+            return;
+        }
+
+        // Attempt to find the entity data in the client cache
+        const entityData = this.spacetimeDBClient.sdkConnection?.db.entity.entity_id.find(playerData.entityId);
+        console.log(`Entity found for player ${playerData.name}: ${entityData ? 'YES' : 'NO'}`);
+
+        // If entity data exists, create the sprite immediately
+        if (entityData) {
+            this.createOtherPlayerSprite(playerData, entityData);
+            return;
+        }
+        
+        // Otherwise store player as pending
+        console.warn(`Entity not found for player ${playerData.name} (entityId: ${playerData.entityId}). Storing as pending.`);
+        this.pendingPlayers.set(playerData.entityId, playerData);
+        console.log(`Total pending players: ${this.pendingPlayers.size}`);
+    }
 
     updateOtherPlayerPosition(identity: Identity, x: number, y: number) {
          const container = this.otherPlayers.get(identity);
