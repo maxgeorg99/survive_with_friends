@@ -8,6 +8,9 @@ import { Identity } from '@clockworklabs/spacetimedb-sdk';
 const PLAYER_SPEED = 200;
 const PLAYER_ASSET_KEY = 'player_fighter_1';
 const GRASS_ASSET_KEY = 'grass_background';
+const SHADOW_ASSET_KEY = 'shadow';
+const SHADOW_OFFSET_Y = 14; // Vertical offset for the shadow (Increased)
+const SHADOW_ALPHA = 0.4; // Transparency for the shadow
 const PLAYER_NAME_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
     fontSize: '16px',
     fontFamily: 'Arial',
@@ -20,6 +23,7 @@ export default class GameScene extends Phaser.Scene {
     private spacetimeDBClient: SpacetimeDBClient;
     private localPlayerSprite: Phaser.Physics.Arcade.Sprite | null = null;
     private localPlayerNameText: Phaser.GameObjects.Text | null = null;
+    private localPlayerShadow: Phaser.GameObjects.Image | null = null; // Added for local player shadow
     private otherPlayers: Map<Identity, Phaser.GameObjects.Container> = new Map();
     // Map to hold player data waiting for corresponding entity data (keyed by entityId)
     private pendingPlayers: Map<number, Player> = new Map();
@@ -38,6 +42,7 @@ export default class GameScene extends Phaser.Scene {
         // Load assets from the /assets path (copied from public)
         this.load.image(PLAYER_ASSET_KEY, '/assets/class_fighter_1.png');
         this.load.image(GRASS_ASSET_KEY, '/assets/grass.png');
+        this.load.image(SHADOW_ASSET_KEY, '/assets/shadow.png');
         console.log("GameScene preload finished.");
     }
 
@@ -116,8 +121,13 @@ export default class GameScene extends Phaser.Scene {
             const startX = Math.floor(localEntityData.position.x);
             const startY = Math.floor(localEntityData.position.y);
             this.localPlayerSprite = this.physics.add.sprite(startX, startY, PLAYER_ASSET_KEY);
+            this.localPlayerSprite.setDepth(1); // Set sprite depth explicitly
             this.localPlayerNameText = this.add.text(startX, startY - Math.floor(this.localPlayerSprite.height / 2) - 10, localPlayerData.name || 'Player', PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
-             this.localPlayerSprite.setCollideWorldBounds(true);
+            this.localPlayerNameText.setDepth(2); // Ensure name is above sprite
+            this.localPlayerShadow = this.add.image(startX, startY + SHADOW_OFFSET_Y, SHADOW_ASSET_KEY)
+                .setAlpha(SHADOW_ALPHA)
+                .setDepth(0); // Set shadow depth explicitly below sprite
+            this.localPlayerSprite.setCollideWorldBounds(true);
 
             // --- Camera Setup (Only if sprite exists) ---
             // Make camera follow instantly (lerp = 1)
@@ -214,7 +224,12 @@ export default class GameScene extends Phaser.Scene {
                  const startX = Math.floor(entityData.position.x);
                  const startY = Math.floor(entityData.position.y);
                  this.localPlayerSprite = this.physics.add.sprite(startX, startY, PLAYER_ASSET_KEY);
+                 this.localPlayerSprite.setDepth(1); // Set sprite depth explicitly
                  this.localPlayerNameText = this.add.text(startX, startY - Math.floor(this.localPlayerSprite.height / 2) - 10, localPlayer.name || 'Player', PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
+                 this.localPlayerNameText.setDepth(2); // Ensure name is above sprite
+                 this.localPlayerShadow = this.add.image(startX, startY + SHADOW_OFFSET_Y, SHADOW_ASSET_KEY)
+                     .setAlpha(SHADOW_ALPHA)
+                     .setDepth(0); // Set shadow depth explicitly below sprite
                  this.localPlayerSprite.setCollideWorldBounds(true);
 
                 // --- Camera Setup ---
@@ -245,13 +260,17 @@ export default class GameScene extends Phaser.Scene {
              // Ensure we don't accidentally re-add if it somehow got created between checks
              if (!this.otherPlayers.has(pendingPlayerData.identity)) {
                  console.log(`Creating new player sprite for pending player ${pendingPlayerData.name} at (${entityData.position.x}, ${entityData.position.y})`);
+                 const shadow = this.add.image(0, SHADOW_OFFSET_Y, SHADOW_ASSET_KEY)
+                     .setAlpha(SHADOW_ALPHA)
+                     .setDepth(-1); // Depth relative to container, draw behind sprite
                  const sprite = this.add.sprite(0, 0, PLAYER_ASSET_KEY);
                  const text = this.add.text(0, -Math.floor(sprite.height / 2) - 10, pendingPlayerData.name || 'Player', PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
                  const startX = Math.floor(entityData.position.x);
                  const startY = Math.floor(entityData.position.y);
-                 const container = this.add.container(startX, startY, [sprite, text]);
+                 const container = this.add.container(startX, startY, [shadow, sprite, text]);
                  container.setData('entityId', entityData.entityId); // Store entityId
                  this.otherPlayers.set(pendingPlayerData.identity, container);
+                 console.log(`Created container for PENDING player ${pendingPlayerData.name}. Shadow Visible: ${shadow.visible}`);
              } else {
                 console.warn(`Tried to create pending player ${pendingPlayerData.name}, but they already exist in otherPlayers map.`);
                 // If it already exists, maybe just update its position?
@@ -307,7 +326,8 @@ export default class GameScene extends Phaser.Scene {
              container.setData('entityId', playerData.entityId); // Ensure entityId is up-to-date
              // Round position when updating existing container
              container.setPosition(Math.floor(entityData.position.x), Math.floor(entityData.position.y));
-             const text = container.getAt(1) as Phaser.GameObjects.Text;
+             // Indices shift: 0=shadow, 1=sprite, 2=text
+             const text = container.getAt(2) as Phaser.GameObjects.Text;
             if (text.text !== playerData.name) {
                  console.log(`Updating name for player ${playerData.identity.toHexString()} to ${playerData.name}`);
                  text.setText(playerData.name || 'Player');
@@ -315,14 +335,18 @@ export default class GameScene extends Phaser.Scene {
          } else {
              // Create new player sprite and text container
              console.log(`Adding new player sprite for ${playerData.name} at (${entityData.position.x}, ${entityData.position.y})`);
+             const shadow = this.add.image(0, SHADOW_OFFSET_Y, SHADOW_ASSET_KEY)
+                 .setAlpha(SHADOW_ALPHA)
+                 .setDepth(-1); // Depth relative to container
              const sprite = this.add.sprite(0, 0, PLAYER_ASSET_KEY);
              const text = this.add.text(0, -Math.floor(sprite.height / 2) - 10, playerData.name || 'Player', PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
              // Round position on creation
              const startX = Math.floor(entityData.position.x);
              const startY = Math.floor(entityData.position.y);
-             container = this.add.container(startX, startY, [sprite, text]);
+             container = this.add.container(startX, startY, [shadow, sprite, text]);
              container.setData('entityId', entityData.entityId); // Store entityId on creation
              this.otherPlayers.set(playerData.identity, container);
+             console.log(`Created container for NEW player ${playerData.name}. Shadow Visible: ${shadow.visible}`);
          }
      }
 
@@ -396,6 +420,11 @@ export default class GameScene extends Phaser.Scene {
         this.localPlayerSprite.x = Math.floor(this.localPlayerSprite.x);
         this.localPlayerSprite.y = Math.floor(this.localPlayerSprite.y);
 
+        // Update local player shadow and name text position
+        if (this.localPlayerSprite && this.localPlayerShadow) {
+            this.localPlayerShadow.setPosition(this.localPlayerSprite.x, this.localPlayerSprite.y + SHADOW_OFFSET_Y);
+            // console.log(`Updating local shadow position to (${this.localPlayerShadow.x}, ${this.localPlayerShadow.y})`); // Optional: uncomment for verbose logging
+        }
         // Update name text position, using the now-rounded sprite coordinates
         this.localPlayerNameText.setPosition(
             this.localPlayerSprite.x, // Already rounded
@@ -418,10 +447,13 @@ export default class GameScene extends Phaser.Scene {
 
         // Keep other player names above their sprites
         this.otherPlayers.forEach(container => {
-             const text = container.getAt(1) as Phaser.GameObjects.Text;
-             const sprite = container.getAt(0) as Phaser.GameObjects.Sprite;
-             // Position relative to container, rounding the offset calculation
-             text.setPosition(0, Math.floor(-sprite.height / 2) - 10);
+             // Indices shift: 0=shadow, 1=sprite, 2=text
+             const shadow = container.getAt(0) as Phaser.GameObjects.Image; // Check shadow
+             const sprite = container.getAt(1) as Phaser.GameObjects.Sprite;
+             // console.log(`Other player container list: ${container.list.map(go => go.type)} Shadow Visible: ${shadow?.visible}`); // Optional: uncomment for verbose logging
+              // Position relative to container, rounding the offset calculation
+              const text = container.getAt(2) as Phaser.GameObjects.Text;
+              text.setPosition(0, Math.floor(-sprite.height / 2) - 10);
         });
     }
 } 
