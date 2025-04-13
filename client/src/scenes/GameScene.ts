@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { Player, Entity } from "../autobindings";
-import { UpdatePlayerPosition } from "../autobindings";
+import { UpdatePlayerDirection } from "../autobindings";
 import { Identity } from '@clockworklabs/spacetimedb-sdk';
 
 // Constants
@@ -11,6 +11,8 @@ const GRASS_ASSET_KEY = 'grass_background';
 const SHADOW_ASSET_KEY = 'shadow';
 const SHADOW_OFFSET_Y = 14; // Vertical offset for the shadow (Increased)
 const SHADOW_ALPHA = 0.4; // Transparency for the shadow
+const INTERPOLATION_SPEED = 0.2; // Speed of interpolation (0-1, higher is faster)
+const DIRECTION_UPDATE_RATE = 100; // Send direction updates every 100ms
 const PLAYER_NAME_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
     fontSize: '16px',
     fontFamily: 'Arial',
@@ -30,6 +32,12 @@ export default class GameScene extends Phaser.Scene {
     private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null;
     private backgroundTile: Phaser.GameObjects.TileSprite | null = null;
     private isPlayerDataReady = false;
+    
+    // Server-authoritative motion variables
+    private lastDirectionUpdateTime: number = 0;
+    private serverPosition: Phaser.Math.Vector2 | null = null;
+    private currentDirection: Phaser.Math.Vector2 = new Phaser.Math.Vector2(0, 0);
+    private isMoving: boolean = false;
 
     constructor() {
         super('GameScene');
@@ -43,7 +51,10 @@ export default class GameScene extends Phaser.Scene {
         this.load.image(PLAYER_ASSET_KEY, '/assets/class_fighter_1.png');
         this.load.image(GRASS_ASSET_KEY, '/assets/grass.png');
         this.load.image(SHADOW_ASSET_KEY, '/assets/shadow.png');
-        console.log("GameScene preload finished.");
+        console.log("GameScene preload finished. Assets loaded:", 
+            this.textures.exists(PLAYER_ASSET_KEY),
+            this.textures.exists(GRASS_ASSET_KEY), 
+            this.textures.exists(SHADOW_ASSET_KEY));
     }
 
     create() {
@@ -108,8 +119,18 @@ export default class GameScene extends Phaser.Scene {
             console.error("Local player data not found!");
             return; // Cannot proceed without local player
         }
-        // Get the entity associated with the local player
+        
+        console.log("Local player data found:", localPlayerData);
+        console.log("Looking for entity with ID:", localPlayerData.entityId);
+
+        // Debug: Check all entity tables
+        console.log("Entities in DB:", 
+            Array.from(this.spacetimeDBClient.sdkConnection?.db.entity.iter() || [])
+                .map(e => `Entity ID: ${e.entityId} at (${e.position.x},${e.position.y})`));
+                
+        // Get the entity associated with the local player - use the correct property name
         const localEntityData = this.spacetimeDBClient.sdkConnection?.db.entity.entity_id.find(localPlayerData.entityId);
+        
         if (!localEntityData) {
             // Log that we are waiting, but don't create the sprite yet.
             // The Entity.onInsert/onUpdate listener will handle creation/positioning when data arrives.
@@ -212,93 +233,89 @@ export default class GameScene extends Phaser.Scene {
 
     // Helper function to handle entity updates and move corresponding sprites
     handleEntityUpdate(entityData: Entity) {
-         if (!this.isPlayerDataReady || !this.spacetimeDBClient?.sdkConnection?.db || !this.spacetimeDBClient?.identity) return;
-         const localIdentity = this.spacetimeDBClient.identity;
+        console.log(`Entity update received: ID ${entityData.entityId} at pos (${entityData.position.x}, ${entityData.position.y})`);
+        
+        // Get local player EntityId (inline implementation to avoid TypeScript issues)
+        let localPlayerEntityId: number | undefined = undefined;
+        try {
+            if (this.spacetimeDBClient?.identity && this.spacetimeDBClient?.sdkConnection?.db) {
+                const localPlayer = this.spacetimeDBClient.sdkConnection.db.player.identity.find(
+                    // Force type assertion here to work around the TypeScript error
+                    this.spacetimeDBClient.identity as any as Identity
+                );
+                if (localPlayer) {
+                    localPlayerEntityId = localPlayer.entityId;
+                }
+            }
+        } catch (error) {
+            console.error("Error getting local player entity ID:", error);
+        }
+        
+        // Check if this entity update is for the local player
+        if (localPlayerEntityId === entityData.entityId) {
+            console.log(`Local player entity updated: ${entityData.entityId}`);
+            
+            // If local player sprite doesn't exist yet, create it now
+            if (!this.localPlayerSprite) {
+                console.log(`Creating local player sprite from entity update at (${entityData.position.x}, ${entityData.position.y})`);
+                const startX = Math.floor(entityData.position.x);
+                const startY = Math.floor(entityData.position.y);
+                
+                // Get local player data for the name
+                let playerName = 'Player';
+                try {
+                    if (this.spacetimeDBClient?.identity && this.spacetimeDBClient?.sdkConnection?.db) {
+                        const localPlayer = this.spacetimeDBClient.sdkConnection.db.player.identity.find(
+                            this.spacetimeDBClient.identity as any as Identity
+                        );
+                        if (localPlayer?.name) {
+                            playerName = localPlayer.name;
+                        }
+                    }
+                } catch (error) {
+                    console.error("Error getting player name:", error);
+                }
+                
+                this.localPlayerSprite = this.physics.add.sprite(startX, startY, PLAYER_ASSET_KEY);
+                this.localPlayerSprite.setDepth(1);
+                this.localPlayerNameText = this.add.text(startX, startY - Math.floor(this.localPlayerSprite.height / 2) - 10, 
+                    playerName, PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
+                this.localPlayerNameText.setDepth(2);
+                this.localPlayerShadow = this.add.image(startX, startY + SHADOW_OFFSET_Y, SHADOW_ASSET_KEY)
+                    .setAlpha(SHADOW_ALPHA)
+                    .setDepth(0);
+                this.localPlayerSprite.setCollideWorldBounds(true);
 
-         // Check if this entity update is for the local player
-         const localPlayer = this.spacetimeDBClient.sdkConnection?.db.player.identity.find(localIdentity);
-         if (localPlayer && localPlayer.entityId === entityData.entityId) {
-             if (!this.localPlayerSprite) {
-                 // Sprite doesn't exist yet, create it now that we have entity data
-                 console.log(`Creating local player sprite (via entity update) for ${localPlayer.name} at (${entityData.position.x}, ${entityData.position.y})`);
-                 const startX = Math.floor(entityData.position.x);
-                 const startY = Math.floor(entityData.position.y);
-                 this.localPlayerSprite = this.physics.add.sprite(startX, startY, PLAYER_ASSET_KEY);
-                 this.localPlayerSprite.setDepth(1); // Set sprite depth explicitly
-                 this.localPlayerNameText = this.add.text(startX, startY - Math.floor(this.localPlayerSprite.height / 2) - 10, localPlayer.name || 'Player', PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
-                 this.localPlayerNameText.setDepth(2); // Ensure name is above sprite
-                 this.localPlayerShadow = this.add.image(startX, startY + SHADOW_OFFSET_Y, SHADOW_ASSET_KEY)
-                     .setAlpha(SHADOW_ALPHA)
-                     .setDepth(0); // Set shadow depth explicitly below sprite
-                 this.localPlayerSprite.setCollideWorldBounds(true);
-
-                // --- Camera Setup ---
-                const worldSize = this.physics.world.bounds.width; // Or pass it in/get from config
-                // Make camera follow instantly (lerp = 1)
+                // Camera follow
                 this.cameras.main.startFollow(this.localPlayerSprite, true, 1, 1);
-                this.cameras.main.setBounds(0, 0, worldSize, worldSize);
-                this.cameras.main.setZoom(1);
-                this.cameras.main.setRoundPixels(true); // Enable pixel rounding here too
-                console.log("Local player sprite and camera initialized via handleEntityUpdate.")
-             } else {
-                 // Sprite exists, potential server reconciliation logic could go here
-                 // console.debug(`Received entity update for existing local player sprite: ${entityData.entityId}`);
-                // For now, we assume client-side prediction handles movement, so we don't reposition here.
-                 // If server reconciliation is needed, update sprite position here:
-                 // this.localPlayerSprite.setPosition(entityData.position.x, entityData.position.y);
-             }
-             return; // Handled local player update
-         }
+                this.cameras.main.setRoundPixels(true);
+            }
+            
+            // Store server position for interpolation
+            this.serverPosition = new Phaser.Math.Vector2(entityData.position.x, entityData.position.y);
+            return;
+        }
+        
+        // Logic for other player entities
+        // Find the player who owns this entity in pending players
+        const pendingPlayer = this.pendingPlayers.get(entityData.entityId);
+        if (pendingPlayer) {
+            // We have player data waiting for this entity - create/update
+            console.log(`Found pending player for entity ${entityData.entityId}`);
+            this.addOrUpdateOtherPlayer(pendingPlayer);
+            return;
+        }
 
-         // Check if this entity update corresponds to a player waiting for entity data
-         if (this.pendingPlayers.has(entityData.entityId)) {
-             const pendingPlayerData = this.pendingPlayers.get(entityData.entityId)!;
-             console.log(`Entity data received for pending player ${pendingPlayerData.name} (Entity ID: ${entityData.entityId}). Creating sprite now.`);
-             this.pendingPlayers.delete(entityData.entityId); // Remove from pending
-
-             // Now create the actual player sprite using both player and entity data
-             // Ensure we don't accidentally re-add if it somehow got created between checks
-             if (!this.otherPlayers.has(pendingPlayerData.identity)) {
-                 console.log(`Creating new player sprite for pending player ${pendingPlayerData.name} at (${entityData.position.x}, ${entityData.position.y})`);
-                 const shadow = this.add.image(0, SHADOW_OFFSET_Y, SHADOW_ASSET_KEY)
-                     .setAlpha(SHADOW_ALPHA)
-                     .setDepth(-1); // Depth relative to container, draw behind sprite
-                 const sprite = this.add.sprite(0, 0, PLAYER_ASSET_KEY);
-                 const text = this.add.text(0, -Math.floor(sprite.height / 2) - 10, pendingPlayerData.name || 'Player', PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
-                 const startX = Math.floor(entityData.position.x);
-                 const startY = Math.floor(entityData.position.y);
-                 const container = this.add.container(startX, startY, [shadow, sprite, text]);
-                 container.setData('entityId', entityData.entityId); // Store entityId
-                 this.otherPlayers.set(pendingPlayerData.identity, container);
-                 console.log(`Created container for PENDING player ${pendingPlayerData.name}. Shadow Visible: ${shadow.visible}`);
-             } else {
-                console.warn(`Tried to create pending player ${pendingPlayerData.name}, but they already exist in otherPlayers map.`);
-                // If it already exists, maybe just update its position?
-                this.updateOtherPlayerPosition(pendingPlayerData.identity, entityData.position.x, entityData.position.y);
-             }
-             return; // Handled pending player creation
-         }
-
-         // If not a local player and not a pending player, it must be an update for an existing other player.
-         // Find the other player's container associated with this entityId
-         let foundPlayerIdentity: Identity | null = null;
-         for (const [identity, container] of this.otherPlayers.entries()) {
-            if (container.getData('entityId') === entityData.entityId) {
-                foundPlayerIdentity = identity;
-                break;
+        // Try finding the owning player by entity ID in all known players
+        for (const player of this.spacetimeDBClient.sdkConnection?.db.player.iter() || []) {
+            if (player.entityId === entityData.entityId) {
+                console.log(`Found player ${player.name} for entity ${entityData.entityId}`);
+                this.updateOtherPlayerPosition(player.identity, entityData.position.x, entityData.position.y);
+                return;
             }
         }
-
-        if (foundPlayerIdentity) {
-             // This entity belongs to another player we know about
-            console.debug(`Received entity update for other player: ${entityData.entityId}, Identity: ${foundPlayerIdentity.toHexString()}`);
-            this.updateOtherPlayerPosition(foundPlayerIdentity, entityData.position.x, entityData.position.y);
-        } else {
-            // Entity update received, but we don't have a corresponding player sprite yet.
-            // This might happen if Entity.onInsert arrives before Player.onInsert.
-            // We could potentially trigger a check here or wait for Player.onInsert.
-            console.warn(`Received entity update for unknown player (Entity ID: ${entityData.entityId})`);
-        }
+        
+        console.warn(`Entity update received for unknown entity: ${entityData.entityId}`);
     }
 
     addOrUpdateOtherPlayer(playerData: Player) {
@@ -379,81 +396,119 @@ export default class GameScene extends Phaser.Scene {
         this.physics.velocityFromRotation(angle, PLAYER_SPEED, this.localPlayerSprite.body?.velocity);
     }
 
-    update(_time: number, delta: number) {
+    update(time: number, delta: number) {
         if (!this.isPlayerDataReady || !this.localPlayerSprite || !this.localPlayerNameText || !this.cursors || !this.spacetimeDBClient?.sdkConnection?.reducers) {
             return; // Don't run update logic until player and reducers are ready
         }
 
-        const velocity = new Phaser.Math.Vector2(0, 0);
+        // Calculate input direction
+        const inputDirection = new Phaser.Math.Vector2(0, 0);
         let isMoving = false;
 
         // Keyboard movement
         if (this.cursors.left?.isDown || this.input.keyboard?.addKey('A').isDown) {
-            velocity.x = -1;
+            inputDirection.x = -1;
             isMoving = true;
         }
         if (this.cursors.right?.isDown || this.input.keyboard?.addKey('D').isDown) {
-            velocity.x = 1;
+            inputDirection.x = 1;
             isMoving = true;
         }
         if (this.cursors.up?.isDown || this.input.keyboard?.addKey('W').isDown) {
-            velocity.y = -1;
+            inputDirection.y = -1;
             isMoving = true;
         }
         if (this.cursors.down?.isDown || this.input.keyboard?.addKey('S').isDown) {
-            velocity.y = 1;
+            inputDirection.y = 1;
             isMoving = true;
         }
 
-        // Normalize velocity and apply speed
+        // Normalize direction if moving
         if (isMoving) {
-            velocity.normalize().scale(PLAYER_SPEED);
-            this.localPlayerSprite.setVelocity(velocity.x, velocity.y);
-        } else {
-             // Stop movement if no keyboard input is detected and not currently moving via touch
-            if (!this.input.activePointer.isDown) {
-                 this.localPlayerSprite.setVelocity(0, 0);
-            }
+            inputDirection.normalize();
         }
 
-        // Round the sprite's position *after* physics velocity is applied
-        this.localPlayerSprite.x = Math.floor(this.localPlayerSprite.x);
-        this.localPlayerSprite.y = Math.floor(this.localPlayerSprite.y);
+        // Check if direction changed or if it's time to send an update
+        const directionChanged = this.currentDirection.x !== inputDirection.x || 
+                                this.currentDirection.y !== inputDirection.y ||
+                                this.isMoving !== isMoving;
+        
+        const timeToUpdate = time - this.lastDirectionUpdateTime >= DIRECTION_UPDATE_RATE;
+        
+        // Send direction update to server if needed
+        if ((directionChanged || (isMoving && timeToUpdate)) && this.spacetimeDBClient.sdkConnection?.reducers) {
+            this.currentDirection.copy(inputDirection);
+            this.isMoving = isMoving;
+            this.lastDirectionUpdateTime = time;
+            
+            // Send the direction to the server - using the dedicated direction reducer
+            this.spacetimeDBClient.sdkConnection.reducers.updatePlayerDirection(
+                inputDirection.x,
+                inputDirection.y
+            );
+            
+            console.debug(`Sent direction update: (${inputDirection.x.toFixed(2)}, ${inputDirection.y.toFixed(2)})`);
+        }
+        
+        // Interpolate towards server position if available
+        if (this.serverPosition && this.localPlayerSprite) {
+            const currentPos = new Phaser.Math.Vector2(this.localPlayerSprite.x, this.localPlayerSprite.y);
+            
+            // Calculate distance to server position
+            const distanceToServer = Phaser.Math.Distance.Between(
+                currentPos.x, currentPos.y,
+                this.serverPosition.x, this.serverPosition.y
+            );
+            
+            // If we're far from server position, use interpolation
+            if (distanceToServer > 2) {
+                // Interpolate position (lerp)
+                currentPos.lerp(this.serverPosition, INTERPOLATION_SPEED);
+                this.localPlayerSprite.setPosition(currentPos.x, currentPos.y);
+            }
+        }
+        
+        // Apply client-side prediction if moving
+        if (isMoving && this.localPlayerSprite) {
+            // Calculate the velocity based on input direction and speed
+            const velocity = inputDirection.clone().scale(PLAYER_SPEED);
+            
+            // Calculate the predicted movement for this frame
+            const frameVelocity = velocity.clone().scale(delta / 1000);
+            
+            // Apply prediction by moving the sprite
+            this.localPlayerSprite.x += frameVelocity.x;
+            this.localPlayerSprite.y += frameVelocity.y;
+        }
+
+        // Round the sprite's position for pixel-perfect rendering
+        if (this.localPlayerSprite) {
+            this.localPlayerSprite.x = Math.floor(this.localPlayerSprite.x);
+            this.localPlayerSprite.y = Math.floor(this.localPlayerSprite.y);
+        }
 
         // Update local player shadow and name text position
         if (this.localPlayerSprite && this.localPlayerShadow) {
             this.localPlayerShadow.setPosition(this.localPlayerSprite.x, this.localPlayerSprite.y + SHADOW_OFFSET_Y);
-            // console.log(`Updating local shadow position to (${this.localPlayerShadow.x}, ${this.localPlayerShadow.y})`); // Optional: uncomment for verbose logging
         }
-        // Update name text position, using the now-rounded sprite coordinates
-        this.localPlayerNameText.setPosition(
-            this.localPlayerSprite.x, // Already rounded
-            this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - 10
-        );
-
-        // --- Network Update ---
-        const currentVelocity = this.localPlayerSprite?.body?.velocity;
-        // Only send update if moving
-        if (currentVelocity && (currentVelocity.x !== 0 || currentVelocity.y !== 0)) {
-            // Send the rounded position
-            const newX = this.localPlayerSprite!.x;
-            const newY = this.localPlayerSprite!.y;
-            // Use the reducers object from the client instance
-            this.spacetimeDBClient.sdkConnection?.reducers.updatePlayerPosition(newX, newY);
-            console.debug(`Sent position update: (${newX.toFixed(2)}, ${newY.toFixed(2)})`);
-        } else {
-             // Could potentially send a 'stopped moving' event if needed
+        
+        if (this.localPlayerSprite && this.localPlayerNameText) {
+            // Update name text position, using the rounded sprite coordinates
+            this.localPlayerNameText.setPosition(
+                this.localPlayerSprite.x,
+                this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - 10
+            );
         }
 
         // Keep other player names above their sprites
         this.otherPlayers.forEach(container => {
-             // Indices shift: 0=shadow, 1=sprite, 2=text
-             const shadow = container.getAt(0) as Phaser.GameObjects.Image; // Check shadow
-             const sprite = container.getAt(1) as Phaser.GameObjects.Sprite;
-             // console.log(`Other player container list: ${container.list.map(go => go.type)} Shadow Visible: ${shadow?.visible}`); // Optional: uncomment for verbose logging
-              // Position relative to container, rounding the offset calculation
-              const text = container.getAt(2) as Phaser.GameObjects.Text;
-              text.setPosition(0, Math.floor(-sprite.height / 2) - 10);
+            // Indices shift: 0=shadow, 1=sprite, 2=text
+            const shadow = container.getAt(0) as Phaser.GameObjects.Image;
+            const sprite = container.getAt(1) as Phaser.GameObjects.Sprite;
+            
+            // Position relative to container, rounding the offset calculation
+            const text = container.getAt(2) as Phaser.GameObjects.Text;
+            text.setPosition(0, Math.floor(-sprite.height / 2) - 10);
         });
     }
 } 

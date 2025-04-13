@@ -14,6 +14,49 @@ public static partial class Module
             this.x = x;
             this.y = y;
         }
+        
+        // Get normalized vector (direction only)
+        public DbVector2 Normalize()
+        {
+            float mag = Magnitude();
+            if (mag > 0)
+            {
+                return new DbVector2(x / mag, y / mag);
+            }
+            return new DbVector2(0, 0);
+        }
+        
+        // Get magnitude (length) of vector
+        public float Magnitude()
+        {
+            return MathF.Sqrt(x * x + y * y);
+        }
+        
+        // Vector addition
+        public static DbVector2 operator +(DbVector2 a, DbVector2 b)
+        {
+            return new DbVector2(a.x + b.x, a.y + b.y);
+        }
+        
+        // Vector multiplication by scalar
+        public static DbVector2 operator *(DbVector2 a, float b)
+        {
+            return new DbVector2(a.x * b, a.y * b);
+        }
+    }
+    
+    // --- Game Constants ---
+    private const float PLAYER_SPEED = 200.0f; // Units per second
+    private const float TICK_RATE = 20.0f; // Updates per second (50ms)
+    private const float DELTA_TIME = 1.0f / TICK_RATE; // Time between ticks in seconds
+
+    // --- Timer Table ---
+    [Table(Name = "game_tick_timer", Scheduled = nameof(GameTick), ScheduledAt = nameof(scheduled_at))]
+    public partial struct GameTickTimer
+    {
+        [PrimaryKey, AutoInc]
+        public ulong scheduled_id;
+        public ScheduleAt scheduled_at;
     }
 
     // --- Tables ---
@@ -25,6 +68,10 @@ public static partial class Module
 
         public DbVector2 position;
         public uint mass;
+        
+        // Added direction and movement state directly to Entity
+        public DbVector2 direction;   // Direction vector (normalized)
+        public bool is_moving;        // Whether entity is actively moving
     }
 
     [SpacetimeDB.Table(Name = "player", Public = true)] // Typically player table shouldn't be public, but adjusting per example
@@ -41,6 +88,20 @@ public static partial class Module
     }
 
     // --- Lifecyle Hooks ---
+    [Reducer(ReducerKind.Init)]
+    public static void Init(ReducerContext ctx)
+    {
+        Log.Info("Initializing game and scheduling game tick...");
+        
+        // Schedule game tick to run at regular intervals (50ms = 20 ticks/second)
+        ctx.Db.game_tick_timer.Insert(new GameTickTimer
+        {
+            scheduled_at = new ScheduleAt.Interval(TimeSpan.FromMilliseconds(50))
+        });
+        
+        Log.Info("Game tick scheduled successfully");
+    }
+    
     [Reducer(ReducerKind.ClientConnected)]
     public static void ClientConnected(ReducerContext ctx)
     {
@@ -53,11 +114,13 @@ public static partial class Module
         {
             Log.Info($"New player detected. Creating records for {identity}.");
 
-            // 1. Create the Entity for the player
+            // 1. Create the Entity for the player with default direction and not moving
             Entity? newEntityOpt = ctx.Db.entity.Insert(new Entity
             {
                 position = new DbVector2(100, 100), // Example starting position
-                mass = 10 // Example starting mass
+                mass = 10, // Example starting mass
+                direction = new DbVector2(0, 0), // Default direction
+                is_moving = false // Not moving by default
             });
 
             // Check if entity insertion failed
@@ -92,7 +155,6 @@ public static partial class Module
              // Insertion succeeded, get the non-nullable value
             Player newPlayer = newPlayerOpt.Value;
             Log.Info($"Created new player record for {identity} linked to entity {newPlayer.entity_id}.");
-
         }
         else
         {
@@ -135,36 +197,68 @@ public static partial class Module
     }
 
     [Reducer]
-    public static void UpdatePlayerPosition(ReducerContext ctx, float x, float y)
+    public static void UpdatePlayerDirection(ReducerContext ctx, float dirX, float dirY)
     {
         var identity = ctx.Sender;
         // Find the player record for the caller
         var playerOpt = ctx.Db.player.identity.Find(identity);
         if (playerOpt is null)
         {
-            Log.Warn($"UpdatePlayerPosition called by non-existent player {identity}.");
+            Log.Warn($"UpdatePlayerDirection called by non-existent player {identity}.");
             return;
         }
         var player = playerOpt.Value;
-
+        
+        // Get direction vector and determine if player is attempting to move
+        var direction = new DbVector2(dirX, dirY);
+        bool isMoving = dirX != 0 || dirY != 0;
+        
         // Find the entity associated with this player
         var entityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
         if (entityOpt is null)
         {
-            Log.Error($"Player {identity} (entity_id: {player.entity_id}) has no matching entity! Cannot update position.");
-            // This indicates a data consistency issue - player exists but their entity doesn't
+            Log.Error($"Player {identity} (entity_id: {player.entity_id}) has no matching entity! Cannot update direction.");
             return;
         }
+        
+        // Update entity with new direction and movement state
         var entity = entityOpt.Value;
-
-        // Update the entity's position
-        entity.position.x = x;
-        entity.position.y = y;
-
-        // Update the entity in the database using its primary key index
+        entity.direction = isMoving ? direction.Normalize() : direction;
+        entity.is_moving = isMoving;
+        
+        // Update the entity in the database
         ctx.Db.entity.entity_id.Update(entity);
+        
+        Log.Debug($"Updated direction for player {player.name} to ({dirX}, {dirY}), isMoving: {isMoving}");
+    }
+    
+    [Reducer]
+    public static void GameTick(ReducerContext ctx, GameTickTimer timer)
+    {
+        // Process all movable entities
+        foreach (var entity in ctx.Db.entity.Iter())
+        {
+            if (!entity.is_moving)
+                continue;
+                
+            // Calculate new position based on direction, speed and time delta
+            float moveDistance = PLAYER_SPEED * DELTA_TIME;
+            var moveOffset = entity.direction * moveDistance;
+            
+            // Update entity with new position
+            var updatedEntity = entity;
+            updatedEntity.position = entity.position + moveOffset;
+            
+            // Update entity in database
+            ctx.Db.entity.entity_id.Update(updatedEntity);
+        }
+    }
 
-        // Avoid logging every update for performance
-        // Log.Debug($"Updated position for player {player.name} (entity: {entity.entity_id}) to ({x}, {y})");
+    // Legacy position update reducer - kept for compatibility but now unused
+    [Reducer]
+    public static void UpdatePlayerPosition(ReducerContext ctx, float x, float y)
+    {
+        Log.Warn("UpdatePlayerPosition called but server now uses direction-based movement. Please update client.");
+        // This reducer is kept for backward compatibility but does nothing now
     }
 }
