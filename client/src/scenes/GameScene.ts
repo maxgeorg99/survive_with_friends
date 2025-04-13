@@ -104,37 +104,41 @@ export default class GameScene extends Phaser.Scene {
         // Get the entity associated with the local player
         const localEntityData = this.spacetimeDBClient.sdkConnection?.db.entity.entity_id.find(localPlayerData.entityId);
         if (!localEntityData) {
-            console.error(`Entity data not found for local player ${localPlayerData.identity.toHexString()} (entityId: ${localPlayerData.entityId})!`);
-            // Handle fallback or wait for entity data
-            const startX = 100, startY = 100; // Fallback position
-             console.log(`Creating local player sprite for ${localPlayerData.name} at fallback (${startX}, ${startY})`);
-             this.localPlayerSprite = this.physics.add.sprite(startX, startY, PLAYER_ASSET_KEY);
-             this.localPlayerNameText = this.add.text(startX, startY - (this.localPlayerSprite.height / 2) - 10, localPlayerData.name || 'Player', PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
+            // Log that we are waiting, but don't create the sprite yet.
+            // The Entity.onInsert/onUpdate listener will handle creation/positioning when data arrives.
+            console.warn(`Entity data not found for local player ${localPlayerData.identity.toHexString()} (entityId: ${localPlayerData.entityId}). Waiting for entity data...`);
+             // Optionally: You could set a flag here to indicate we are waiting for the entity
+             // return; // Or simply return if you don't want to proceed further without the entity
         } else {
             console.log(`Creating local player sprite for ${localPlayerData.name} at (${localEntityData.position.x}, ${localEntityData.position.y})`);
             this.localPlayerSprite = this.physics.add.sprite(localEntityData.position.x, localEntityData.position.y, PLAYER_ASSET_KEY);
             this.localPlayerNameText = this.add.text(localEntityData.position.x, localEntityData.position.y - this.localPlayerSprite.height / 2 - 10, localPlayerData.name || 'Player', PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
+             this.localPlayerSprite.setCollideWorldBounds(true);
+
+            // --- Camera Setup (Only if sprite exists) ---
+            this.cameras.main.startFollow(this.localPlayerSprite, true, 0.1, 0.1);
+            this.cameras.main.setBounds(0, 0, worldSize, worldSize);
+            this.cameras.main.setZoom(1);
         }
 
-        this.localPlayerSprite.setCollideWorldBounds(true);
-
-        // --- Camera Setup ---
-        this.cameras.main.startFollow(this.localPlayerSprite, true, 0.1, 0.1);
-        this.cameras.main.setBounds(0, 0, worldSize, worldSize);
-        this.cameras.main.setZoom(1);
-
-        // --- SpacetimeDB Listeners ---
+        // Move SpacetimeDB listener registration *before* player iteration
+        // to ensure listeners are active when processing existing players.
         this.registerSpacetimeDBListeners();
 
         // Initialize existing players already in the DB
         console.log("Initializing existing players from SpacetimeDB...");
+        // This loop might need adjustment if addOrUpdateOtherPlayer relies on localPlayerSprite being set
         for (const player of this.spacetimeDBClient.sdkConnection?.db.player.iter()) {
              if (!player.identity.isEqual(localIdentity)) {
                 console.log(`Found existing player: ${player.name}`);
                 this.addOrUpdateOtherPlayer(player);
             }
         }
-        console.log("Game world initialization complete.");
+
+        // --- SpacetimeDB Listeners ---
+        // this.registerSpacetimeDBListeners(); // Moved earlier
+
+        console.log("Game world initialization checks complete."); // Message changed slightly
     }
 
     registerSpacetimeDBListeners() {
@@ -195,12 +199,31 @@ export default class GameScene extends Phaser.Scene {
          if (!this.isPlayerDataReady || !this.spacetimeDBClient?.sdkConnection?.db || !this.spacetimeDBClient?.identity) return;
          const localIdentity = this.spacetimeDBClient.identity;
 
-         // Check if this entity update is for the local player (for server reconciliation)
+         // Check if this entity update is for the local player
          const localPlayer = this.spacetimeDBClient.sdkConnection?.db.player.identity.find(localIdentity);
-         if (localPlayer && localPlayer.entityId === entityData.entityId && this.localPlayerSprite) {
-             // Server reconciliation logic could go here
-             // console.debug(`Received entity update for local player: ${entityData.entityId}`);
-             return; // Assuming client-side prediction for now
+         if (localPlayer && localPlayer.entityId === entityData.entityId) {
+             if (!this.localPlayerSprite) {
+                 // Sprite doesn't exist yet, create it now that we have entity data
+                 console.log(`Creating local player sprite (via entity update) for ${localPlayer.name} at (${entityData.position.x}, ${entityData.position.y})`);
+                 this.localPlayerSprite = this.physics.add.sprite(entityData.position.x, entityData.position.y, PLAYER_ASSET_KEY);
+                 this.localPlayerNameText = this.add.text(entityData.position.x, entityData.position.y - this.localPlayerSprite.height / 2 - 10, localPlayer.name || 'Player', PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
+                 this.localPlayerSprite.setCollideWorldBounds(true);
+
+                // --- Camera Setup ---
+                // Get world size (assuming it's consistent or retrieved elsewhere if dynamic)
+                const worldSize = this.physics.world.bounds.width; // Or pass it in/get from config
+                this.cameras.main.startFollow(this.localPlayerSprite, true, 0.1, 0.1);
+                this.cameras.main.setBounds(0, 0, worldSize, worldSize);
+                this.cameras.main.setZoom(1);
+                console.log("Local player sprite and camera initialized via handleEntityUpdate.")
+             } else {
+                 // Sprite exists, potential server reconciliation logic could go here
+                 // console.debug(`Received entity update for existing local player sprite: ${entityData.entityId}`);
+                // For now, we assume client-side prediction handles movement, so we don't reposition here.
+                 // If server reconciliation is needed, update sprite position here:
+                 // this.localPlayerSprite.setPosition(entityData.position.x, entityData.position.y);
+             }
+             return; // Handled local player update
          }
 
          // Find the other player's container associated with this entityId
