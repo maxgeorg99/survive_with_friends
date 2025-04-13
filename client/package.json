@@ -1,0 +1,22 @@
+{
+  "name": "vibe_survivors_client",
+  "version": "1.0.0",
+  "description": "Phaser client for Vibe Survivors",
+  "main": "src/main.ts",
+  "scripts": {
+    "start": "vite",
+    "build": "vite build",
+    "serve": "vite preview",
+    "generate-bindings": "spacetimedb generate --lang typescript --out-dir ./src/autobindings"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "phaser": "^3.80.1",
+    "@clockworklabs/spacetimedb-sdk": "^1.0.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "vite": "^5.0.11"
+  }
+} 
