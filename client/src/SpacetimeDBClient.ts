@@ -61,7 +61,8 @@ class SpacetimeDBClient {
             .onError(this.handleSubscriptionError.bind(this))
             .subscribe([
                 "SELECT * FROM player",
-                "SELECT * FROM entity"
+                "SELECT * FROM entity",
+                "SELECT * FROM monsters"
             ]);
 
         // Call external onConnect listener
@@ -78,7 +79,9 @@ class SpacetimeDBClient {
         if (this.sdkConnection?.db) {
             const playerCount = Array.from(this.sdkConnection.db.player.iter()).length;
             const entityCount = Array.from(this.sdkConnection.db.entity.iter()).length;
-            console.log(`Subscription data received: ${playerCount} players, ${entityCount} entities`);
+            const monsterCount = Array.from(this.sdkConnection.db.monsters.iter()).length;
+            
+            console.log(`Subscription data received: ${playerCount} players, ${entityCount} entities, ${monsterCount} monsters`);
             
             // Log all players received
             console.log("=== PLAYERS RECEIVED IN SUBSCRIPTION ===");
@@ -90,6 +93,12 @@ class SpacetimeDBClient {
             console.log("=== ENTITIES RECEIVED IN SUBSCRIPTION ===");
             Array.from(this.sdkConnection.db.entity.iter()).forEach(e => {
                 console.log(`Entity ID: ${e.entityId} at (${e.position.x}, ${e.position.y})`);
+            });
+            
+            // Log all monsters received
+            console.log("=== MONSTERS RECEIVED IN SUBSCRIPTION ===");
+            Array.from(this.sdkConnection.db.monsters.iter()).forEach(m => {
+                console.log(`Monster ID: ${m.monsterId}, Type: ${m.bestiaryId.tag}, EntityID: ${m.entityId}, HP: ${m.hp}`);
             });
         }
         
