@@ -337,16 +337,17 @@ export default class GameScene extends Phaser.Scene {
             this.cameras.main.setRoundPixels(true); // Enable pixel rounding
         }
 
-        // Move SpacetimeDB listener registration *before* player iteration
-        // to ensure listeners are active when processing existing players.
+        // Register event listeners
         this.registerSpacetimeDBListeners();
+        
+        // Force an explicit player sync after entering the game world
+        this.syncPlayers();
 
-        // Initialize existing players already in the DB
-        console.log("Initializing existing players from SpacetimeDB...");
-        // This loop might need adjustment if addOrUpdateOtherPlayer relies on localPlayerSprite being set
-        for (const player of this.spacetimeDBClient.sdkConnection?.db.player.iter()) {
-             if (!player.identity.isEqual(localIdentity)) {
-                console.log(`Found existing player: ${player.name}`);
+        // Initialize other players (those already in the database)
+        console.log("Looking for other existing players in the game world...");
+        for (const player of this.spacetimeDBClient.sdkConnection?.db?.player.iter() || []) {
+            if (!player.identity.isEqual(localIdentity)) {
+                console.log(`Found other player ${player.name} (ID: ${player.identity.toHexString()}, EntityID: ${player.entityId})`);
                 this.addOrUpdateOtherPlayer(player as Player);
             }
         }
@@ -926,6 +927,45 @@ export default class GameScene extends Phaser.Scene {
                     healthBarBackground.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
                     healthBar.x = this.localPlayerSprite.x - (HEALTH_BAR_WIDTH / 2);
                     healthBar.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
+                }
+            }
+        }
+    }
+
+    // Force a synchronization of player entities
+    syncPlayers() {
+        console.log("Forcing player sync...");
+        if (!this.spacetimeDBClient || !this.spacetimeDBClient.identity || !this.spacetimeDBClient.sdkConnection?.db) {
+            console.error("Cannot sync players: SpacetimeDB client, identity, or tables not available");
+            return;
+        }
+
+        const localIdentity = this.spacetimeDBClient.identity;
+        const allPlayers = Array.from(this.spacetimeDBClient.sdkConnection.db.player.iter());
+        const allEntities = Array.from(this.spacetimeDBClient.sdkConnection.db.entity.iter());
+        
+        console.log(`Syncing ${allPlayers.length} players with ${allEntities.length} entities`);
+        
+        // First, handle local player if not already created
+        if (!this.localPlayerSprite) {
+            const localPlayer = allPlayers.find(p => p.identity.isEqual(localIdentity));
+            if (localPlayer) {
+                const entityData = allEntities.find(e => e.entityId === localPlayer.entityId);
+                if (entityData) {
+                    console.log(`Creating local player during sync: ${localPlayer.name} at (${entityData.position.x}, ${entityData.position.y})`);
+                    this.handleEntityUpdate(entityData);
+                }
+            }
+        }
+        
+        // Then handle all other players
+        for (const player of allPlayers) {
+            if (!player.identity.isEqual(localIdentity)) {
+                const entityData = allEntities.find(e => e.entityId === player.entityId);
+                if (entityData) {
+                    console.log(`Syncing other player: ${player.name} at (${entityData.position.x}, ${entityData.position.y})`);
+                    this.addOrUpdateOtherPlayer(player);
+                    this.updateOtherPlayerPosition(player.identity, entityData.position.x, entityData.position.y);
                 }
             }
         }
