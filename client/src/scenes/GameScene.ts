@@ -33,6 +33,13 @@ const MONSTER_HEALTH_BAR_WIDTH = 40;
 const MONSTER_HEALTH_BAR_HEIGHT = 4;
 const MONSTER_HEALTH_BAR_OFFSET_Y = 12;
 
+// Depth sorting constants
+const BASE_DEPTH = 1000; // Base depth to ensure all sprites are above background
+const SHADOW_DEPTH_OFFSET = -1; // Always behind the sprite
+const NAME_DEPTH_OFFSET = 2; // Always in front of the sprite
+const HEALTH_BG_DEPTH_OFFSET = 1; // Just behind health bar but in front of sprite
+const HEALTH_BAR_DEPTH_OFFSET = 1.1; // In front of background but behind name
+
 // Asset keys for different player classes
 const CLASS_ASSET_KEYS: Record<string, string> = {
     "Fighter": 'player_fighter',
@@ -386,10 +393,15 @@ export default class GameScene extends Phaser.Scene {
                 const classKey = this.getClassSpriteKey(playerClass);
                 console.log(`Creating local player with sprite key: ${classKey}`);
                 this.localPlayerSprite = this.physics.add.sprite(startX, startY, classKey);
-                this.localPlayerSprite.setDepth(1);
+                
+                // Use Y position for depth instead of fixed value
+                const initialDepth = BASE_DEPTH + startY;
+                this.localPlayerSprite.setDepth(initialDepth);
+                console.log(`Setting initial local player depth to ${initialDepth} based on Y position ${startY}`);
+                
                 this.localPlayerNameText = this.add.text(startX, startY - Math.floor(this.localPlayerSprite.height / 2) - NAME_OFFSET_Y, 
                     `${playerName} (${playerLevel})`, PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
-                this.localPlayerNameText.setDepth(2);
+                this.localPlayerNameText.setDepth(initialDepth + NAME_DEPTH_OFFSET);
 
                 // Create health bar
                 const healthBarBackground = this.add.rectangle(
@@ -414,9 +426,9 @@ export default class GameScene extends Phaser.Scene {
                     1
                 ).setOrigin(0, 0.5);
                 
-                // Set health bar properties
-                healthBarBackground.setDepth(1.5);
-                healthBar.setDepth(1.6);
+                // Set health bar properties with Y-based depth
+                healthBarBackground.setDepth(initialDepth + HEALTH_BG_DEPTH_OFFSET);
+                healthBar.setDepth(initialDepth + HEALTH_BAR_DEPTH_OFFSET);
                 
                 // Store health bar references
                 this.localPlayerSprite.setData('healthBarBackground', healthBarBackground);
@@ -430,7 +442,7 @@ export default class GameScene extends Phaser.Scene {
                 
                 this.localPlayerShadow = this.add.image(startX, startY + SHADOW_OFFSET_Y, SHADOW_ASSET_KEY)
                     .setAlpha(SHADOW_ALPHA)
-                    .setDepth(0);
+                    .setDepth(initialDepth + SHADOW_DEPTH_OFFSET);
 
                 // Set collision bounds
                 this.localPlayerSprite.setCollideWorldBounds(true);
@@ -525,10 +537,18 @@ export default class GameScene extends Phaser.Scene {
             return;
         }
         
+        // Round position on creation
+        const startX = Math.floor(entityData.position.x);
+        const startY = Math.floor(entityData.position.y);
+        
+        // Calculate depth based on Y position
+        const initialDepth = BASE_DEPTH + startY;
+        console.log(`Setting initial depth for ${playerData.name} to ${initialDepth} based on Y position ${startY}`);
+        
         // Create new player container with shadow, sprite and name
         const shadow = this.add.image(0, SHADOW_OFFSET_Y, SHADOW_ASSET_KEY)
             .setAlpha(SHADOW_ALPHA)
-            .setDepth(-1);
+            .setDepth(SHADOW_DEPTH_OFFSET); // Relative depth within container
         
         // Get class-specific sprite
         const classKey = this.getClassSpriteKey(playerData.playerClass);
@@ -563,15 +583,14 @@ export default class GameScene extends Phaser.Scene {
             1
         ).setOrigin(0, 0.5);
         
-        // Round position on creation
-        const startX = Math.floor(entityData.position.x);
-        const startY = Math.floor(entityData.position.y);
-        
         // Create container and add all elements
         const container = this.add.container(startX, startY, [shadow, sprite, text, healthBarBackground, healthBar]);
         container.setData('entityId', entityData.entityId);
         container.setData('hp', playerData.hp);
         container.setData('maxHp', playerData.maxHp);
+        
+        // Set the container depth based on Y position
+        container.setDepth(initialDepth);
         
         // Store in our players map
         this.otherPlayers.set(playerData.identity, container);
@@ -663,7 +682,11 @@ export default class GameScene extends Phaser.Scene {
                 x: Math.floor(x),
                 y: Math.floor(y),
                 duration: 100, // Short duration for smooth sync
-                ease: 'Linear'
+                ease: 'Linear',
+                onUpdate: () => {
+                    // Update depth during the tween
+                    container.setDepth(BASE_DEPTH + container.y);
+                }
             });
         }
     }
@@ -767,26 +790,34 @@ export default class GameScene extends Phaser.Scene {
             this.localPlayerSprite.x += dx;
             this.localPlayerSprite.y += dy;
             
+            // Update the depth based on new Y position
+            this.localPlayerSprite.setDepth(BASE_DEPTH + this.localPlayerSprite.y);
+            
             // Update UI elements position
             if (this.localPlayerNameText) {
                 this.localPlayerNameText.x = this.localPlayerSprite.x;
                 this.localPlayerNameText.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - NAME_OFFSET_Y;
+                this.localPlayerNameText.setDepth(BASE_DEPTH + this.localPlayerSprite.y + NAME_DEPTH_OFFSET);
             }
             
             // Update shadow position
             if (this.localPlayerShadow) {
                 this.localPlayerShadow.x = this.localPlayerSprite.x;
                 this.localPlayerShadow.y = this.localPlayerSprite.y + SHADOW_OFFSET_Y;
+                this.localPlayerShadow.setDepth(BASE_DEPTH + this.localPlayerSprite.y + SHADOW_DEPTH_OFFSET);
             }
             
-            // Update health bar position
+            // Update health bar position and depth
             const healthBarBackground = this.localPlayerSprite.getData('healthBarBackground');
             const healthBar = this.localPlayerSprite.getData('healthBar');
             if (healthBarBackground && healthBar) {
                 healthBarBackground.x = this.localPlayerSprite.x;
                 healthBarBackground.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
+                healthBarBackground.setDepth(BASE_DEPTH + this.localPlayerSprite.y + HEALTH_BG_DEPTH_OFFSET);
+                
                 healthBar.x = this.localPlayerSprite.x - (HEALTH_BAR_WIDTH / 2);
                 healthBar.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
+                healthBar.setDepth(BASE_DEPTH + this.localPlayerSprite.y + HEALTH_BAR_DEPTH_OFFSET);
             }
         }
         
@@ -804,28 +835,41 @@ export default class GameScene extends Phaser.Scene {
                 this.localPlayerSprite.x += distX * INTERPOLATION_SPEED;
                 this.localPlayerSprite.y += distY * INTERPOLATION_SPEED;
                 
-                // Update UI elements with interpolated position
+                // Update the depth based on new Y position
+                this.localPlayerSprite.setDepth(BASE_DEPTH + this.localPlayerSprite.y);
+                
+                // Update UI elements with interpolated position and depth
                 if (this.localPlayerNameText) {
                     this.localPlayerNameText.x = this.localPlayerSprite.x;
                     this.localPlayerNameText.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - NAME_OFFSET_Y;
+                    this.localPlayerNameText.setDepth(BASE_DEPTH + this.localPlayerSprite.y + NAME_DEPTH_OFFSET);
                 }
                 
                 if (this.localPlayerShadow) {
                     this.localPlayerShadow.x = this.localPlayerSprite.x;
                     this.localPlayerShadow.y = this.localPlayerSprite.y + SHADOW_OFFSET_Y;
+                    this.localPlayerShadow.setDepth(BASE_DEPTH + this.localPlayerSprite.y + SHADOW_DEPTH_OFFSET);
                 }
                 
-                // Update health bar with interpolated position
+                // Update health bar with interpolated position and depth
                 const healthBarBackground = this.localPlayerSprite.getData('healthBarBackground');
                 const healthBar = this.localPlayerSprite.getData('healthBar');
                 if (healthBarBackground && healthBar) {
                     healthBarBackground.x = this.localPlayerSprite.x;
                     healthBarBackground.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
+                    healthBarBackground.setDepth(BASE_DEPTH + this.localPlayerSprite.y + HEALTH_BG_DEPTH_OFFSET);
+                    
                     healthBar.x = this.localPlayerSprite.x - (HEALTH_BAR_WIDTH / 2);
                     healthBar.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
+                    healthBar.setDepth(BASE_DEPTH + this.localPlayerSprite.y + HEALTH_BAR_DEPTH_OFFSET);
                 }
             }
         }
+        
+        // Update depths for other players as well
+        this.otherPlayers.forEach((container) => {
+            container.setDepth(BASE_DEPTH + container.y);
+        });
     }
 
     // Force a synchronization of player entities

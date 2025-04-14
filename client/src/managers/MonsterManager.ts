@@ -10,6 +10,12 @@ const MONSTER_HEALTH_BAR_WIDTH = 40;
 const MONSTER_HEALTH_BAR_HEIGHT = 4;
 const MONSTER_HEALTH_BAR_OFFSET_Y = 12;
 
+// Depth sorting constants (matching those in GameScene)
+const BASE_DEPTH = 1000; // Base depth to ensure all sprites are above background
+const SHADOW_DEPTH_OFFSET = -1; // Always behind the sprite
+const HEALTH_BG_DEPTH_OFFSET = 1; // Just behind health bar
+const HEALTH_BAR_DEPTH_OFFSET = 1.1; // In front of background
+
 export default class MonsterManager {
     // Reference to the scene
     private scene: Phaser.Scene;
@@ -104,6 +110,10 @@ export default class MonsterManager {
                 // Update the monster position
                 monsterContainer.x = entityData.position.x;
                 monsterContainer.y = entityData.position.y;
+                
+                // Update depth based on Y position
+                monsterContainer.setDepth(BASE_DEPTH + entityData.position.y);
+                
                 console.log(`Updated monster ${pendingMonster.monsterId} position to (${entityData.position.x}, ${entityData.position.y})`);
                 
                 // Remove from pending after updating
@@ -132,6 +142,9 @@ export default class MonsterManager {
                     // IMPORTANT: Set position directly AND IMMEDIATELY instead of recording it for later
                     monsterContainer.x = entityData.position.x;
                     monsterContainer.y = entityData.position.y;
+                    
+                    // Update depth based on Y position
+                    monsterContainer.setDepth(BASE_DEPTH + entityData.position.y);
                     
                     // Verify position was updated
                     console.log(`Monster ${monster.monsterId} position after update: (${monsterContainer.x}, ${monsterContainer.y})`);
@@ -233,6 +246,9 @@ export default class MonsterManager {
                 // Force direct position update - no tweening
                 monsterContainer.setPosition(position.x, position.y);
                 
+                // Update depth based on Y position
+                monsterContainer.setDepth(BASE_DEPTH + position.y);
+                
                 // Verify position update
                 console.log(`Monster ${monsterData.monsterId} position after setPosition: (${monsterContainer.x}, ${monsterContainer.y})`);
                 
@@ -258,6 +274,9 @@ export default class MonsterManager {
             // Create new monster sprite
             console.log(`Creating new monster sprite container: ${monsterType} at (${position.x}, ${position.y})`);
             
+            // Calculate depth based on Y position
+            const initialDepth = BASE_DEPTH + position.y;
+            
             // Create container for monster and its components
             const container = this.scene.add.container(position.x, position.y);
             
@@ -271,12 +290,12 @@ export default class MonsterManager {
             // Add shadow with monster-specific offset
             const shadow = this.scene.add.image(0, shadowOffset, SHADOW_ASSET_KEY)
                 .setAlpha(SHADOW_ALPHA)
-                .setDepth(0);
+                .setDepth(SHADOW_DEPTH_OFFSET); // Relative depth within container
             shadow.setScale(0.7); // Make monster shadows slightly smaller
             
             // Add sprite
             const sprite = this.scene.add.sprite(0, 0, spriteKey);
-            sprite.setDepth(1);
+            sprite.setDepth(0); // Base sprite at 0 relative to container
             
             // Get monster-specific max HP from lookup table
             const maxHP = MONSTER_MAX_HP[monsterType] || MONSTER_MAX_HP["default"];
@@ -296,7 +315,7 @@ export default class MonsterManager {
                 0x000000,
                 0.7
             );
-            healthBarBg.setDepth(1);
+            healthBarBg.setDepth(HEALTH_BG_DEPTH_OFFSET); // Relative depth
             
             // Health bar
             const healthPercent = monsterData.hp / maxHP;
@@ -309,15 +328,17 @@ export default class MonsterManager {
                 1
             );
             healthBar.setOrigin(0, 0.5);
-            healthBar.setDepth(1);
+            healthBar.setDepth(HEALTH_BAR_DEPTH_OFFSET); // Relative depth
             healthBar.name = 'healthBar';
             
             // Add all components to container
             container.add([shadow, sprite, healthBarBg, healthBar]);
             
             // Set container properties
-            container.setDepth(1);
+            container.setDepth(initialDepth);
             container.setSize(sprite.width, sprite.height);
+            
+            console.log(`Set monster depth to ${initialDepth} based on Y position ${position.y}`);
             
             // Store in monsters map
             this.monsters.set(monsterData.monsterId, container);
