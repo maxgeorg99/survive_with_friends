@@ -98,6 +98,17 @@ function startGameWorld() {
     if (isGameWorldStarted) return; // Only start once
     isGameWorldStarted = true;
     console.log("Starting game world and emitting playerDataReady.");
+    
+    // Clear the fallback timer if it exists
+    if ((window as any).fallbackTimerId) {
+        clearTimeout((window as any).fallbackTimerId);
+        (window as any).fallbackTimerId = null;
+    }
+    
+    // Reset button state in case it was left in loading state
+    submitNameButton.disabled = false;
+    submitNameButton.textContent = "Start";
+    
     hideNamePrompt();
     // Let the GameScene know the SpacetimeDB connection and initial subscription is ready
     game.scene.getScene('GameScene').events.emit('playerDataReady');
@@ -110,14 +121,24 @@ submitNameButton.addEventListener('click', () => {
         // Use the reducer object from the client instance
         if (spacetimeDBClient.sdkConnection?.reducers) {
             console.log(`Attempting to call enterGame reducer with name: ${name}`);
+            
+            // Show loading indicator
+            submitNameButton.disabled = true;
+            submitNameButton.textContent = "Loading...";
+            
+            // Set a fallback timer in case the event listeners don't fire
+            const fallbackTimer = setTimeout(() => {
+                console.log("Fallback timer triggered - forcing game start");
+                submitNameButton.disabled = false;
+                submitNameButton.textContent = "Start";
+                startGameWorld();
+            }, 3000); // 3 second fallback
+            
+            // Store the timer ID so we can clear it if normal flow works
+            (window as any).fallbackTimerId = fallbackTimer;
+            
             spacetimeDBClient.sdkConnection?.reducers.enterGame(name);
-            // Don't call startGameWorld here directly.
-            // Wait for the player update to be reflected in the cache,
-            // which will be picked up by GameScene's listeners.
-            // We might hide the prompt optimistically or show a loading indicator.
             console.log("Name submitted. Waiting for server confirmation...");
-            // Optionally hide prompt here, but GameScene needs player data.
-            // hideNamePrompt();
         } else {
             console.error("Cannot enter game: SpacetimeDB reducers not available.");
             alert("Error setting name. Please try again.");
@@ -137,6 +158,52 @@ spacetimeDBClient.onSubscriptionApplied = () => {
         return; // Wait for connection to be fully established in handleConnect
     }
 
+    // Set up player table listeners AFTER subscription is applied
+    console.log("Setting up player table listeners...");
+    
+    // Listen for player inserts
+    spacetimeDBClient.sdkConnection.db.player.onInsert((_ctx, player) => {
+        console.log("Player inserted event received");
+        console.log("- Player data:", JSON.stringify({
+            name: player.name,
+            id: player.identity.toHexString(),
+            entityId: player.entityId
+        }));
+        console.log("- Local identity:", spacetimeDBClient.identity?.toHexString());
+        
+        const isLocalPlayer = spacetimeDBClient.identity && player.identity.isEqual(spacetimeDBClient.identity);
+        console.log("- Is local player:", isLocalPlayer);
+        
+        if (isLocalPlayer) {
+            console.log("Local player inserted! Starting game world.");
+            startGameWorld();
+        }
+    });
+    
+    // Listen for player updates
+    spacetimeDBClient.sdkConnection.db.player.onUpdate((_ctx, oldPlayer, newPlayer) => {
+        console.log("Player updated event received");
+        console.log("- Old player data:", JSON.stringify({
+            name: oldPlayer.name,
+            id: oldPlayer.identity.toHexString(),
+            entityId: oldPlayer.entityId
+        }));
+        console.log("- New player data:", JSON.stringify({
+            name: newPlayer.name,
+            id: newPlayer.identity.toHexString(),
+            entityId: newPlayer.entityId
+        }));
+        console.log("- Local identity:", spacetimeDBClient.identity?.toHexString());
+        
+        const isLocalPlayer = spacetimeDBClient.identity && newPlayer.identity.isEqual(spacetimeDBClient.identity);
+        console.log("- Is local player:", isLocalPlayer);
+        
+        if (isLocalPlayer) {
+            console.log("Local player updated! Starting game world.");
+            startGameWorld();
+        }
+    });
+
     console.log("Checking for existing player...");
     const localPlayer = spacetimeDBClient.sdkConnection?.db.player.identity.find(spacetimeDBClient.identity);
 
@@ -149,9 +216,6 @@ spacetimeDBClient.onSubscriptionApplied = () => {
                        // GameScene won't initialize fully until player data appears
     }
 };
-
-// Connection is initiated in SpacetimeDBClient constructor
-// No need for spacetimeDBClient.connect(); here
 
 // Ensure the client instance is accessible globally or passed to scenes as needed
 (window as any).spacetimeDBClient = spacetimeDBClient;
