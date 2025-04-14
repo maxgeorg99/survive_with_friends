@@ -109,6 +109,9 @@ public static partial class Module
     {
         Log.Info("Initializing game and scheduling game tick...");
         
+        // Initialize game configuration first
+        InitGameConfig(ctx);
+        
         // Schedule game tick to run at regular intervals (50ms = 20 ticks/second)
         ctx.Db.game_tick_timer.Insert(new GameTickTimer
         {
@@ -116,6 +119,12 @@ public static partial class Module
         });
         
         Log.Info("Game tick scheduled successfully");
+        
+        // Initialize bestiary with monster data
+        InitBestiary(ctx);
+        
+        // Schedule monster spawning
+        ScheduleMonsterSpawning(ctx);
     }
     
     [Reducer(ReducerKind.ClientConnected)]
