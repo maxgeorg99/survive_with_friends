@@ -9,8 +9,8 @@ export const MONSTER_ASSET_KEYS: Record<string, string> = {
 
 // Shadow offset configurations for each monster type (vertical offset in pixels)
 export const MONSTER_SHADOW_OFFSETS: Record<string, number> = {
-    "Rat": 6,     // Smaller monster, smaller shadow offset
-    "Slime": 5,    // Very low to the ground
+    "Rat": -10,     // Smaller monster, smaller shadow offset
+    "Slime": -12,    // Very low to the ground
     "Orc": 12      // Larger monster, bigger shadow offset
 };
 

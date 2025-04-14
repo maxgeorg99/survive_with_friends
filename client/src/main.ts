@@ -37,12 +37,45 @@ const submitNameButton = document.getElementById('submitNameButton') as HTMLButt
 
 let isGameWorldStarted = false; // Flag to prevent multiple starts
 
+// Add focus/blur events to prevent game from capturing keystrokes while entering name
+nameInput.addEventListener('focus', () => {
+    // Disable game keyboard inputs when input field is focused
+    if (game.input && game.input.keyboard) {
+        game.input.keyboard.enabled = false;
+        console.log("Game keyboard input disabled while name input is focused");
+    }
+});
+
+nameInput.addEventListener('blur', () => {
+    // Re-enable keyboard inputs when input field loses focus
+    if (game.input && game.input.keyboard) {
+        game.input.keyboard.enabled = true;
+        console.log("Game keyboard input re-enabled");
+    }
+});
+
+// Also handle Enter key press on the input
+nameInput.addEventListener('keypress', (event) => {
+    if (event.key === 'Enter') {
+        submitNameButton.click();
+    }
+});
+
 function showNamePrompt() {
     console.log("Showing name prompt.");
     namePrompt.style.display = 'block';
     // Hide the game canvas while prompting for name
     if (game.canvas.parentElement) {
         game.canvas.parentElement.style.visibility = 'hidden';
+    }
+    
+    // Focus the input field automatically
+    nameInput.focus();
+    
+    // Disable game keyboard inputs when prompt is shown
+    if (game.input && game.input.keyboard) {
+        game.input.keyboard.enabled = false;
+        console.log("Game keyboard input disabled while name prompt is shown");
     }
 }
 
@@ -52,6 +85,12 @@ function hideNamePrompt() {
     // Show the game canvas
     if (game.canvas.parentElement) {
         game.canvas.parentElement.style.visibility = 'visible';
+    }
+    
+    // Re-enable keyboard inputs when prompt is hidden
+    if (game.input && game.input.keyboard) {
+        game.input.keyboard.enabled = true;
+        console.log("Game keyboard input re-enabled");
     }
 }
 
