@@ -234,125 +234,16 @@ export default class GameScene extends Phaser.Scene {
         console.log("Entities in DB:", 
             Array.from(this.spacetimeDBClient.sdkConnection?.db.entity.iter() || [])
                 .map(e => `Entity ID: ${e.entityId} at (${e.position.x},${e.position.y})`));
-                
-        // Get the entity associated with the local player - use the correct property name
-        const localEntityData = this.spacetimeDBClient.sdkConnection?.db.entity.entity_id.find(localPlayerData.entityId);
         
-        if (!localEntityData) {
-            // Log that we are waiting, but don't create the sprite yet.
-            // The Entity.onInsert/onUpdate listener will handle creation/positioning when data arrives.
-            console.warn(`Entity data not found for local player ${localPlayerData.identity.toHexString()} (entityId: ${localPlayerData.entityId}). Waiting for entity data...`);
-             // Optionally: You could set a flag here to indicate we are waiting for the entity
-             // return; // Or simply return if you don't want to proceed further without the entity
-        } else {
-            console.log(`Creating local player sprite for ${localPlayerData.name} at (${localEntityData.position.x}, ${localEntityData.position.y})`);
-            const startX = Math.floor(localEntityData.position.x);
-            const startY = Math.floor(localEntityData.position.y);
-            
-            // Get local player data for the name
-            let playerName = 'Player';
-            let playerClass = PlayerClass.Fighter; // Default class
-            let playerLevel = 1; // Default level
-            try {
-                if (this.spacetimeDBClient?.identity && this.spacetimeDBClient?.sdkConnection?.db) {
-                    const localPlayer = this.spacetimeDBClient.sdkConnection.db.player.identity.find(
-                        this.spacetimeDBClient.identity as any as Identity
-                    );
-                    if (localPlayer?.name) {
-                        playerName = localPlayer.name;
-                    }
-                    if (localPlayer?.playerClass) {
-                        playerClass = localPlayer.playerClass;
-                    }
-                    if (localPlayer?.level) {
-                        playerLevel = localPlayer.level;
-                    }
-                }
-            } catch (error) {
-                console.error("Error getting player name:", error);
-            }
-            
-            // Get class-specific sprite key
-            const classKey = this.getClassSpriteKey(playerClass);
-            console.log(`Creating local player with sprite key: ${classKey}`);
-            this.localPlayerSprite = this.physics.add.sprite(startX, startY, classKey);
-            this.localPlayerSprite.setDepth(1);
-            this.localPlayerNameText = this.add.text(
-                startX, 
-                startY - Math.floor(this.localPlayerSprite.height / 2) - NAME_OFFSET_Y, 
-                `${playerName} (${playerLevel})`, 
-                PLAYER_NAME_STYLE
-            ).setOrigin(0.5, 0.5);
-            this.localPlayerNameText.setDepth(2); // Ensure name is above sprite
-            
-            // Create health bar
-            const healthBarBackground = this.add.rectangle(
-                startX,
-                startY - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y,
-                HEALTH_BAR_WIDTH,
-                HEALTH_BAR_HEIGHT,
-                0x000000,
-                0.7
-            ).setOrigin(0.5, 0.5);
-            
-            const healthBar = this.add.rectangle(
-                startX - (HEALTH_BAR_WIDTH / 2),
-                startY - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y,
-                HEALTH_BAR_WIDTH * (this.spacetimeDBClient?.sdkConnection?.db.player.identity.find(
-                    this.spacetimeDBClient.identity as any as Identity
-                )?.hp || 100) / (this.spacetimeDBClient?.sdkConnection?.db.player.identity.find(
-                    this.spacetimeDBClient.identity as any as Identity
-                )?.maxHp || 100),
-                HEALTH_BAR_HEIGHT,
-                0x00FF00,
-                1
-            ).setOrigin(0, 0.5);
-            
-            // Set health bar properties
-            healthBarBackground.setDepth(1.5);
-            healthBar.setDepth(1.6);
-            
-            // Store health bar references
-            this.localPlayerSprite.setData('healthBarBackground', healthBarBackground);
-            this.localPlayerSprite.setData('healthBar', healthBar);
-            this.localPlayerSprite.setData('hp', this.spacetimeDBClient?.sdkConnection?.db.player.identity.find(
-                this.spacetimeDBClient.identity as any as Identity
-            )?.hp || 100);
-            this.localPlayerSprite.setData('maxHp', this.spacetimeDBClient?.sdkConnection?.db.player.identity.find(
-                this.spacetimeDBClient.identity as any as Identity
-            )?.maxHp || 100);
-            
-            // Shadow
-            this.localPlayerShadow = this.add.image(startX, startY + SHADOW_OFFSET_Y, SHADOW_ASSET_KEY)
-                .setAlpha(SHADOW_ALPHA)
-                .setDepth(0); // Set shadow depth explicitly below sprite
-            
-            this.localPlayerSprite.setCollideWorldBounds(true);
-
-            // --- Camera Setup (Only if sprite exists) ---
-            // Make camera follow instantly (lerp = 1)
-            this.cameras.main.startFollow(this.localPlayerSprite, true, 1, 1);
-            this.cameras.main.setBounds(0, 0, worldSize, worldSize);
-            this.cameras.main.setZoom(1);
-            this.cameras.main.setRoundPixels(true); // Enable pixel rounding
-        }
-
         // Register event listeners
         this.registerSpacetimeDBListeners();
         
         // Force an explicit player sync after entering the game world
+        // This will handle both local player and other players
+        console.log("Performing initial player synchronization...");
         this.syncPlayers();
 
-        // Initialize other players (those already in the database)
-        console.log("Looking for other existing players in the game world...");
-        for (const player of this.spacetimeDBClient.sdkConnection?.db?.player.iter() || []) {
-            if (!player.identity.isEqual(localIdentity)) {
-                console.log(`Found other player ${player.name} (ID: ${player.identity.toHexString()}, EntityID: ${player.entityId})`);
-                this.addOrUpdateOtherPlayer(player as Player);
-            }
-        }
-
-        console.log("Game world initialization checks complete.");
+        console.log("Game world initialization complete.");
     }
 
     registerSpacetimeDBListeners() {
@@ -541,9 +432,14 @@ export default class GameScene extends Phaser.Scene {
                     .setAlpha(SHADOW_ALPHA)
                     .setDepth(0);
 
+                // Set collision bounds
+                this.localPlayerSprite.setCollideWorldBounds(true);
+
                 // Camera follow
                 this.cameras.main.startFollow(this.localPlayerSprite, true, 1, 1);
                 this.cameras.main.setRoundPixels(true);
+                
+                console.log("Local player sprite created and camera following set up");
             }
             
             // Store server position for interpolation
@@ -954,7 +850,11 @@ export default class GameScene extends Phaser.Scene {
                 if (entityData) {
                     console.log(`Creating local player during sync: ${localPlayer.name} at (${entityData.position.x}, ${entityData.position.y})`);
                     this.handleEntityUpdate(entityData);
+                } else {
+                    console.warn(`Entity data not found for local player (entityId: ${localPlayer.entityId})`);
                 }
+            } else {
+                console.warn(`Local player data not found in player table during sync`);
             }
         }
         
@@ -964,10 +864,29 @@ export default class GameScene extends Phaser.Scene {
                 const entityData = allEntities.find(e => e.entityId === player.entityId);
                 if (entityData) {
                     console.log(`Syncing other player: ${player.name} at (${entityData.position.x}, ${entityData.position.y})`);
-                    this.addOrUpdateOtherPlayer(player);
-                    this.updateOtherPlayerPosition(player.identity, entityData.position.x, entityData.position.y);
+                    
+                    // Check if this player already has a sprite
+                    const existingContainer = this.otherPlayers.get(player.identity);
+                    if (!existingContainer) {
+                        // Create the sprite directly - this bypasses the normal flow but ensures
+                        // the sprite is created immediately
+                        console.log(`Directly creating sprite for other player: ${player.name}`);
+                        this.createOtherPlayerSprite(player, entityData);
+                    } else {
+                        // Just update position if sprite already exists
+                        console.log(`Updating position for existing player: ${player.name}`);
+                        this.updateOtherPlayerPosition(player.identity, entityData.position.x, entityData.position.y);
+                    }
+                } else {
+                    console.warn(`Entity data not found for player ${player.name} (entityId: ${player.entityId})`);
                 }
             }
         }
+        
+        // Debug output of all tracked players
+        console.log(`Total tracked other players after sync: ${this.otherPlayers.size}`);
+        this.otherPlayers.forEach((container, identity) => {
+            console.log(`- Player ${identity.toHexString()} at position (${container.x}, ${container.y})`);
+        });
     }
 }
