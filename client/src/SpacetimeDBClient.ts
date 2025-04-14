@@ -98,7 +98,7 @@ class SpacetimeDBClient {
             // Log all monsters received
             console.log("=== MONSTERS RECEIVED IN SUBSCRIPTION ===");
             Array.from(this.sdkConnection.db.monsters.iter()).forEach(m => {
-                console.log(`Monster ID: ${m.monsterId}, Type: ${m.bestiaryId.tag}, EntityID: ${m.entityId}, HP: ${m.hp}`);
+                console.log(`Monster ID: ${m.monsterId}, Type: ${m.bestiaryId.tag}, EntityID: ${m.entityId}, HP: ${m.hp}/${m.maxHp}`);
             });
         }
         

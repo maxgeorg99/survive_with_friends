@@ -15,6 +15,7 @@ public static partial class Module
         
         // monster attributes
         public uint hp;
+        public uint max_hp; // Maximum HP copied from bestiary
         
         // target entity id the monster is following
         public uint target_entity_id;
@@ -121,10 +122,11 @@ public static partial class Module
             entity_id = entityOpt.Value.entity_id,
             bestiary_id = monsterType,
             hp = bestiaryEntry.Value.max_hp,
+            max_hp = bestiaryEntry.Value.max_hp, // Store max_hp from bestiary
             target_entity_id = targetPlayer.entity_id
         });
         
-        Log.Info($"Spawned {monsterType} monster (entity: {entityOpt.Value.entity_id}) targeting player: {targetPlayer.name}");
+        Log.Info($"Spawned {monsterType} monster (entity: {entityOpt.Value.entity_id}) targeting player: {targetPlayer.name} with HP: {bestiaryEntry.Value.max_hp}/{bestiaryEntry.Value.max_hp}");
     }
     
     // Method to schedule monster spawning - called from Init in Lib.cs

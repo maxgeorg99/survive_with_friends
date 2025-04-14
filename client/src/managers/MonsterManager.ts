@@ -179,7 +179,8 @@ export default class MonsterManager {
             for (const child of children) {
                 if (child.name === 'healthBar') {
                     const healthBar = child as Phaser.GameObjects.Rectangle;
-                    const maxHP = existingMonster.getData('maxHP') || 100;
+                    // Use the server-provided max_hp instead of local constants
+                    const maxHP = monsterData.maxHp;
                     
                     // Update health bar width based on current HP percentage
                     const healthPercent = monsterData.hp / maxHP;
@@ -187,6 +188,8 @@ export default class MonsterManager {
                     
                     // Update HP data in container
                     existingMonster.setData('currentHP', monsterData.hp);
+                    existingMonster.setData('maxHP', monsterData.maxHp);
+                    console.log(`Updated monster ${monsterData.monsterId} health: ${monsterData.hp}/${monsterData.maxHp}`);
                     break;
                 }
             }
@@ -228,7 +231,7 @@ export default class MonsterManager {
         const monsterType = monsterData.bestiaryId.tag;
         const spriteKey = MONSTER_ASSET_KEYS[monsterType];
         
-        console.log(`Creating monster sprite: ID ${monsterData.monsterId}, Type ${monsterType}, Position (${position.x}, ${position.y})`);
+        console.log(`Creating monster sprite: ID ${monsterData.monsterId}, Type ${monsterType}, Position (${position.x}, ${position.y}), HP: ${monsterData.hp}/${monsterData.maxHp}`);
         
         if (!spriteKey || !this.scene.textures.exists(spriteKey)) {
             console.error(`Missing texture for monster type: ${monsterType}`);
@@ -257,8 +260,8 @@ export default class MonsterManager {
                 for (const child of children) {
                     if (child.name === 'healthBar') {
                         const healthBar = child as Phaser.GameObjects.Rectangle;
-                        // Get health from container data instead of bestiary
-                        const maxHP = monsterContainer.getData('maxHP') || 100;
+                        // Use monster server data instead of local constants
+                        const maxHP = monsterData.maxHp;
                         
                         // Update health bar width based on current HP percentage
                         const healthPercent = monsterData.hp / maxHP;
@@ -266,6 +269,7 @@ export default class MonsterManager {
                         
                         // Update HP data in container
                         monsterContainer.setData('currentHP', monsterData.hp);
+                        monsterContainer.setData('maxHP', monsterData.maxHp);
                         break;
                     }
                 }
@@ -297,8 +301,8 @@ export default class MonsterManager {
             const sprite = this.scene.add.sprite(0, 0, spriteKey);
             sprite.setDepth(0); // Base sprite at 0 relative to container
             
-            // Get monster-specific max HP from lookup table
-            const maxHP = MONSTER_MAX_HP[monsterType] || MONSTER_MAX_HP["default"];
+            // Use the server-provided max_hp instead of hardcoded values
+            const maxHP = monsterData.maxHp;
             
             // Store health data in container
             container.setData('maxHP', maxHP);
