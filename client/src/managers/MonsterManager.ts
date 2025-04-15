@@ -286,8 +286,6 @@ export default class MonsterManager {
                 // Update depth based on Y position
                 monsterContainer.setDepth(BASE_DEPTH + position.y);
                 
-                // Verify position update
-                
                 // Update health bar if it exists
                 const children = monsterContainer.getAll();
                 for (const child of children) {
@@ -306,6 +304,9 @@ export default class MonsterManager {
                         break;
                     }
                 }
+                
+                // Find and update radius visualization if debug mode is on
+                this.updateCollisionCircle(monsterContainer, monsterData.entityId);
             }
         } else {
             // Create new monster sprite
@@ -316,8 +317,6 @@ export default class MonsterManager {
             // Create container for monster and its components
             const container = this.scene.add.container(position.x, position.y);
             
-            // Verify container position after creation
-
             // Get monster-specific shadow offset from lookup table
             const shadowOffset = MONSTER_SHADOW_OFFSETS[monsterType] || 8; // Use default if not found
             
@@ -339,6 +338,7 @@ export default class MonsterManager {
             container.setData('currentHP', monsterData.hp);
             container.setData('entityId', monsterData.entityId);
             container.setData('monsterId', monsterData.monsterId);
+            container.setData('monsterType', monsterType);
             
             // Health bar background
             const healthBarBg = this.scene.add.rectangle(
@@ -372,8 +372,80 @@ export default class MonsterManager {
             container.setDepth(initialDepth);
             container.setSize(sprite.width, sprite.height);
             
+            // Create collision circle visualization (will only be visible in debug mode)
+            this.createCollisionCircle(container, monsterData.entityId);
+            
             // Store in monsters map
             this.monsters.set(monsterData.monsterId, container);
+        }
+    }
+    
+    // Create a visual representation of collision circle (for debugging)
+    private createCollisionCircle(container: Phaser.GameObjects.Container, entityId: number) {
+        // For now, we'll only create this in debug mode
+        const DEBUG_COLLISIONS = false; // Set to true to enable collision circle visualization
+        
+        if (!DEBUG_COLLISIONS) return;
+        
+        const entityData = this.spacetimeDBClient.sdkConnection?.db.entity.entity_id.find(entityId);
+        if (!entityData) return;
+        
+        // Get radius from entity data or fallback to defaults based on monster type
+        // Note: We're accessing radius as a property that might not be in the type yet
+        const radius = (entityData as any).radius || this.getDefaultRadiusForMonster(container);
+        
+        // Create the collision circle
+        const circle = this.scene.add.circle(0, 0, radius, 0xff0000, 0.2);
+        circle.setStrokeStyle(1, 0xff0000, 0.8);
+        circle.setDepth(-2); // Below sprite
+        circle.name = 'collisionCircle';
+        
+        // Add to container
+        container.add(circle);
+    }
+    
+    // Update the collision circle when entity data changes
+    private updateCollisionCircle(container: Phaser.GameObjects.Container, entityId: number) {
+        // For now, we'll only update this in debug mode
+        const DEBUG_COLLISIONS = false; // Set to true to enable collision circle visualization
+        
+        if (!DEBUG_COLLISIONS) return;
+        
+        const entityData = this.spacetimeDBClient.sdkConnection?.db.entity.entity_id.find(entityId);
+        if (!entityData) return;
+        
+        // Get radius from entity data or fallback to defaults based on monster type
+        // Note: We're accessing radius as a property that might not be in the type yet
+        const radius = (entityData as any).radius || this.getDefaultRadiusForMonster(container);
+        
+        // Find existing collision circle
+        const children = container.getAll();
+        for (const child of children) {
+            if (child.name === 'collisionCircle') {
+                const circle = child as Phaser.GameObjects.Arc;
+                circle.setRadius(radius);
+                return;
+            }
+        }
+        
+        // If no collision circle exists yet, create it
+        this.createCollisionCircle(container, entityId);
+    }
+    
+    // Helper function to get a default radius based on monster type
+    private getDefaultRadiusForMonster(container: Phaser.GameObjects.Container): number {
+        const monsterType = container.getData('monsterType');
+        
+        // Default radii based on monster type
+        switch(monsterType) {
+            case 'Rat':
+                return 24;
+            case 'Slime':
+                return 30;
+            case 'Orc':
+                return 40;
+            default:
+                return 30; // Default radius
         }
     }
     

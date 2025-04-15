@@ -80,6 +80,7 @@ public static partial class Module
         // Added direction and movement state directly to Entity
         public DbVector2 direction;   // Direction vector (normalized)
         public bool is_moving;        // Whether entity is actively moving
+        public float radius;          // Collision radius for this entity
     }
 
     [SpacetimeDB.Table(Name = "player", Public = true)] // Typically player table shouldn't be public, but adjusting per example
@@ -152,7 +153,8 @@ public static partial class Module
                 {
                     position = new DbVector2(100, 100), 
                     direction = new DbVector2(0, 0),
-                    is_moving = false
+                    is_moving = false,
+                    radius = 48.0f
                 });
                 
                 if (newEntityOpt != null)
@@ -222,7 +224,8 @@ public static partial class Module
         {
             position = new DbVector2(100, 100), // Example starting position
             direction = new DbVector2(0, 0), // Default direction
-            is_moving = false // Not moving by default
+            is_moving = false, // Not moving by default
+            radius = 48.0f // Player collision radius
         });
 
         // Check if entity insertion failed
@@ -368,6 +371,64 @@ public static partial class Module
         ProcessMonsterMovements(ctx);
     }
     
+    // Helper function to check if two entities are colliding using circle-based detection
+    private static bool AreEntitiesColliding(Entity entityA, Entity entityB)
+    {
+        // Get the distance between the two entities
+        float dx = entityA.position.x - entityB.position.x;
+        float dy = entityA.position.y - entityB.position.y;
+        float distanceSquared = dx * dx + dy * dy;
+        
+        // Calculate the minimum distance to avoid collision (sum of both radii)
+        float minDistance = entityA.radius + entityB.radius;
+        float minDistanceSquared = minDistance * minDistance;
+        
+        // If distance squared is less than minimum distance squared, they are colliding
+        return distanceSquared < minDistanceSquared;
+    }
+    
+    // Helper function to calculate the overlap between two entities
+    private static float GetEntitiesOverlap(Entity entityA, Entity entityB)
+    {
+        // Get the distance between the two entities
+        float dx = entityA.position.x - entityB.position.x;
+        float dy = entityA.position.y - entityB.position.y;
+        float distance = MathF.Sqrt(dx * dx + dy * dy);
+        
+        // Calculate the minimum distance to avoid collision (sum of both radii)
+        float minDistance = entityA.radius + entityB.radius;
+        
+        // Calculate overlap (positive value means they are overlapping)
+        return minDistance - distance;
+    }
+    
+    // Helper function to get a repulsion vector based on overlap
+    private static DbVector2 GetRepulsionVector(Entity entityA, Entity entityB, float overlap)
+    {
+        // Direction from B to A (the direction to push A away from B)
+        float dx = entityA.position.x - entityB.position.x;
+        float dy = entityA.position.y - entityB.position.y;
+        
+        // Normalize the direction vector
+        float distance = MathF.Sqrt(dx * dx + dy * dy);
+        
+        // Avoid division by zero
+        if (distance < 0.0001f)
+        {
+            // If entities are exactly at the same position, push in a random direction
+            return new DbVector2(0.707f, 0.707f); // 45-degree angle
+        }
+        
+        float nx = dx / distance;
+        float ny = dy / distance;
+        
+        // Scale the repulsion by the overlap amount
+        // The larger the overlap, the stronger the repulsion
+        float repulsionStrength = overlap * 0.5f; // Adjust this factor as needed
+        
+        return new DbVector2(nx * repulsionStrength, ny * repulsionStrength);
+    }
+    
     // Helper method to process monster movements
     private static void ProcessMonsterMovements(ReducerContext ctx)
     {
@@ -375,16 +436,28 @@ public static partial class Module
         const float MIN_DISTANCE_TO_MOVE = 20.0f;  // Minimum distance before monster starts moving
         const float MIN_DISTANCE_TO_REACH = 5.0f;  // Distance considered "reached" the target
         
-        // Get all monsters and update their directions and positions
+        // First, get all monster entities for collision detection
+        var monsterEntities = new Dictionary<uint, Entity>();
+        var monsterTypes = new Dictionary<uint, MonsterType>();
+        
+        foreach (var monster in ctx.Db.monsters.Iter())
+        {
+            var entityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
+            if (entityOpt != null)
+            {
+                monsterEntities[monster.entity_id] = entityOpt.Value;
+                monsterTypes[monster.entity_id] = monster.bestiary_id;
+            }
+        }
+        
+        // Now process each monster's movement with collision avoidance
         foreach (var monster in ctx.Db.monsters.Iter())
         {
             // Get the monster's entity
-            var monsterEntityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
-            if (monsterEntityOpt == null)
+            if (!monsterEntities.TryGetValue(monster.entity_id, out Entity monsterEntity))
             {
                 continue;
             }
-            var monsterEntity = monsterEntityOpt.Value;
             
             // Get the target entity
             var targetEntityOpt = ctx.Db.entity.entity_id.Find(monster.target_entity_id);
@@ -419,43 +492,82 @@ public static partial class Module
                 continue;
             }
             
-            // If we're too far away from the minimum distance threshold, start moving
+            // If we're far enough from the target, start moving
             if (distanceToTarget > MIN_DISTANCE_TO_MOVE)
             {
-                // Normalize the direction vector
+                // Normalize the direction vector to get base movement direction
                 var normalizedDirection = directionVector.Normalize();
                 
-                // Get monster speed from bestiary - FIXING THIS PART
+                // Get monster speed from bestiary
                 float monsterSpeed = 20.0f; // Lower default fallback speed
                 
-                // The monster type is stored in monster.bestiary_id
-                // We need to properly look up the bestiary entry using the MonsterType
+                // Get the monster type
                 MonsterType monsterType = monster.bestiary_id;
                 
-                // Get bestiary entry using correct ID (the type enum value as uint)
+                // Get bestiary entry using correct ID
                 var bestiaryEntryOpt = ctx.Db.bestiary.bestiary_id.Find((uint)monsterType);
                 
                 if (bestiaryEntryOpt != null)
                 {
                     monsterSpeed = bestiaryEntryOpt.Value.speed;
                 }
-                else
+                
+                // Check for collisions with other monsters and calculate avoidance vectors
+                var avoidanceVector = new DbVector2(0, 0);
+                
+                foreach (var otherEntityPair in monsterEntities)
                 {
-                    Log.Warn($"Bestiary entry not found for monster type {monsterType} (ID: {(uint)monsterType})");
+                    uint otherEntityId = otherEntityPair.Key;
+                    Entity otherEntity = otherEntityPair.Value;
+                    
+                    // Skip self
+                    if (otherEntityId == monster.entity_id)
+                        continue;
+                    
+                    // Check if we're colliding with this entity
+                    float overlap = GetEntitiesOverlap(monsterEntity, otherEntity);
+                    
+                    if (overlap > 0)
+                    {
+                        // We have a collision! Calculate repulsion vector
+                        DbVector2 repulsion = GetRepulsionVector(monsterEntity, otherEntity, overlap);
+                        
+                        // Add to avoidance vector
+                        avoidanceVector.x += repulsion.x;
+                        avoidanceVector.y += repulsion.y;
+                        
+                        Log.Debug($"Monster {monster.monster_id} colliding with entity {otherEntityId}, " +
+                                 $"overlap: {overlap:F2}, adding repulsion: ({repulsion.x:F2}, {repulsion.y:F2})");
+                    }
                 }
+                
+                // Combine the target direction with the avoidance vector
+                // We give more weight to avoidance to ensure monsters don't stack
+                var combinedDirection = new DbVector2(
+                    normalizedDirection.x + avoidanceVector.x * 1.5f,
+                    normalizedDirection.y + avoidanceVector.y * 1.5f
+                );
+                
+                // Re-normalize the combined direction
+                var finalDirection = combinedDirection.Magnitude() > 0.0001f 
+                    ? combinedDirection.Normalize() 
+                    : normalizedDirection;
                 
                 // Calculate new position based on direction, speed and time delta
                 float moveDistance = monsterSpeed * DELTA_TIME;
-                var moveOffset = normalizedDirection * moveDistance;
+                var moveOffset = finalDirection * moveDistance;
                 
                 // Update entity with new direction and position
                 var updatedEntity = monsterEntity;
-                updatedEntity.direction = normalizedDirection;
+                updatedEntity.direction = finalDirection;
                 updatedEntity.is_moving = true;
                 updatedEntity.position = monsterEntity.position + moveOffset;
                 
                 // Update entity in database
                 ctx.Db.entity.entity_id.Update(updatedEntity);
+                
+                // Update our local cache for subsequent collision checks
+                monsterEntities[monster.entity_id] = updatedEntity;
             }
         }
     }

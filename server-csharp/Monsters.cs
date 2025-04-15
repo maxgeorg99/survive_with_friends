@@ -103,7 +103,8 @@ public static partial class Module
         {
             position = position,
             direction = new DbVector2(0, 0), // Initial direction
-            is_moving = false  // Not moving initially
+            is_moving = false,  // Not moving initially
+            radius = bestiaryEntry.Value.radius // Set radius from bestiary entry
         });
         
         if (entityOpt == null)
