@@ -107,14 +107,19 @@ export default class MonsterManager {
             // Check if the monster sprite exists already
             const monsterContainer = this.monsters.get(pendingMonster.monsterId);
             if (monsterContainer) {
-                // Update the monster position
+                // For pending monsters, set position immediately to avoid teleporting from (0,0)
                 monsterContainer.x = entityData.position.x;
                 monsterContainer.y = entityData.position.y;
                 
                 // Update depth based on Y position
                 monsterContainer.setDepth(BASE_DEPTH + entityData.position.y);
                 
-                console.log(`Updated monster ${pendingMonster.monsterId} position to (${entityData.position.x}, ${entityData.position.y})`);
+                // Set target position data for later lerping
+                monsterContainer.setData('targetX', entityData.position.x);
+                monsterContainer.setData('targetY', entityData.position.y);
+                monsterContainer.setData('lastUpdateTime', Date.now());
+                
+                console.log(`Updated pending monster ${pendingMonster.monsterId} position to (${entityData.position.x}, ${entityData.position.y})`);
                 
                 // Remove from pending after updating
                 this.pendingMonsters.delete(entityData.entityId);
@@ -137,23 +142,84 @@ export default class MonsterManager {
                 // Entity belongs to a monster, update its position
                 const monsterContainer = this.monsters.get(monster.monsterId);
                 if (monsterContainer) {
-                    console.log(`Updating position for monster ${monster.monsterId} from (${monsterContainer.x}, ${monsterContainer.y}) to (${entityData.position.x}, ${entityData.position.y})`);
+                    // Cancel any existing tween to prevent overlapping animations
+                    this.scene.tweens.killTweensOf(monsterContainer);
                     
-                    // IMPORTANT: Set position directly AND IMMEDIATELY instead of recording it for later
-                    monsterContainer.x = entityData.position.x;
-                    monsterContainer.y = entityData.position.y;
+                    const monsterType = monster.bestiaryId.tag;
+                    console.log(`Updating position for ${monsterType} monster ${monster.monsterId} from (${monsterContainer.x.toFixed(1)}, ${monsterContainer.y.toFixed(1)}) to (${entityData.position.x.toFixed(1)}, ${entityData.position.y.toFixed(1)})`);
                     
-                    // Update depth based on Y position
-                    monsterContainer.setDepth(BASE_DEPTH + entityData.position.y);
+                    // Store target position for lerping in update
+                    monsterContainer.setData('targetX', entityData.position.x);
+                    monsterContainer.setData('targetY', entityData.position.y);
+                    monsterContainer.setData('lastUpdateTime', Date.now());
                     
-                    // Verify position was updated
-                    console.log(`Monster ${monster.monsterId} position after update: (${monsterContainer.x}, ${monsterContainer.y})`);
+                    // Use tween for smooth movement instead of direct position setting
+                    const isMoving = entityData.isMoving;
+                    
+                    // If monster is far away from its current server position, teleport it instead of tweening
+                    const distSquared = Math.pow(monsterContainer.x - entityData.position.x, 2) + 
+                                       Math.pow(monsterContainer.y - entityData.position.y, 2);
+                    
+                    if (distSquared > 10000) { // More than 100 units away, teleport
+                        console.log(`Monster ${monster.monsterId} too far from server position, teleporting`);
+                        monsterContainer.x = entityData.position.x;
+                        monsterContainer.y = entityData.position.y;
+                    } else if (isMoving) {
+                        // Server tick rate is 50ms
+                        // Use a tween that finishes just before the next server update for smoothest motion
+                        // (49ms tween for a 50ms server tick)
+                        this.scene.tweens.add({
+                            targets: monsterContainer,
+                            x: entityData.position.x,
+                            y: entityData.position.y,
+                            duration: 49, // Just under the server tick rate of 50ms
+                            ease: 'Linear',
+                            onUpdate: () => {
+                                // Update depth on each tween update
+                                monsterContainer.setDepth(BASE_DEPTH + monsterContainer.y);
+                            }
+                        });
+                        
+                        // Debug log the monster type and movement details for diagnosis
+                        const moveDistance = Math.sqrt(
+                            Math.pow(entityData.position.x - monsterContainer.x, 2) + 
+                            Math.pow(entityData.position.y - monsterContainer.y, 2)
+                        );
+                        
+                        console.log(
+                            `Moving ${monsterType} monster ${monster.monsterId}, ` + 
+                            `distance: ${moveDistance.toFixed(2)}, ` + 
+                            `direction: (${entityData.direction.x.toFixed(2)}, ${entityData.direction.y.toFixed(2)})`
+                        );
+                    } else {
+                        // For non-moving monsters, use a shorter tween duration
+                        this.scene.tweens.add({
+                            targets: monsterContainer,
+                            x: entityData.position.x,
+                            y: entityData.position.y,
+                            duration: 40, // Even faster tween for stopped monsters
+                            ease: 'Power1',
+                            onUpdate: () => {
+                                monsterContainer.setDepth(BASE_DEPTH + monsterContainer.y);
+                            }
+                        });
+                    }
+                    
+                    // Store the movement state and monster type
+                    monsterContainer.setData('isMoving', isMoving);
+                    monsterContainer.setData('monsterType', monsterType);
+                    monsterContainer.setData('direction', {
+                        x: entityData.direction.x,
+                        y: entityData.direction.y
+                    });
+                    
+                    return true;
                 } else {
                     // If container doesn't exist yet, try to create it
                     console.log(`Monster container not found for monster ID ${monster.monsterId}, creating it now at (${entityData.position.x}, ${entityData.position.y})`);
                     this.createMonsterSprite(monster, entityData.position);
+                    return true;
                 }
-                return true;
             }
         }
         
@@ -377,5 +443,31 @@ export default class MonsterManager {
     // Get count of pending monsters
     getPendingMonsterCount(): number {
         return this.pendingMonsters.size;
+    }
+
+    // Update method to be called from scene's update method
+    update(time: number, delta: number) {
+        // Process active monsters for smooth interpolation between server updates
+        const lerp = (a: number, b: number, t: number) => a + (b - a) * Math.min(t, 1.0);
+        const now = Date.now();
+        
+        this.monsters.forEach((container, monsterId) => {
+            const targetX = container.getData('targetX');
+            const targetY = container.getData('targetY');
+            const lastUpdate = container.getData('lastUpdateTime');
+            const isMoving = container.getData('isMoving');
+            
+            // If we have target position data and the monster is moving
+            if (targetX !== undefined && targetY !== undefined && lastUpdate !== undefined && isMoving) {
+                // We already have tweens, this is just additional smoothing if needed
+                // This can be enabled if you want extra smoothing between tween updates
+                /* 
+                const lerpFactor = 0.1;
+                container.x = lerp(container.x, targetX, lerpFactor);
+                container.y = lerp(container.y, targetY, lerpFactor);
+                container.setDepth(BASE_DEPTH + container.y);
+                */
+            }
+        });
     }
 } 

@@ -870,6 +870,9 @@ export default class GameScene extends Phaser.Scene {
         this.otherPlayers.forEach((container) => {
             container.setDepth(BASE_DEPTH + container.y);
         });
+        
+        // Update monster positions with interpolation
+        this.monsterManager.update(time, delta);
     }
 
     // Force a synchronization of player entities

@@ -133,18 +133,6 @@ public static partial class Module
         var identity = ctx.Sender;
         Log.Info($"Client connected: {identity}");
 
-        // Debug log: check all existing players
-        Log.Info("=== Current Players in DB ===");
-        foreach (var p in ctx.Db.player.Iter())
-        {
-            Log.Info($"Player: {p.name} (ID: {p.identity}) with EntityID: {p.entity_id}");
-        }
-        Log.Info("=== Current Entities in DB ===");
-        foreach (var e in ctx.Db.entity.Iter())
-        {
-            Log.Info($"Entity ID: {e.entity_id} at position ({e.position.x}, {e.position.y})");
-        }
-
         // Check if player already exists - if so, reconnect them
         var playerOpt = ctx.Db.player.identity.Find(identity);
         if (playerOpt != null)
@@ -340,30 +328,28 @@ public static partial class Module
         
         // Update the entity in the database
         ctx.Db.entity.entity_id.Update(entity);
-        
-        Log.Debug($"Updated direction for player {player.name} to ({dirX}, {dirY}), isMoving: {isMoving}");
     }
     
     [Reducer]
     public static void GameTick(ReducerContext ctx, GameTickTimer timer)
     {
-        // Process all movable entities
-        foreach (var entity in ctx.Db.entity.Iter())
+        // Process all movable players
+        foreach (var player in ctx.Db.player.Iter())
         {
-            if (!entity.is_moving)
-                continue;
-                
-            // Find the player associated with this entity to get their speed
-            float moveSpeed = PLAYER_SPEED; // Default fallback speed
-            
-            // Try to find a player that owns this entity
-            foreach (var player in ctx.Db.player.Iter())
+            float moveSpeed = player.speed;
+
+            var entityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
+
+            if(entityOpt is null)
             {
-                if (player.entity_id == entity.entity_id)
-                {
-                    moveSpeed = player.speed;
-                    break;
-                }
+                continue;
+            }
+
+            var entity = entityOpt.Value;
+
+            if (!entity.is_moving)
+            {
+                continue;
             }
             
             // Calculate new position based on direction, speed and time delta
@@ -377,13 +363,130 @@ public static partial class Module
             // Update entity in database
             ctx.Db.entity.entity_id.Update(updatedEntity);
         }
+        
+        // Process monster movements
+        ProcessMonsterMovements(ctx);
     }
-
-    // Legacy position update reducer - kept for compatibility but now unused
-    [Reducer]
-    public static void UpdatePlayerPosition(ReducerContext ctx, float x, float y)
+    
+    // Helper method to process monster movements
+    private static void ProcessMonsterMovements(ReducerContext ctx)
     {
-        Log.Warn("UpdatePlayerPosition called but server now uses direction-based movement. Please update client.");
-        // This reducer is kept for backward compatibility but does nothing now
+        // Constants for monster behavior
+        const float MIN_DISTANCE_TO_MOVE = 20.0f;  // Minimum distance before monster starts moving
+        const float MIN_DISTANCE_TO_REACH = 5.0f;  // Distance considered "reached" the target
+        
+        // Get all monsters and update their directions and positions
+        foreach (var monster in ctx.Db.monsters.Iter())
+        {
+            // Get the monster's entity
+            var monsterEntityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
+            if (monsterEntityOpt == null)
+            {
+                continue;
+            }
+            var monsterEntity = monsterEntityOpt.Value;
+            
+            // Get the target entity
+            var targetEntityOpt = ctx.Db.entity.entity_id.Find(monster.target_entity_id);
+            if (targetEntityOpt == null)
+            {
+                // Target entity no longer exists - find a new target
+                ReassignMonsterTarget(ctx, monster);
+                continue;
+            }
+            var targetEntity = targetEntityOpt.Value;
+            
+            // Calculate direction vector from monster to target
+            var directionVector = new DbVector2(
+                targetEntity.position.x - monsterEntity.position.x,
+                targetEntity.position.y - monsterEntity.position.y
+            );
+            
+            // Calculate distance to target
+            float distanceToTarget = directionVector.Magnitude();
+            
+            // If we're too close to the target, stop moving
+            if (distanceToTarget < MIN_DISTANCE_TO_REACH)
+            {
+                // Monster reached the target, stop moving
+                if (monsterEntity.is_moving)
+                {
+                    var stoppedEntity = monsterEntity;
+                    stoppedEntity.is_moving = false;
+                    stoppedEntity.direction = new DbVector2(0, 0);
+                    ctx.Db.entity.entity_id.Update(stoppedEntity);
+                }
+                continue;
+            }
+            
+            // If we're too far away from the minimum distance threshold, start moving
+            if (distanceToTarget > MIN_DISTANCE_TO_MOVE)
+            {
+                // Normalize the direction vector
+                var normalizedDirection = directionVector.Normalize();
+                
+                // Get monster speed from bestiary - FIXING THIS PART
+                float monsterSpeed = 20.0f; // Lower default fallback speed
+                
+                // The monster type is stored in monster.bestiary_id
+                // We need to properly look up the bestiary entry using the MonsterType
+                MonsterType monsterType = monster.bestiary_id;
+                
+                // Get bestiary entry using correct ID (the type enum value as uint)
+                var bestiaryEntryOpt = ctx.Db.bestiary.bestiary_id.Find((uint)monsterType);
+                
+                if (bestiaryEntryOpt != null)
+                {
+                    monsterSpeed = bestiaryEntryOpt.Value.speed;
+                }
+                else
+                {
+                    Log.Warn($"Bestiary entry not found for monster type {monsterType} (ID: {(uint)monsterType})");
+                }
+                
+                // Calculate new position based on direction, speed and time delta
+                float moveDistance = monsterSpeed * DELTA_TIME;
+                var moveOffset = normalizedDirection * moveDistance;
+                
+                // Update entity with new direction and position
+                var updatedEntity = monsterEntity;
+                updatedEntity.direction = normalizedDirection;
+                updatedEntity.is_moving = true;
+                updatedEntity.position = monsterEntity.position + moveOffset;
+                
+                // Update entity in database
+                ctx.Db.entity.entity_id.Update(updatedEntity);
+            }
+        }
+    }
+    
+    // Helper method to reassign a monster's target when original target is gone
+    private static void ReassignMonsterTarget(ReducerContext ctx, Monsters monster)
+    {
+        // Find a new target among existing players
+        var players = ctx.Db.player.Iter().ToArray();
+        if (players.Length == 0)
+        {
+            // Make the monster stop moving
+            var entityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
+            if (entityOpt != null)
+            {
+                var entity = entityOpt.Value;
+                entity.is_moving = false;
+                entity.direction = new DbVector2(0, 0);
+                ctx.Db.entity.entity_id.Update(entity);
+            }
+            return;
+        }
+        
+        // Choose a random player as the new target
+        var rng = ctx.Rng;
+        var randomIndex = rng.Next(0, players.Length);
+        var newTarget = players[randomIndex];
+        
+        // Update the monster with the new target
+        var updatedMonster = monster;
+        updatedMonster.target_entity_id = newTarget.entity_id;
+        ctx.Db.monsters.monster_id.Update(updatedMonster);
     }
 }
