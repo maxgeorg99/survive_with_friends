@@ -157,14 +157,12 @@ export default class GameScene extends Phaser.Scene {
         this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
             if (pointer.isDown && this.localPlayerSprite) {
                 this.tapTarget = new Phaser.Math.Vector2(pointer.worldX, pointer.worldY);
-                console.log(`Pointer move target set to: (${this.tapTarget.x}, ${this.tapTarget.y})`);
                 this.updateTapMarker();
             }
         });
         this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
             if (this.localPlayerSprite) {
                 this.tapTarget = new Phaser.Math.Vector2(pointer.worldX, pointer.worldY);
-                console.log(`Pointer down target set to: (${this.tapTarget.x}, ${this.tapTarget.y})`);
                 this.updateTapMarker();
             }
         });
@@ -174,7 +172,6 @@ export default class GameScene extends Phaser.Scene {
 
         // Create tap marker using shape graphics instead of texture
         // This is more reliable than the texture generation approach
-        console.log("Creating tap marker...");
         // Make the outer circle more transparent (0.3 instead of 0.6)
         const outerCircle = this.add.circle(0, 0, 32, 0xffffff, 0.3);
         // Make the inner circle more transparent (0.5 instead of 0.8)
@@ -201,7 +198,6 @@ export default class GameScene extends Phaser.Scene {
             this.tapMarker.setDepth(0.5);
             // Add a slight overall alpha to the entire container
             this.tapMarker.setAlpha(0.8);
-            console.log("Tap marker created:", this.tapMarker.visible, this.tapMarker.depth);
         }
 
         // If data is already ready when scene starts (e.g., scene restart)
@@ -236,11 +232,6 @@ export default class GameScene extends Phaser.Scene {
         
         console.log("Local player data found:", localPlayerData);
         console.log("Looking for entity with ID:", localPlayerData.entityId);
-
-        // Debug: Check all entity tables
-        console.log("Entities in DB:", 
-            Array.from(this.spacetimeDBClient.sdkConnection?.db.entity.iter() || [])
-                .map(e => `Entity ID: ${e.entityId} at (${e.position.x},${e.position.y})`));
         
         // Register event listeners
         this.registerSpacetimeDBListeners();
@@ -261,21 +252,6 @@ export default class GameScene extends Phaser.Scene {
             return;
         }
         const localIdentity = this.spacetimeDBClient.identity;
-
-        // Log all existing players and entities at startup
-        console.log("=== EXISTING PLAYERS AT STARTUP ===");
-        const existingPlayers = Array.from(this.spacetimeDBClient.sdkConnection.db.player.iter());
-        console.log(`Total player count: ${existingPlayers.length}`);
-        existingPlayers.forEach(p => {
-            console.log(`Player: ${p.name} (ID: ${p.identity.toHexString()}, EntityID: ${p.entityId})`);
-        });
-        
-        console.log("=== EXISTING ENTITIES AT STARTUP ===");
-        const existingEntities = Array.from(this.spacetimeDBClient.sdkConnection.db.entity.iter());
-        console.log(`Total entity count: ${existingEntities.length}`);
-        existingEntities.forEach(e => {
-            console.log(`Entity ID: ${e.entityId} at (${e.position.x}, ${e.position.y})`);
-        });
 
         // Use the table handle to register listeners with correct signatures
         this.spacetimeDBClient.sdkConnection?.db.player.onInsert((_ctx, player: Player) => {
@@ -327,7 +303,6 @@ export default class GameScene extends Phaser.Scene {
 
     // Helper function to handle entity updates and move corresponding sprites
     handleEntityUpdate(entityData: Entity) {
-        console.log(`Entity update received: ID ${entityData.entityId} at pos (${entityData.position.x}, ${entityData.position.y})`);
         
         // First check if this is a monster entity through the monster manager
         const wasMonsterEntity = this.monsterManager.handleEntityUpdate(entityData);
@@ -338,8 +313,6 @@ export default class GameScene extends Phaser.Scene {
         
         // Debug: Log all entities in cache to verify state
         const allEntities = Array.from(this.spacetimeDBClient.sdkConnection?.db.entity.iter() || []);
-        console.log(`Current entity cache has ${allEntities.length} entities:`);
-        allEntities.forEach(e => console.log(`  Entity ID: ${e.entityId} at (${e.position.x}, ${e.position.y})`));
         
         // Get local player EntityId
         let localPlayerEntityId: number | undefined = undefined;
@@ -358,11 +331,9 @@ export default class GameScene extends Phaser.Scene {
         
         // Check if this entity update is for the local player
         if (localPlayerEntityId === entityData.entityId) {
-            console.log(`Local player entity updated: ${entityData.entityId}`);
             
             // If local player sprite doesn't exist yet, create it now
             if (!this.localPlayerSprite) {
-                console.log(`Creating local player sprite from entity update at (${entityData.position.x}, ${entityData.position.y})`);
                 const startX = Math.floor(entityData.position.x);
                 const startY = Math.floor(entityData.position.y);
                 
@@ -391,13 +362,11 @@ export default class GameScene extends Phaser.Scene {
                 
                 // Get class-specific sprite key
                 const classKey = this.getClassSpriteKey(playerClass);
-                console.log(`Creating local player with sprite key: ${classKey}`);
                 this.localPlayerSprite = this.physics.add.sprite(startX, startY, classKey);
                 
                 // Use Y position for depth instead of fixed value
                 const initialDepth = BASE_DEPTH + startY;
                 this.localPlayerSprite.setDepth(initialDepth);
-                console.log(`Setting initial local player depth to ${initialDepth} based on Y position ${startY}`);
                 
                 this.localPlayerNameText = this.add.text(startX, startY - Math.floor(this.localPlayerSprite.height / 2) - NAME_OFFSET_Y, 
                     `${playerName} (${playerLevel})`, PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
@@ -450,8 +419,6 @@ export default class GameScene extends Phaser.Scene {
                 // Camera follow
                 this.cameras.main.startFollow(this.localPlayerSprite, true, 1, 1);
                 this.cameras.main.setRoundPixels(true);
-                
-                console.log("Local player sprite created and camera following set up");
             }
             
             // Store server position for interpolation
@@ -463,7 +430,6 @@ export default class GameScene extends Phaser.Scene {
         // Find the player who owns this entity in pending players
         const pendingPlayer = this.pendingPlayers.get(entityData.entityId);
         if (pendingPlayer) {
-            console.log(`Found pending player for entity ${entityData.entityId}. Creating sprite directly.`);
             
             // IMPROVED: Create player sprite directly with entity data instead of trying to look it up again
             this.createOtherPlayerSprite(pendingPlayer, entityData);
@@ -478,7 +444,6 @@ export default class GameScene extends Phaser.Scene {
             if (player.entityId === entityData.entityId) {
                 // Cast player to Player
                 const extendedPlayer = player as Player;
-                console.log(`Found player ${player.name} for entity ${entityData.entityId}`);
                 this.updateOtherPlayerPosition(player.identity, entityData.position.x, entityData.position.y);
                 return;
             }
@@ -489,35 +454,26 @@ export default class GameScene extends Phaser.Scene {
 
     // Get class-specific sprite key
     getClassSpriteKey(playerClass: any): string {
-        console.log("PlayerClass value:", playerClass);
-        console.log("PlayerClass type:", typeof playerClass);
         
         // Handle case when playerClass is a simple object with a tag property
         if (playerClass && typeof playerClass === 'object' && 'tag' in playerClass) {
             const className = playerClass.tag;
-            console.log("Found tag property:", className);
             const spriteKey = CLASS_ASSET_KEYS[className] || 'player_fighter';
-            console.log(`Using sprite key '${spriteKey}' for class '${className}'`);
             return spriteKey;
         } 
         
         // Handle case when playerClass is just a string
         if (typeof playerClass === 'string') {
-            console.log("PlayerClass is a string:", playerClass);
             const spriteKey = CLASS_ASSET_KEYS[playerClass] || 'player_fighter';
-            console.log(`Using sprite key '${spriteKey}' for string class '${playerClass}'`);
             return spriteKey;
         }
         
         // Handle case when playerClass is a number (enum value)
         if (typeof playerClass === 'number') {
-            console.log("PlayerClass is a number:", playerClass);
             // Map numeric enum values to class names
             const classNames = ["Fighter", "Rogue", "Mage", "Paladin"];
             const className = classNames[playerClass] || "Fighter";
-            console.log("Mapped to class name:", className);
             const spriteKey = CLASS_ASSET_KEYS[className] || 'player_fighter';
-            console.log(`Using sprite key '${spriteKey}' for numeric class ${playerClass} (${className})`);
             return spriteKey;
         }
         
@@ -528,11 +484,9 @@ export default class GameScene extends Phaser.Scene {
     
     // Update the function to properly use the player's class
     createOtherPlayerSprite(playerData: Player, entityData: Entity) {
-        console.log(`Creating player sprite for ${playerData.name} at (${entityData.position.x}, ${entityData.position.y})`);
         
         // Check if we already have this player
         if (this.otherPlayers.has(playerData.identity)) {
-            console.log(`Player ${playerData.name} already has a sprite, updating position`);
             this.updateOtherPlayerPosition(playerData.identity, entityData.position.x, entityData.position.y);
             return;
         }
@@ -543,7 +497,6 @@ export default class GameScene extends Phaser.Scene {
         
         // Calculate depth based on Y position
         const initialDepth = BASE_DEPTH + startY;
-        console.log(`Setting initial depth for ${playerData.name} to ${initialDepth} based on Y position ${startY}`);
         
         // Create new player container with shadow, sprite and name
         const shadow = this.add.image(0, SHADOW_OFFSET_Y, SHADOW_ASSET_KEY)
@@ -594,26 +547,20 @@ export default class GameScene extends Phaser.Scene {
         
         // Store in our players map
         this.otherPlayers.set(playerData.identity, container);
-        
-        console.log(`Created container for player ${playerData.name} with ${container.length} children.`);
     }
 
     addOrUpdateOtherPlayer(playerData: Player) {
         // Check if we are already tracking this player
         let container = this.otherPlayers.get(playerData.identity);
-        console.log(`Adding/updating player ${playerData.name} (ID: ${playerData.identity.toHexString()}, EntityID: ${playerData.entityId})`);
-        console.log(`Already tracked in otherPlayers: ${container ? 'YES' : 'NO'}`);
-
+        
         // If container exists, just update the name if needed
         if (container) {
-            console.log(`Container exists for player ${playerData.name}, updating data`);
             container.setData('entityId', playerData.entityId);
             
             // Update player name with level
             const text = container.getAt(2) as Phaser.GameObjects.Text;
             const displayName = `${playerData.name} (${playerData.level})`;
             if (text.text !== displayName) {
-                console.log(`Updating name for player ${playerData.identity.toHexString()} to ${displayName}`);
                 text.setText(displayName);
             }
             
@@ -631,7 +578,6 @@ export default class GameScene extends Phaser.Scene {
 
         // Attempt to find the entity data in the client cache
         const entityData = this.spacetimeDBClient.sdkConnection?.db.entity.entity_id.find(playerData.entityId);
-        console.log(`Entity found for player ${playerData.name}: ${entityData ? 'YES' : 'NO'}`);
 
         // If entity data exists, create the sprite immediately
         if (entityData) {
@@ -642,7 +588,6 @@ export default class GameScene extends Phaser.Scene {
         // Otherwise store player as pending
         console.warn(`Entity not found for player ${playerData.name} (entityId: ${playerData.entityId}). Storing as pending.`);
         this.pendingPlayers.set(playerData.entityId, playerData);
-        console.log(`Total pending players: ${this.pendingPlayers.size}`);
     }
 
     updateTapMarker() {
@@ -652,7 +597,6 @@ export default class GameScene extends Phaser.Scene {
         }
         
         if (this.tapTarget) {
-            console.log(`Updating tap marker to position: (${this.tapTarget.x}, ${this.tapTarget.y})`);
             // Position marker at tap target and make visible
             // Add larger vertical offset to align with character feet (SHADOW_OFFSET_Y + 10)
             this.tapMarker.setPosition(this.tapTarget.x, this.tapTarget.y + SHADOW_OFFSET_Y + 20);
@@ -665,9 +609,7 @@ export default class GameScene extends Phaser.Scene {
                 duration: 300,
                 ease: 'Bounce.Out'
             });
-            console.log("Tap marker visibility:", this.tapMarker.visible);
         } else {
-            console.log("Hiding tap marker - no target");
             // Hide marker when no target
             this.tapMarker.setVisible(false);
         }
@@ -694,7 +636,6 @@ export default class GameScene extends Phaser.Scene {
     removeOtherPlayer(identity: Identity) {
         const container = this.otherPlayers.get(identity);
         if (container) {
-            console.log(`Removing player sprite for identity ${identity.toHexString()}`);
             container.destroy();
             this.otherPlayers.delete(identity);
         }
@@ -732,7 +673,6 @@ export default class GameScene extends Phaser.Scene {
         
         // Clear tap target if keyboard input is detected
         if (keyboardInputDetected && this.tapTarget) {
-            console.log("Keyboard input detected, clearing tap target");
             this.tapTarget = null;
             this.tapMarker?.setVisible(false);
         }
@@ -763,8 +703,6 @@ export default class GameScene extends Phaser.Scene {
         const timeForUpdate = (time - this.lastDirectionUpdateTime) > DIRECTION_UPDATE_RATE;
         
         if ((directionChanged || (hasDirection && timeForUpdate))) {
-            // Debug log for direction updates
-            console.log(`Sending direction update: (${dirX}, ${dirY})`);
             
             // Update current direction
             this.currentDirection.set(dirX, dirY);
@@ -829,7 +767,6 @@ export default class GameScene extends Phaser.Scene {
             
             // If difference is significant (more than 10 pixels), interpolate toward server position
             if (distSquared > 100) {
-                console.log(`Correcting position. Client: (${this.localPlayerSprite.x}, ${this.localPlayerSprite.y}), Server: (${this.serverPosition.x}, ${this.serverPosition.y})`);
                 
                 // Interpolate position
                 this.localPlayerSprite.x += distX * INTERPOLATION_SPEED;
@@ -910,18 +847,15 @@ export default class GameScene extends Phaser.Scene {
             if (!player.identity.isEqual(localIdentity)) {
                 const entityData = allEntities.find(e => e.entityId === player.entityId);
                 if (entityData) {
-                    console.log(`Syncing other player: ${player.name} at (${entityData.position.x}, ${entityData.position.y})`);
                     
                     // Check if this player already has a sprite
                     const existingContainer = this.otherPlayers.get(player.identity);
                     if (!existingContainer) {
                         // Create the sprite directly - this bypasses the normal flow but ensures
                         // the sprite is created immediately
-                        console.log(`Directly creating sprite for other player: ${player.name}`);
                         this.createOtherPlayerSprite(player, entityData);
                     } else {
                         // Just update position if sprite already exists
-                        console.log(`Updating position for existing player: ${player.name}`);
                         this.updateOtherPlayerPosition(player.identity, entityData.position.x, entityData.position.y);
                     }
                 } else {
@@ -932,8 +866,5 @@ export default class GameScene extends Phaser.Scene {
         
         // Debug output of all tracked players
         console.log(`Total tracked other players after sync: ${this.otherPlayers.size}`);
-        this.otherPlayers.forEach((container, identity) => {
-            console.log(`- Player ${identity.toHexString()} at position (${container.x}, ${container.y})`);
-        });
     }
 }

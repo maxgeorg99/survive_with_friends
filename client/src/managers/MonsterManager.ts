@@ -43,29 +43,18 @@ export default class MonsterManager {
         const allMonsters = Array.from(this.spacetimeDBClient.sdkConnection.db.monsters.iter());
         const allEntities = Array.from(this.spacetimeDBClient.sdkConnection.db.entity.iter());
         
-        // Debug: Print all entity IDs for easier comparison
-        console.log("=== ALL ENTITIES ===");
         const entityIds = allEntities.map(e => e.entityId);
-        console.log(`Found ${allEntities.length} entities with IDs:`, entityIds);
-        
-        // Debug: Print all monsters and check if their entities exist
-        console.log("=== ALL MONSTERS ===");
-        console.log(`Found ${allMonsters.length} monsters`);
         
         // Force immediate update for all monsters with known entities
         for (const monster of allMonsters) {
             const matchingEntity = allEntities.find(e => e.entityId === monster.entityId);
             const entityExists = !!matchingEntity;
             
-            console.log(`Monster ID: ${monster.monsterId}, Type: ${monster.bestiaryId.tag}, EntityID: ${monster.entityId}, Entity exists: ${entityExists}`);
-            
             if (entityExists && matchingEntity) {
                 // Entity exists, create directly with correct position
-                console.log(`Creating monster ${monster.monsterId} directly with entity position (${matchingEntity.position.x}, ${matchingEntity.position.y})`);
                 this.createMonsterSprite(monster, matchingEntity.position);
             } else {
                 // Entity doesn't exist yet, create at origin and track for updates
-                console.log(`Creating monster ${monster.monsterId} at origin (0,0) - waiting for entity update`);
                 this.createOrUpdateMonster(monster);
             }
         }
@@ -82,17 +71,14 @@ export default class MonsterManager {
         }
 
         this.spacetimeDBClient.sdkConnection.db.monsters.onInsert((_ctx, monster: Monsters) => {
-            console.log(`Monster.onInsert: ID ${monster.monsterId}, Type ${monster.bestiaryId.tag}`);
             this.createOrUpdateMonster(monster);
         });
 
         this.spacetimeDBClient.sdkConnection.db.monsters.onUpdate((_ctx, _oldMonster: Monsters, newMonster: Monsters) => {
-            console.log(`Monster.onUpdate: ID ${newMonster.monsterId}, HP: ${newMonster.hp}`);
             this.createOrUpdateMonster(newMonster);
         });
 
         this.spacetimeDBClient.sdkConnection.db.monsters.onDelete((_ctx, monster: Monsters) => {
-            console.log(`Monster.onDelete: ID ${monster.monsterId}`);
             this.removeMonster(monster.monsterId);
         });
     }
@@ -102,7 +88,6 @@ export default class MonsterManager {
         // Check if we have a pending monster waiting for this entity
         const pendingMonster = this.pendingMonsters.get(entityData.entityId);
         if (pendingMonster) {
-            console.log(`Found pending monster ID ${pendingMonster.monsterId} for entity ${entityData.entityId}. Updating position.`);
             
             // Check if the monster sprite exists already
             const monsterContainer = this.monsters.get(pendingMonster.monsterId);
@@ -119,15 +104,11 @@ export default class MonsterManager {
                 monsterContainer.setData('targetY', entityData.position.y);
                 monsterContainer.setData('lastUpdateTime', Date.now());
                 
-                console.log(`Updated pending monster ${pendingMonster.monsterId} position to (${entityData.position.x}, ${entityData.position.y})`);
-                
                 // Remove from pending after updating
                 this.pendingMonsters.delete(entityData.entityId);
-                console.log(`Remaining pending monsters: ${this.pendingMonsters.size}`);
                 return true;
             } else {
                 // Create the monster with the entity position
-                console.log(`Creating monster ${pendingMonster.monsterId} with entity position`);
                 // Remove from pending monsters first to avoid infinite recursion
                 this.pendingMonsters.delete(entityData.entityId);
                 // Create the monster with the entity data
@@ -146,7 +127,6 @@ export default class MonsterManager {
                     this.scene.tweens.killTweensOf(monsterContainer);
                     
                     const monsterType = monster.bestiaryId.tag;
-                    console.log(`Updating position for ${monsterType} monster ${monster.monsterId} from (${monsterContainer.x.toFixed(1)}, ${monsterContainer.y.toFixed(1)}) to (${entityData.position.x.toFixed(1)}, ${entityData.position.y.toFixed(1)})`);
                     
                     // Store target position for lerping in update
                     monsterContainer.setData('targetX', entityData.position.x);
@@ -161,7 +141,6 @@ export default class MonsterManager {
                                        Math.pow(monsterContainer.y - entityData.position.y, 2);
                     
                     if (distSquared > 10000) { // More than 100 units away, teleport
-                        console.log(`Monster ${monster.monsterId} too far from server position, teleporting`);
                         monsterContainer.x = entityData.position.x;
                         monsterContainer.y = entityData.position.y;
                     } else if (isMoving) {
@@ -186,11 +165,6 @@ export default class MonsterManager {
                             Math.pow(entityData.position.y - monsterContainer.y, 2)
                         );
                         
-                        console.log(
-                            `Moving ${monsterType} monster ${monster.monsterId}, ` + 
-                            `distance: ${moveDistance.toFixed(2)}, ` + 
-                            `direction: (${entityData.direction.x.toFixed(2)}, ${entityData.direction.y.toFixed(2)})`
-                        );
                     } else {
                         // For non-moving monsters, use a shorter tween duration
                         this.scene.tweens.add({
@@ -216,7 +190,6 @@ export default class MonsterManager {
                     return true;
                 } else {
                     // If container doesn't exist yet, try to create it
-                    console.log(`Monster container not found for monster ID ${monster.monsterId}, creating it now at (${entityData.position.x}, ${entityData.position.y})`);
                     this.createMonsterSprite(monster, entityData.position);
                     return true;
                 }
@@ -238,7 +211,6 @@ export default class MonsterManager {
         // First check if we already have this monster with a valid position
         const existingMonster = this.monsters.get(monsterData.monsterId);
         if (existingMonster && (existingMonster.x !== 0 || existingMonster.y !== 0)) {
-            console.log(`Monster ${monsterData.monsterId} already exists at non-zero position (${existingMonster.x}, ${existingMonster.y}). Preserving position.`);
             
             // Just update health and other properties, but keep the position
             const children = existingMonster.getAll();
@@ -255,7 +227,6 @@ export default class MonsterManager {
                     // Update HP data in container
                     existingMonster.setData('currentHP', monsterData.hp);
                     existingMonster.setData('maxHP', monsterData.maxHp);
-                    console.log(`Updated monster ${monsterData.monsterId} health: ${monsterData.hp}/${monsterData.maxHp}`);
                     break;
                 }
             }
@@ -283,7 +254,6 @@ export default class MonsterManager {
             
             // Still store in pending monsters so we can update position when entity arrives
             this.pendingMonsters.set(monsterData.entityId, monsterData);
-            console.log(`Total pending monsters: ${this.pendingMonsters.size}`);
             return;
         }
 
@@ -297,7 +267,6 @@ export default class MonsterManager {
         const monsterType = monsterData.bestiaryId.tag;
         const spriteKey = MONSTER_ASSET_KEYS[monsterType];
         
-        console.log(`Creating monster sprite: ID ${monsterData.monsterId}, Type ${monsterType}, Position (${position.x}, ${position.y}), HP: ${monsterData.hp}/${monsterData.maxHp}`);
         
         if (!spriteKey || !this.scene.textures.exists(spriteKey)) {
             console.error(`Missing texture for monster type: ${monsterType}`);
@@ -310,7 +279,6 @@ export default class MonsterManager {
             const monsterContainer = this.monsters.get(monsterData.monsterId);
             if (monsterContainer) {
                 // Update position
-                console.log(`Updating existing monster ${monsterData.monsterId} position from (${monsterContainer.x}, ${monsterContainer.y}) to (${position.x}, ${position.y})`);
                 
                 // Force direct position update - no tweening
                 monsterContainer.setPosition(position.x, position.y);
@@ -319,7 +287,6 @@ export default class MonsterManager {
                 monsterContainer.setDepth(BASE_DEPTH + position.y);
                 
                 // Verify position update
-                console.log(`Monster ${monsterData.monsterId} position after setPosition: (${monsterContainer.x}, ${monsterContainer.y})`);
                 
                 // Update health bar if it exists
                 const children = monsterContainer.getAll();
@@ -342,7 +309,6 @@ export default class MonsterManager {
             }
         } else {
             // Create new monster sprite
-            console.log(`Creating new monster sprite container: ${monsterType} at (${position.x}, ${position.y})`);
             
             // Calculate depth based on Y position
             const initialDepth = BASE_DEPTH + position.y;
@@ -351,11 +317,9 @@ export default class MonsterManager {
             const container = this.scene.add.container(position.x, position.y);
             
             // Verify container position after creation
-            console.log(`New monster container created at (${container.x}, ${container.y})`);
-            
+
             // Get monster-specific shadow offset from lookup table
             const shadowOffset = MONSTER_SHADOW_OFFSETS[monsterType] || 8; // Use default if not found
-            console.log(`Using shadow offset of ${shadowOffset} for ${monsterType}`);
             
             // Add shadow with monster-specific offset
             const shadow = this.scene.add.image(0, shadowOffset, SHADOW_ASSET_KEY)
@@ -408,8 +372,6 @@ export default class MonsterManager {
             container.setDepth(initialDepth);
             container.setSize(sprite.width, sprite.height);
             
-            console.log(`Set monster depth to ${initialDepth} based on Y position ${position.y}`);
-            
             // Store in monsters map
             this.monsters.set(monsterData.monsterId, container);
         }
@@ -421,7 +383,6 @@ export default class MonsterManager {
         if (monsterContainer) {
             monsterContainer.destroy();
             this.monsters.delete(monsterId);
-            console.log(`Removed monster sprite for monster ID: ${monsterId}`);
         }
     }
 
