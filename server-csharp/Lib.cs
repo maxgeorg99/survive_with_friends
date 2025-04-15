@@ -102,6 +102,7 @@ public static partial class Module
         public uint max_hp;
         public uint hp;
         public float speed;
+        public uint armor; // New field for player armor
     }
 
     // --- Lifecyle Hooks ---
@@ -250,7 +251,8 @@ public static partial class Module
             exp = 0,
             max_hp = 100,
             hp = 100,
-            speed = PLAYER_SPEED
+            speed = PLAYER_SPEED,
+            armor = 0 // Initialize armor
         });
 
         // Check if player insertion failed
