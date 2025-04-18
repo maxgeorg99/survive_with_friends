@@ -105,6 +105,19 @@ public static partial class Module
         public uint armor; // New field for player armor
     }
 
+    // Table to store dead players (same structure as Player)
+    [SpacetimeDB.Table(Name = "dead_players", Public = true)]
+    public partial struct DeadPlayer
+    {
+        [PrimaryKey]
+        public SpacetimeDB.Identity identity;
+
+        [Unique, AutoInc]
+        public uint player_id;
+
+        public string name;
+    }
+
     // --- Lifecyle Hooks ---
     [Reducer(ReducerKind.Init)]
     public static void Init(ReducerContext ctx)
@@ -335,6 +348,55 @@ public static partial class Module
         ctx.Db.entity.entity_id.Update(entity);
     }
     
+    // Server-only reducer for damaging players
+    [Reducer]
+    public static void DamagePlayer(ReducerContext ctx, uint player_id, uint damage_amount)
+    {
+        // This reducer is server-only (no PublicReducer attribute)
+        
+        // Find the player
+        var playerOpt = ctx.Db.player.player_id.Find(player_id);
+        if (playerOpt is null)
+        {
+            Log.Warn($"DamagePlayer called for non-existent player {player_id}.");
+            return;
+        }
+        
+        // Get the player and reduce HP
+        var player = playerOpt.Value;
+        
+        // Make sure we don't underflow
+        if (player.hp <= damage_amount)
+        {
+            // Player is dead - set HP to 0
+            player.hp = 0;
+            
+            // Update player record with 0 HP before we delete
+            ctx.Db.player.player_id.Update(player);
+            
+            // Log the death
+            Log.Info($"Player {player.name} (ID: {player.player_id}) has died!");
+            
+            // Store the player in the dead_players table before removing them
+            ctx.Db.dead_players.Insert(player);
+            Log.Info($"Player {player.name} (ID: {player.player_id}) moved to dead_players table.");
+            
+            // Delete the player and their entity
+            // Note: The client will detect this deletion through the onDelete handler
+            ctx.Db.player.player_id.Delete(player.player_id);
+            ctx.Db.entity.entity_id.Delete(player.entity_id);
+        }
+        else
+        {
+            // Player is still alive, update with reduced HP
+            player.hp -= damage_amount;
+            ctx.Db.player.player_id.Update(player);
+            
+            // Log the damage
+            Log.Info($"Player {player.name} (ID: {player.player_id}) took {damage_amount} damage. HP: {player.hp}/{player.max_hp}");
+        }
+    }
+    
     [Reducer]
     public static void GameTick(ReducerContext ctx, GameTickTimer timer)
     {
@@ -371,6 +433,74 @@ public static partial class Module
         
         // Process monster movements
         ProcessMonsterMovements(ctx);
+
+        // Check for collisions between players and monsters
+        ProcessPlayerMonsterCollisions(ctx);
+    }
+    
+    // Helper method to process collisions between players and monsters and apply damage
+    private static void ProcessPlayerMonsterCollisions(ReducerContext ctx)
+    {        
+        // Keep track of monster positions and types
+        var monsterEntities = new Dictionary<uint, Entity>();
+        var monsterAtks = new Dictionary<uint, float>();
+        
+        // Load all monsters with entities
+        foreach (var monster in ctx.Db.monsters.Iter())
+        {
+            var entityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
+            if (entityOpt != null)
+            {
+                monsterEntities[monster.entity_id] = entityOpt.Value;
+                
+                // Get monster attack value from bestiary
+                var bestiaryEntryOpt = ctx.Db.bestiary.bestiary_id.Find((uint)monster.bestiary_id);
+                if (bestiaryEntryOpt != null)
+                {
+                    monsterAtks[monster.entity_id] = bestiaryEntryOpt.Value.atk;
+                }
+                else
+                {
+                    // Default attack if bestiary entry not found
+                    monsterAtks[monster.entity_id] = 1.0f;
+                }
+            }
+        }
+        
+        // Check each player for collisions with monsters
+        foreach (var player in ctx.Db.player.Iter())
+        {
+            var playerEntityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
+            if (playerEntityOpt == null)
+            {
+                continue; // Skip if player has no entity
+            }
+            
+            Entity playerEntity = playerEntityOpt.Value;
+            
+            // Check against each monster
+            foreach (var monsterEntry in monsterEntities)
+            {
+                uint monsterId = monsterEntry.Key;
+                Entity monsterEntity = monsterEntry.Value;
+                
+                // Check if player is colliding with this monster
+                if (AreEntitiesColliding(playerEntity, monsterEntity))
+                {
+                    // Get monster attack value
+                    float monsterAtk = monsterAtks.GetValueOrDefault(monsterId, 1.0f);
+                    
+                    // Calculate damage, taking player armor into account
+                    // Armor reduces damage by its value (minimum damage is 1)
+                    uint finalDamage = (uint)Math.Max(1, Math.Ceiling(monsterAtk - (player.armor * 0.1f)));
+                    
+                    // Apply damage to player
+                    DamagePlayer(ctx, player.player_id, finalDamage);
+                    
+                    Log.Info($"Monster {monsterId} damaged player {player.name} for {finalDamage} damage (ATK: {monsterAtk}, Armor: {player.armor})");
+                }
+            }
+        }
     }
     
     // Helper function to check if two entities are colliding using circle-based detection

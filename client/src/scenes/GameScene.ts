@@ -279,7 +279,28 @@ export default class GameScene extends Phaser.Scene {
         this.spacetimeDBClient.sdkConnection?.db.player.onDelete((_ctx, player: Player) => {
             if (!this.isPlayerDataReady) return;
             console.log(`Player.onDelete: ${player.name} (ID: ${player.identity.toHexString()})`);
-            if (!player.identity.isEqual(localIdentity)) {
+            
+            // Get entity position before it's removed (if still in cache)
+            const entityId = player.entityId;
+            const entityPosition = this.getEntityPosition(entityId);
+
+            // Check if it's the local player
+            const isLocalPlayer = player.identity.isEqual(localIdentity);
+            
+            // Create death effects if we have the position
+            if (entityPosition) {
+                console.log(`Creating death effects for player ${player.name} at position (${entityPosition.x}, ${entityPosition.y})`);
+                this.createDeathEffects(entityPosition.x, entityPosition.y);
+                
+                // If local player died, show death screen
+                if (isLocalPlayer) {
+                    console.log("Local player died, showing death screen");
+                    this.showDeathScreen();
+                }
+            }
+            
+            // Remove other player if not local
+            if (!isLocalPlayer) {
                 this.removeOtherPlayer(player.identity);
             }
         });
@@ -866,5 +887,158 @@ export default class GameScene extends Phaser.Scene {
         
         // Debug output of all tracked players
         console.log(`Total tracked other players after sync: ${this.otherPlayers.size}`);
+    }
+
+    // Helper function to find an entity's position by ID
+    private getEntityPosition(entityId: number): { x: number, y: number } | null {
+        // Try to find the entity in the local cache before it gets removed
+        const entities = Array.from(this.spacetimeDBClient.sdkConnection?.db.entity.iter() || []);
+        for (const entity of entities) {
+            if (entity.entityId === entityId) {
+                return { x: entity.position.x, y: entity.position.y };
+            }
+        }
+        
+        // If we have a local player and this is its entity ID
+        if (this.localPlayerSprite && this.spacetimeDBClient?.identity) {
+            const localPlayer = this.spacetimeDBClient.sdkConnection?.db.player.identity.find(
+                this.spacetimeDBClient.identity
+            );
+            if (localPlayer && localPlayer.entityId === entityId) {
+                return { 
+                    x: this.localPlayerSprite.x, 
+                    y: this.localPlayerSprite.y 
+                };
+            }
+        }
+        
+        // Check other players
+        for (const [identity, container] of this.otherPlayers.entries()) {
+            const player = this.spacetimeDBClient.sdkConnection?.db.player.identity.find(identity);
+            if (player && player.entityId === entityId) {
+                return { 
+                    x: container.x, 
+                    y: container.y 
+                };
+            }
+        }
+        
+        return null;
+    }
+    
+    // Create blood splatter particles
+    private createDeathEffects(x: number, y: number) {
+        console.log(`Creating death effects at (${x}, ${y})`);
+        
+        // Create a particle emitter for blood splatter
+        const particles = this.add.particles(x, y, 'shadow', {  // Reusing shadow texture as particle
+            speed: { min: 50, max: 200 },
+            angle: { min: 0, max: 360 },
+            scale: { start: 0.4, end: 0.1 },
+            lifespan: 800,
+            quantity: 20,
+            tint: 0xff0000,  // Red tint for blood
+            gravityY: 300,
+            blendMode: 'ADD',
+            emitting: false
+        });
+        
+        // Set depth to ensure it's visible
+        particles.setDepth(5000);
+        
+        // Emit once
+        particles.explode(30, x, y);
+        
+        // Auto-destroy after animation completes
+        this.time.delayedCall(1000, () => {
+            particles.destroy();
+        });
+    }
+    
+    // Show death screen for local player
+    private showDeathScreen() {
+        console.log("Showing death screen for local player");
+        
+        // Create dark overlay covering the entire screen
+        const { width, height } = this.scale;
+        const overlay = this.add.rectangle(0, 0, width, height, 0x000000, 0.7)
+            .setOrigin(0, 0)
+            .setScrollFactor(0)  // Fix to camera
+            .setDepth(10000);    // Ensure it's on top
+            
+        // Add "You are no Survivor" text
+        const titleText = this.add.text(
+            width / 2, 
+            height / 2 - 50, 
+            "You are no Survivor", 
+            {
+                fontFamily: 'Arial',
+                fontSize: '48px',
+                color: '#FF0000',
+                stroke: '#000000',
+                strokeThickness: 6,
+                align: 'center'
+            }
+        )
+        .setOrigin(0.5)
+        .setScrollFactor(0)
+        .setDepth(10001);
+        
+        // Add "refresh to play again" text
+        const subtitleText = this.add.text(
+            width / 2, 
+            height / 2 + 50, 
+            "refresh to play again", 
+            {
+                fontFamily: 'Arial',
+                fontSize: '24px',
+                color: '#FFFFFF',
+                stroke: '#000000',
+                strokeThickness: 4,
+                align: 'center'
+            }
+        )
+        .setOrigin(0.5)
+        .setScrollFactor(0)
+        .setDepth(10001);
+        
+        // Fade in effect
+        overlay.alpha = 0;
+        titleText.alpha = 0;
+        subtitleText.alpha = 0;
+        
+        this.tweens.add({
+            targets: [overlay, titleText, subtitleText],
+            alpha: 1,
+            duration: 1000,
+            ease: 'Power2'
+        });
+        
+        // Disable input and controls for local player
+        this.disablePlayerControls();
+    }
+    
+    // Disable player controls after death
+    private disablePlayerControls() {
+        // Clear tap target and hide marker
+        this.tapTarget = null;
+        if (this.tapMarker) {
+            this.tapMarker.setVisible(false);
+        }
+        
+        // Set flag to prevent movement in update()
+        this.isMoving = false;
+        
+        // Clear direction
+        this.currentDirection.set(0, 0);
+        
+        // If using actual input components that need disabling:
+        // (This is more for documentation, as the update method won't process input anyway)
+        if (this.input) {
+            // Remove pointer listeners
+            this.input.off('pointermove');
+            this.input.off('pointerdown');
+            this.input.off('pointerup');
+        }
     }
 }
