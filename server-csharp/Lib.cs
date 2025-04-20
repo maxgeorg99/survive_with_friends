@@ -83,18 +83,29 @@ public static partial class Module
         public float radius;          // Collision radius for this entity
     }
 
-    [SpacetimeDB.Table(Name = "player", Public = true)] // Typically player table shouldn't be public, but adjusting per example
-    public partial struct Player
+    [SpacetimeDB.Table(Name = "account", Public = true)]
+    public partial struct Account
     {
         [PrimaryKey]
         public SpacetimeDB.Identity identity;
 
-        [Unique, AutoInc]
+        [Unique]
+        public string name;
+
+        public uint current_player_id;
+    }
+
+    [SpacetimeDB.Table(Name = "player", Public = true)] // Typically player table shouldn't be public, but adjusting per example
+    public partial struct Player
+    {
+        [PrimaryKey, AutoInc]
         public uint player_id;
 
+        [Unique]
+        public uint entity_id;
+
         public string name;
-        public uint entity_id; // Foreign key relating to an Entity row
-        
+
         // New player attributes
         public PlayerClass playerClass;
         public uint level;
@@ -110,9 +121,6 @@ public static partial class Module
     public partial struct DeadPlayer
     {
         [PrimaryKey]
-        public SpacetimeDB.Identity identity;
-
-        [Unique, AutoInc]
         public uint player_id;
 
         public string name;
@@ -148,83 +156,82 @@ public static partial class Module
         var identity = ctx.Sender;
         Log.Info($"Client connected: {identity}");
 
-        // Check if player already exists - if so, reconnect them
-        var playerOpt = ctx.Db.player.identity.Find(identity);
-        if (playerOpt != null)
+        // Check if account already exists - if so, reconnect them
+        var accountOpt = ctx.Db.account.identity.Find(identity);
+        if (accountOpt != null)
         {
-            Log.Info($"Existing player {identity} reconnected.");
-            var player = playerOpt.Value;
-            Log.Info($"Player details: Name={player.name}, EntityID={player.entity_id}");
-            
-            // Check if entity exists
-            var entityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
-            if (entityOpt == null)
+            Log.Info($"Client has existing account: {identity} reconnected.");
+            var account = accountOpt.Value;
+            Log.Info($"Account details: Name={account.name}, PlayerID={account.current_player_id}");
+
+            // Check if player exists
+            var playerOpt = ctx.Db.player.player_id.Find(account.current_player_id);
+            if (playerOpt == null)
             {
-                Log.Warn($"Player {identity} has missing entity {player.entity_id}. Creating new entity.");
-                
-                // Create a new entity for reconnected player with missing entity
-                Entity? newEntityOpt = ctx.Db.entity.Insert(new Entity
+                Log.Info($"No living player found for account {identity}. Checking for dead players...");
+
+                DeadPlayer? deadPlayerOpt = ctx.Db.dead_players.player_id.Find(account.current_player_id);
+                if (deadPlayerOpt == null)
                 {
-                    position = new DbVector2(100, 100), 
-                    direction = new DbVector2(0, 0),
-                    is_moving = false,
-                    radius = 48.0f
-                });
-                
-                if (newEntityOpt != null)
+                    Log.Info($"No dead player found for account {identity} either.");
+                }
+                else
                 {
-                    // Update player with new entity
-                    player.entity_id = newEntityOpt.Value.entity_id;
-                    ctx.Db.player.identity.Update(player);
-                    Log.Info($"Created replacement entity {newEntityOpt.Value.entity_id} for player {identity}");
+                    Log.Info($"Found dead player {deadPlayerOpt.Value.player_id} for account {identity}.");
                 }
             }
             else
             {
-                Log.Info($"Entity {player.entity_id} exists at position ({entityOpt.Value.position.x}, {entityOpt.Value.position.y})");
+                Log.Info($"Found living player {playerOpt.Value.player_id} for account {identity}.");
             }
         }
         else
         {
-            // No player creation happens here now - wait for EnterGame
-            Log.Info($"New connection from {identity}. Waiting for name entry...");
+            // Create a new account
+            Log.Info($"New connection from {identity}. Creating a new account.");
+            
+            Account? newAccountOpt = ctx.Db.account.Insert(new Account
+            {
+                identity = identity,
+                name = "",
+                current_player_id = 0
+            });
+            
+            if (newAccountOpt != null)
+            {
+                Log.Info($"Created new account for {identity}");
+            }
         }
-        
-        // After processing, log the final state
-        Log.Info("=== After ClientConnected Processing ===");
-        Log.Info($"Total players: {ctx.Db.player.Iter().Count()}");
-        Log.Info($"Total entities: {ctx.Db.entity.Iter().Count()}");
     }
 
     // --- Reducers ---
     [Reducer]
-    public static void EnterGame(ReducerContext ctx, string name)
+    public static void SpawnPlayer(ReducerContext ctx)
     {
         var identity = ctx.Sender;
-        Log.Info($"EnterGame called by identity: {identity} with name: {name}");
 
-        // Basic validation
-        if (string.IsNullOrWhiteSpace(name) || name.Length > 16) // Example: Max 16 chars
+        Log.Info($"SpawnPlayer called by identity: {identity}");
+
+        //Check if account exists
+        var accountOpt = ctx.Db.account.identity.Find(identity);
+        if (accountOpt == null)
         {
-            Log.Warn($"Invalid name provided by {identity}: '{name}'. Name must be 1-16 characters.");
-            return;
+            throw new Exception($"SpawnPlayer: Account {identity} does not exist.");
         }
 
+        var account = accountOpt.Value;
+        var player_id = account.current_player_id;
+
         // Check if player already exists
-        var playerOpt = ctx.Db.player.identity.Find(identity);
+        var playerOpt = ctx.Db.player.player_id.Find(player_id);
         if (playerOpt != null)
         {
-            Log.Info($"Player {identity} already exists. Updating name to: {name}");
-            
-            // Update existing player's name
-            var player = playerOpt.Value;
-            player.name = name.Trim();
-            ctx.Db.player.identity.Update(player);
-            
-            return;
+            throw new Exception($"SpawnPlayer: Player for {identity} already exists.");
         }
 
         // Create a new player with a random class
+        var name = account.name;
+
         Log.Info($"Creating new player for {identity} with name: {name}");
         
         // Choose a random player class
@@ -233,6 +240,26 @@ public static partial class Module
         var randomClassIndex = rng.Next(0, classCount);
         var playerClass = (PlayerClass)randomClassIndex;
         
+        // Create the player and entity
+        var newPlayerOpt = CreateNewPlayer(ctx, name, playerClass);
+        if (newPlayerOpt == null)
+        {
+            throw new Exception($"Failed to create new player for {identity}!");
+            return;
+        }
+        
+        var newPlayer = newPlayerOpt.Value;
+
+        // Update the account to point to the new player
+        account.current_player_id = newPlayer.player_id;
+        ctx.Db.account.identity.Update(account);
+
+        Log.Info($"Created new player record for {identity} with class {playerClass} linked to entity {newPlayer.entity_id}.");
+    }
+    
+    // Helper function to create a new player with an associated entity
+    private static Player? CreateNewPlayer(ReducerContext ctx, string name, PlayerClass playerClass)
+    {
         // 1. Create the Entity for the player with default direction and not moving
         Entity? newEntityOpt = ctx.Db.entity.Insert(new Entity
         {
@@ -245,19 +272,18 @@ public static partial class Module
         // Check if entity insertion failed
         if(newEntityOpt is null)
         {
-            Log.Error($"Failed to insert new entity for {identity}! Insert returned null.");
-            return;
+            throw new Exception("Failed to insert new entity for {identity}! Insert returned null.");
         }
 
         // Insertion succeeded, get the non-nullable value
         Entity newEntity = newEntityOpt.Value;
-        Log.Info($"Created new entity with ID: {newEntity.entity_id} for {identity}.");
+        Log.Info($"Created new entity with ID: {newEntity.entity_id} for Player {name}.");
 
         // 2. Create the Player record, linking to the new entity
         Player? newPlayerOpt = ctx.Db.player.Insert(new Player
         {
-            identity = identity,
-            name = name.Trim(),
+            player_id = 0,
+            name = name,
             entity_id = newEntity.entity_id,
             playerClass = playerClass,
             level = 1,
@@ -265,21 +291,16 @@ public static partial class Module
             max_hp = 100,
             hp = 100,
             speed = PLAYER_SPEED,
-            armor = 0 // Initialize armor
+            armor = 0
         });
 
         // Check if player insertion failed
         if(newPlayerOpt is null)
         {
-            Log.Error($"Failed to insert new player for {identity} (entity: {newEntity.entity_id})! Insert returned null.");
-            // Delete the orphaned entity to avoid leaking
-            ctx.Db.entity.entity_id.Delete(newEntity.entity_id);
-            return;
+            throw new Exception("Failed to insert new player for {identity}! Insert returned null.");
         }
 
-        // Insertion succeeded, get the non-nullable value
-        Player newPlayer = newPlayerOpt.Value;
-        Log.Info($"Created new player record for {identity} with class {playerClass} linked to entity {newPlayer.entity_id}.");
+        return newPlayerOpt;
     }
 
     [Reducer]
@@ -289,448 +310,24 @@ public static partial class Module
         Log.Info($"SetName called by identity: {identity} with name: {name}");
 
         // Basic validation
-        if (string.IsNullOrWhiteSpace(name) || name.Length > 16) // Example: Max 16 chars
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 16)
         {
-            Log.Warn($"Invalid name provided by {identity}: '{name}'. Name must be 1-16 characters.");
-            return; // Or just ignore the request
+            throw new Exception($"SetName: Invalid name provided by {identity}: '{name}'. Name must be 1-16 characters.");
         }
 
-        // Find the player using the context's Db object and the primary key index (identity)
-        var playerOpt = ctx.Db.player.identity.Find(identity);
-        if (playerOpt is null)
+        // Find the account using the context's Db object and the primary key index (identity)
+        var accountOpt = ctx.Db.account.identity.Find(identity);
+        if (accountOpt is null)
         {
-            Log.Warn($"Attempted to set name for non-existent player {identity}.");
-            return;
+            throw new Exception($"SetName: Attempted to set name for non-existent account {identity}.");
         }
 
-        // Get the actual player struct from the nullable result
-        var player = playerOpt.Value;
+        var account = accountOpt.Value;
 
-        // Update player name
-        player.name = name.Trim(); // Trim whitespace
+        account.name = name.Trim();
 
-        // Update the player in the database using the context's Db object and the primary key index (identity)
-        ctx.Db.player.identity.Update(player); // Update via the identity index
-        Log.Info($"Player {identity} name set to {player.name}.");
+        ctx.Db.account.identity.Update(account);
+        Log.Info($"Account {identity} name set to {account.name}.");
     }
 
-    [Reducer]
-    public static void UpdatePlayerDirection(ReducerContext ctx, float dirX, float dirY)
-    {
-        var identity = ctx.Sender;
-        // Find the player record for the caller
-        var playerOpt = ctx.Db.player.identity.Find(identity);
-        if (playerOpt is null)
-        {
-            Log.Warn($"UpdatePlayerDirection called by non-existent player {identity}.");
-            return;
-        }
-        var player = playerOpt.Value;
-        
-        // Get direction vector and determine if player is attempting to move
-        var direction = new DbVector2(dirX, dirY);
-        bool isMoving = dirX != 0 || dirY != 0;
-        
-        // Find the entity associated with this player
-        var entityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
-        if (entityOpt is null)
-        {
-            Log.Error($"Player {identity} (entity_id: {player.entity_id}) has no matching entity! Cannot update direction.");
-            return;
-        }
-        
-        // Update entity with new direction and movement state
-        var entity = entityOpt.Value;
-        entity.direction = isMoving ? direction.Normalize() : direction;
-        entity.is_moving = isMoving;
-        
-        // Update the entity in the database
-        ctx.Db.entity.entity_id.Update(entity);
-    }
-    
-    // Server-only reducer for damaging players
-    [Reducer]
-    public static void DamagePlayer(ReducerContext ctx, uint player_id, uint damage_amount)
-    {
-        // This reducer is server-only (no PublicReducer attribute)
-        
-        // Find the player
-        var playerOpt = ctx.Db.player.player_id.Find(player_id);
-        if (playerOpt is null)
-        {
-            Log.Warn($"DamagePlayer called for non-existent player {player_id}.");
-            return;
-        }
-        
-        // Get the player and reduce HP
-        var player = playerOpt.Value;
-        
-        // Make sure we don't underflow
-        if (player.hp <= damage_amount)
-        {
-            // Player is dead - set HP to 0
-            player.hp = 0;
-            
-            // Update player record with 0 HP before we delete
-            ctx.Db.player.player_id.Update(player);
-            
-            // Log the death
-            Log.Info($"Player {player.name} (ID: {player.player_id}) has died!");
-            
-            // Store the player in the dead_players table before removing them
-            ctx.Db.dead_players.Insert(player);
-            Log.Info($"Player {player.name} (ID: {player.player_id}) moved to dead_players table.");
-            
-            // Delete the player and their entity
-            // Note: The client will detect this deletion through the onDelete handler
-            ctx.Db.player.player_id.Delete(player.player_id);
-            ctx.Db.entity.entity_id.Delete(player.entity_id);
-        }
-        else
-        {
-            // Player is still alive, update with reduced HP
-            player.hp -= damage_amount;
-            ctx.Db.player.player_id.Update(player);
-            
-            // Log the damage
-            Log.Info($"Player {player.name} (ID: {player.player_id}) took {damage_amount} damage. HP: {player.hp}/{player.max_hp}");
-        }
-    }
-    
-    [Reducer]
-    public static void GameTick(ReducerContext ctx, GameTickTimer timer)
-    {
-        // Process all movable players
-        foreach (var player in ctx.Db.player.Iter())
-        {
-            float moveSpeed = player.speed;
-
-            var entityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
-
-            if(entityOpt is null)
-            {
-                continue;
-            }
-
-            var entity = entityOpt.Value;
-
-            if (!entity.is_moving)
-            {
-                continue;
-            }
-            
-            // Calculate new position based on direction, speed and time delta
-            float moveDistance = moveSpeed * DELTA_TIME;
-            var moveOffset = entity.direction * moveDistance;
-            
-            // Update entity with new position
-            var updatedEntity = entity;
-            updatedEntity.position = entity.position + moveOffset;
-            
-            // Update entity in database
-            ctx.Db.entity.entity_id.Update(updatedEntity);
-        }
-        
-        // Process monster movements
-        ProcessMonsterMovements(ctx);
-
-        // Check for collisions between players and monsters
-        ProcessPlayerMonsterCollisions(ctx);
-    }
-    
-    // Helper method to process collisions between players and monsters and apply damage
-    private static void ProcessPlayerMonsterCollisions(ReducerContext ctx)
-    {        
-        // Keep track of monster positions and types
-        var monsterEntities = new Dictionary<uint, Entity>();
-        var monsterAtks = new Dictionary<uint, float>();
-        
-        // Load all monsters with entities
-        foreach (var monster in ctx.Db.monsters.Iter())
-        {
-            var entityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
-            if (entityOpt != null)
-            {
-                monsterEntities[monster.entity_id] = entityOpt.Value;
-                
-                // Get monster attack value from bestiary
-                var bestiaryEntryOpt = ctx.Db.bestiary.bestiary_id.Find((uint)monster.bestiary_id);
-                if (bestiaryEntryOpt != null)
-                {
-                    monsterAtks[monster.entity_id] = bestiaryEntryOpt.Value.atk;
-                }
-                else
-                {
-                    // Default attack if bestiary entry not found
-                    monsterAtks[monster.entity_id] = 1.0f;
-                }
-            }
-        }
-        
-        // Check each player for collisions with monsters
-        foreach (var player in ctx.Db.player.Iter())
-        {
-            var playerEntityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
-            if (playerEntityOpt == null)
-            {
-                continue; // Skip if player has no entity
-            }
-            
-            Entity playerEntity = playerEntityOpt.Value;
-            
-            // Check against each monster
-            foreach (var monsterEntry in monsterEntities)
-            {
-                uint monsterId = monsterEntry.Key;
-                Entity monsterEntity = monsterEntry.Value;
-                
-                // Check if player is colliding with this monster
-                if (AreEntitiesColliding(playerEntity, monsterEntity))
-                {
-                    // Get monster attack value
-                    float monsterAtk = monsterAtks.GetValueOrDefault(monsterId, 1.0f);
-                    
-                    // Calculate damage, taking player armor into account
-                    // Armor reduces damage by its value (minimum damage is 1)
-                    uint finalDamage = (uint)Math.Max(1, Math.Ceiling(monsterAtk - (player.armor * 0.1f)));
-                    
-                    // Apply damage to player
-                    DamagePlayer(ctx, player.player_id, finalDamage);
-                    
-                    Log.Info($"Monster {monsterId} damaged player {player.name} for {finalDamage} damage (ATK: {monsterAtk}, Armor: {player.armor})");
-                }
-            }
-        }
-    }
-    
-    // Helper function to check if two entities are colliding using circle-based detection
-    private static bool AreEntitiesColliding(Entity entityA, Entity entityB)
-    {
-        // Get the distance between the two entities
-        float dx = entityA.position.x - entityB.position.x;
-        float dy = entityA.position.y - entityB.position.y;
-        float distanceSquared = dx * dx + dy * dy;
-        
-        // Calculate the minimum distance to avoid collision (sum of both radii)
-        float minDistance = entityA.radius + entityB.radius;
-        float minDistanceSquared = minDistance * minDistance;
-        
-        // If distance squared is less than minimum distance squared, they are colliding
-        return distanceSquared < minDistanceSquared;
-    }
-    
-    // Helper function to calculate the overlap between two entities
-    private static float GetEntitiesOverlap(Entity entityA, Entity entityB)
-    {
-        // Get the distance between the two entities
-        float dx = entityA.position.x - entityB.position.x;
-        float dy = entityA.position.y - entityB.position.y;
-        float distance = MathF.Sqrt(dx * dx + dy * dy);
-        
-        // Calculate the minimum distance to avoid collision (sum of both radii)
-        float minDistance = entityA.radius + entityB.radius;
-        
-        // Calculate overlap (positive value means they are overlapping)
-        return minDistance - distance;
-    }
-    
-    // Helper function to get a repulsion vector based on overlap
-    private static DbVector2 GetRepulsionVector(Entity entityA, Entity entityB, float overlap)
-    {
-        // Direction from B to A (the direction to push A away from B)
-        float dx = entityA.position.x - entityB.position.x;
-        float dy = entityA.position.y - entityB.position.y;
-        
-        // Normalize the direction vector
-        float distance = MathF.Sqrt(dx * dx + dy * dy);
-        
-        // Avoid division by zero
-        if (distance < 0.0001f)
-        {
-            // If entities are exactly at the same position, push in a random direction
-            return new DbVector2(0.707f, 0.707f); // 45-degree angle
-        }
-        
-        float nx = dx / distance;
-        float ny = dy / distance;
-        
-        // Scale the repulsion by the overlap amount
-        // The larger the overlap, the stronger the repulsion
-        float repulsionStrength = overlap * 0.5f; // Adjust this factor as needed
-        
-        return new DbVector2(nx * repulsionStrength, ny * repulsionStrength);
-    }
-    
-    // Helper method to process monster movements
-    private static void ProcessMonsterMovements(ReducerContext ctx)
-    {
-        // Constants for monster behavior
-        const float MIN_DISTANCE_TO_MOVE = 20.0f;  // Minimum distance before monster starts moving
-        const float MIN_DISTANCE_TO_REACH = 5.0f;  // Distance considered "reached" the target
-        
-        // First, get all monster entities for collision detection
-        var monsterEntities = new Dictionary<uint, Entity>();
-        var monsterTypes = new Dictionary<uint, MonsterType>();
-        
-        foreach (var monster in ctx.Db.monsters.Iter())
-        {
-            var entityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
-            if (entityOpt != null)
-            {
-                monsterEntities[monster.entity_id] = entityOpt.Value;
-                monsterTypes[monster.entity_id] = monster.bestiary_id;
-            }
-        }
-        
-        // Now process each monster's movement with collision avoidance
-        foreach (var monster in ctx.Db.monsters.Iter())
-        {
-            // Get the monster's entity
-            if (!monsterEntities.TryGetValue(monster.entity_id, out Entity monsterEntity))
-            {
-                continue;
-            }
-            
-            // Get the target entity
-            var targetEntityOpt = ctx.Db.entity.entity_id.Find(monster.target_entity_id);
-            if (targetEntityOpt == null)
-            {
-                // Target entity no longer exists - find a new target
-                ReassignMonsterTarget(ctx, monster);
-                continue;
-            }
-            var targetEntity = targetEntityOpt.Value;
-            
-            // Calculate direction vector from monster to target
-            var directionVector = new DbVector2(
-                targetEntity.position.x - monsterEntity.position.x,
-                targetEntity.position.y - monsterEntity.position.y
-            );
-            
-            // Calculate distance to target
-            float distanceToTarget = directionVector.Magnitude();
-            
-            // If we're too close to the target, stop moving
-            if (distanceToTarget < MIN_DISTANCE_TO_REACH)
-            {
-                // Monster reached the target, stop moving
-                if (monsterEntity.is_moving)
-                {
-                    var stoppedEntity = monsterEntity;
-                    stoppedEntity.is_moving = false;
-                    stoppedEntity.direction = new DbVector2(0, 0);
-                    ctx.Db.entity.entity_id.Update(stoppedEntity);
-                }
-                continue;
-            }
-            
-            // If we're far enough from the target, start moving
-            if (distanceToTarget > MIN_DISTANCE_TO_MOVE)
-            {
-                // Normalize the direction vector to get base movement direction
-                var normalizedDirection = directionVector.Normalize();
-                
-                // Get monster speed from bestiary
-                float monsterSpeed = 20.0f; // Lower default fallback speed
-                
-                // Get the monster type
-                MonsterType monsterType = monster.bestiary_id;
-                
-                // Get bestiary entry using correct ID
-                var bestiaryEntryOpt = ctx.Db.bestiary.bestiary_id.Find((uint)monsterType);
-                
-                if (bestiaryEntryOpt != null)
-                {
-                    monsterSpeed = bestiaryEntryOpt.Value.speed;
-                }
-                
-                // Check for collisions with other monsters and calculate avoidance vectors
-                var avoidanceVector = new DbVector2(0, 0);
-                
-                foreach (var otherEntityPair in monsterEntities)
-                {
-                    uint otherEntityId = otherEntityPair.Key;
-                    Entity otherEntity = otherEntityPair.Value;
-                    
-                    // Skip self
-                    if (otherEntityId == monster.entity_id)
-                        continue;
-                    
-                    // Check if we're colliding with this entity
-                    float overlap = GetEntitiesOverlap(monsterEntity, otherEntity);
-                    
-                    if (overlap > 0)
-                    {
-                        // We have a collision! Calculate repulsion vector
-                        DbVector2 repulsion = GetRepulsionVector(monsterEntity, otherEntity, overlap);
-                        
-                        // Add to avoidance vector
-                        avoidanceVector.x += repulsion.x;
-                        avoidanceVector.y += repulsion.y;
-                        
-                        Log.Debug($"Monster {monster.monster_id} colliding with entity {otherEntityId}, " +
-                                 $"overlap: {overlap:F2}, adding repulsion: ({repulsion.x:F2}, {repulsion.y:F2})");
-                    }
-                }
-                
-                // Combine the target direction with the avoidance vector
-                // We give more weight to avoidance to ensure monsters don't stack
-                var combinedDirection = new DbVector2(
-                    normalizedDirection.x + avoidanceVector.x * 1.5f,
-                    normalizedDirection.y + avoidanceVector.y * 1.5f
-                );
-                
-                // Re-normalize the combined direction
-                var finalDirection = combinedDirection.Magnitude() > 0.0001f 
-                    ? combinedDirection.Normalize() 
-                    : normalizedDirection;
-                
-                // Calculate new position based on direction, speed and time delta
-                float moveDistance = monsterSpeed * DELTA_TIME;
-                var moveOffset = finalDirection * moveDistance;
-                
-                // Update entity with new direction and position
-                var updatedEntity = monsterEntity;
-                updatedEntity.direction = finalDirection;
-                updatedEntity.is_moving = true;
-                updatedEntity.position = monsterEntity.position + moveOffset;
-                
-                // Update entity in database
-                ctx.Db.entity.entity_id.Update(updatedEntity);
-                
-                // Update our local cache for subsequent collision checks
-                monsterEntities[monster.entity_id] = updatedEntity;
-            }
-        }
-    }
-    
-    // Helper method to reassign a monster's target when original target is gone
-    private static void ReassignMonsterTarget(ReducerContext ctx, Monsters monster)
-    {
-        // Find a new target among existing players
-        var players = ctx.Db.player.Iter().ToArray();
-        if (players.Length == 0)
-        {
-            // Make the monster stop moving
-            var entityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
-            if (entityOpt != null)
-            {
-                var entity = entityOpt.Value;
-                entity.is_moving = false;
-                entity.direction = new DbVector2(0, 0);
-                ctx.Db.entity.entity_id.Update(entity);
-            }
-            return;
-        }
-        
-        // Choose a random player as the new target
-        var rng = ctx.Rng;
-        var randomIndex = rng.Next(0, players.Length);
-        var newTarget = players[randomIndex];
-        
-        // Update the monster with the new target
-        var updatedMonster = monster;
-        updatedMonster.target_entity_id = newTarget.entity_id;
-        ctx.Db.monsters.monster_id.Update(updatedMonster);
-    }
 }
