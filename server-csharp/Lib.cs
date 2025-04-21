@@ -206,7 +206,7 @@ public static partial class Module
 
     // --- Reducers ---
     [Reducer]
-    public static void SpawnPlayer(ReducerContext ctx)
+    public static void SpawnPlayer(ReducerContext ctx, uint class_id)
     {
         var identity = ctx.Sender;
 
@@ -234,18 +234,19 @@ public static partial class Module
 
         Log.Info($"Creating new player for {identity} with name: {name}");
         
-        // Choose a random player class
-        var rng = ctx.Rng;
-        var classCount = Enum.GetValues(typeof(PlayerClass)).Length;
-        var randomClassIndex = rng.Next(0, classCount);
-        var playerClass = (PlayerClass)randomClassIndex;
+        // Cast the class_id to a PlayerClass enum
+        if(class_id < 0 || class_id >= Enum.GetValues(typeof(PlayerClass)).Length)
+        {
+            throw new Exception($"SpawnPlayer: Invalid class ID provided by {identity}: {class_id}. Must be between 0 and {Enum.GetValues(typeof(PlayerClass)).Length - 1}.");
+        }
+
+        var playerClass = (PlayerClass)class_id;
         
         // Create the player and entity
         var newPlayerOpt = CreateNewPlayer(ctx, name, playerClass);
         if (newPlayerOpt == null)
         {
             throw new Exception($"Failed to create new player for {identity}!");
-            return;
         }
         
         var newPlayer = newPlayerOpt.Value;
