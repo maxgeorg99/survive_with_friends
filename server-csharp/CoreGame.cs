@@ -86,8 +86,13 @@ public static partial class Module
             
             // Delete the player and their entity
             // Note: The client will detect this deletion through the onDelete handler
-            ctx.Db.player.player_id.Delete(player.player_id);
-            ctx.Db.entity.entity_id.Delete(player.entity_id);
+
+            //Delete the player from the player tableb
+            ctx.Db.player.player_id.Delete(player_id);
+
+            //Delete the entity from the entity table
+            var entity_id = player.entity_id;
+            ctx.Db.entity.entity_id.Delete(entity_id);
         }
         else
         {

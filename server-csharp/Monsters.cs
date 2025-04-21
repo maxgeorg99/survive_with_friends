@@ -42,7 +42,7 @@ public static partial class Module
         var playerCount = ctx.Db.player.Count;
         if (playerCount == 0)
         {
-            Log.Info("SpawnMonster: No players online, skipping monster spawn.");
+            //Log.Info("SpawnMonster: No players online, skipping monster spawn.");
             return;
         }
         
@@ -58,7 +58,7 @@ public static partial class Module
         var monsterCount = ctx.Db.monsters.Count;
         if (monsterCount >= config.max_monsters)
         {
-            Log.Info($"SpawnMonster: At maximum monster capacity ({monsterCount}/{config.max_monsters}), skipping spawn.");
+            //Log.Info($"SpawnMonster: At maximum monster capacity ({monsterCount}/{config.max_monsters}), skipping spawn.");
             return;
         }
         

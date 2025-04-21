@@ -62,7 +62,7 @@ class SpacetimeDBClient {
             .subscribe([
                 "SELECT * FROM account",
                 "SELECT * FROM player",
-                "SELECT * FROM dead_player",
+                "SELECT * FROM dead_players",
                 "SELECT * FROM entity",
                 "SELECT * FROM monsters"
             ]);
