@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import GameScene from './scenes/GameScene';
+import LoginScene from './scenes/LoginScene';
 import SpacetimeDBClient from './SpacetimeDBClient';
 import { Player } from './autobindings';
 
@@ -19,7 +20,7 @@ const config: Phaser.Types.Core.GameConfig = {
             // debug: true // Set to true for physics debugging
         }
     },
-    scene: [GameScene],
+    scene: [LoginScene, GameScene],
     scale: {
         mode: Phaser.Scale.RESIZE,
         autoCenter: Phaser.Scale.CENTER_BOTH
@@ -99,12 +100,6 @@ function startGameWorld() {
     isGameWorldStarted = true;
     console.log("Starting game world and emitting playerDataReady.");
     
-    // Clear the fallback timer if it exists
-    if ((window as any).fallbackTimerId) {
-        clearTimeout((window as any).fallbackTimerId);
-        (window as any).fallbackTimerId = null;
-    }
-    
     // Reset button state in case it was left in loading state
     submitNameButton.disabled = false;
     submitNameButton.textContent = "Start";
@@ -126,18 +121,7 @@ submitNameButton.addEventListener('click', () => {
             submitNameButton.disabled = true;
             submitNameButton.textContent = "Loading...";
             
-            // Set a fallback timer in case the event listeners don't fire
-            const fallbackTimer = setTimeout(() => {
-                console.log("Fallback timer triggered - forcing game start");
-                submitNameButton.disabled = false;
-                submitNameButton.textContent = "Start";
-                startGameWorld();
-            }, 3000); // 3 second fallback
-            
-            // Store the timer ID so we can clear it if normal flow works
-            (window as any).fallbackTimerId = fallbackTimer;
-            
-            spacetimeDBClient.sdkConnection?.reducers.enterGame(name);
+            spacetimeDBClient.sdkConnection?.reducers.setName(name);
             console.log("Name submitted. Waiting for server confirmation...");
         } else {
             console.error("Cannot enter game: SpacetimeDB reducers not available.");
@@ -158,62 +142,97 @@ spacetimeDBClient.onSubscriptionApplied = () => {
         return; // Wait for connection to be fully established in handleConnect
     }
 
+    var localDb = spacetimeDBClient.sdkConnection?.db;
+    var localIdentity = spacetimeDBClient.identity;
+    
+    // Listen for account updates
+    
+    // Listen for account inserts
+    localDb.account.onInsert((_ctx, account) => {
+        console.log("Account inserted event received");
+        console.log("- Account data:", JSON.stringify(account));
+
+        //Check if account is local
+        if (account.identity.isEqual(localIdentity)) {
+            console.log("Local account inserted! Waiting for name.");
+        }
+    });
+
+    localDb.account.onUpdate((_ctx, oldAccount, newAccount) => {
+        console.log("Account updated event received");
+        console.log("- Account data:", JSON.stringify(newAccount));
+
+        if(!newAccount.name)
+        {
+            console.log("No name found for updated account. Waiting for name.");
+            return;
+        }
+
+        //Check if account is local
+        if (newAccount.identity.isEqual(localIdentity)) {
+            console.log("Local account updated. Checking for player...");
+            var localPlayer = localDb.player.player_id.find(newAccount.currentPlayerId);
+            if(localPlayer) {
+                console.log("Player found for account. Starting game.");
+                //TODO: Move to game scene.
+            }
+            else
+            {
+                console.log("No player found for account. Try spawning a new player.");
+                spacetimeDBClient.sdkConnection?.reducers.spawnPlayer();
+            }
+        }
+    });
+
     // Set up player table listeners AFTER subscription is applied
     console.log("Setting up player table listeners...");
     
     // Listen for player inserts
-    spacetimeDBClient.sdkConnection.db.player.onInsert((_ctx, player) => {
+    localDb.player.onInsert((_ctx, player) => {
         console.log("Player inserted event received");
-        console.log("- Player data:", JSON.stringify({
-            name: player.name,
-            id: player.identity.toHexString(),
-            entityId: player.entityId
-        }));
-        console.log("- Local identity:", spacetimeDBClient.identity?.toHexString());
-        
-        const isLocalPlayer = spacetimeDBClient.identity && player.identity.isEqual(spacetimeDBClient.identity);
-        console.log("- Is local player:", isLocalPlayer);
-        
-        if (isLocalPlayer) {
-            console.log("Local player inserted! Starting game world.");
-            startGameWorld();
+        console.log("- Player data:", JSON.stringify(player));
+
+        var myAccount = localDb.account.identity.find(localIdentity);
+        if(!myAccount) {
+            console.log("No account found for local identity. Waiting for account.");
+            return;
         }
-    });
-    
-    // Listen for player updates
-    spacetimeDBClient.sdkConnection.db.player.onUpdate((_ctx, oldPlayer, newPlayer) => {
-        console.log("Player updated event received");
-        console.log("- Old player data:", JSON.stringify({
-            name: oldPlayer.name,
-            id: oldPlayer.identity.toHexString(),
-            entityId: oldPlayer.entityId
-        }));
-        console.log("- New player data:", JSON.stringify({
-            name: newPlayer.name,
-            id: newPlayer.identity.toHexString(),
-            entityId: newPlayer.entityId
-        }));
-        console.log("- Local identity:", spacetimeDBClient.identity?.toHexString());
-        
-        const isLocalPlayer = spacetimeDBClient.identity && newPlayer.identity.isEqual(spacetimeDBClient.identity);
-        console.log("- Is local player:", isLocalPlayer);
-        
-        if (isLocalPlayer) {
-            console.log("Local player updated! Starting game world.");
-            startGameWorld();
+
+        if(myAccount.currentPlayerId != player.playerId) {
+            console.log("Another player has logged on: " + player.name);
+            return;
         }
+        
+        console.log("Local player inserted! Move to game scene.");
+        //TODO: Move to game scene.
     });
 
-    console.log("Checking for existing player...");
-    const localPlayer = spacetimeDBClient.sdkConnection?.db.player.identity.find(spacetimeDBClient.identity);
+    console.log("Checking for existing account...");
+    var myAccount = localDb.account.identity.find(localIdentity);
+    if(!myAccount) {
+        console.log("No account found for local identity. We need to wait for the account to be inserted.");
+        return;
+    }
 
-    if (localPlayer?.name) {
-        console.log(`Existing player found: ${localPlayer.name}. Starting game.`);
-        startGameWorld(); // Player exists, start the game scene's initialization
-    } else {
-        console.log("New player detected or player data not yet in cache. Prompting for name.");
-        showNamePrompt(); // Player doesn't exist in cache yet, prompt for name
-                       // GameScene won't initialize fully until player data appears
+    if(myAccount.name)
+    {
+        console.log("Account found for local identity: " + myAccount.name + ". Checking for existing player...");
+        var localPlayer = localDb.player.player_id.find(myAccount.currentPlayerId);
+        if(localPlayer) {
+            console.log("Player found for account. Starting game.");
+            //TODO: Move to game scene.
+        }
+        else
+        {
+            console.log("No player found for account. Try spawning a new player.");
+            spacetimeDBClient.sdkConnection?.reducers.spawnPlayer();
+        }
+    }
+    else
+    {
+        console.log("No name found for account. Prompting for name.");
+        showNamePrompt();
+        return;
     }
 };
 
