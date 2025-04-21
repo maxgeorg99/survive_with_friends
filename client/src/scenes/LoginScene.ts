@@ -203,8 +203,6 @@ export default class LoginScene extends Phaser.Scene {
         
         // Add event listeners
         this.nameButton.addEventListener('click', () => this.setPlayerName());
-        this.spawnButton.addEventListener('click', () => this.spawnPlayer());
-        this.respawnButton.addEventListener('click', () => this.spawnPlayer());
         this.nameInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 this.setPlayerName();
@@ -548,23 +546,10 @@ export default class LoginScene extends Phaser.Scene {
             return;
         }
         
-        if (this.hasDeadPlayer) {
-            // Player is dead, show respawn button
-            this.statusText.setText('You died! Want to try again?');
-            this.showRespawnButton();
-            return;
-        }
-        
-        // Has name but needs to select class before spawning
-        if (!this.selectedClass) {
-            this.statusText.setText('Choose your class:');
-            this.showClassSelection();
-            return;
-        }
-        
-        // Has name and selected class but no player
-        this.statusText.setText('Ready to enter the game?');
-        this.showSpawnButton();
+        // If we have a name but no player, move to ClassSelectScene
+        this.statusText.setText('Name set! Moving to character selection...');
+        this.hideAllInputs();
+        this.startClassSelectScene();
     }
     
     private hideAllInputs() {
@@ -653,39 +638,6 @@ export default class LoginScene extends Phaser.Scene {
         this.updateLoginState();
     }
     
-    private spawnPlayer() {
-        if (!this.selectedClass && !this.hasDeadPlayer) {
-            this.showError('Please select a class first');
-            return;
-        }
-        
-        this.setLoading(true);
-        this.statusText.setText('Spawning player...');
-        
-        try {
-            if (this.spacetimeDBClient.sdkConnection?.reducers) {
-                console.log('Spawning player');
-                // The SpawnPlayer reducer doesn't take parameters
-                this.spacetimeDBClient.sdkConnection.reducers.spawnPlayer();
-                
-                // Set a timeout to check if the player was spawned
-                setTimeout(() => {
-                    if (!this.hasLivingPlayer) {
-                        this.setLoading(false);
-                        this.showError('Failed to spawn player. Please try again.');
-                    }
-                }, 5000);
-            } else {
-                this.setLoading(false);
-                this.showError('Cannot spawn player: SpacetimeDB reducers not available');
-            }
-        } catch (error) {
-            console.error('Error spawning player:', error);
-            this.setLoading(false);
-            this.showError('An error occurred while spawning your player');
-        }
-    }
-    
     private setLoading(isLoading: boolean) {
         this.isLoading = isLoading;
         
@@ -707,6 +659,16 @@ export default class LoginScene extends Phaser.Scene {
         
         // Start the game scene
         this.scene.start('GameScene');
+    }
+    
+    private startClassSelectScene() {
+        console.log("Starting ClassSelectScene");
+        
+        // Clean up HTML elements when transitioning scenes
+        this.hideAllInputs();
+        
+        // Start the class select scene
+        this.scene.start('ClassSelectScene');
     }
     
     shutdown() {

@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import GameScene from './scenes/GameScene';
 import LoginScene from './scenes/LoginScene';
+import ClassSelectScene from './scenes/ClassSelectScene';
 import SpacetimeDBClient from './SpacetimeDBClient';
 import { Player } from './autobindings';
 
@@ -20,7 +21,7 @@ const config: Phaser.Types.Core.GameConfig = {
             // debug: true // Set to true for physics debugging
         }
     },
-    scene: [LoginScene, GameScene],
+    scene: [LoginScene, ClassSelectScene, GameScene],
     scale: {
         mode: Phaser.Scale.RESIZE,
         autoCenter: Phaser.Scale.CENTER_BOTH
@@ -40,8 +41,8 @@ spacetimeDBClient.onSubscriptionApplied = () => {
         return; // Wait for connection to be fully established in handleConnect
     }
 
-    var localDb = spacetimeDBClient.sdkConnection?.db;
-    var localIdentity = spacetimeDBClient.identity;
+    const localDb = spacetimeDBClient.sdkConnection?.db;
+    const localIdentity = spacetimeDBClient.identity;
     
     // Listen for account updates
     
@@ -50,9 +51,41 @@ spacetimeDBClient.onSubscriptionApplied = () => {
         console.log("Account inserted event received");
         console.log("- Account data:", JSON.stringify(account));
 
-        //Check if account is local
-        if (account.identity.isEqual(localIdentity)) {
-            console.log("Local account inserted! Waiting for name.");
+        // Check if account is local
+        if (account.identity.isEqual(localIdentity)) 
+        {
+            console.log("Local account inserted!");
+            
+            // Check if the account has a name
+            if (!account.name) 
+            {
+                console.log("New account has no name. Going to LoginScene.");
+                game.scene.start('LoginScene');
+            } 
+            else 
+            {
+                // If account has a name but no player, go to ClassSelectScene
+                if (account.currentPlayerId === 0) 
+                {
+                    console.log("Account has name but no player. Going to ClassSelectScene.");
+                    game.scene.start('ClassSelectScene');
+                } 
+                else 
+                {
+                    // Check if the player exists and is alive
+                    const localPlayer = localDb.player.player_id.find(account.currentPlayerId);
+                    if (localPlayer) 
+                    {
+                        console.log("Account has name and living player. Going to GameScene.");
+                        game.scene.start('GameScene');
+                    } 
+                    else 
+                    {
+                        console.log("Account has name but player is not found. Going to ClassSelectScene.");
+                        game.scene.start('ClassSelectScene');
+                    }
+                }
+            }
         }
     });
 
@@ -60,77 +93,142 @@ spacetimeDBClient.onSubscriptionApplied = () => {
         console.log("Account updated event received");
         console.log("- Account data:", JSON.stringify(newAccount));
 
-        if(!newAccount.name)
+        // Check if account is local
+        if (newAccount.identity.isEqual(localIdentity)) 
         {
-            console.log("No name found for updated account. Waiting for name.");
-            return;
-        }
-
-        //Check if account is local
-        if (newAccount.identity.isEqual(localIdentity)) {
-            console.log("Local account updated. Checking for player...");
-            var localPlayer = localDb.player.player_id.find(newAccount.currentPlayerId);
-            if(localPlayer) {
-                console.log("Player found for account. Starting game.");
-                //TODO: Move to game scene.
-            }
-            else
+            console.log("Local account updated.");
+            
+            // Check if name was just set (from null/empty to a value)
+            if ((!oldAccount.name || oldAccount.name === "") && newAccount.name) 
             {
-                console.log("No player found for account. Try spawning a new player.");
-                //TODO: move to class selection scene.
+                console.log("Name was set. Going to ClassSelectScene.");
+                game.scene.start('ClassSelectScene');
+                return;
+            }
+
+            // Check if playerId changed
+            if (oldAccount.currentPlayerId !== newAccount.currentPlayerId) 
+            {
+                console.log("New player assigned. Checking if player exists for id: " + newAccount.currentPlayerId);
+                const player = localDb.player.player_id.find(newAccount.currentPlayerId);
+                if (player) 
+                {
+                    if (game.scene.isActive('GameScene'))   
+                    {
+                        console.log("already in game scene");
+                    }
+                    else
+                    {
+                        console.log("Player found. Going to GameScene.");
+                        game.scene.start('GameScene');
+                    }
+                }
             }
         }
     });
 
-    // Set up player table listeners AFTER subscription is applied
-    console.log("Setting up player table listeners...");
-    
     // Listen for player inserts
     localDb.player.onInsert((_ctx, player) => {
         console.log("Player inserted event received");
         console.log("- Player data:", JSON.stringify(player));
 
-        var myAccount = localDb.account.identity.find(localIdentity);
-        if(!myAccount) {
+        const myAccount = localDb.account.identity.find(localIdentity);
+        if (!myAccount) 
+        {
             console.log("No account found for local identity. Waiting for account.");
             return;
         }
 
-        if(myAccount.currentPlayerId != player.playerId) {
+        if (myAccount.currentPlayerId === player.playerId) 
+        {
+            if (game.scene.isActive('GameScene')) 
+            {
+                console.log("already in game scene");
+            }
+            else
+            {
+                console.log("Local player inserted! Going to GameScene.");
+                game.scene.start('GameScene');
+            }
+        } 
+        else 
+        {
             console.log("Another player has logged on: " + player.name);
-            return;
         }
-        
-        console.log("Local player inserted! Move to game scene.");
-        //TODO: Move to game scene.
     });
 
-    console.log("Checking for existing account...");
-    var myAccount = localDb.account.identity.find(localIdentity);
-    if(!myAccount) {
-        console.log("No account found for local identity. We need to wait for the account to be inserted.");
+    // Listen for player deletions (death)
+    localDb.player.onDelete((_ctx, player) => {
+        console.log("Player deleted event received");
+        console.log("- Player data:", JSON.stringify(player));
+
+        const myAccount = localDb.account.identity.find(localIdentity);
+        if (!myAccount) 
+        {
+            console.log("No account found for local identity.");
+            return;
+        }
+
+        if (myAccount.currentPlayerId === player.playerId) 
+        {
+            console.log("Local player was deleted/died! Going to ClassSelectScene.");
+            // If we're in the GameScene, this will transition after showing death message
+            // Otherwise, force transition here
+            if (game.scene.isActive('GameScene')) 
+            {
+                console.log("GameScene is active, death handling will occur there.");
+            } 
+            else 
+            {
+                game.scene.start('ClassSelectScene');
+            }
+        }
+    });
+
+    // Check initial state and load appropriate scene
+    console.log("Checking current account and player state...");
+    const myAccount = localDb.account.identity.find(localIdentity);
+    
+    if (!myAccount) {
+        console.log("No account found for local identity. Waiting for account to be created.");
+        // Start with LoginScene (default)
         return;
     }
 
-    if(myAccount.name)
+    if (!myAccount.name) 
     {
-        console.log("Account found for local identity: " + myAccount.name + ". Checking for existing player...");
-        var localPlayer = localDb.player.player_id.find(myAccount.currentPlayerId);
-        if(localPlayer) {
-            console.log("Player found for account. Starting game.");
-            //TODO: Move to game scene.
-        }
-        else
-        {
-            console.log("No player found for account. Try spawning a new player.");
-            //TODO: move to class selection scene.
-        }
-    }
-    else
-    {
-        console.log("No name found for account. Prompting for name.");
-        //TODO: move to login scene.
+        console.log("Account has no name. Going to LoginScene.");
+        game.scene.start('LoginScene');
         return;
+    }
+
+    if (myAccount.currentPlayerId === 0) 
+    {
+        console.log("Account has name but no player. Going to ClassSelectScene.");
+        game.scene.start('ClassSelectScene');
+        return;
+    }
+
+    // Check if player exists and is alive
+    const localPlayer = localDb.player.player_id.find(myAccount.currentPlayerId);
+    if (localPlayer) 
+    {
+        console.log("Account has name and living player. Going to GameScene.");
+        game.scene.start('GameScene');
+    }
+    else 
+    {
+        // Check if player is in dead_players table
+        const deadPlayer = localDb.deadPlayers.player_id.find(myAccount.currentPlayerId);
+        if (deadPlayer) 
+        {
+            console.log("Player is dead. Going to ClassSelectScene.");
+        } 
+        else 
+        {
+            console.log("Player not found. Going to ClassSelectScene.");
+        }
+        game.scene.start('ClassSelectScene');
     }
 };
 

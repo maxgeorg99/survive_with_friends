@@ -1152,11 +1152,11 @@ export default class GameScene extends Phaser.Scene {
         .setScrollFactor(0)
         .setDepth(10001);
         
-        // Add "refresh to play again" text
+        // Add "Choose a new character" text (updated from "refresh to play again")
         const subtitleText = this.add.text(
             width / 2, 
             height / 2 + 50, 
-            "refresh to play again", 
+            "Choose a new character", 
             {
                 fontFamily: 'Arial',
                 fontSize: '24px',
@@ -1179,7 +1179,14 @@ export default class GameScene extends Phaser.Scene {
             targets: [overlay, titleText, subtitleText],
             alpha: 1,
             duration: 1000,
-            ease: 'Power2'
+            ease: 'Power2',
+            onComplete: () => {
+                // Wait 3 seconds before transitioning to ClassSelectScene
+                this.time.delayedCall(3000, () => {
+                    console.log("Death screen timer complete, transitioning to ClassSelectScene");
+                    this.scene.start('ClassSelectScene');
+                });
+            }
         });
         
         // Disable input and controls for local player
