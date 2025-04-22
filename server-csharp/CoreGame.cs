@@ -2,6 +2,8 @@ using SpacetimeDB;
 
 public static partial class Module
 {
+    static bool errorFlag = false;
+
     [Reducer]
     public static void UpdatePlayerDirection(ReducerContext ctx, float dirX, float dirY)
     {
@@ -46,12 +48,14 @@ public static partial class Module
     }
     
     //Helper function to damage a player
-    public static void DamagePlayer(ReducerContext ctx, uint player_id, uint damage_amount)
+    //Returns true if the player is dead, false otherwise
+    public static bool DamagePlayer(ReducerContext ctx, uint player_id, uint damage_amount)
     {
         // Find the player
         var playerOpt = ctx.Db.player.player_id.Find(player_id);
         if (playerOpt is null)
         {
+            errorFlag = true;
             throw new Exception($"DamagePlayer: Player {player_id} does not exist.");
         }
         
@@ -79,6 +83,7 @@ public static partial class Module
 
             if (deadPlayerOpt is null)
             {
+                errorFlag = true;
                 throw new Exception($"DamagePlayer: Player {player.name} (ID: {player.player_id}) could not be moved to dead_players table.");
             }
 
@@ -93,6 +98,8 @@ public static partial class Module
             //Delete the entity from the entity table
             var entity_id = player.entity_id;
             ctx.Db.entity.entity_id.Delete(entity_id);
+
+            return true;
         }
         else
         {
@@ -102,6 +109,8 @@ public static partial class Module
             
             // Log the damage
             Log.Info($"Player {player.name} (ID: {player.player_id}) took {damage_amount} damage. HP: {player.hp}/{player.max_hp}");
+
+            return false;
         }
     }
     
@@ -111,6 +120,12 @@ public static partial class Module
         if (ctx.Sender != ctx.Identity)
         {
             throw new Exception("Reducer GameTick may not be invoked by clients, only via scheduling.");
+        }
+
+        if(errorFlag)
+        {
+            //If there was an error, don't process the game tick
+            return;
         }
 
         // Process all movable players
@@ -190,6 +205,8 @@ public static partial class Module
             }
             
             Entity playerEntity = playerEntityOpt.Value;
+
+            bool playerIsDead = false;
             
             // Check against each monster
             foreach (var monsterEntry in monsterEntities)
@@ -208,10 +225,20 @@ public static partial class Module
                     uint finalDamage = (uint)Math.Max(1, Math.Ceiling(monsterAtk - (player.armor * 0.1f)));
                     
                     // Apply damage to player
-                    DamagePlayer(ctx, player.player_id, finalDamage);
+                    playerIsDead = DamagePlayer(ctx, player.player_id, finalDamage);
                     
                     Log.Info($"Monster {monsterId} damaged player {player.name} for {finalDamage} damage (ATK: {monsterAtk}, Armor: {player.armor})");
+
+                    if(playerIsDead)
+                    {
+                        break;
+                    }
                 }
+            }
+
+            if(playerIsDead)
+            {
+                continue;
             }
         }
     }
