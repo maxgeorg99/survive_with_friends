@@ -4,6 +4,7 @@ import { Player, Entity, PlayerClass, UpdatePlayerDirection, Monsters, MonsterTy
 import { Identity } from '@clockworklabs/spacetimedb-sdk';
 import { MONSTER_ASSET_KEYS, MONSTER_SHADOW_OFFSETS, MONSTER_MAX_HP } from '../constants/MonsterConfig';
 import MonsterManager from '../managers/MonsterManager';
+import { GameEvents } from '../constants/GameEvents';
 
 // Constants
 const PLAYER_SPEED = 200;
@@ -50,6 +51,7 @@ const CLASS_ASSET_KEYS: Record<string, string> = {
 
 export default class GameScene extends Phaser.Scene {
     private spacetimeDBClient: SpacetimeDBClient;
+    private gameEvents: Phaser.Events.EventEmitter;
     private localPlayerSprite: Phaser.Physics.Arcade.Sprite | null = null;
     private localPlayerNameText: Phaser.GameObjects.Text | null = null;
     private localPlayerShadow: Phaser.GameObjects.Image | null = null; // Added for local player shadow
@@ -84,6 +86,7 @@ export default class GameScene extends Phaser.Scene {
     constructor() {
         super('GameScene');
         this.spacetimeDBClient = (window as any).spacetimeDBClient;
+        this.gameEvents = (window as any).gameEvents;
         console.log("GameScene constructor called.");
         // Initialize MonsterManager
         this.monsterManager = new MonsterManager(this, this.spacetimeDBClient);
@@ -133,12 +136,8 @@ export default class GameScene extends Phaser.Scene {
         // Set a fallback background color
         this.cameras.main.setBackgroundColor('#336699'); // A nice blue
 
-        // Wait for player data from main.ts before initializing game elements
-        this.events.on('playerDataReady', () => {
-            console.log("GameScene received playerDataReady event.");
-            this.isPlayerDataReady = true;
-            this.initializeGameWorld();
-        });
+        // Register event listeners
+        this.registerEventListeners();
 
         // Setup keyboard input
         this.cursors = this.input.keyboard?.createCursorKeys() ?? null;
@@ -200,11 +199,84 @@ export default class GameScene extends Phaser.Scene {
             this.tapMarker.setAlpha(0.8);
         }
 
-        // If data is already ready when scene starts (e.g., scene restart)
-        if (this.isPlayerDataReady) {
-             this.initializeGameWorld();
+        // Initialize game world
+        this.initializeGameWorld();
+    }
+
+    private registerEventListeners() {
+        // Player events
+        this.gameEvents.on(GameEvents.PLAYER_CREATED, this.handlePlayerCreated, this);
+        this.gameEvents.on(GameEvents.PLAYER_UPDATED, this.handlePlayerUpdated, this);
+        this.gameEvents.on(GameEvents.PLAYER_DELETED, this.handlePlayerDeleted, this);
+        this.gameEvents.on(GameEvents.PLAYER_DIED, this.handlePlayerDied, this);
+        
+        // Connection events
+        this.gameEvents.on(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
+    }
+
+    private handlePlayerCreated(player: Player, isLocalPlayer: boolean = true) {
+        console.log("Player created event received in GameScene");
+        if (isLocalPlayer) {
+            // This is our local player
+            console.log("Local player created:", player);
+            // Initialize or update local player
+            this.initializeLocalPlayer(player);
+        } else {
+            // Another player joined
+            console.log("Other player created:", player);
+            // Add or update other player
+            this.addOrUpdateOtherPlayer(player);
         }
-        console.log("GameScene create finished.");
+    }
+
+    private handlePlayerUpdated(oldPlayer: Player, newPlayer: Player, isLocalPlayer: boolean) {
+        console.log("Player updated event received in GameScene");
+        if (isLocalPlayer) {
+            // This is our local player being updated
+            console.log("Local player updated:", newPlayer);
+            // Update local player attributes if needed
+            this.updateLocalPlayerAttributes(newPlayer);
+        } else {
+            // Update another player
+            console.log("Other player updated:", newPlayer);
+            // Update other player
+            this.addOrUpdateOtherPlayer(newPlayer);
+        }
+    }
+
+    private handlePlayerDeleted(player: Player, isLocalPlayer: boolean) 
+    {
+        console.log("Player deleted event received in GameScene");
+        if (!isLocalPlayer) {
+            // Only need to handle other players being deleted
+            // (Local player deletion is handled by handlePlayerDied)
+            console.log("Other player deleted:", player);
+            this.removeOtherPlayer(player.playerId);
+        }
+    }
+
+    private handlePlayerDied(player: Player) {
+        console.log("Player died event received in GameScene");
+        // This is our local player that died
+        console.log("Local player died:", player);
+        this.showDeathScreen();
+    }
+
+    private handleConnectionLost() {
+        console.log("Connection lost event received in GameScene");
+        // Show a connection lost message
+        const { width, height } = this.scale;
+        const connectionLostText = this.add.text(width/2, height/2, 'CONNECTION LOST\nPlease refresh the page', {
+            fontFamily: 'Arial',
+            fontSize: '32px',
+            color: '#ffffff',
+            align: 'center',
+            stroke: '#000000',
+            strokeThickness: 6
+        }).setOrigin(0.5);
+        
+        // Disable controls
+        this.disablePlayerControls();
     }
 
     initializeGameWorld() {
@@ -1186,5 +1258,17 @@ export default class GameScene extends Phaser.Scene {
             this.input.off('pointerdown');
             this.input.off('pointerup');
         }
+    }
+
+    shutdown() {
+        // Remove event listeners
+        this.gameEvents.off(GameEvents.PLAYER_CREATED, this.handlePlayerCreated, this);
+        this.gameEvents.off(GameEvents.PLAYER_UPDATED, this.handlePlayerUpdated, this);
+        this.gameEvents.off(GameEvents.PLAYER_DELETED, this.handlePlayerDeleted, this);
+        this.gameEvents.off(GameEvents.PLAYER_DIED, this.handlePlayerDied, this);
+        this.gameEvents.off(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
+        
+        // Additional cleanup
+        // ... existing cleanup code ...
     }
 }

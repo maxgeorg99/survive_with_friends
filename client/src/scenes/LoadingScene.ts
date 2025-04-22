@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { GameEvents } from '../constants/GameEvents';
 
 export default class LoadingScene extends Phaser.Scene {
     private loadingText!: Phaser.GameObjects.Text;
@@ -10,16 +11,20 @@ export default class LoadingScene extends Phaser.Scene {
     private message: string = '';
     private timeoutDuration: number = 10000; // 10 seconds timeout by default
     private timeoutTimer: Phaser.Time.TimerEvent | null = null;
+    private gameEvents: Phaser.Events.EventEmitter;
+    private waitingFor: string = ''; // What are we waiting for? 'name', 'player', etc.
 
     constructor() {
         super('LoadingScene');
+        this.gameEvents = (window as any).gameEvents;
     }
 
-    init(data: { message?: string, nextScene?: string, timeoutDuration?: number }) {
+    init(data: { message?: string, nextScene?: string, timeoutDuration?: number, waitingFor?: string }) {
         this.message = data.message || 'Loading...';
         this.nextScene = data.nextScene || '';
         this.timeoutDuration = data.timeoutDuration || 10000;
-        console.log(`LoadingScene initialized with message: ${this.message}, next scene: ${this.nextScene}`);
+        this.waitingFor = data.waitingFor || '';
+        console.log(`LoadingScene initialized with message: ${this.message}, next scene: ${this.nextScene}, waiting for: ${this.waitingFor}`);
     }
 
     create() {
@@ -54,6 +59,9 @@ export default class LoadingScene extends Phaser.Scene {
             loop: true
         });
         
+        // Register event listeners based on what we're waiting for
+        this.registerEventListeners();
+        
         // Set timeout to prevent indefinite loading
         if (this.nextScene) {
             this.timeoutTimer = this.time.delayedCall(this.timeoutDuration, () => {
@@ -64,6 +72,21 @@ export default class LoadingScene extends Phaser.Scene {
         
         // Handle window resize
         this.scale.on('resize', this.handleResize, this);
+    }
+    
+    private registerEventListeners() {
+        // Listen for loading complete event
+        this.gameEvents.on(GameEvents.LOADING_COMPLETE, this.completeLoading, this);
+        
+        // Listen for connection lost event
+        this.gameEvents.on(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
+        
+        // Listen for specific events based on what we're waiting for
+        if (this.waitingFor === 'name') {
+            this.gameEvents.on(GameEvents.NAME_SET, this.completeLoading, this);
+        } else if (this.waitingFor === 'player') {
+            this.gameEvents.on(GameEvents.PLAYER_CREATED, this.completeLoading, this);
+        }
     }
     
     private createSpinner(x: number, y: number) {
@@ -116,6 +139,13 @@ export default class LoadingScene extends Phaser.Scene {
         }
     }
     
+    private handleConnectionLost() {
+        console.log("Connection lost during loading");
+        this.loadingText.setText('Connection lost. Please refresh the page.');
+        this.timeoutTimer?.remove();
+        this.timeoutTimer = null;
+    }
+    
     /**
      * Call this method to complete loading and move to the next scene
      */
@@ -148,6 +178,16 @@ export default class LoadingScene extends Phaser.Scene {
         if (this.timeoutTimer) {
             this.timeoutTimer.remove();
             this.timeoutTimer = null;
+        }
+        
+        // Remove event listeners
+        this.gameEvents.off(GameEvents.LOADING_COMPLETE, this.completeLoading, this);
+        this.gameEvents.off(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
+        
+        if (this.waitingFor === 'name') {
+            this.gameEvents.off(GameEvents.NAME_SET, this.completeLoading, this);
+        } else if (this.waitingFor === 'player') {
+            this.gameEvents.off(GameEvents.PLAYER_CREATED, this.completeLoading, this);
         }
         
         // Remove resize listener

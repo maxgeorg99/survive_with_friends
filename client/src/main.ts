@@ -5,8 +5,14 @@ import ClassSelectScene from './scenes/ClassSelectScene';
 import LoadingScene from './scenes/LoadingScene';
 import SpacetimeDBClient from './SpacetimeDBClient';
 import { Player } from './autobindings';
+import { GameEvents } from './constants/GameEvents';
 
 console.log("Main script loading...");
+
+// Create a global event emitter for game-wide events
+const gameEvents = new Phaser.Events.EventEmitter();
+// Make it accessible globally
+(window as any).gameEvents = gameEvents;
 
 const config: Phaser.Types.Core.GameConfig = {
     type: Phaser.AUTO,
@@ -43,7 +49,8 @@ const onSubscriptionApplied = () => {
     const localDb = spacetimeDBClient.sdkConnection?.db;
     const localIdentity = spacetimeDBClient.identity;
     
-    // Listen for account updates
+    // Emit subscription applied event
+    gameEvents.emit(GameEvents.SUBSCRIPTION_APPLIED);
     
     // Listen for account inserts
     localDb.account.onInsert((_ctx, account) => {
@@ -55,10 +62,12 @@ const onSubscriptionApplied = () => {
         {
             console.log("Local account inserted!");
             
-            // Check if the account has a name
+            // Emit account created event with the account data
+            gameEvents.emit(GameEvents.ACCOUNT_CREATED, account);
+            
+            // Automatically go to login scene if account has no name
             if (!account.name) 
             {
-                console.log("New account has no name. Going to LoginScene.");
                 game.scene.start('LoginScene');
             } 
             else 
@@ -66,7 +75,6 @@ const onSubscriptionApplied = () => {
                 // If account has a name but no player, go to ClassSelectScene
                 if (account.currentPlayerId === 0) 
                 {
-                    console.log("Account has name but no player. Going to ClassSelectScene.");
                     game.scene.start('ClassSelectScene');
                 } 
                 else 
@@ -75,12 +83,10 @@ const onSubscriptionApplied = () => {
                     const localPlayer = localDb.player.player_id.find(account.currentPlayerId);
                     if (localPlayer) 
                     {
-                        console.log("Account has name and living player. Going to GameScene.");
                         game.scene.start('GameScene');
                     } 
                     else 
                     {
-                        console.log("Account has name but player is not found. Going to ClassSelectScene.");
                         game.scene.start('ClassSelectScene');
                     }
                 }
@@ -97,44 +103,48 @@ const onSubscriptionApplied = () => {
         {
             console.log("Local account updated.");
             
+            // Emit account updated event with old and new account data
+            gameEvents.emit(GameEvents.ACCOUNT_UPDATED, oldAccount, newAccount);
+            
             // Check if name was just set (from null/empty to a value)
             if ((!oldAccount.name || oldAccount.name === "") && newAccount.name) 
             {
-                console.log("Name was set. Transitioning from LoadingScene to ClassSelectScene.");
-                // If we're in the LoadingScene waiting for name to be set, complete it
-                if (game.scene.isActive('LoadingScene')) {
+                console.log("Name was set.");
+                
+                // Emit name set event
+                gameEvents.emit(GameEvents.NAME_SET, newAccount);
+                
+                // Complete loading if in LoadingScene
+                if (game.scene.isActive('LoadingScene')) 
+                {
                     const loadingScene = game.scene.getScene('LoadingScene') as any;
-                    if (loadingScene.completeLoading) {
+                    if (loadingScene.completeLoading) 
+                    {
                         loadingScene.completeLoading();
                     }
-                } else {
-                    game.scene.start('ClassSelectScene');
                 }
+                
                 return;
             }
 
             // Check if playerId changed
             if (oldAccount.currentPlayerId !== newAccount.currentPlayerId) 
             {
-                console.log("New player assigned. Checking if player exists for id: " + newAccount.currentPlayerId);
-                const player = localDb.player.player_id.find(newAccount.currentPlayerId);
-                if (player) 
-                {
-                    if (game.scene.isActive('GameScene'))   
+                console.log("Player ID changed from", oldAccount.currentPlayerId, "to", newAccount.currentPlayerId);
+                
+                // Check if the new player exists
+                if (newAccount.currentPlayerId > 0) {
+                    const player = localDb.player.player_id.find(newAccount.currentPlayerId);
+                    if (player) 
                     {
-                        console.log("already in game scene");
-                    }
-                    else
-                    {
-                        console.log("Player found. Going to GameScene.");
-                        // If we're in LoadingScene waiting for player creation, complete it
-                        if (game.scene.isActive('LoadingScene')) {
+                        // Emit player created event if in LoadingScene
+                        if (game.scene.isActive('LoadingScene')) 
+                        {
                             const loadingScene = game.scene.getScene('LoadingScene') as any;
-                            if (loadingScene.completeLoading) {
+                            if (loadingScene.completeLoading) 
+                            {
                                 loadingScene.completeLoading();
                             }
-                        } else {
-                            game.scene.start('GameScene');
                         }
                     }
                 }
@@ -156,28 +166,40 @@ const onSubscriptionApplied = () => {
 
         if (myAccount.currentPlayerId === player.playerId) 
         {
-            if (game.scene.isActive('GameScene')) 
+            console.log("Local player inserted!");
+            
+            // Emit player created event
+            gameEvents.emit(GameEvents.PLAYER_CREATED, player);
+            
+            // If we're in LoadingScene waiting for player creation, complete it
+            if (game.scene.isActive('LoadingScene')) 
             {
-                console.log("already in game scene");
-            }
-            else
-            {
-                console.log("Local player inserted! Going to GameScene.");
-                // If we're in LoadingScene waiting for player creation, complete it
-                if (game.scene.isActive('LoadingScene')) {
-                    const loadingScene = game.scene.getScene('LoadingScene') as any;
-                    if (loadingScene.completeLoading) {
-                        loadingScene.completeLoading();
-                    }
-                } else {
-                    game.scene.start('GameScene');
+                const loadingScene = game.scene.getScene('LoadingScene') as any;
+                if (loadingScene.completeLoading) 
+                {
+                    loadingScene.completeLoading();
                 }
             }
         } 
         else 
         {
             console.log("Another player has logged on: " + player.name);
+            
+            // Emit player created event for other players too
+            gameEvents.emit(GameEvents.PLAYER_CREATED, player, false);
         }
+    });
+
+    // Listen for player updates
+    localDb.player.onUpdate((_ctx, oldPlayer, newPlayer) => {
+        console.log("Player updated event received");
+        console.log("- Player data:", JSON.stringify(newPlayer));
+        
+        const myAccount = localDb.account.identity.find(localIdentity);
+        const isLocalPlayer = myAccount && myAccount.currentPlayerId === newPlayer.playerId;
+        
+        // Emit player updated event
+        gameEvents.emit(GameEvents.PLAYER_UPDATED, oldPlayer, newPlayer, isLocalPlayer);
     });
 
     // Listen for player deletions (death)
@@ -194,17 +216,17 @@ const onSubscriptionApplied = () => {
 
         if (myAccount.currentPlayerId === player.playerId) 
         {
-            console.log("Local player was deleted/died! Going to ClassSelectScene.");
-            // If we're in the GameScene, this will transition after showing death message
-            // Otherwise, force transition here
-            if (game.scene.isActive('GameScene')) 
-            {
-                console.log("GameScene is active, death handling will occur there.");
-            } 
-            else 
-            {
-                game.scene.start('ClassSelectScene');
-            }
+            console.log("Local player was deleted/died!");
+            
+            // Emit player died event
+            gameEvents.emit(GameEvents.PLAYER_DIED, player);
+            
+            // If we're in the GameScene, death handling will be done by the scene
+            // The scene will listen for PLAYER_DIED event
+        }
+        else {
+            // Emit player deleted event for other players
+            gameEvents.emit(GameEvents.PLAYER_DELETED, player, false);
         }
     });
 
@@ -257,10 +279,14 @@ const onSubscriptionApplied = () => {
 
 const onConnect = () => {
     console.log("SpacetimeDB connection established.");
+    // Emit connection established event
+    gameEvents.emit(GameEvents.CONNECTION_ESTABLISHED);
 };
 
 const onDisconnect = () => {
     console.log("SpacetimeDB connection lost.");
+    // Emit connection lost event
+    gameEvents.emit(GameEvents.CONNECTION_LOST);
 };
 
 const spacetimeDBClient = new SpacetimeDBClient(onSubscriptionApplied, onConnect, onDisconnect);

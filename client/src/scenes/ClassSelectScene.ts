@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { Account } from '../autobindings';
 import PlayerClass from '../autobindings/player_class_type';
+import { GameEvents } from '../constants/GameEvents';
 
 // Map player class to numeric class ID
 const CLASS_ID_MAP = {
@@ -13,6 +14,7 @@ const CLASS_ID_MAP = {
 
 export default class ClassSelectScene extends Phaser.Scene {
     private spacetimeDBClient: SpacetimeDBClient;
+    private gameEvents: Phaser.Events.EventEmitter;
     
     // UI Elements
     private titleText!: Phaser.GameObjects.Text;
@@ -32,6 +34,7 @@ export default class ClassSelectScene extends Phaser.Scene {
     constructor() {
         super('ClassSelectScene');
         this.spacetimeDBClient = (window as any).spacetimeDBClient;
+        this.gameEvents = (window as any).gameEvents;
         console.log("ClassSelectScene constructor called");
     }
 
@@ -92,14 +95,14 @@ export default class ClassSelectScene extends Phaser.Scene {
             align: 'center'
         }).setOrigin(0.5).setVisible(false);
         
+        // Register event listeners
+        this.registerEventListeners();
+        
         // Handle window resize
         this.scale.on('resize', this.handleResize, this);
         
         // Position HTML elements
         this.positionHTMLElements();
-        
-        // Register event handlers
-        this.registerEventHandlers();
     }
     
     private createClassButtons() {
@@ -209,24 +212,47 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.positionHTMLElements();
     }
     
-    private registerEventHandlers() {
-        // Listen for player inserts
-        if (this.spacetimeDBClient.sdkConnection?.db) {
-            this.spacetimeDBClient.sdkConnection.db.player.onInsert((_ctx, player) => {
-                console.log("Player inserted event received in ClassSelectScene");
-                console.log("- Player data:", JSON.stringify(player));
-                
-                // Check if this is our player
-                const localIdentity = this.spacetimeDBClient.identity;
-                if (!localIdentity) return;
-                
-                const myAccount = this.spacetimeDBClient.sdkConnection?.db.account.identity.find(localIdentity);
-                if (myAccount && myAccount.currentPlayerId === player.playerId) {
-                    console.log("Our player was created. Starting game scene.");
-                    this.startGameScene();
-                }
-            });
+    private registerEventListeners() {
+        // Listen for player related events
+        this.gameEvents.on(GameEvents.PLAYER_CREATED, this.handlePlayerCreated, this);
+        this.gameEvents.on(GameEvents.PLAYER_DIED, this.handlePlayerDied, this);
+        this.gameEvents.on(GameEvents.NAME_SET, this.handleNameSet, this);
+        
+        // Listen for connection events
+        this.gameEvents.on(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
+        
+        // Listen for loading events
+        this.gameEvents.on(GameEvents.LOADING_ERROR, this.handleLoadingError, this);
+    }
+    
+    private handlePlayerCreated(player: any, isLocalPlayer = true) {
+        console.log("Player created event received in ClassSelectScene");
+        if (isLocalPlayer) {
+            // This will be handled by the LoadingScene transition
+            console.log("Our player was created. Will transition to GameScene.");
         }
+    }
+    
+    private handlePlayerDied(player: any) {
+        console.log("Player died event received in ClassSelectScene");
+        // The player might have died while we were in GameScene and then transitioned here
+        // So we should show a message that they died
+        this.subtitleText.setText('Your previous character died. Choose a new class...');
+    }
+    
+    private handleNameSet(account: any) {
+        console.log("Name set event received in ClassSelectScene", account.name);
+        // We might receive this if the name was just set and we were auto-transitioned here
+    }
+    
+    private handleConnectionLost() {
+        console.log("Connection lost event received in ClassSelectScene");
+        this.showError('Connection to server lost. Please refresh the page.');
+    }
+    
+    private handleLoadingError(message: string) {
+        console.log("Loading error event received in ClassSelectScene", message);
+        this.showError(message);
     }
     
     private selectClass(classType: PlayerClass, button: HTMLButtonElement) {
@@ -253,14 +279,18 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.errorText.setVisible(false);
     }
     
-    private spawnPlayer() {
-        if (!this.selectedClass) {
+    private spawnPlayer() 
+    {
+        if (!this.selectedClass) 
+        {
             this.showError('Please select a class first');
             return;
         }
         
-        try {
-            if (this.spacetimeDBClient.sdkConnection?.reducers) {
+        try 
+        {
+            if (this.spacetimeDBClient.sdkConnection?.reducers) 
+            {
                 // Get class ID from the PlayerClass tag
                 const classId = CLASS_ID_MAP[this.selectedClass.tag];
                 console.log(`Spawning player with class: ${this.selectedClass.tag} (ID: ${classId})`);
@@ -276,26 +306,16 @@ export default class ClassSelectScene extends Phaser.Scene {
                 this.spacetimeDBClient.sdkConnection.reducers.spawnPlayer(classId);
                 
                 // No need for timeout logic here as that's handled by LoadingScene
-            } else {
+            } 
+            else 
+            {
                 this.showError('Cannot spawn player: SpacetimeDB reducers not available');
             }
-        } catch (error) {
+        } 
+        catch (error) 
+        {
             console.error('Error spawning player:', error);
             this.showError('An error occurred while spawning your player');
-        }
-    }
-    
-    private setLoading(isLoading: boolean) {
-        this.isLoading = isLoading;
-        
-        if (isLoading) {
-            this.classButtonsContainer.style.display = 'none';
-            this.titleText.setText('SPAWNING PLAYER...');
-            this.subtitleText.setText('Please wait while your character enters the world...');
-        } else {
-            this.classButtonsContainer.style.display = 'flex';
-            this.titleText.setText('SELECT YOUR CLASS');
-            this.subtitleText.setText('Choose wisely, brave survivor...');
         }
     }
     
@@ -315,6 +335,13 @@ export default class ClassSelectScene extends Phaser.Scene {
     }
     
     shutdown() {
+        // Remove event listeners
+        this.gameEvents.off(GameEvents.PLAYER_CREATED, this.handlePlayerCreated, this);
+        this.gameEvents.off(GameEvents.PLAYER_DIED, this.handlePlayerDied, this);
+        this.gameEvents.off(GameEvents.NAME_SET, this.handleNameSet, this);
+        this.gameEvents.off(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
+        this.gameEvents.off(GameEvents.LOADING_ERROR, this.handleLoadingError, this);
+        
         // Clean up HTML elements when the scene is shut down
         if (this.classButtonsContainer) {
             this.classButtonsContainer.remove();

@@ -1,8 +1,10 @@
 import Phaser from 'phaser';
 import SpacetimeDBClient from '../SpacetimeDBClient';
+import { GameEvents } from '../constants/GameEvents';
 
 export default class LoginScene extends Phaser.Scene {
     private spacetimeDBClient: SpacetimeDBClient;
+    private gameEvents: Phaser.Events.EventEmitter;
     
     // UI Elements
     private statusText!: Phaser.GameObjects.Text;
@@ -14,6 +16,7 @@ export default class LoginScene extends Phaser.Scene {
     constructor() {
         super('LoginScene');
         this.spacetimeDBClient = (window as any).spacetimeDBClient;
+        this.gameEvents = (window as any).gameEvents;
         console.log("LoginScene constructor called");
     }
 
@@ -75,8 +78,11 @@ export default class LoginScene extends Phaser.Scene {
         }).setOrigin(0.5).setVisible(false);
         this.loginContainer.add(this.errorText);
         
+        // Register game event listeners
+        this.registerEventListeners();
+        
         // Check initial connection state
-        this.checkConnectionState();
+        this.updateConnectionStatus();
         
         // Handle window resize
         this.scale.on('resize', this.handleResize, this);
@@ -150,15 +156,57 @@ export default class LoginScene extends Phaser.Scene {
         this.positionHTMLElements();
     }
     
-    private checkConnectionState() {
+    private registerEventListeners() {
+        // Connection events
+        this.gameEvents.on(GameEvents.CONNECTION_ESTABLISHED, this.handleConnectionEstablished, this);
+        this.gameEvents.on(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
         
-        if (this.spacetimeDBClient.isConnected) 
-        {
+        // Account events
+        this.gameEvents.on(GameEvents.ACCOUNT_CREATED, this.handleAccountCreated, this);
+        this.gameEvents.on(GameEvents.NAME_SET, this.handleNameSet, this);
+        
+        // Loading events
+        this.gameEvents.on(GameEvents.LOADING_ERROR, this.handleLoadingError, this);
+    }
+    
+    private handleConnectionEstablished() {
+        console.log("Connection established event received in LoginScene");
+        this.updateConnectionStatus();
+    }
+    
+    private handleConnectionLost() {
+        console.log("Connection lost event received in LoginScene");
+        this.updateConnectionStatus();
+        this.statusText.setText('Disconnected. Please refresh the page.');
+        this.hideAllInputs();
+    }
+    
+    private handleAccountCreated(account: any) {
+        console.log("Account created event received in LoginScene");
+        if (!account.name) {
+            this.showNameInput();
+        }
+    }
+    
+    private handleNameSet() {
+        console.log("Name set event received in LoginScene");
+        // If we're in the login scene when name is set, we should go to class select
+        // This will happen automatically through LoadingScene transitions
+    }
+    
+    private handleLoadingError(message: string) {
+        console.log("Loading error event received in LoginScene", message);
+        this.showError(message);
+    }
+    
+    private updateConnectionStatus() {
+        if (this.spacetimeDBClient.isConnected) {
             console.log("Connected to server");
-        } 
-        else 
-        {
+            this.statusText.setText('Please enter your name:');
+            this.showNameInput();
+        } else {
             this.statusText.setText('Connecting to server...');
+            this.hideAllInputs();
         }
     }
     
@@ -178,19 +226,24 @@ export default class LoginScene extends Phaser.Scene {
         });
         
         try {
-            if (this.spacetimeDBClient.sdkConnection?.reducers) {
+            if (this.spacetimeDBClient.sdkConnection?.reducers) 
+            {
                 console.log(`Setting name to: ${name}`);
                 this.spacetimeDBClient.sdkConnection.reducers.setName(name);
                 
                 // No need for timeout logic here as that's handled by LoadingScene
-            } else {
+            } 
+            else 
+            {
                 // If reducers aren't available, go back to LoginScene with error
                 this.scene.start('LoginScene');
                 setTimeout(() => {
                     this.showError('Cannot set name: SpacetimeDB reducers not available');
                 }, 100);
             }
-        } catch (error) {
+        } 
+        catch (error) 
+        {
             console.error('Error setting name:', error);
             // If there's an error, go back to LoginScene with error
             this.scene.start('LoginScene');
@@ -200,12 +253,29 @@ export default class LoginScene extends Phaser.Scene {
         }
     }
     
+    private hideAllInputs() {
+        this.nameInput.style.display = 'none';
+        this.nameButton.style.display = 'none';
+    }
+    
+    private showNameInput() {
+        this.nameInput.style.display = 'block';
+        this.nameButton.style.display = 'block';
+    }
+    
     private showError(message: string) {
         this.errorText.setText(message);
         this.errorText.setVisible(true);
     }
     
     shutdown() {
+        // Remove event listeners
+        this.gameEvents.off(GameEvents.CONNECTION_ESTABLISHED, this.handleConnectionEstablished, this);
+        this.gameEvents.off(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
+        this.gameEvents.off(GameEvents.ACCOUNT_CREATED, this.handleAccountCreated, this);
+        this.gameEvents.off(GameEvents.NAME_SET, this.handleNameSet, this);
+        this.gameEvents.off(GameEvents.LOADING_ERROR, this.handleLoadingError, this);
+        
         // Clean up HTML elements when the scene is shut down
         this.nameInput.remove();
         this.nameButton.remove();
