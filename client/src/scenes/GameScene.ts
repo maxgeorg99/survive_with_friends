@@ -203,6 +203,14 @@ export default class GameScene extends Phaser.Scene {
         }
 
         // Initialize game world
+
+        // Background - Make it large enough to feel like a world
+        const worldSize = 2000; // Example world size
+        this.backgroundTile = this.add.tileSprite(0, 0, worldSize, worldSize, GRASS_ASSET_KEY)
+            .setOrigin(0, 0)
+            .setScrollFactor(1); // Scroll with the camera
+        this.physics.world.setBounds(0, 0, worldSize, worldSize);
+
         this.initializeGameWorld();
     }
 
@@ -300,48 +308,55 @@ export default class GameScene extends Phaser.Scene {
         // Ensure client and tables are ready
         if (!this.spacetimeDBClient || !this.spacetimeDBClient.identity || !this.spacetimeDBClient.sdkConnection?.db) {
             console.error("SpacetimeDB client, identity, or tables not available in initializeGameWorld.");
+            // Try again in 500ms
+            setTimeout(() => this.initializeGameWorld(), 500);
             return;
         }
         const localIdentity = this.spacetimeDBClient.identity;
 
-        // Background - Make it large enough to feel like a world
-        const worldSize = 2000; // Example world size
-        this.backgroundTile = this.add.tileSprite(0, 0, worldSize, worldSize, GRASS_ASSET_KEY)
-            .setOrigin(0, 0)
-            .setScrollFactor(1); // Scroll with the camera
-        this.physics.world.setBounds(0, 0, worldSize, worldSize);
 
         // --- Player Initialization ---
         // First look up the account by identity
         const account = this.spacetimeDBClient.sdkConnection?.db.account.identity.find(localIdentity) as Account;
         if (!account) {
             console.error("Local account not found!");
-            return; // Cannot proceed without account
+            // Try again after a short delay
+            setTimeout(() => this.initializeGameWorld(), 500);
+            return;
         }
-        
-        console.log("Local account found:", account);
-        
+
+        console.log("Local account found:", account);        
         // Then look up the player by player_id from the account
         if (!account.currentPlayerId) {
             console.error("Local account has no currentPlayerId!");
             return; // Cannot proceed without player ID
         }
+
+        var playerId = account.currentPlayerId;
         
-        const localPlayerData = this.spacetimeDBClient.sdkConnection?.db.player.player_id.find(account.currentPlayerId) as Player;
+        var localPlayerData = this.spacetimeDBClient.sdkConnection?.db.player.player_id.find(playerId);
         if (!localPlayerData) {
             // Check if player is in the dead_players table
-            const deadPlayerData = this.spacetimeDBClient.sdkConnection?.db.deadPlayers.player_id.find(account.currentPlayerId) as DeadPlayer;
+            var deadPlayerData = this.spacetimeDBClient.sdkConnection?.db.deadPlayers.player_id.find(playerId);
             if (deadPlayerData) {
                 console.error("Local player is dead! The game scene should not have been loaded.");
                 return; // Cannot proceed with dead player
             }
+
+            //Print all players
+            const allPlayers = Array.from(this.spacetimeDBClient.sdkConnection?.db.player.iter() || []);
+            console.log("All players:", allPlayers);
             
-            console.error("Local player data not found!");
-            return; // Cannot proceed without local player
+            console.error("Local player data not found for playerID:", account.currentPlayerId);
+            setTimeout(() => this.initializeGameWorld(), 500);
+            return;
         }
         
         console.log("Local player data found:", localPlayerData);
         console.log("Looking for entity with ID:", localPlayerData.entityId);
+        
+        // Initialize local player
+        this.initializeLocalPlayer(localPlayerData);
         
         // Force an explicit player sync after entering the game world
         // This will handle both local player and other players

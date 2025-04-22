@@ -226,8 +226,6 @@ public static partial class Module
                     
                     // Apply damage to player
                     playerIsDead = DamagePlayer(ctx, player.player_id, finalDamage);
-                    
-                    Log.Info($"Monster {monsterId} damaged player {player.name} for {finalDamage} damage (ATK: {monsterAtk}, Armor: {player.armor})");
 
                     if(playerIsDead)
                     {
