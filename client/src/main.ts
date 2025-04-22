@@ -2,12 +2,11 @@ import Phaser from 'phaser';
 import GameScene from './scenes/GameScene';
 import LoginScene from './scenes/LoginScene';
 import ClassSelectScene from './scenes/ClassSelectScene';
+import LoadingScene from './scenes/LoadingScene';
 import SpacetimeDBClient from './SpacetimeDBClient';
 import { Player } from './autobindings';
 
 console.log("Main script loading...");
-
-const spacetimeDBClient = new SpacetimeDBClient();
 
 const config: Phaser.Types.Core.GameConfig = {
     type: Phaser.AUTO,
@@ -21,7 +20,7 @@ const config: Phaser.Types.Core.GameConfig = {
             // debug: true // Set to true for physics debugging
         }
     },
-    scene: [LoginScene, ClassSelectScene, GameScene],
+    scene: [LoginScene, ClassSelectScene, GameScene, LoadingScene],
     scale: {
         mode: Phaser.Scale.RESIZE,
         autoCenter: Phaser.Scale.CENTER_BOTH
@@ -32,7 +31,7 @@ const game = new Phaser.Game(config);
 console.log("Phaser game initialized.");
 
 // Callback for when the SpacetimeDB subscription is initially applied
-spacetimeDBClient.onSubscriptionApplied = () => {
+const onSubscriptionApplied = () => {
     console.log("SpacetimeDB subscription applied callback triggered in main.ts.");
 
     // Ensure client and tables are ready before proceeding
@@ -101,8 +100,16 @@ spacetimeDBClient.onSubscriptionApplied = () => {
             // Check if name was just set (from null/empty to a value)
             if ((!oldAccount.name || oldAccount.name === "") && newAccount.name) 
             {
-                console.log("Name was set. Going to ClassSelectScene.");
-                game.scene.start('ClassSelectScene');
+                console.log("Name was set. Transitioning from LoadingScene to ClassSelectScene.");
+                // If we're in the LoadingScene waiting for name to be set, complete it
+                if (game.scene.isActive('LoadingScene')) {
+                    const loadingScene = game.scene.getScene('LoadingScene') as any;
+                    if (loadingScene.completeLoading) {
+                        loadingScene.completeLoading();
+                    }
+                } else {
+                    game.scene.start('ClassSelectScene');
+                }
                 return;
             }
 
@@ -120,7 +127,15 @@ spacetimeDBClient.onSubscriptionApplied = () => {
                     else
                     {
                         console.log("Player found. Going to GameScene.");
-                        game.scene.start('GameScene');
+                        // If we're in LoadingScene waiting for player creation, complete it
+                        if (game.scene.isActive('LoadingScene')) {
+                            const loadingScene = game.scene.getScene('LoadingScene') as any;
+                            if (loadingScene.completeLoading) {
+                                loadingScene.completeLoading();
+                            }
+                        } else {
+                            game.scene.start('GameScene');
+                        }
                     }
                 }
             }
@@ -148,7 +163,15 @@ spacetimeDBClient.onSubscriptionApplied = () => {
             else
             {
                 console.log("Local player inserted! Going to GameScene.");
-                game.scene.start('GameScene');
+                // If we're in LoadingScene waiting for player creation, complete it
+                if (game.scene.isActive('LoadingScene')) {
+                    const loadingScene = game.scene.getScene('LoadingScene') as any;
+                    if (loadingScene.completeLoading) {
+                        loadingScene.completeLoading();
+                    }
+                } else {
+                    game.scene.start('GameScene');
+                }
             }
         } 
         else 
@@ -231,6 +254,16 @@ spacetimeDBClient.onSubscriptionApplied = () => {
         game.scene.start('ClassSelectScene');
     }
 };
+
+const onConnect = () => {
+    console.log("SpacetimeDB connection established.");
+};
+
+const onDisconnect = () => {
+    console.log("SpacetimeDB connection lost.");
+};
+
+const spacetimeDBClient = new SpacetimeDBClient(onSubscriptionApplied, onConnect, onDisconnect);
 
 // Ensure the client instance is accessible globally or passed to scenes as needed
 (window as any).spacetimeDBClient = spacetimeDBClient;

@@ -1,7 +1,5 @@
 import Phaser from 'phaser';
 import SpacetimeDBClient from '../SpacetimeDBClient';
-import { Player, Account } from '../autobindings';
-import { Identity } from '@clockworklabs/spacetimedb-sdk';
 
 export default class LoginScene extends Phaser.Scene {
     private spacetimeDBClient: SpacetimeDBClient;
@@ -12,13 +10,6 @@ export default class LoginScene extends Phaser.Scene {
     private nameButton!: HTMLButtonElement;
     private errorText!: Phaser.GameObjects.Text;
     private loginContainer!: Phaser.GameObjects.Container;
-    
-    // State tracking
-    private hasAccount: boolean = false;
-    private hasName: boolean = false;
-    private hasLivingPlayer: boolean = false;
-    private isConnected: boolean = false;
-    private isLoading: boolean = false;
 
     constructor() {
         super('LoginScene');
@@ -83,9 +74,6 @@ export default class LoginScene extends Phaser.Scene {
             align: 'center'
         }).setOrigin(0.5).setVisible(false);
         this.loginContainer.add(this.errorText);
-        
-        // Register event handlers for SpacetimeDB client
-        this.registerEventHandlers();
         
         // Check initial connection state
         this.checkConnectionState();
@@ -162,173 +150,16 @@ export default class LoginScene extends Phaser.Scene {
         this.positionHTMLElements();
     }
     
-    private registerEventHandlers() {
-        // Handle connection events
-        this.spacetimeDBClient.onConnect = () => {
-            console.log("Connected to SpacetimeDB");
-            this.isConnected = true;
-            this.updateLoginState();
-        };
-        
-        this.spacetimeDBClient.onDisconnect = () => {
-            console.log("Disconnected from SpacetimeDB");
-            this.isConnected = false;
-            this.statusText.setText('Disconnected. Please refresh the page.');
-            this.hideAllInputs();
-        };
-        
-        // Handle subscription
-        this.spacetimeDBClient.onSubscriptionApplied = () => {
-            console.log("Subscription applied");
-            if (this.isConnected) {
-                this.checkPlayerState();
-            }
-        };
-        
-        // Register table listeners for account and player updates
-        if (this.spacetimeDBClient.sdkConnection?.db) {
-            // Account table listeners
-            this.spacetimeDBClient.sdkConnection.db.account.onInsert((_ctx, account) => {
-                if (this.isMyAccount(account)) {
-                    console.log("My account inserted", account);
-                    this.hasAccount = true;
-                    this.hasName = !!account.name && account.name.trim().length > 0;
-                    this.updateLoginState();
-                }
-            });
-            
-            this.spacetimeDBClient.sdkConnection.db.account.onUpdate((_ctx, _oldAccount, newAccount) => {
-                if (this.isMyAccount(newAccount)) {
-                    console.log("My account updated", newAccount);
-                    this.hasName = !!newAccount.name && newAccount.name.trim().length > 0;
-                    this.updateLoginState();
-                }
-            });
-            
-            // Player table listeners
-            this.spacetimeDBClient.sdkConnection.db.player.onInsert((_ctx, player) => {
-                this.checkIfMyPlayer(player);
-            });
-            
-            this.spacetimeDBClient.sdkConnection.db.player.onUpdate((_ctx, _oldPlayer, newPlayer) => {
-                this.checkIfMyPlayer(newPlayer);
-            });
-            
-            this.spacetimeDBClient.sdkConnection.db.player.onDelete((_ctx, player) => {
-                const myAccount = this.getMyAccount();
-                if (myAccount && myAccount.currentPlayerId === player.playerId) {
-                    this.hasLivingPlayer = false;
-                    this.updateLoginState();
-                }
-            });
-        }
-    }
-    
-    private checkIfMyPlayer(player: Player) {
-        const myAccount = this.getMyAccount();
-        if (myAccount && myAccount.currentPlayerId === player.playerId) {
-            console.log("My player found or updated", player);
-            this.hasLivingPlayer = true;
-            this.updateLoginState();
-        }
-    }
-    
-    private isMyAccount(account: Account): boolean {
-        return this.spacetimeDBClient.identity !== null && 
-               account.identity.isEqual(this.spacetimeDBClient.identity);
-    }
-    
-    private getMyAccount(): Account | null {
-        if (!this.spacetimeDBClient.identity || !this.spacetimeDBClient.sdkConnection?.db) {
-            return null;
-        }
-        
-        const account = this.spacetimeDBClient.sdkConnection.db.account.identity.find(this.spacetimeDBClient.identity);
-        return account || null;
-    }
-    
     private checkConnectionState() {
-        this.isConnected = this.spacetimeDBClient.isConnected;
         
-        if (this.isConnected) {
-            this.checkPlayerState();
-        } else {
+        if (this.spacetimeDBClient.isConnected) 
+        {
+            console.log("Connected to server");
+        } 
+        else 
+        {
             this.statusText.setText('Connecting to server...');
         }
-    }
-    
-    private checkPlayerState() {
-        if (!this.spacetimeDBClient.sdkConnection?.db || !this.spacetimeDBClient.identity) {
-            return;
-        }
-        
-        const account = this.getMyAccount();
-        this.hasAccount = !!account;
-        
-        if (account) {
-            this.hasName = !!account.name && account.name.trim().length > 0;
-            
-            // Check for living player
-            if (account.currentPlayerId > 0) {
-                const player = this.spacetimeDBClient.sdkConnection.db.player.player_id.find(account.currentPlayerId);
-                this.hasLivingPlayer = !!player;
-            }
-        }
-        
-        this.updateLoginState();
-    }
-    
-    private updateLoginState() {
-        if (!this.isConnected) {
-            this.statusText.setText('Connecting to server...');
-            this.hideAllInputs();
-            return;
-        }
-        
-        if (this.isLoading) {
-            return; // Skip updates while loading
-        }
-        
-        // Clear any previous error
-        this.errorText.setVisible(false);
-        
-        // Handle different states
-        if (this.hasLivingPlayer) {
-            // Has a living player - move to game scene
-            this.statusText.setText('Player ready! Entering game...');
-            this.hideAllInputs();
-            this.startGameScene();
-            return;
-        }
-        
-        if (!this.hasAccount) {
-            // Waiting for account creation
-            this.statusText.setText('Creating account...');
-            this.hideAllInputs();
-            return;
-        }
-        
-        if (!this.hasName) {
-            // Need to set name
-            this.statusText.setText('Please enter your name:');
-            this.showNameInput();
-            return;
-        }
-        
-        // If we have a name but no player, move to ClassSelectScene
-        this.statusText.setText('Name set! Moving to character selection...');
-        this.hideAllInputs();
-        this.startClassSelectScene();
-    }
-    
-    private hideAllInputs() {
-        this.nameInput.style.display = 'none';
-        this.nameButton.style.display = 'none';
-    }
-    
-    private showNameInput() {
-        this.nameInput.style.display = 'block';
-        this.nameButton.style.display = 'block';
     }
     
     private setPlayerName() {
@@ -339,63 +170,39 @@ export default class LoginScene extends Phaser.Scene {
             return;
         }
         
-        this.setLoading(true);
-        this.statusText.setText('Setting name...');
+        // Show loading scene while setting name
+        this.scene.start('LoadingScene', { 
+            message: 'Setting your name...', 
+            nextScene: 'ClassSelectScene',
+            timeoutDuration: 10000 // 10 seconds timeout
+        });
         
         try {
             if (this.spacetimeDBClient.sdkConnection?.reducers) {
                 console.log(`Setting name to: ${name}`);
                 this.spacetimeDBClient.sdkConnection.reducers.setName(name);
                 
-                // Set a timeout to check if the name was set
-                setTimeout(() => {
-                    if (!this.hasName) {
-                        this.setLoading(false);
-                        this.showError('Failed to set name. Please try again.');
-                    }
-                }, 5000);
+                // No need for timeout logic here as that's handled by LoadingScene
             } else {
-                this.setLoading(false);
-                this.showError('Cannot set name: SpacetimeDB reducers not available');
+                // If reducers aren't available, go back to LoginScene with error
+                this.scene.start('LoginScene');
+                setTimeout(() => {
+                    this.showError('Cannot set name: SpacetimeDB reducers not available');
+                }, 100);
             }
         } catch (error) {
             console.error('Error setting name:', error);
-            this.setLoading(false);
-            this.showError('An error occurred while setting your name');
-        }
-    }
-    
-    private setLoading(isLoading: boolean) {
-        this.isLoading = isLoading;
-        
-        if (isLoading) {
-            this.hideAllInputs();
-        } else {
-            this.updateLoginState();
+            // If there's an error, go back to LoginScene with error
+            this.scene.start('LoginScene');
+            setTimeout(() => {
+                this.showError('An error occurred while setting your name');
+            }, 100);
         }
     }
     
     private showError(message: string) {
         this.errorText.setText(message);
         this.errorText.setVisible(true);
-    }
-    
-    private startGameScene() {
-        // Clean up HTML elements
-        this.hideAllInputs();
-        
-        // Start the game scene
-        this.scene.start('GameScene');
-    }
-    
-    private startClassSelectScene() {
-        console.log("Starting ClassSelectScene");
-        
-        // Clean up HTML elements when transitioning scenes
-        this.hideAllInputs();
-        
-        // Start the class select scene
-        this.scene.start('ClassSelectScene');
     }
     
     shutdown() {

@@ -14,8 +14,18 @@ class SpacetimeDBClient {
     public onConnect: (() => void) | null = null;
     public onDisconnect: (() => void) | null = null;
 
-    constructor() {
+    constructor(
+        onSubscriptionApplied?: () => void,
+        onConnect?: () => void,
+        onDisconnect?: () => void
+    ) {
         console.log("Initializing SpacetimeDBClient and preparing connection...");
+        
+        // Store callback handlers
+        this.onSubscriptionApplied = onSubscriptionApplied || null;
+        this.onConnect = onConnect || null; 
+        this.onDisconnect = onDisconnect || null;
+
         // Configure and initiate connection attempt.
         // The actual DbConnection instance is received in onConnect.
         DbConnection.builder()

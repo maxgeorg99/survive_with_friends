@@ -259,31 +259,28 @@ export default class ClassSelectScene extends Phaser.Scene {
             return;
         }
         
-        this.setLoading(true);
-        
         try {
             if (this.spacetimeDBClient.sdkConnection?.reducers) {
                 // Get class ID from the PlayerClass tag
                 const classId = CLASS_ID_MAP[this.selectedClass.tag];
                 console.log(`Spawning player with class: ${this.selectedClass.tag} (ID: ${classId})`);
                 
+                // Show loading scene while player is being spawned
+                this.scene.start('LoadingScene', { 
+                    message: 'Creating your character...', 
+                    nextScene: 'GameScene',
+                    timeoutDuration: 10000 // 10 seconds timeout
+                });
+                
                 // Call the spawnPlayer reducer with the numeric class ID
                 this.spacetimeDBClient.sdkConnection.reducers.spawnPlayer(classId);
                 
-                // Set a timeout to check if the player was spawned
-                setTimeout(() => {
-                    if (this.scene.key === 'ClassSelectScene') { // We're still in this scene
-                        this.setLoading(false);
-                        this.showError('Failed to spawn player. Please try again.');
-                    }
-                }, 5000);
+                // No need for timeout logic here as that's handled by LoadingScene
             } else {
-                this.setLoading(false);
                 this.showError('Cannot spawn player: SpacetimeDB reducers not available');
             }
         } catch (error) {
             console.error('Error spawning player:', error);
-            this.setLoading(false);
             this.showError('An error occurred while spawning your player');
         }
     }

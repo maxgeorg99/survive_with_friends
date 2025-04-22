@@ -275,35 +275,6 @@ export default class GameScene extends Phaser.Scene {
         }
         const localIdentity = this.spacetimeDBClient.identity;
 
-        // Listen for account updates
-        this.spacetimeDBClient.sdkConnection?.db.account.onUpdate((_ctx, oldAccount: Account, newAccount: Account) => {
-            if (!this.isPlayerDataReady) return;
-            
-            // Check if this is our account
-            if (newAccount.identity.isEqual(localIdentity)) {
-                // If our player ID changed, we might need to refresh
-                if (oldAccount.currentPlayerId !== newAccount.currentPlayerId) {
-                    console.log(`Local player ID changed from ${oldAccount.currentPlayerId} to ${newAccount.currentPlayerId}`);
-                    // If we had a player before and now don't, we might have died
-                    if (oldAccount.currentPlayerId > 0 && newAccount.currentPlayerId === 0) {
-                        console.log("Local player may have died - removing sprite");
-                        if (this.localPlayerSprite) {
-                            this.localPlayerSprite.destroy();
-                            this.localPlayerSprite = null;
-                        }
-                        if (this.localPlayerNameText) {
-                            this.localPlayerNameText.destroy();
-                            this.localPlayerNameText = null;
-                        }
-                        if (this.localPlayerShadow) {
-                            this.localPlayerShadow.destroy();
-                            this.localPlayerShadow = null;
-                        }
-                    }
-                }
-            }
-        });
-
         // Use the table handle to register listeners with correct signatures
         this.spacetimeDBClient.sdkConnection?.db.player.onInsert((_ctx, player: Player) => {
             if (!this.isPlayerDataReady) return;
