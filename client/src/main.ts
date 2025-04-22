@@ -55,7 +55,6 @@ const onSubscriptionApplied = () => {
     // Listen for account inserts
     localDb.account.onInsert((_ctx, account) => {
         console.log("Account inserted event received");
-        console.log("- Account data:", JSON.stringify(account));
 
         // Check if account is local
         if (account.identity.isEqual(localIdentity)) 
@@ -92,11 +91,15 @@ const onSubscriptionApplied = () => {
                 }
             }
         }
+        else
+        {
+            console.log("Another user has logged on: " + account.identity.toString());
+        }
     });
 
     localDb.account.onUpdate((_ctx, oldAccount, newAccount) => {
         console.log("Account updated event received");
-        console.log("- Account data:", JSON.stringify(newAccount));
+        console.log("- Account data: ", newAccount.name + " - " + newAccount.currentPlayerId);
 
         // Check if account is local
         if (newAccount.identity.isEqual(localIdentity)) 
@@ -155,7 +158,7 @@ const onSubscriptionApplied = () => {
     // Listen for player inserts
     localDb.player.onInsert((_ctx, player) => {
         console.log("Player inserted event received");
-        console.log("- Player data:", JSON.stringify(player));
+        console.log("- Player data: " + player.name + " - " + player.playerId);
 
         const myAccount = localDb.account.identity.find(localIdentity);
         if (!myAccount) 
@@ -193,7 +196,7 @@ const onSubscriptionApplied = () => {
     // Listen for player updates
     localDb.player.onUpdate((_ctx, oldPlayer, newPlayer) => {
         console.log("Player updated event received");
-        console.log("- Player data:", JSON.stringify(newPlayer));
+        console.log("- Player data: ", newPlayer.name + " - " + newPlayer.playerId);
         
         const myAccount = localDb.account.identity.find(localIdentity);
         const isLocalPlayer = myAccount && myAccount.currentPlayerId === newPlayer.playerId;
@@ -205,7 +208,7 @@ const onSubscriptionApplied = () => {
     // Listen for player deletions (death)
     localDb.player.onDelete((_ctx, player) => {
         console.log("Player deleted event received");
-        console.log("- Player data:", JSON.stringify(player));
+        console.log("- Player data: ", player.name + " - " + player.playerId);
 
         const myAccount = localDb.account.identity.find(localIdentity);
         if (!myAccount) 
@@ -231,27 +234,15 @@ const onSubscriptionApplied = () => {
     });
 
     // Entity event listeners
-    localDb.entity.onInsert((_ctx, entity) => {
-        console.log("Entity inserted event received");
-        console.log("- Entity data:", JSON.stringify(entity));
-        
-        // Emit entity created event
+    localDb.entity.onInsert((_ctx, entity) => {        // Emit entity created event
         gameEvents.emit(GameEvents.ENTITY_CREATED, entity);
     });
 
     localDb.entity.onUpdate((_ctx, oldEntity, newEntity) => {
-        console.log("Entity updated event received");
-        console.log("- Entity data:", JSON.stringify(newEntity));
-        
-        // Emit entity updated event
         gameEvents.emit(GameEvents.ENTITY_UPDATED, oldEntity, newEntity);
     });
 
     localDb.entity.onDelete((_ctx, entity) => {
-        console.log("Entity deleted event received");
-        console.log("- Entity data:", JSON.stringify(entity));
-        
-        // Emit entity deleted event
         gameEvents.emit(GameEvents.ENTITY_DELETED, entity);
     });
 
