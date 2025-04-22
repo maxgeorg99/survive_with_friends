@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { Monsters, Entity } from "../autobindings";
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { MONSTER_ASSET_KEYS, MONSTER_SHADOW_OFFSETS, MONSTER_MAX_HP } from '../constants/MonsterConfig';
+import { GameEvents } from '../constants/GameEvents';
 
 // Constants from GameScene
 const SHADOW_ASSET_KEY = 'shadow';
@@ -25,10 +26,13 @@ export default class MonsterManager {
     private monsters: Map<number, Phaser.GameObjects.Container> = new Map();
     // Map to hold monster data waiting for corresponding entity data (keyed by entityId)
     private pendingMonsters: Map<number, Monsters> = new Map();
+    // Add a property for the game events
+    private gameEvents: Phaser.Events.EventEmitter;
 
     constructor(scene: Phaser.Scene, client: SpacetimeDBClient) {
         this.scene = scene;
         this.spacetimeDBClient = client;
+        this.gameEvents = (window as any).gameEvents;
         console.log("MonsterManager initialized");
     }
 
@@ -61,6 +65,9 @@ export default class MonsterManager {
 
         // Register monster listeners
         this.registerMonsterListeners();
+        
+        // Register entity event listeners
+        this.registerEntityListeners();
     }
 
     // Register monster-related event listeners
@@ -81,6 +88,23 @@ export default class MonsterManager {
         this.spacetimeDBClient.sdkConnection.db.monsters.onDelete((_ctx, monster: Monsters) => {
             this.removeMonster(monster.monsterId);
         });
+    }
+
+    // Add method to register for entity events
+    registerEntityListeners() {
+        console.log("Registering entity event listeners for MonsterManager");
+        
+        // Listen for entity events
+        this.gameEvents.on(GameEvents.ENTITY_CREATED, this.handleEntityEvent, this);
+        this.gameEvents.on(GameEvents.ENTITY_UPDATED, (oldEntity: Entity, newEntity: Entity) => {
+            this.handleEntityEvent(newEntity);
+        }, this);
+    }
+
+    // Add method to handle entity events
+    handleEntityEvent(entity: Entity) {
+        // Call the existing handleEntityUpdate method
+        this.handleEntityUpdate(entity);
     }
 
     // Handle entity updates for monsters
@@ -502,5 +526,14 @@ export default class MonsterManager {
                 */
             }
         });
+    }
+
+    // Add method to clean up event listeners
+    unregisterListeners() {
+        console.log("Unregistering event listeners for MonsterManager");
+        
+        // Remove entity event listeners
+        this.gameEvents.off(GameEvents.ENTITY_CREATED, this.handleEntityEvent, this);
+        this.gameEvents.off(GameEvents.ENTITY_UPDATED);
     }
 } 

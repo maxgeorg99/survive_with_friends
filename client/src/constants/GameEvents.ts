@@ -17,6 +17,11 @@ export enum GameEvents {
     PLAYER_DELETED = 'player:deleted',
     PLAYER_DIED = 'player_died',
     
+    // Entity events
+    ENTITY_CREATED = 'entity:created',
+    ENTITY_UPDATED = 'entity:updated',
+    ENTITY_DELETED = 'entity:deleted',
+    
     // Loading events
     LOADING_COMPLETE = 'loading_complete',
     LOADING_ERROR = 'loading_error',

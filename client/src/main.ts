@@ -230,6 +230,31 @@ const onSubscriptionApplied = () => {
         }
     });
 
+    // Entity event listeners
+    localDb.entity.onInsert((_ctx, entity) => {
+        console.log("Entity inserted event received");
+        console.log("- Entity data:", JSON.stringify(entity));
+        
+        // Emit entity created event
+        gameEvents.emit(GameEvents.ENTITY_CREATED, entity);
+    });
+
+    localDb.entity.onUpdate((_ctx, oldEntity, newEntity) => {
+        console.log("Entity updated event received");
+        console.log("- Entity data:", JSON.stringify(newEntity));
+        
+        // Emit entity updated event
+        gameEvents.emit(GameEvents.ENTITY_UPDATED, oldEntity, newEntity);
+    });
+
+    localDb.entity.onDelete((_ctx, entity) => {
+        console.log("Entity deleted event received");
+        console.log("- Entity data:", JSON.stringify(entity));
+        
+        // Emit entity deleted event
+        gameEvents.emit(GameEvents.ENTITY_DELETED, entity);
+    });
+
     // Check initial state and load appropriate scene
     console.log("Checking current account and player state...");
     const myAccount = localDb.account.identity.find(localIdentity);

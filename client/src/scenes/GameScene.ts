@@ -210,6 +210,11 @@ export default class GameScene extends Phaser.Scene {
         this.gameEvents.on(GameEvents.PLAYER_DELETED, this.handlePlayerDeleted, this);
         this.gameEvents.on(GameEvents.PLAYER_DIED, this.handlePlayerDied, this);
         
+        // Entity events
+        this.gameEvents.on(GameEvents.ENTITY_CREATED, this.handleEntityCreated, this);
+        this.gameEvents.on(GameEvents.ENTITY_UPDATED, this.handleEntityUpdated, this);
+        this.gameEvents.on(GameEvents.ENTITY_DELETED, this.handleEntityDeleted, this);
+        
         // Connection events
         this.gameEvents.on(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
     }
@@ -346,22 +351,11 @@ export default class GameScene extends Phaser.Scene {
     registerSpacetimeDBListeners() {
         console.log("Registering game event listeners...");
         
-        // Register event listeners for player events
-        this.gameEvents.on(GameEvents.PLAYER_CREATED, this.handlePlayerCreated, this);
-        this.gameEvents.on(GameEvents.PLAYER_UPDATED, this.handlePlayerUpdated, this);
-        this.gameEvents.on(GameEvents.PLAYER_DELETED, this.handlePlayerDeleted, this);
-        this.gameEvents.on(GameEvents.PLAYER_DIED, this.handlePlayerDied, this);
+        // Player event listeners are already registered in registerEventListeners
+        // Entity event listeners are now also registered in registerEventListeners
         
-        // Register for entity table updates directly since these aren't covered by game events yet
-        if (this.spacetimeDBClient?.sdkConnection?.db) {
-            this.spacetimeDBClient.sdkConnection.db.entity.onUpdate((_ctx, _oldEntity, newEntity) => {
-                this.handleEntityUpdate(newEntity);
-            });
-            
-            this.spacetimeDBClient.sdkConnection.db.entity.onInsert((_ctx, entity) => {
-                this.handleEntityUpdate(entity);
-            });
-        }
+        // Initialize the monster manager
+        this.monsterManager.initializeMonsters();
         
         console.log("Game event listeners registered successfully.");
     }
@@ -1249,7 +1243,18 @@ export default class GameScene extends Phaser.Scene {
         this.gameEvents.off(GameEvents.PLAYER_UPDATED, this.handlePlayerUpdated, this);
         this.gameEvents.off(GameEvents.PLAYER_DELETED, this.handlePlayerDeleted, this);
         this.gameEvents.off(GameEvents.PLAYER_DIED, this.handlePlayerDied, this);
+        
+        // Remove entity event listeners
+        this.gameEvents.off(GameEvents.ENTITY_CREATED, this.handleEntityCreated, this);
+        this.gameEvents.off(GameEvents.ENTITY_UPDATED, this.handleEntityUpdated, this);
+        this.gameEvents.off(GameEvents.ENTITY_DELETED, this.handleEntityDeleted, this);
+        
         this.gameEvents.off(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
+        
+        // Clean up MonsterManager event listeners
+        if (this.monsterManager) {
+            this.monsterManager.unregisterListeners();
+        }
         
         // Clean up local player objects
         if (this.localPlayerSprite) {
@@ -1281,5 +1286,22 @@ export default class GameScene extends Phaser.Scene {
         }
         
         console.log("GameScene shutdown complete.");
+    }
+
+    // New entity event handlers
+    private handleEntityCreated(entity: Entity) {
+        console.log("Entity created event received in GameScene");
+        this.handleEntityUpdate(entity);
+    }
+
+    private handleEntityUpdated(oldEntity: Entity, newEntity: Entity) {
+        console.log("Entity updated event received in GameScene");
+        this.handleEntityUpdate(newEntity);
+    }
+
+    private handleEntityDeleted(entity: Entity) {
+        console.log("Entity deleted event received in GameScene");
+        // Handle entity deletion (if needed)
+        // Currently no specific handling is needed as player/monster deletions are handled by respective events
     }
 }
