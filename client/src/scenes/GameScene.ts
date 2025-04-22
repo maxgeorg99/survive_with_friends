@@ -216,42 +216,50 @@ export default class GameScene extends Phaser.Scene {
 
     private handlePlayerCreated(player: Player, isLocalPlayer: boolean = true) {
         console.log("Player created event received in GameScene");
+        
         if (isLocalPlayer) {
-            // This is our local player
             console.log("Local player created:", player);
             // Initialize or update local player
             this.initializeLocalPlayer(player);
         } else {
             // Another player joined
             console.log("Other player created:", player);
-            // Add or update other player
             this.addOrUpdateOtherPlayer(player);
         }
     }
 
     private handlePlayerUpdated(oldPlayer: Player, newPlayer: Player, isLocalPlayer: boolean) {
         console.log("Player updated event received in GameScene");
+        
         if (isLocalPlayer) {
-            // This is our local player being updated
             console.log("Local player updated:", newPlayer);
             // Update local player attributes if needed
             this.updateLocalPlayerAttributes(newPlayer);
         } else {
             // Update another player
             console.log("Other player updated:", newPlayer);
-            // Update other player
             this.addOrUpdateOtherPlayer(newPlayer);
         }
     }
 
-    private handlePlayerDeleted(player: Player, isLocalPlayer: boolean) 
+    private handlePlayerDeleted(player: Player, isLocalPlayer: boolean = false) 
     {
-        console.log("Player deleted event received in GameScene");
-        if (!isLocalPlayer) {
-            // Only need to handle other players being deleted
+        if (isLocalPlayer) {
             // (Local player deletion is handled by handlePlayerDied)
+            console.log("Local player deleted event received");
+        } else {
+            // Find and remove the other player
             console.log("Other player deleted:", player);
-            this.removeOtherPlayer(player.playerId);
+            
+            // Find the account for this player to get the identity
+            const playerAccounts = Array.from(this.spacetimeDBClient?.sdkConnection?.db?.account.iter() || []);
+            const playerAccount = playerAccounts.find(acc => acc.currentPlayerId === player.playerId);
+            
+            if (playerAccount) {
+                this.removeOtherPlayer(playerAccount.identity);
+            } else {
+                console.warn(`Could not find account for player ID ${player.playerId}`);
+            }
         }
     }
 
@@ -327,9 +335,6 @@ export default class GameScene extends Phaser.Scene {
         console.log("Local player data found:", localPlayerData);
         console.log("Looking for entity with ID:", localPlayerData.entityId);
         
-        // Register event listeners
-        this.registerSpacetimeDBListeners();
-        
         // Force an explicit player sync after entering the game world
         // This will handle both local player and other players
         console.log("Performing initial player synchronization...");
@@ -339,120 +344,96 @@ export default class GameScene extends Phaser.Scene {
     }
 
     registerSpacetimeDBListeners() {
-        console.log("Registering SpacetimeDB listeners...");
-        // Ensure client and tables are ready
-        if (!this.spacetimeDBClient || !this.spacetimeDBClient.identity || !this.spacetimeDBClient.sdkConnection?.db) {
-            console.error("Attempted to register listeners without valid client/identity/tables.");
+        console.log("Registering game event listeners...");
+        
+        // Register event listeners for player events
+        this.gameEvents.on(GameEvents.PLAYER_CREATED, this.handlePlayerCreated, this);
+        this.gameEvents.on(GameEvents.PLAYER_UPDATED, this.handlePlayerUpdated, this);
+        this.gameEvents.on(GameEvents.PLAYER_DELETED, this.handlePlayerDeleted, this);
+        this.gameEvents.on(GameEvents.PLAYER_DIED, this.handlePlayerDied, this);
+        
+        // Register for entity table updates directly since these aren't covered by game events yet
+        if (this.spacetimeDBClient?.sdkConnection?.db) {
+            this.spacetimeDBClient.sdkConnection.db.entity.onUpdate((_ctx, _oldEntity, newEntity) => {
+                this.handleEntityUpdate(newEntity);
+            });
+            
+            this.spacetimeDBClient.sdkConnection.db.entity.onInsert((_ctx, entity) => {
+                this.handleEntityUpdate(entity);
+            });
+        }
+        
+        console.log("Game event listeners registered successfully.");
+    }
+
+    /**
+     * Initialize local player with data from server
+     */
+    private initializeLocalPlayer(player: Player) {
+        console.log("Initializing local player...");
+        
+        // Get the entity data for this player
+        const entityData = this.spacetimeDBClient?.sdkConnection?.db?.entity.entity_id.find(player.entityId);
+        if (!entityData) {
+            console.log("Entity data not found for local player, adding to pending players");
+            this.pendingPlayers.set(player.entityId, player);
             return;
         }
-        const localIdentity = this.spacetimeDBClient.identity;
 
-        // Use the table handle to register listeners with correct signatures
-        this.spacetimeDBClient.sdkConnection?.db.player.onInsert((_ctx, player: Player) => {
-            if (!this.isPlayerDataReady) return;
-            console.log(`Player.onInsert: ${player.name} (ID: ${player.playerId}, EntityID: ${player.entityId})`);
-            
-            // Find account for this player
-            const allAccounts = Array.from(this.spacetimeDBClient.sdkConnection?.db.account.iter() || []);
-            const ownerAccount = allAccounts.find(a => a.currentPlayerId === player.playerId);
-            
-            if (!ownerAccount) {
-                console.warn(`Could not find account for player ${player.name} (ID: ${player.playerId})`);
-                return;
-            }
-            
-            // Check if this is a local or other player
-            if (!ownerAccount.identity.isEqual(localIdentity)) {
-                this.addOrUpdateOtherPlayer(player);
-            }
-        });
-
-        this.spacetimeDBClient.sdkConnection?.db.player.onUpdate((_ctx, oldPlayer: Player, newPlayer: Player) => {
-            if (!this.isPlayerDataReady) return;
-            
-            // Find account for this player
-            const allAccounts = Array.from(this.spacetimeDBClient.sdkConnection?.db.account.iter() || []);
-            const ownerAccount = allAccounts.find(a => a.currentPlayerId === newPlayer.playerId);
-            
-            if (!ownerAccount) {
-                console.warn(`Could not find account for player ${newPlayer.name} (ID: ${newPlayer.playerId})`);
-                return;
-            }
-            
-            // Check if this is a local or other player
-            if (!ownerAccount.identity.isEqual(localIdentity)) {
-                this.addOrUpdateOtherPlayer(newPlayer);
-            } else {
-                // Update local player name if it changes
-                if (this.localPlayerNameText && newPlayer.name && this.localPlayerNameText.text !== `${newPlayer.name} (${newPlayer.level})`) {
-                    console.log(`Updating local player name to: ${newPlayer.name} (${newPlayer.level})`);
-                    this.localPlayerNameText.setText(`${newPlayer.name} (${newPlayer.level})`);
-                }
-                
-                // Update health bar if needed
-                if (this.localPlayerSprite && newPlayer.hp !== undefined && newPlayer.maxHp !== undefined) {
-                    // Find the health bar object
-                    const healthBar = this.children.getByName('localPlayerHealthBar') as Phaser.GameObjects.Rectangle;
-                    if (healthBar) {
-                        // Adjust health bar width based on current HP
-                        const healthPercentage = Math.max(0, Math.min(1, newPlayer.hp / newPlayer.maxHp));
-                        healthBar.width = HEALTH_BAR_WIDTH * healthPercentage;
-                    }
-                }
-            }
-        });
-
-        // Handle player deletion/death
-        this.spacetimeDBClient.sdkConnection?.db.player.onDelete((_ctx, player: Player) => {
-            if (!this.isPlayerDataReady) return;
-            console.log(`Player.onDelete: ${player.name} (ID: ${player.playerId})`);
-            
-            // Find account for this player
-            const allAccounts = Array.from(this.spacetimeDBClient.sdkConnection?.db.account.iter() || []);
-            const ownerAccount = allAccounts.find(a => a.currentPlayerId === player.playerId);
-            
-            // Get entity position before it's removed (if still in cache)
-            const entityId = player.entityId;
-            const entityPosition = this.getEntityPosition(entityId);
-            
-            // Create death effects if we have the position
-            if (entityPosition) {
-                console.log(`Creating death effects for player ${player.name} at position (${entityPosition.x}, ${entityPosition.y})`);
-                this.createDeathEffects(entityPosition.x, entityPosition.y);
-            }
-            
-            // Handle based on whether it's local or other player
-            if (ownerAccount) {
-                const isLocalAccount = ownerAccount.identity.isEqual(localIdentity);
-                
-                if (isLocalAccount) {
-                    console.log("Local player died, showing death screen");
-                    this.showDeathScreen();
-                } else {
-                    // Remove other player sprite
-                    this.removeOtherPlayer(ownerAccount.identity);
-                }
-            } else {
-                console.warn(`Could not find account for player ${player.name} (ID: ${player.playerId})`);
-            }
-        });
-
-        // Entity listeners remain unchanged
-        this.spacetimeDBClient.sdkConnection?.db.entity.onInsert((_ctx, entity: Entity) => {
-            this.handleEntityUpdate(entity);
-        });
+        // Set up the player sprite based on their class
+        const spriteKey = this.getClassSpriteKey(player.playerClass);
         
-        this.spacetimeDBClient.sdkConnection?.db.entity.onUpdate((_ctx, _oldEntity: Entity, newEntity: Entity) => {
-            this.handleEntityUpdate(newEntity);
-        });
+        // Create the player sprite
+        if (!this.localPlayerSprite) {
+            this.localPlayerSprite = this.physics.add.sprite(entityData.position.x, entityData.position.y, spriteKey);
+            this.localPlayerSprite.setDepth(BASE_DEPTH + entityData.position.y);
+            
+            // Add shadow
+            this.localPlayerShadow = this.add.image(entityData.position.x, entityData.position.y, SHADOW_ASSET_KEY);
+            this.localPlayerShadow.setAlpha(SHADOW_ALPHA);
+            this.localPlayerShadow.setDepth(BASE_DEPTH + entityData.position.y + SHADOW_DEPTH_OFFSET);
+            
+            // Add player name text
+            this.localPlayerNameText = this.add.text(entityData.position.x, entityData.position.y - 40, player.name, {
+                fontSize: '16px',
+                color: '#FFFFFF',
+                stroke: '#000000',
+                strokeThickness: 3,
+                fontStyle: 'bold'
+            }).setOrigin(0.5);
+            this.localPlayerNameText.setDepth(BASE_DEPTH + entityData.position.y + 1);
+        } else {
+            // Update the existing player sprite
+            this.localPlayerSprite.setTexture(spriteKey);
+            this.localPlayerSprite.setPosition(entityData.position.x, entityData.position.y);
+        }
         
-        this.spacetimeDBClient.sdkConnection?.db.entity.onDelete((_ctx, entity: Entity) => {
-            // When an entity is deleted, we don't need to do anything here
-            // Monster handlers will take care of monster entities
-        });
+        // Store the server position
+        this.serverPosition = new Phaser.Math.Vector2(entityData.position.x, entityData.position.y);
+        
+        // Set player data as ready
+        this.isPlayerDataReady = true;
+        
+        console.log("Local player initialized at position:", entityData.position);
+    }
 
-        // Initialize the monster manager and register its listeners
-        this.monsterManager.initializeMonsters();
+    /**
+     * Update local player attributes when server data changes
+     */
+    private updateLocalPlayerAttributes(player: Player) {
+        // Update player name if it changed
+        if (this.localPlayerNameText && this.localPlayerNameText.text !== player.name) {
+            this.localPlayerNameText.setText(player.name);
+        }
+        
+        // Update other player attributes as needed
+        // e.g., class, health, equipment, etc.
+        
+        // Get the latest entity data
+        const entityData = this.spacetimeDBClient?.sdkConnection?.db?.entity.entity_id.find(player.entityId);
+        if (entityData && this.serverPosition) {
+            this.serverPosition.set(entityData.position.x, entityData.position.y);
+        }
     }
 
     // Helper function to handle entity updates and move corresponding sprites
@@ -1261,6 +1242,8 @@ export default class GameScene extends Phaser.Scene {
     }
 
     shutdown() {
+        console.log("GameScene shutting down...");
+        
         // Remove event listeners
         this.gameEvents.off(GameEvents.PLAYER_CREATED, this.handlePlayerCreated, this);
         this.gameEvents.off(GameEvents.PLAYER_UPDATED, this.handlePlayerUpdated, this);
@@ -1268,7 +1251,35 @@ export default class GameScene extends Phaser.Scene {
         this.gameEvents.off(GameEvents.PLAYER_DIED, this.handlePlayerDied, this);
         this.gameEvents.off(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
         
-        // Additional cleanup
-        // ... existing cleanup code ...
+        // Clean up local player objects
+        if (this.localPlayerSprite) {
+            this.localPlayerSprite.destroy();
+            this.localPlayerSprite = null;
+        }
+        
+        if (this.localPlayerShadow) {
+            this.localPlayerShadow.destroy();
+            this.localPlayerShadow = null;
+        }
+        
+        if (this.localPlayerNameText) {
+            this.localPlayerNameText.destroy();
+            this.localPlayerNameText = null;
+        }
+        
+        // Clean up other player sprites
+        for (const [_, container] of this.otherPlayers) {
+            container.destroy();
+        }
+        this.otherPlayers.clear();
+        
+        // Clear tap target and marker
+        this.tapTarget = null;
+        if (this.tapMarker) {
+            this.tapMarker.destroy();
+            this.tapMarker = null;
+        }
+        
+        console.log("GameScene shutdown complete.");
     }
 }
