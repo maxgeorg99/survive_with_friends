@@ -103,6 +103,9 @@ export default class ClassSelectScene extends Phaser.Scene {
         
         // Position HTML elements
         this.positionHTMLElements();
+        
+        // Only clean up when the scene is actually shut down, not at scene start
+        this.events.on('shutdown', this.cleanupHTMLElements, this);
     }
     
     private createClassButtons() {

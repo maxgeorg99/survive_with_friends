@@ -1309,60 +1309,25 @@ export default class GameScene extends Phaser.Scene {
     }
 
     private cleanupLingeringUIElements() {
-        console.log("GameScene: Cleaning up any lingering UI elements from other scenes");
+        console.log("GameScene: Cleaning up lingering UI elements from other scenes only");
         
         try {
-            // Clean up login scene elements
+            // Only clean up elements we know belong to other scenes
+            // Login scene elements
             const loginInput = document.getElementById('login-name-input');
             if (loginInput && loginInput.parentNode) {
-                console.log("Removing lingering login input");
+                console.log("GameScene: Removing lingering login input");
                 loginInput.remove();
             }
             
-            document.querySelectorAll('.login-button').forEach(el => {
-                if (el && el.parentNode) {
-                    console.log("Removing lingering login button");
-                    el.remove();
-                }
-            });
-            
-            // Clean up class select scene elements
+            // Class select scene elements - only if we find the container ID
             const classContainer = document.getElementById('class-select-container');
             if (classContainer && classContainer.parentNode) {
-                console.log("Removing lingering class container");
+                console.log("GameScene: Removing lingering class container");
                 classContainer.remove();
             }
-            
-            document.querySelectorAll('.class-select-button').forEach(el => {
-                if (el && el.parentNode) {
-                    console.log("Removing lingering class button");
-                    el.remove();
-                }
-            });
-            
-            // Find all text inputs and buttons that might be from other scenes
-            document.querySelectorAll('input[type="text"]').forEach(el => {
-                if (el.id === 'login-name-input' && el.parentNode) {
-                    console.log("Removing generic text input");
-                    el.remove();
-                }
-            });
-            
-            document.querySelectorAll('button').forEach(el => {
-                const buttonText = (el as HTMLElement).textContent || '';
-                if ((buttonText.includes('Set Name') || 
-                     buttonText.includes('Fighter') || 
-                     buttonText.includes('Rogue') || 
-                     buttonText.includes('Mage') || 
-                     buttonText.includes('Paladin') || 
-                     buttonText.includes('Confirm')) && 
-                    el.parentNode) {
-                    console.log("Removing generic button:", buttonText);
-                    el.remove();
-                }
-            });
         } catch (e) {
-            console.error("Error in cleanupLingeringUIElements:", e);
+            console.error("Error in GameScene cleanupLingeringUIElements:", e);
         }
     }
 }

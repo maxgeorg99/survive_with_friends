@@ -261,10 +261,37 @@ public static partial class Module
     // Helper function to create a new player with an associated entity
     private static Player? CreateNewPlayer(ReducerContext ctx, string name, PlayerClass playerClass)
     {
+        // Get game configuration to determine world center
+        var configOpt = ctx.Db.config.id.Find(0);
+        if (configOpt == null)
+        {
+            Log.Error("CreateNewPlayer: Could not find game configuration!");
+            // Fall back to a reasonable default if config not found
+            return CreateNewPlayerWithPosition(ctx, name, playerClass, new DbVector2(1000, 1000));
+        }
+
+        // Calculate center position based on world size
+        var config = configOpt.Value;
+        float centerX = config.world_size / 2;
+        float centerY = config.world_size / 2;
+        
+        // Add a small random offset (±100 pixels) to avoid all new players stacking exactly at center
+        float offsetX = ctx.Rng.Next(-100, 101);
+        float offsetY = ctx.Rng.Next(-100, 101);
+        
+        DbVector2 centerPosition = new DbVector2(centerX + offsetX, centerY + offsetY);
+        Log.Info($"Placing new player '{name}' at position: {centerPosition.x}, {centerPosition.y}");
+        
+        return CreateNewPlayerWithPosition(ctx, name, playerClass, centerPosition);
+    }
+    
+    // Helper function that takes a position parameter
+    private static Player? CreateNewPlayerWithPosition(ReducerContext ctx, string name, PlayerClass playerClass, DbVector2 position)
+    {
         // 1. Create the Entity for the player with default direction and not moving
         Entity? newEntityOpt = ctx.Db.entity.Insert(new Entity
         {
-            position = new DbVector2(100, 100), // Example starting position
+            position = position,
             direction = new DbVector2(0, 0), // Default direction
             is_moving = false, // Not moving by default
             radius = 48.0f // Player collision radius

@@ -27,6 +27,9 @@ export default class LoginScene extends Phaser.Scene {
     }
 
     create() {
+        // Remove force cleanup at scene creation
+        // this.forceCleanupDOMElements();
+        
         // Set up background
         const { width, height } = this.scale;
         
@@ -86,6 +89,10 @@ export default class LoginScene extends Phaser.Scene {
         
         // Handle window resize
         this.scale.on('resize', this.handleResize, this);
+        
+        // Only clean up when the scene is actually stopped/removed, not at scene start
+        this.events.off('stop', this.forceCleanupDOMElements, this); // Remove existing if any
+        this.events.on('shutdown', this.forceCleanupDOMElements, this); // Add to shutdown instead
     }
     
     private createHTMLElements() {
@@ -331,5 +338,53 @@ export default class LoginScene extends Phaser.Scene {
         
         // Remove resize listener
         this.scale.off('resize', this.handleResize);
+    }
+
+    // Add a dedicated aggressive DOM cleanup method
+    private forceCleanupDOMElements() {
+        console.log("LoginScene: Force cleaning up all DOM elements");
+        
+        try {
+            // Immediately hide any input elements we might have reference to
+            if (this.nameInput) {
+                this.nameInput.style.display = 'none';
+            }
+            
+            if (this.nameButton) {
+                this.nameButton.style.display = 'none';
+            }
+            
+            // Find ALL possible login elements in the document and remove them
+            // By ID
+            const nameInput = document.getElementById('login-name-input');
+            if (nameInput) {
+                console.log("Force-removing login input by ID");
+                nameInput.remove();
+            }
+            
+            // By class name
+            document.querySelectorAll('.login-button').forEach(el => {
+                console.log("Force-removing login button by class");
+                el.remove();
+            });
+            
+            // By input type
+            document.querySelectorAll('input[type="text"]').forEach(el => {
+                if (el.id === 'login-name-input') {
+                    console.log("Force-removing text input");
+                    el.remove();
+                }
+            });
+            
+            // By content
+            document.querySelectorAll('button').forEach(el => {
+                if ((el as HTMLElement).textContent === 'Set Name') {
+                    console.log("Force-removing button by text content");
+                    el.remove();
+                }
+            });
+        } catch (e) {
+            console.error("Error in forceCleanupDOMElements:", e);
+        }
     }
 } 
