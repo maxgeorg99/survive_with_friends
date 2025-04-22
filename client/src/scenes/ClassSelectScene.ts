@@ -295,6 +295,9 @@ export default class ClassSelectScene extends Phaser.Scene {
                 const classId = CLASS_ID_MAP[this.selectedClass.tag];
                 console.log(`Spawning player with class: ${this.selectedClass.tag} (ID: ${classId})`);
                 
+                // Try to clean up HTML elements immediately before transition
+                this.cleanupHTMLElements();
+                
                 // Show loading scene while player is being spawned
                 this.scene.start('LoadingScene', { 
                     message: 'Creating your character...', 
@@ -319,22 +322,66 @@ export default class ClassSelectScene extends Phaser.Scene {
         }
     }
     
+    // Add a dedicated cleanup method for HTML elements
+    private cleanupHTMLElements() {
+        console.log("Cleaning up ClassSelectScene HTML elements");
+        try {
+            // Method 1: Our class reference
+            if (this.classButtonsContainer && this.classButtonsContainer.parentNode) {
+                this.classButtonsContainer.remove();
+            }
+            
+            // Method 2: Query by ID and class
+            const container = document.getElementById('class-select-container');
+            if (container && container.parentNode) {
+                container.remove();
+            }
+            
+            // Method 3: Query by class
+            document.querySelectorAll('.class-select-button').forEach(el => {
+                if (el && el.parentNode) {
+                    el.remove();
+                }
+            });
+            
+            // Method 4: Look for any buttons that might be ours
+            document.querySelectorAll('button').forEach(el => {
+                if ((el as HTMLElement).textContent?.includes('Fighter') || 
+                    (el as HTMLElement).textContent?.includes('Rogue') ||
+                    (el as HTMLElement).textContent?.includes('Mage') ||
+                    (el as HTMLElement).textContent?.includes('Paladin') ||
+                    (el as HTMLElement).textContent?.includes('Confirm Selection')) {
+                    if (el && el.parentNode) {
+                        console.log("Removing class button:", (el as HTMLElement).textContent);
+                        el.remove();
+                    }
+                }
+            });
+            
+            // Look for the container div
+            document.querySelectorAll('div').forEach(el => {
+                if (el.id === 'class-select-container' || 
+                    (el.children.length > 0 && Array.from(el.children).some(child => 
+                        (child as HTMLElement).className === 'class-select-button'))) {
+                    if (el && el.parentNode) {
+                        console.log("Removing class container div");
+                        el.remove();
+                    }
+                }
+            });
+        } catch (e) {
+            console.error("Error in cleanupHTMLElements:", e);
+        }
+    }
+    
     private showError(message: string) {
         this.errorText.setText(message);
         this.errorText.setVisible(true);
     }
     
-    private startGameScene() {
-        console.log("Starting GameScene from ClassSelectScene");
-        
-        // Clean up HTML elements
-        this.classButtonsContainer.remove();
-        
-        // Start the game scene
-        this.scene.start('GameScene');
-    }
-    
     shutdown() {
+        console.log("ClassSelectScene shutdown called");
+        
         // Remove event listeners
         this.gameEvents.off(GameEvents.PLAYER_CREATED, this.handlePlayerCreated, this);
         this.gameEvents.off(GameEvents.PLAYER_DIED, this.handlePlayerDied, this);
@@ -342,10 +389,8 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.gameEvents.off(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
         this.gameEvents.off(GameEvents.LOADING_ERROR, this.handleLoadingError, this);
         
-        // Clean up HTML elements when the scene is shut down
-        if (this.classButtonsContainer) {
-            this.classButtonsContainer.remove();
-        }
+        // Use our dedicated cleanup method
+        this.cleanupHTMLElements();
         
         // Remove resize listener
         this.scale.off('resize', this.handleResize);

@@ -28,6 +28,9 @@ export default class LoadingScene extends Phaser.Scene {
     }
 
     create() {
+        // Global cleanup - remove any lingering UI elements from previous scenes
+        this.cleanupLingeringUIElements();
+        
         const { width, height } = this.scale;
         
         // Set background color
@@ -192,5 +195,63 @@ export default class LoadingScene extends Phaser.Scene {
         
         // Remove resize listener
         this.scale.off('resize', this.handleResize);
+    }
+    
+    private cleanupLingeringUIElements() {
+        console.log("LoadingScene: Cleaning up any lingering UI elements from other scenes");
+        
+        try {
+            // Clean up login scene elements
+            const loginInput = document.getElementById('login-name-input');
+            if (loginInput && loginInput.parentNode) {
+                console.log("Removing lingering login input");
+                loginInput.remove();
+            }
+            
+            document.querySelectorAll('.login-button').forEach(el => {
+                if (el && el.parentNode) {
+                    console.log("Removing lingering login button");
+                    el.remove();
+                }
+            });
+            
+            // Clean up class select scene elements
+            const classContainer = document.getElementById('class-select-container');
+            if (classContainer && classContainer.parentNode) {
+                console.log("Removing lingering class container");
+                classContainer.remove();
+            }
+            
+            document.querySelectorAll('.class-select-button').forEach(el => {
+                if (el && el.parentNode) {
+                    console.log("Removing lingering class button");
+                    el.remove();
+                }
+            });
+            
+            // General cleanup for buttons and inputs that might be left over
+            document.querySelectorAll('input[type="text"]').forEach(el => {
+                if (el.id === 'login-name-input' && el.parentNode) {
+                    console.log("Removing generic text input");
+                    el.remove();
+                }
+            });
+            
+            document.querySelectorAll('button').forEach(el => {
+                const buttonText = (el as HTMLElement).textContent || '';
+                if ((buttonText.includes('Set Name') || 
+                     buttonText.includes('Fighter') || 
+                     buttonText.includes('Rogue') || 
+                     buttonText.includes('Mage') || 
+                     buttonText.includes('Paladin') || 
+                     buttonText.includes('Confirm')) && 
+                    el.parentNode) {
+                    console.log("Removing generic button:", buttonText);
+                    el.remove();
+                }
+            });
+        } catch (e) {
+            console.error("Error in cleanupLingeringUIElements:", e);
+        }
     }
 } 

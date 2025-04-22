@@ -218,6 +218,9 @@ export default class LoginScene extends Phaser.Scene {
             return;
         }
         
+        // Hide elements immediately before scene transition
+        this.hideAllInputs();
+        
         // Show loading scene while setting name
         this.scene.start('LoadingScene', { 
             message: 'Setting your name...', 
@@ -269,6 +272,9 @@ export default class LoginScene extends Phaser.Scene {
     }
     
     shutdown() {
+        // First hide all inputs
+        this.hideAllInputs();
+        
         // Remove event listeners
         this.gameEvents.off(GameEvents.CONNECTION_ESTABLISHED, this.handleConnectionEstablished, this);
         this.gameEvents.off(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
@@ -276,9 +282,52 @@ export default class LoginScene extends Phaser.Scene {
         this.gameEvents.off(GameEvents.NAME_SET, this.handleNameSet, this);
         this.gameEvents.off(GameEvents.LOADING_ERROR, this.handleLoadingError, this);
         
-        // Clean up HTML elements when the scene is shut down
-        this.nameInput.remove();
-        this.nameButton.remove();
+        // Clean up HTML elements more thoroughly
+        try {
+            // Find elements by multiple methods to ensure we get them all
+            let inputElements = [];
+            let buttonElements = [];
+            
+            // Method 1: Our class references
+            if (this.nameInput) inputElements.push(this.nameInput);
+            if (this.nameButton) buttonElements.push(this.nameButton);
+            
+            // Method 2: Query by ID
+            const inputById = document.getElementById('login-name-input');
+            if (inputById) inputElements.push(inputById);
+            
+            // Method 3: Query by class
+            document.querySelectorAll('.login-button').forEach(el => buttonElements.push(el));
+            
+            // Method 4: Find all inputs and buttons that might be related
+            document.querySelectorAll('input[type="text"], button').forEach(el => {
+                if (el.id === 'login-name-input' || 
+                    (el as HTMLElement).className === 'login-button' ||
+                    (el.parentElement && el.parentElement.id === 'login-form')) {
+                    if (el.tagName === 'INPUT') inputElements.push(el);
+                    if (el.tagName === 'BUTTON') buttonElements.push(el);
+                }
+            });
+            
+            // Remove all found elements
+            inputElements.forEach(el => {
+                if (el && el.parentNode) {
+                    console.log("Removing login input element:", el.id);
+                    el.remove();
+                }
+            });
+            
+            buttonElements.forEach(el => {
+                if (el && el.parentNode) {
+                    console.log("Removing login button element:", (el as HTMLElement).className);
+                    el.remove();
+                }
+            });
+            
+            console.log("LoginScene HTML elements cleaned up");
+        } catch (e) {
+            console.error("Error cleaning up LoginScene HTML elements:", e);
+        }
         
         // Remove resize listener
         this.scale.off('resize', this.handleResize);

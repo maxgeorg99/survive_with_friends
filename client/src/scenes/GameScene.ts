@@ -133,6 +133,9 @@ export default class GameScene extends Phaser.Scene {
     create() {
         console.log("GameScene create started.");
 
+        // Clean up any lingering UI elements from other scenes
+        this.cleanupLingeringUIElements();
+
         // Set a fallback background color
         this.cameras.main.setBackgroundColor('#336699'); // A nice blue
 
@@ -1303,5 +1306,63 @@ export default class GameScene extends Phaser.Scene {
         console.log("Entity deleted event received in GameScene");
         // Handle entity deletion (if needed)
         // Currently no specific handling is needed as player/monster deletions are handled by respective events
+    }
+
+    private cleanupLingeringUIElements() {
+        console.log("GameScene: Cleaning up any lingering UI elements from other scenes");
+        
+        try {
+            // Clean up login scene elements
+            const loginInput = document.getElementById('login-name-input');
+            if (loginInput && loginInput.parentNode) {
+                console.log("Removing lingering login input");
+                loginInput.remove();
+            }
+            
+            document.querySelectorAll('.login-button').forEach(el => {
+                if (el && el.parentNode) {
+                    console.log("Removing lingering login button");
+                    el.remove();
+                }
+            });
+            
+            // Clean up class select scene elements
+            const classContainer = document.getElementById('class-select-container');
+            if (classContainer && classContainer.parentNode) {
+                console.log("Removing lingering class container");
+                classContainer.remove();
+            }
+            
+            document.querySelectorAll('.class-select-button').forEach(el => {
+                if (el && el.parentNode) {
+                    console.log("Removing lingering class button");
+                    el.remove();
+                }
+            });
+            
+            // Find all text inputs and buttons that might be from other scenes
+            document.querySelectorAll('input[type="text"]').forEach(el => {
+                if (el.id === 'login-name-input' && el.parentNode) {
+                    console.log("Removing generic text input");
+                    el.remove();
+                }
+            });
+            
+            document.querySelectorAll('button').forEach(el => {
+                const buttonText = (el as HTMLElement).textContent || '';
+                if ((buttonText.includes('Set Name') || 
+                     buttonText.includes('Fighter') || 
+                     buttonText.includes('Rogue') || 
+                     buttonText.includes('Mage') || 
+                     buttonText.includes('Paladin') || 
+                     buttonText.includes('Confirm')) && 
+                    el.parentNode) {
+                    console.log("Removing generic button:", buttonText);
+                    el.remove();
+                }
+            });
+        } catch (e) {
+            console.error("Error in cleanupLingeringUIElements:", e);
+        }
     }
 }
