@@ -218,7 +218,7 @@ export default class GameScene extends Phaser.Scene {
         console.log("Background and world bounds set up. World size:", worldSize);
 
         // Initialize game world once event listeners are set up
-        console.log("Waiting for player created event to initialize game world...");
+        console.log("Waiting for account login updated event to initialize game world...");
 
         this.spacetimeDBClient.sdkConnection?.reducers.updateLastLogin();
     }
@@ -246,7 +246,7 @@ export default class GameScene extends Phaser.Scene {
     private handleAccountUpdated(ctx: EventContext, oldAccount: Account, newAccount: Account) {
         //determine if its the local account
         console.log("Account updated event received in GameScene");
-        
+
         if (this.spacetimeDBClient.identity && newAccount.identity.isEqual(this.spacetimeDBClient.identity)) 
         {
             console.log("GameScene: Local account updated");

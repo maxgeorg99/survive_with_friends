@@ -97,7 +97,7 @@ public static partial class Module
         public Timestamp last_login;
     }
 
-    [SpacetimeDB.Table(Name = "player", Public = true)] // Typically player table shouldn't be public, but adjusting per example
+    [SpacetimeDB.Table(Name = "player", Public = true)]
     public partial struct Player
     {
         [PrimaryKey, AutoInc]
@@ -109,13 +109,13 @@ public static partial class Module
         public string name;
 
         // New player attributes
-        public PlayerClass playerClass;
+        public PlayerClass player_class;
         public uint level;
         public uint exp;
         public uint max_hp;
         public uint hp;
         public float speed;
-        public uint armor; // New field for player armor
+        public uint armor; 
     }
 
     // Table to store dead players (same structure as Player)
@@ -315,7 +315,7 @@ public static partial class Module
             player_id = 0,
             name = name,
             entity_id = newEntity.entity_id,
-            playerClass = playerClass,
+            player_class = playerClass,
             level = 1,
             exp = 0,
             max_hp = 100,

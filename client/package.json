@@ -13,7 +13,7 @@
   "license": "ISC",
   "dependencies": {
     "phaser": "^3.80.1",
-    "@clockworklabs/spacetimedb-sdk": "^1.0.3"
+    "@clockworklabs/spacetimedb-sdk": "latest"
   },
   "devDependencies": {
     "typescript": "^5.3.3",
