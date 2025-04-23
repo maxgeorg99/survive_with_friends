@@ -448,6 +448,42 @@ export default class GameScene extends Phaser.Scene {
             }).setOrigin(0.5);
             this.localPlayerNameText.setDepth(BASE_DEPTH + entityData.position.y + 1);
             
+            // Create health bar
+            const startX = entityData.position.x;
+            const startY = entityData.position.y;
+            
+            // Health bar background (black)
+            const healthBarBackground = this.add.rectangle(
+                startX,
+                startY - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y,
+                HEALTH_BAR_WIDTH,
+                HEALTH_BAR_HEIGHT,
+                0x000000,
+                0.7
+            ).setOrigin(0.5, 0.5);
+            
+            // Health bar foreground (green)
+            const healthBar = this.add.rectangle(
+                startX - (HEALTH_BAR_WIDTH / 2),
+                startY - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y,
+                HEALTH_BAR_WIDTH * (player.hp / player.maxHp),
+                HEALTH_BAR_HEIGHT,
+                0x00FF00,
+                1
+            ).setOrigin(0, 0.5);
+            
+            // Set appropriate depths
+            healthBarBackground.setDepth(BASE_DEPTH + entityData.position.y + HEALTH_BG_DEPTH_OFFSET);
+            healthBar.setDepth(BASE_DEPTH + entityData.position.y + HEALTH_BAR_DEPTH_OFFSET);
+            
+            // Store references to health bar elements and current health values
+            this.localPlayerSprite.setData('healthBarBackground', healthBarBackground);
+            this.localPlayerSprite.setData('healthBar', healthBar);
+            this.localPlayerSprite.setData('hp', player.hp);
+            this.localPlayerSprite.setData('maxHp', player.maxHp);
+            
+            console.log(`Created health bar for player: ${player.hp}/${player.maxHp}`);
+            
             // Set collision bounds
             this.localPlayerSprite.setCollideWorldBounds(true);
             
@@ -459,6 +495,31 @@ export default class GameScene extends Phaser.Scene {
             // Update the existing player sprite
             this.localPlayerSprite.setTexture(spriteKey);
             this.localPlayerSprite.setPosition(entityData.position.x, entityData.position.y);
+            
+            // Update health bar if it exists
+            const healthBar = this.localPlayerSprite.getData('healthBar');
+            const healthBarBackground = this.localPlayerSprite.getData('healthBarBackground');
+            
+            if (healthBar && healthBarBackground) {
+                // Update health bar position
+                healthBarBackground.x = entityData.position.x;
+                healthBarBackground.y = entityData.position.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
+                
+                healthBar.x = entityData.position.x - (HEALTH_BAR_WIDTH / 2);
+                healthBar.y = entityData.position.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
+                
+                // Update health bar width
+                const healthPercent = Math.max(0, Math.min(1, player.hp / player.maxHp));
+                healthBar.width = HEALTH_BAR_WIDTH * healthPercent;
+                
+                // Update stored health values
+                this.localPlayerSprite.setData('hp', player.hp);
+                this.localPlayerSprite.setData('maxHp', player.maxHp);
+                
+                console.log(`Updated health bar: ${player.hp}/${player.maxHp}`);
+            } else {
+                console.warn("Health bar elements not found on existing sprite");
+            }
         }
         
         // Store the server position
@@ -483,8 +544,37 @@ export default class GameScene extends Phaser.Scene {
             this.localPlayerNameText.setText(player.name);
         }
         
-        // Update other player attributes as needed
-        // e.g., class, health, equipment, etc.
+        // Update health bar if health changed
+        if (this.localPlayerSprite) {
+            const currentHp = this.localPlayerSprite.getData('hp');
+            const currentMaxHp = this.localPlayerSprite.getData('maxHp');
+            
+            // Check if health values changed
+            if (currentHp !== player.hp || currentMaxHp !== player.maxHp) {
+                console.log(`Updating health bar: ${player.hp}/${player.maxHp}`);
+                
+                // Update stored values
+                this.localPlayerSprite.setData('hp', player.hp);
+                this.localPlayerSprite.setData('maxHp', player.maxHp);
+                
+                // Update health bar visuals
+                const healthBar = this.localPlayerSprite.getData('healthBar');
+                if (healthBar) {
+                    // Update the width of the health bar based on current health percentage
+                    const healthPercent = Math.max(0, Math.min(1, player.hp / player.maxHp));
+                    healthBar.width = HEALTH_BAR_WIDTH * healthPercent;
+                    
+                    // Change color based on health percentage
+                    if (healthPercent > 0.6) {
+                        healthBar.fillColor = 0x00FF00; // Green
+                    } else if (healthPercent > 0.3) {
+                        healthBar.fillColor = 0xFFFF00; // Yellow
+                    } else {
+                        healthBar.fillColor = 0xFF0000; // Red
+                    }
+                }
+            }
+        }
         
         // Get the latest entity data
         const entityData = ctx.db?.entity.entityId.find(player.entityId);
