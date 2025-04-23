@@ -60,72 +60,72 @@ public static partial class Module
     private const float DELTA_TIME = 1.0f / TICK_RATE; // Time between ticks in seconds
 
     // --- Timer Table ---
-    [Table(Name = "game_tick_timer", Scheduled = nameof(GameTick), ScheduledAt = nameof(scheduled_at))]
+    [Table(Name = "GameTickTimer", Scheduled = nameof(GameTick), ScheduledAt = nameof(ScheduledAt))]
     public partial struct GameTickTimer
     {
         [PrimaryKey, AutoInc]
-        public ulong scheduled_id;
-        public ScheduleAt scheduled_at;
+        public ulong ScheduledId;
+        public ScheduleAt ScheduledAt;
     }
 
     // --- Tables ---
-    [SpacetimeDB.Table(Name = "entity", Public = true)]
+    [SpacetimeDB.Table(Name = "Entity", Public = true)]
     public partial struct Entity
     {
         [PrimaryKey, AutoInc]
-        public uint entity_id;
+        public uint EntityId;
 
-        public DbVector2 position;
+        public DbVector2 Position;
         
         // Added direction and movement state directly to Entity
-        public DbVector2 direction;   // Direction vector (normalized)
-        public bool is_moving;        // Whether entity is actively moving
-        public float radius;          // Collision radius for this entity
+        public DbVector2 Direction;   // Direction vector (normalized)
+        public bool IsMoving;        // Whether entity is actively moving
+        public float Radius;          // Collision radius for this entity
     }
 
-    [SpacetimeDB.Table(Name = "account", Public = true)]
+    [SpacetimeDB.Table(Name = "Account", Public = true)]
     public partial struct Account
     {
         [PrimaryKey]
-        public SpacetimeDB.Identity identity;
+        public SpacetimeDB.Identity Identity;
 
         [Unique]
-        public string name;
+        public string Name;
         
-        public uint current_player_id;
+        public uint CurrentPlayerId;
 
-        public Timestamp last_login;
+        public Timestamp LastLogin;
     }
 
-    [SpacetimeDB.Table(Name = "player", Public = true)]
+    [SpacetimeDB.Table(Name = "Player", Public = true)]
     public partial struct Player
     {
         [PrimaryKey, AutoInc]
-        public uint player_id;
+        public uint PlayerId;
 
         [Unique]
-        public uint entity_id;
+        public uint EntityId;
 
-        public string name;
+        public string Name;
 
         // New player attributes
-        public PlayerClass player_class;
-        public uint level;
-        public uint exp;
-        public uint max_hp;
-        public uint hp;
-        public float speed;
-        public uint armor; 
+        public PlayerClass PlayerClass;
+        public uint Level;
+        public uint Exp;
+        public uint MaxHp;
+        public uint Hp;
+        public float Speed;
+        public uint Armor; 
     }
 
     // Table to store dead players (same structure as Player)
-    [SpacetimeDB.Table(Name = "dead_players", Public = true)]
+    [SpacetimeDB.Table(Name = "DeadPlayers", Public = true)]
     public partial struct DeadPlayer
     {
         [PrimaryKey]
-        public uint player_id;
+        public uint PlayerId;
 
-        public string name;
+        public string Name;
     }
 
     // --- Lifecyle Hooks ---
@@ -138,9 +138,9 @@ public static partial class Module
         InitGameConfig(ctx);
         
         // Schedule game tick to run at regular intervals (50ms = 20 ticks/second)
-        ctx.Db.game_tick_timer.Insert(new GameTickTimer
+        ctx.Db.GameTickTimer.Insert(new GameTickTimer
         {
-            scheduled_at = new ScheduleAt.Interval(TimeSpan.FromMilliseconds(50))
+            ScheduledAt = new ScheduleAt.Interval(TimeSpan.FromMilliseconds(50))
         });
         
         Log.Info("Game tick scheduled successfully");
@@ -159,32 +159,32 @@ public static partial class Module
         Log.Info($"Client connected: {identity}");
 
         // Check if account already exists - if so, reconnect them
-        var accountOpt = ctx.Db.account.identity.Find(identity);
+        var accountOpt = ctx.Db.Account.Identity.Find(identity);
         if (accountOpt != null)
         {
             Log.Info($"Client has existing account: {identity} reconnected.");
             var account = accountOpt.Value;
-            Log.Info($"Account details: Name={account.name}, PlayerID={account.current_player_id}");
+            Log.Info($"Account details: Name={account.Name}, PlayerID={account.CurrentPlayerId}");
 
             // Check if player exists
-            var playerOpt = ctx.Db.player.player_id.Find(account.current_player_id);
+            var playerOpt = ctx.Db.Player.PlayerId.Find(account.CurrentPlayerId);
             if (playerOpt == null)
             {
                 Log.Info($"No living player found for account {identity}. Checking for dead players...");
 
-                DeadPlayer? deadPlayerOpt = ctx.Db.dead_players.player_id.Find(account.current_player_id);
+                DeadPlayer? deadPlayerOpt = ctx.Db.DeadPlayers.PlayerId.Find(account.CurrentPlayerId);
                 if (deadPlayerOpt == null)
                 {
                     Log.Info($"No dead player found for account {identity} either.");
                 }
                 else
                 {
-                    Log.Info($"Found dead player {deadPlayerOpt.Value.player_id} for account {identity}.");
+                    Log.Info($"Found dead player {deadPlayerOpt.Value.PlayerId} for account {identity}.");
                 }
             }
             else
             {
-                Log.Info($"Found living player {playerOpt.Value.player_id} for account {identity}.");
+                Log.Info($"Found living player {playerOpt.Value.PlayerId} for account {identity}.");
             }
         }
         else
@@ -192,11 +192,11 @@ public static partial class Module
             // Create a new account
             Log.Info($"New connection from {identity}. Creating a new account.");
             
-            Account? newAccountOpt = ctx.Db.account.Insert(new Account
+            Account? newAccountOpt = ctx.Db.Account.Insert(new Account
             {
-                identity = identity,
-                name = "",
-                current_player_id = 0
+                Identity = identity,
+                Name = "",
+                CurrentPlayerId = 0
             });
             
             if (newAccountOpt != null)
@@ -215,24 +215,24 @@ public static partial class Module
         Log.Info($"SpawnPlayer called by identity: {identity}");
 
         //Check if account exists
-        var accountOpt = ctx.Db.account.identity.Find(identity);
+        var accountOpt = ctx.Db.Account.Identity.Find(identity);
         if (accountOpt == null)
         {
             throw new Exception($"SpawnPlayer: Account {identity} does not exist.");
         }
 
         var account = accountOpt.Value;
-        var player_id = account.current_player_id;
+        var player_id = account.CurrentPlayerId;
 
         // Check if player already exists
-        var playerOpt = ctx.Db.player.player_id.Find(player_id);
+        var playerOpt = ctx.Db.Player.PlayerId.Find(player_id);
         if (playerOpt != null)
         {
             throw new Exception($"SpawnPlayer: Player for {identity} already exists.");
         }
 
         // Create a new player with a random class
-        var name = account.name;
+        var name = account.Name;
 
         Log.Info($"Creating new player for {identity} with name: {name}");
         
@@ -254,17 +254,17 @@ public static partial class Module
         var newPlayer = newPlayerOpt.Value;
 
         // Update the account to point to the new player
-        account.current_player_id = newPlayer.player_id;
-        ctx.Db.account.identity.Update(account);
+        account.CurrentPlayerId = newPlayer.PlayerId;
+        ctx.Db.Account.Identity.Update(account);
 
-        Log.Info($"Created new player record for {identity} with class {playerClass} linked to entity {newPlayer.entity_id}.");
+        Log.Info($"Created new player record for {identity} with class {playerClass} linked to entity {newPlayer.EntityId}.");
     }
     
     // Helper function to create a new player with an associated entity
     private static Player? CreateNewPlayer(ReducerContext ctx, string name, PlayerClass playerClass)
     {
         // Get game configuration to determine world center
-        var configOpt = ctx.Db.config.id.Find(0);
+        var configOpt = ctx.Db.Config.Id.Find(0);
         if (configOpt == null)
         {
             Log.Error("CreateNewPlayer: Could not find game configuration!");
@@ -274,8 +274,8 @@ public static partial class Module
 
         // Calculate center position based on world size
         var config = configOpt.Value;
-        float centerX = config.world_size / 2;
-        float centerY = config.world_size / 2;
+        float centerX = config.WorldSize / 2;
+        float centerY = config.WorldSize / 2;
         
         // Add a small random offset (±100 pixels) to avoid all new players stacking exactly at center
         float offsetX = ctx.Rng.Next(-100, 101);
@@ -291,12 +291,12 @@ public static partial class Module
     private static Player? CreateNewPlayerWithPosition(ReducerContext ctx, string name, PlayerClass playerClass, DbVector2 position)
     {
         // 1. Create the Entity for the player with default direction and not moving
-        Entity? newEntityOpt = ctx.Db.entity.Insert(new Entity
+        Entity? newEntityOpt = ctx.Db.Entity.Insert(new Entity
         {
-            position = position,
-            direction = new DbVector2(0, 0), // Default direction
-            is_moving = false, // Not moving by default
-            radius = 48.0f // Player collision radius
+            Position = position,
+            Direction = new DbVector2(0, 0), // Default direction
+            IsMoving = false, // Not moving by default
+            Radius = 48.0f // Player collision radius
         });
 
         // Check if entity insertion failed
@@ -307,21 +307,21 @@ public static partial class Module
 
         // Insertion succeeded, get the non-nullable value
         Entity newEntity = newEntityOpt.Value;
-        Log.Info($"Created new entity with ID: {newEntity.entity_id} for Player {name}.");
+        Log.Info($"Created new entity with ID: {newEntity.EntityId} for Player {name}.");
 
         // 2. Create the Player record, linking to the new entity
-        Player? newPlayerOpt = ctx.Db.player.Insert(new Player
+        Player? newPlayerOpt = ctx.Db.Player.Insert(new Player
         {
-            player_id = 0,
-            name = name,
-            entity_id = newEntity.entity_id,
-            player_class = playerClass,
-            level = 1,
-            exp = 0,
-            max_hp = 100,
-            hp = 100,
-            speed = PLAYER_SPEED,
-            armor = 0
+            PlayerId = 0,
+            Name = name,
+            EntityId = newEntity.EntityId,
+            PlayerClass = playerClass,
+            Level = 1,
+            Exp = 0,
+            MaxHp = 100,
+            Hp = 100,
+            Speed = PLAYER_SPEED,
+            Armor = 0
         });
 
         // Check if player insertion failed
@@ -346,7 +346,7 @@ public static partial class Module
         }
 
         // Find the account using the context's Db object and the primary key index (identity)
-        var accountOpt = ctx.Db.account.identity.Find(identity);
+        var accountOpt = ctx.Db.Account.Identity.Find(identity);
         if (accountOpt is null)
         {
             throw new Exception($"SetName: Attempted to set name for non-existent account {identity}.");
@@ -354,10 +354,10 @@ public static partial class Module
 
         var account = accountOpt.Value;
 
-        account.name = name.Trim();
+        account.Name = name.Trim();
 
-        ctx.Db.account.identity.Update(account);
-        Log.Info($"Account {identity} name set to {account.name}.");
+        ctx.Db.Account.Identity.Update(account);
+        Log.Info($"Account {identity} name set to {account.Name}.");
     }
 
     //last_login
@@ -367,7 +367,7 @@ public static partial class Module
         var identity = ctx.Sender;
         Log.Info($"UpdateLastLogin called by identity: {identity}");
 
-        var accountOpt = ctx.Db.account.identity.Find(identity);
+        var accountOpt = ctx.Db.Account.Identity.Find(identity);
         if (accountOpt == null)
         {
             throw new Exception($"UpdateLastLogin: Attempted to update last login for non-existent account {identity}.");
@@ -376,9 +376,9 @@ public static partial class Module
         var account = accountOpt.Value;
 
         var now = ctx.Timestamp;
-        account.last_login = now;
+        account.LastLogin = now;
 
-        ctx.Db.account.identity.Update(account);
+        ctx.Db.Account.Identity.Update(account);
         Log.Info($"Updated last login for account {identity} to {now}.");
     }
 
