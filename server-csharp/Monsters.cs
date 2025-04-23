@@ -2,32 +2,32 @@ using SpacetimeDB;
 
 public static partial class Module
 {
-    [SpacetimeDB.Table(Name = "Monsters", Public = true)]
+    [SpacetimeDB.Table(Name = "monsters", Public = true)]
     public partial struct Monsters
     {
         [PrimaryKey, AutoInc]
-        public uint MonsterId;
+        public uint monster_id;
 
         [Unique]
-        public uint EntityId;
+        public uint entity_id;
 
-        public MonsterType BestiaryId;
+        public MonsterType bestiary_id;
         
         // monster attributes
-        public uint Hp;
-        public uint MaxHp; // Maximum HP copied from bestiary
+        public uint hp;
+        public uint max_hp; // Maximum HP copied from bestiary
         
         // target entity id the monster is following
-        public uint TargetEntityId;
+        public uint target_entity_id;
     }
 
     // Timer table for spawning monsters
-    [Table(Name = "MonsterSpawnTimer", Scheduled = nameof(SpawnMonster), ScheduledAt = nameof(ScheduledAt))]
+    [Table(Name = "monster_spawn_timer", Scheduled = nameof(SpawnMonster), ScheduledAt = nameof(scheduled_at))]
     public partial struct MonsterSpawnTimer
     {
         [PrimaryKey, AutoInc]
-        public ulong ScheduledId;
-        public ScheduleAt ScheduledAt;
+        public ulong scheduled_id;
+        public ScheduleAt scheduled_at;
     }
     
     [Reducer]
@@ -39,7 +39,7 @@ public static partial class Module
         }
 
         // Check if there are any players online
-        var playerCount = ctx.Db.Player.Count;
+        var playerCount = ctx.Db.player.Count;
         if (playerCount == 0)
         {
             //Log.Info("SpawnMonster: No players online, skipping monster spawn.");
@@ -47,7 +47,7 @@ public static partial class Module
         }
         
         // Get game configuration
-        var configOpt = ctx.Db.Config.Id.Find(0);
+        var configOpt = ctx.Db.config.id.Find(0);
         if (configOpt == null)
         {
             throw new Exception("SpawnMonster: Could not find game configuration!");
@@ -55,10 +55,10 @@ public static partial class Module
         var config = configOpt.Value;
         
         // Check if we're at monster capacity
-        var monsterCount = ctx.Db.Monsters.Count;
-        if (monsterCount >= config.MaxMonsters)
+        var monsterCount = ctx.Db.monsters.Count;
+        if (monsterCount >= config.max_monsters)
         {
-            //Log.Info($"SpawnMonster: At maximum monster capacity ({monsterCount}/{config.MaxMonsters}), skipping spawn.");
+            //Log.Info($"SpawnMonster: At maximum monster capacity ({monsterCount}/{config.max_monsters}), skipping spawn.");
             return;
         }
         
@@ -69,7 +69,7 @@ public static partial class Module
         var monsterType = (MonsterType)randomTypeIndex;
         
         // Get monster stats from bestiary using the monster type as numerical ID
-        var bestiaryEntry = ctx.Db.Bestiary.BestiaryId.Find((uint)monsterType);
+        var bestiaryEntry = ctx.Db.bestiary.bestiary_id.Find((uint)monsterType);
         if (bestiaryEntry == null)
         {
             throw new Exception($"SpawnMonster: Could not find bestiary entry for monster type: {monsterType}");
@@ -77,8 +77,8 @@ public static partial class Module
         
         // Calculate spawn position on the edge of the game world
         DbVector2 position;
-        float edgeOffset = bestiaryEntry.Value.Radius; // Keep monsters from spawning partially off-screen
-        var worldSize = config.WorldSize;
+        float edgeOffset = bestiaryEntry.Value.radius; // Keep monsters from spawning partially off-screen
+        var worldSize = config.world_size;
         
         // Choose a random edge (0=top, 1=right, 2=bottom, 3=left)
         int edge = rng.Next(0, 4);
@@ -102,12 +102,12 @@ public static partial class Module
         }
         
         // Create an entity for the monster
-        Entity? entityOpt = ctx.Db.Entity.Insert(new Entity
+        Entity? entityOpt = ctx.Db.entity.Insert(new Entity
         {
-            Position = position,
-            Direction = new DbVector2(0, 0), // Initial direction
-            IsMoving = false,  // Not moving initially
-            Radius = bestiaryEntry.Value.Radius // Set radius from bestiary entry
+            position = position,
+            direction = new DbVector2(0, 0), // Initial direction
+            is_moving = false,  // Not moving initially
+            radius = bestiaryEntry.Value.radius // Set radius from bestiary entry
         });
         
         if (entityOpt == null)
@@ -117,16 +117,16 @@ public static partial class Module
         
         // Choose a random player to target without loading all players into memory
         var randomSkip = rng.Next(0, (int)playerCount); // Convert playerCount to int
-        var targetPlayer = ctx.Db.Player.Iter().Skip(randomSkip).First();
+        var targetPlayer = ctx.Db.player.Iter().Skip(randomSkip).First();
         
         // Create the monster
-        Monsters? monsterOpt = ctx.Db.Monsters.Insert(new Monsters
+        Monsters? monsterOpt = ctx.Db.monsters.Insert(new Monsters
         {
-            EntityId = entityOpt.Value.EntityId,
-            BestiaryId = monsterType,
-            Hp = bestiaryEntry.Value.MaxHp,
-            MaxHp = bestiaryEntry.Value.MaxHp, // Store max_hp from bestiary
-            TargetEntityId = targetPlayer.EntityId
+            entity_id = entityOpt.Value.entity_id,
+            bestiary_id = monsterType,
+            hp = bestiaryEntry.Value.max_hp,
+            max_hp = bestiaryEntry.Value.max_hp, // Store max_hp from bestiary
+            target_entity_id = targetPlayer.entity_id
         });
         
         if (monsterOpt is null)
@@ -134,7 +134,7 @@ public static partial class Module
             throw new Exception("SpawnMonster: Failed to create monster!");
         }
 
-        Log.Info($"Spawned {monsterType} monster (entity: {entityOpt.Value.EntityId}) targeting player: {targetPlayer.Name} with HP: {bestiaryEntry.Value.MaxHp}/{bestiaryEntry.Value.MaxHp}");
+        Log.Info($"Spawned {monsterType} monster (entity: {entityOpt.Value.entity_id}) targeting player: {targetPlayer.name} with HP: {bestiaryEntry.Value.max_hp}/{bestiaryEntry.Value.max_hp}");
     }
     
     // Method to schedule monster spawning - called from Init in Lib.cs
@@ -143,9 +143,9 @@ public static partial class Module
         Log.Info("Scheduling monster spawning...");
         
         // Schedule monster spawning every 5 seconds
-        ctx.Db.MonsterSpawnTimer.Insert(new MonsterSpawnTimer
+        ctx.Db.monster_spawn_timer.Insert(new MonsterSpawnTimer
         {
-            ScheduledAt = new ScheduleAt.Interval(TimeSpan.FromSeconds(5))
+            scheduled_at = new ScheduleAt.Interval(TimeSpan.FromSeconds(5))
         });
         
         Log.Info("Monster spawning scheduled successfully");
@@ -162,27 +162,27 @@ public static partial class Module
         var monsterEntities = new Dictionary<uint, Entity>();
         var monsterTypes = new Dictionary<uint, MonsterType>();
         
-        foreach (var monster in ctx.Db.Monsters.Iter())
+        foreach (var monster in ctx.Db.monsters.Iter())
         {
-            var entityOpt = ctx.Db.Entity.EntityId.Find(monster.EntityId);
+            var entityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
             if (entityOpt != null)
             {
-                monsterEntities[monster.EntityId] = entityOpt.Value;
-                monsterTypes[monster.EntityId] = monster.BestiaryId;
+                monsterEntities[monster.entity_id] = entityOpt.Value;
+                monsterTypes[monster.entity_id] = monster.bestiary_id;
             }
         }
         
         // Now process each monster's movement with collision avoidance
-        foreach (var monster in ctx.Db.Monsters.Iter())
+        foreach (var monster in ctx.Db.monsters.Iter())
         {
             // Get the monster's entity
-            if (!monsterEntities.TryGetValue(monster.EntityId, out Entity monsterEntity))
+            if (!monsterEntities.TryGetValue(monster.entity_id, out Entity monsterEntity))
             {
                 continue;
             }
             
             // Get the target entity
-            var targetEntityOpt = ctx.Db.Entity.EntityId.Find(monster.TargetEntityId);
+            var targetEntityOpt = ctx.Db.entity.entity_id.Find(monster.target_entity_id);
             if (targetEntityOpt == null)
             {
                 // Target entity no longer exists - find a new target
@@ -193,8 +193,8 @@ public static partial class Module
             
             // Calculate direction vector from monster to target
             var directionVector = new DbVector2(
-                targetEntity.Position.x - monsterEntity.Position.x,
-                targetEntity.Position.y - monsterEntity.Position.y
+                targetEntity.position.x - monsterEntity.position.x,
+                targetEntity.position.y - monsterEntity.position.y
             );
             
             // Calculate distance to target
@@ -204,12 +204,12 @@ public static partial class Module
             if (distanceToTarget < MIN_DISTANCE_TO_REACH)
             {
                 // Monster reached the target, stop moving
-                if (monsterEntity.IsMoving)
+                if (monsterEntity.is_moving)
                 {
                     var stoppedEntity = monsterEntity;
-                    stoppedEntity.IsMoving = false;
-                    stoppedEntity.Direction = new DbVector2(0, 0);
-                    ctx.Db.Entity.EntityId.Update(stoppedEntity);
+                    stoppedEntity.is_moving = false;
+                    stoppedEntity.direction = new DbVector2(0, 0);
+                    ctx.Db.entity.entity_id.Update(stoppedEntity);
                 }
                 continue;
             }
@@ -224,14 +224,14 @@ public static partial class Module
                 float monsterSpeed = 20.0f; // Lower default fallback speed
                 
                 // Get the monster type
-                MonsterType monsterType = monster.BestiaryId;
+                MonsterType monsterType = monster.bestiary_id;
                 
                 // Get bestiary entry using correct ID
-                var bestiaryEntryOpt = ctx.Db.Bestiary.BestiaryId.Find((uint)monsterType);
+                var bestiaryEntryOpt = ctx.Db.bestiary.bestiary_id.Find((uint)monsterType);
                 
                 if (bestiaryEntryOpt != null)
                 {
-                    monsterSpeed = bestiaryEntryOpt.Value.Speed;
+                    monsterSpeed = bestiaryEntryOpt.Value.speed;
                 }
                 
                 // Check for collisions with other monsters and calculate avoidance vectors
@@ -243,7 +243,7 @@ public static partial class Module
                     Entity otherEntity = otherEntityPair.Value;
                     
                     // Skip self
-                    if (otherEntityId == monster.EntityId)
+                    if (otherEntityId == monster.entity_id)
                         continue;
                     
                     // Check if we're colliding with this entity
@@ -278,15 +278,15 @@ public static partial class Module
                 
                 // Update entity with new direction and position
                 var updatedEntity = monsterEntity;
-                updatedEntity.Direction = finalDirection;
-                updatedEntity.IsMoving = true;
-                updatedEntity.Position = monsterEntity.Position + moveOffset;
+                updatedEntity.direction = finalDirection;
+                updatedEntity.is_moving = true;
+                updatedEntity.position = monsterEntity.position + moveOffset;
                 
                 // Update entity in database
-                ctx.Db.Entity.EntityId.Update(updatedEntity);
+                ctx.Db.entity.entity_id.Update(updatedEntity);
                 
                 // Update our local cache for subsequent collision checks
-                monsterEntities[monster.EntityId] = updatedEntity;
+                monsterEntities[monster.entity_id] = updatedEntity;
             }
         }
     }
@@ -295,17 +295,17 @@ public static partial class Module
     private static void ReassignMonsterTarget(ReducerContext ctx, Monsters monster)
     {
         // Find a new target among existing players
-        var players = ctx.Db.Player.Iter().ToArray();
+        var players = ctx.Db.player.Iter().ToArray();
         if (players.Length == 0)
         {
             // Make the monster stop moving
-            var entityOpt = ctx.Db.Entity.EntityId.Find(monster.EntityId);
+            var entityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
             if (entityOpt != null)
             {
                 var entity = entityOpt.Value;
-                entity.IsMoving = false;
-                entity.Direction = new DbVector2(0, 0);
-                ctx.Db.Entity.EntityId.Update(entity);
+                entity.is_moving = false;
+                entity.direction = new DbVector2(0, 0);
+                ctx.Db.entity.entity_id.Update(entity);
             }
             return;
         }
@@ -317,7 +317,7 @@ public static partial class Module
         
         // Update the monster with the new target
         var updatedMonster = monster;
-        updatedMonster.TargetEntityId = newTarget.EntityId;
-        ctx.Db.Monsters.MonsterId.Update(updatedMonster);
+        updatedMonster.target_entity_id = newTarget.entity_id;
+        ctx.Db.monsters.monster_id.Update(updatedMonster);
     }
 }

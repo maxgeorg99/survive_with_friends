@@ -10,20 +10,20 @@ public static partial class Module
         Orc
     }
 
-    [SpacetimeDB.Table(Name = "Bestiary")]
+    [SpacetimeDB.Table(Name = "bestiary")]
     public partial struct Bestiary
     {
         [PrimaryKey]
-        public uint BestiaryId;
+        public uint bestiary_id;
         
-        public MonsterType MonsterType;
+        public MonsterType monster_type;
         
         // monster attributes
-        public uint MaxHp;
-        public float Speed;
-        public uint Exp;
-        public float Atk;  // monster attack power (damage per tick)
-        public float Radius; // monster size/hitbox radius
+        public uint max_hp;
+        public float speed;
+        public uint exp;
+        public float atk;  // monster attack power (damage per tick)
+        public float radius; // monster size/hitbox radius
     }
 
     // Initialize the bestiary with default stats for each monster type
@@ -32,46 +32,46 @@ public static partial class Module
         Log.Info("Initializing bestiary...");
         
         // Only initialize if the bestiary is empty
-        if (ctx.Db.Bestiary.Count > 0)
+        if (ctx.Db.bestiary.Count > 0)
         {
             Log.Info("Bestiary already initialized, skipping");
             return;
         }
 
         // Insert Rat stats
-        ctx.Db.Bestiary.Insert(new Bestiary
+        ctx.Db.bestiary.Insert(new Bestiary
         {
-            BestiaryId = (uint)MonsterType.Rat,
-            MonsterType = MonsterType.Rat,
-            MaxHp = 10,
-            Speed = 160.0f,
-            Exp = 1,
-            Atk = 0.1f,
-            Radius = 24.0f
+            bestiary_id = (uint)MonsterType.Rat,
+            monster_type = MonsterType.Rat,
+            max_hp = 10,
+            speed = 160.0f,
+            exp = 1,
+            atk = 0.1f,
+            radius = 24.0f
         });
 
         // Insert Slime stats
-        ctx.Db.Bestiary.Insert(new Bestiary
+        ctx.Db.bestiary.Insert(new Bestiary
         {
-            BestiaryId = (uint)MonsterType.Slime,
-            MonsterType = MonsterType.Slime,
-            MaxHp = 25,
-            Speed = 100.0f,
-            Exp = 2,
-            Atk = 0.5f,
-            Radius = 30.0f
+            bestiary_id = (uint)MonsterType.Slime,
+            monster_type = MonsterType.Slime,
+            max_hp = 25,
+            speed = 100.0f,
+            exp = 2,
+            atk = 0.5f,
+            radius = 30.0f
         });
 
         // Insert Orc stats
-        ctx.Db.Bestiary.Insert(new Bestiary
+        ctx.Db.bestiary.Insert(new Bestiary
         {
-            BestiaryId = (uint)MonsterType.Orc,
-            MonsterType = MonsterType.Orc,
-            MaxHp = 50,
-            Speed = 140.0f, 
-            Exp = 5,
-            Atk = 1.0f,
-            Radius = 40.0f
+            bestiary_id = (uint)MonsterType.Orc,
+            monster_type = MonsterType.Orc,
+            max_hp = 50,
+            speed = 140.0f, 
+            exp = 5,
+            atk = 1.0f,
+            radius = 40.0f
         });
 
         Log.Info("Bestiary initialization complete");
