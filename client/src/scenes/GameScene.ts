@@ -141,6 +141,7 @@ export default class GameScene extends Phaser.Scene {
 
         // Register event listeners
         this.registerEventListeners();
+        console.log("Game event listeners registered.");
 
         // Setup keyboard input
         this.cursors = this.input.keyboard?.createCursorKeys() ?? null;
@@ -154,6 +155,7 @@ export default class GameScene extends Phaser.Scene {
                 D: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D)
             };
         }
+        console.log("Keyboard input set up.");
 
         // Setup touch input
         this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
@@ -171,6 +173,7 @@ export default class GameScene extends Phaser.Scene {
         this.input.on('pointerup', () => {
             // Don't clear tap target, we want to continue moving toward the target
         });
+        console.log("Touch input set up.");
 
         // Create tap marker using shape graphics instead of texture
         // This is more reliable than the texture generation approach
@@ -201,8 +204,7 @@ export default class GameScene extends Phaser.Scene {
             // Add a slight overall alpha to the entire container
             this.tapMarker.setAlpha(0.8);
         }
-
-        // Initialize game world
+        console.log("Tap marker set up.");
 
         // Background - Make it large enough to feel like a world
         const worldSize = 2000; // Example world size
@@ -210,8 +212,10 @@ export default class GameScene extends Phaser.Scene {
             .setOrigin(0, 0)
             .setScrollFactor(1); // Scroll with the camera
         this.physics.world.setBounds(0, 0, worldSize, worldSize);
+        console.log("Background and world bounds set up. World size:", worldSize);
 
         // Initialize game world once event listeners are set up
+        console.log("Waiting for player created event to initialize game world...");
         this.gameEvents.once(GameEvents.PLAYER_CREATED, this.initializeGameWorld, this);
     }
 
@@ -379,11 +383,14 @@ export default class GameScene extends Phaser.Scene {
             return;
         }
 
+        console.log("Found entity data for player:", entityData);
+
         // Set up the player sprite based on their class
         const spriteKey = this.getClassSpriteKey(player.playerClass);
         
         // Create the player sprite
         if (!this.localPlayerSprite) {
+            console.log("Creating new player sprite at position:", entityData.position);
             this.localPlayerSprite = this.physics.add.sprite(entityData.position.x, entityData.position.y, spriteKey);
             this.localPlayerSprite.setDepth(BASE_DEPTH + entityData.position.y);
             
@@ -401,6 +408,14 @@ export default class GameScene extends Phaser.Scene {
                 fontStyle: 'bold'
             }).setOrigin(0.5);
             this.localPlayerNameText.setDepth(BASE_DEPTH + entityData.position.y + 1);
+            
+            // Set collision bounds
+            this.localPlayerSprite.setCollideWorldBounds(true);
+            
+            // Set up camera follow
+            console.log("Setting camera to follow player");
+            this.cameras.main.startFollow(this.localPlayerSprite, true, 0.5, 0.5);
+            this.cameras.main.setZoom(1.0); // Ensure zoom is at normal level
         } else {
             // Update the existing player sprite
             this.localPlayerSprite.setTexture(spriteKey);
@@ -413,7 +428,9 @@ export default class GameScene extends Phaser.Scene {
         // Set player data as ready
         this.isPlayerDataReady = true;
         
+        // Debug output for verification
         console.log("Local player initialized at position:", entityData.position);
+        console.log("Camera following:", this.cameras.main.followOffset);
     }
 
     /**
@@ -437,10 +454,12 @@ export default class GameScene extends Phaser.Scene {
 
     // Helper function to handle entity updates and move corresponding sprites
     handleEntityUpdate(ctx: EventContext, entityData: Entity) {
+        console.log("Handling entity update for entity ID:", entityData.entityId);
         // First check if this is a monster entity through the monster manager
         const wasMonsterEntity = this.monsterManager.handleEntityUpdate(ctx, entityData);
         if (wasMonsterEntity) {
             // If it was a monster entity, we're done
+            console.log("Entity was handled as a monster");
             return;
         }
         
@@ -462,6 +481,7 @@ export default class GameScene extends Phaser.Scene {
                     
                     if (localPlayer) {
                         localPlayerEntityId = localPlayer.entityId;
+                        console.log("Local player entity ID:", localPlayerEntityId);
                     }
                 }
             }
@@ -471,6 +491,7 @@ export default class GameScene extends Phaser.Scene {
         
         // Check if this entity update is for the local player
         if (localPlayerEntityId === entityData.entityId) {
+            console.log("Entity update is for local player. Creating/updating sprite.");
             // If local player sprite doesn't exist yet, create it now
             if (!this.localPlayerSprite) {
                 const startX = Math.floor(entityData.position.x);
@@ -706,18 +727,12 @@ export default class GameScene extends Phaser.Scene {
     addOrUpdateOtherPlayer(playerData: Player, ctx: EventContext) {
         // Skip if this is our local player
         if (this.spacetimeDBClient?.identity) {
-
-            var myAccount = ctx?.db.account.identity.find(this.spacetimeDBClient.identity) as Account;
-            if(myAccount)
-            {
-                var myPlayer = ctx?.db.player.player_id.find(myAccount?.currentPlayerId) as Player;
-                if(myPlayer)
-                {
-                    if(myPlayer.playerId === playerData.playerId)
-                    {
-                        return;
-                    }
-                }
+            // Get local account
+            const myAccount = ctx.db?.account.identity.find(this.spacetimeDBClient.identity);
+            
+            // Skip if this is our local player
+            if (myAccount && myAccount.currentPlayerId === playerData.playerId) {
+                return;
             }
             
             // If we don't have a container for this player yet, we need to find its entity
@@ -1278,7 +1293,7 @@ export default class GameScene extends Phaser.Scene {
         this.handleEntityUpdate(ctx, newEntity);
     }
 
-    private handleEntityDeleted(entity: Entity) {
+    private handleEntityDeleted(_ctx: EventContext, entity: Entity) {
         console.log("Entity deleted event received in GameScene");
         // Handle entity deletion (if needed)
         // Currently no specific handling is needed as player/monster deletions are handled by respective events
