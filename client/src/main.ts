@@ -3,8 +3,9 @@ import GameScene from './scenes/GameScene';
 import LoginScene from './scenes/LoginScene';
 import ClassSelectScene from './scenes/ClassSelectScene';
 import LoadingScene from './scenes/LoadingScene';
+import { Identity } from '@clockworklabs/spacetimedb-sdk';
 import SpacetimeDBClient from './SpacetimeDBClient';
-import { Player } from './autobindings';
+import { DbConnection, ErrorContext, Player, SubscriptionEventContext } from './autobindings';
 import { GameEvents } from './constants/GameEvents';
 
 console.log("Main script loading...");
@@ -102,7 +103,7 @@ const cleanupDOMElements = () => {
 };
 
 // Callback for when the SpacetimeDB subscription is initially applied
-const onSubscriptionApplied = () => {
+const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
     console.log("SpacetimeDB subscription applied callback triggered in main.ts.");
 
     // Ensure client and tables are ready before proceeding
@@ -118,7 +119,7 @@ const onSubscriptionApplied = () => {
     gameEvents.emit(GameEvents.SUBSCRIPTION_APPLIED);
     
     // Listen for account inserts
-    localDb.account.onInsert((_ctx, account) => {
+    localDb.account.onInsert((ctx, account) => {
         console.log("Account inserted event received");
 
         // Check if account is local
@@ -127,7 +128,7 @@ const onSubscriptionApplied = () => {
             console.log("Local account inserted!");
             
             // Emit account created event with the account data
-            gameEvents.emit(GameEvents.ACCOUNT_CREATED, account);
+            gameEvents.emit(GameEvents.ACCOUNT_CREATED, ctx, account);
             
             // Automatically go to login scene if account has no name
             if (!account.name) 
@@ -148,7 +149,7 @@ const onSubscriptionApplied = () => {
                 else 
                 {
                     // Check if the player exists and is alive
-                    const localPlayer = localDb.player.player_id.find(account.currentPlayerId);
+                    const localPlayer = ctx.db?.player.player_id.find(account.currentPlayerId);
                     if (localPlayer) 
                     {
                         cleanupDOMElements(); // Clean up before transition
@@ -168,7 +169,7 @@ const onSubscriptionApplied = () => {
         }
     });
 
-    localDb.account.onUpdate((_ctx, oldAccount, newAccount) => {
+    localDb.account.onUpdate((ctx, oldAccount, newAccount) => {
         console.log("Account updated event received");
         console.log("- Account data: ", newAccount.name + " - " + newAccount.currentPlayerId);
 
@@ -178,7 +179,7 @@ const onSubscriptionApplied = () => {
             console.log("Local account updated.");
             
             // Emit account updated event with old and new account data
-            gameEvents.emit(GameEvents.ACCOUNT_UPDATED, oldAccount, newAccount);
+            gameEvents.emit(GameEvents.ACCOUNT_UPDATED, ctx, oldAccount, newAccount);
             
             // Check if name was just set (from null/empty to a value)
             if ((!oldAccount.name || oldAccount.name === "") && newAccount.name) 
@@ -186,7 +187,7 @@ const onSubscriptionApplied = () => {
                 console.log("Name was set.");
                 
                 // Emit name set event
-                gameEvents.emit(GameEvents.NAME_SET, newAccount);
+                gameEvents.emit(GameEvents.NAME_SET, ctx, newAccount);
                 
                 // Complete loading if in LoadingScene
                 if (game.scene.isActive('LoadingScene')) 
@@ -208,7 +209,7 @@ const onSubscriptionApplied = () => {
                 
                 // Check if the new player exists
                 if (newAccount.currentPlayerId > 0) {
-                    const player = localDb.player.player_id.find(newAccount.currentPlayerId);
+                    const player = ctx.db?.player.player_id.find(newAccount.currentPlayerId);
                     if (player) 
                     {
                         // Emit player created event if in LoadingScene
@@ -227,11 +228,11 @@ const onSubscriptionApplied = () => {
     });
 
     // Listen for player inserts
-    localDb.player.onInsert((_ctx, player) => {
+    localDb.player.onInsert((ctx, player) => {
         console.log("Player inserted event received");
         console.log("- Player data: " + player.name + " - " + player.playerId);
 
-        const myAccount = localDb.account.identity.find(localIdentity);
+        const myAccount = ctx.db?.account.identity.find(localIdentity);
         if (!myAccount) 
         {
             console.log("No account found for local identity. Waiting for account.");
@@ -243,7 +244,7 @@ const onSubscriptionApplied = () => {
             console.log("Local player inserted!");
             
             // Emit player created event
-            gameEvents.emit(GameEvents.PLAYER_CREATED, player);
+            gameEvents.emit(GameEvents.PLAYER_CREATED, ctx, player);
             
             // If we're in LoadingScene waiting for player creation, complete it
             if (game.scene.isActive('LoadingScene')) 
@@ -260,28 +261,28 @@ const onSubscriptionApplied = () => {
             console.log("Another player has logged on: " + player.name);
             
             // Emit player created event for other players too
-            gameEvents.emit(GameEvents.PLAYER_CREATED, player, false);
+            gameEvents.emit(GameEvents.PLAYER_CREATED, ctx, player, false);
         }
     });
 
     // Listen for player updates
-    localDb.player.onUpdate((_ctx, oldPlayer, newPlayer) => {
+    localDb.player.onUpdate((ctx, oldPlayer, newPlayer) => {
         console.log("Player updated event received");
         console.log("- Player data: ", newPlayer.name + " - " + newPlayer.playerId);
         
-        const myAccount = localDb.account.identity.find(localIdentity);
+        const myAccount = ctx.db?.account.identity.find(localIdentity);
         const isLocalPlayer = myAccount && myAccount.currentPlayerId === newPlayer.playerId;
         
         // Emit player updated event
-        gameEvents.emit(GameEvents.PLAYER_UPDATED, oldPlayer, newPlayer, isLocalPlayer);
+        gameEvents.emit(GameEvents.PLAYER_UPDATED, ctx, oldPlayer, newPlayer, isLocalPlayer);
     });
 
     // Listen for player deletions (death)
-    localDb.player.onDelete((_ctx, player) => {
+    localDb.player.onDelete((ctx, player) => {
         console.log("Player deleted event received");
         console.log("- Player data: ", player.name + " - " + player.playerId);
 
-        const myAccount = localDb.account.identity.find(localIdentity);
+        const myAccount = ctx.db?.account.identity.find(localIdentity);
         if (!myAccount) 
         {
             console.log("No account found for local identity.");
@@ -293,33 +294,33 @@ const onSubscriptionApplied = () => {
             console.log("Local player was deleted/died!");
             
             // Emit player died event
-            gameEvents.emit(GameEvents.PLAYER_DIED, player);
+            gameEvents.emit(GameEvents.PLAYER_DIED, ctx, player);
             
             // If we're in the GameScene, death handling will be done by the scene
             // The scene will listen for PLAYER_DIED event
         }
         else {
             // Emit player deleted event for other players
-            gameEvents.emit(GameEvents.PLAYER_DELETED, player, false);
+            gameEvents.emit(GameEvents.PLAYER_DELETED, ctx, player, false);
         }
     });
 
     // Entity event listeners
-    localDb.entity.onInsert((_ctx, entity) => {        // Emit entity created event
-        gameEvents.emit(GameEvents.ENTITY_CREATED, entity);
+    localDb.entity.onInsert((ctx, entity) => {        // Emit entity created event
+        gameEvents.emit(GameEvents.ENTITY_CREATED, ctx, entity);
     });
 
-    localDb.entity.onUpdate((_ctx, oldEntity, newEntity) => {
-        gameEvents.emit(GameEvents.ENTITY_UPDATED, oldEntity, newEntity);
+    localDb.entity.onUpdate((ctx, oldEntity, newEntity) => {
+        gameEvents.emit(GameEvents.ENTITY_UPDATED, ctx, oldEntity, newEntity);
     });
 
-    localDb.entity.onDelete((_ctx, entity) => {
-        gameEvents.emit(GameEvents.ENTITY_DELETED, entity);
+    localDb.entity.onDelete((ctx, entity) => {
+        gameEvents.emit(GameEvents.ENTITY_DELETED, ctx, entity);
     });
 
     // Check initial state and load appropriate scene
     console.log("Checking current account and player state...");
-    const myAccount = localDb.account.identity.find(localIdentity);
+    const myAccount = ctx.db?.account.identity.find(localIdentity);
     
     if (!myAccount) {
         console.log("No account found for local identity. Waiting for account to be created.");
@@ -344,7 +345,7 @@ const onSubscriptionApplied = () => {
     }
 
     // Check if player exists and is alive
-    const localPlayer = localDb.player.player_id.find(myAccount.currentPlayerId);
+    const localPlayer = ctx.db?.player.player_id.find(myAccount.currentPlayerId);
     if (localPlayer) 
     {
         console.log("Account has name and living player. Going to GameScene.");
@@ -354,7 +355,7 @@ const onSubscriptionApplied = () => {
     else 
     {
         // Check if player is in dead_players table
-        const deadPlayer = localDb.deadPlayers.player_id.find(myAccount.currentPlayerId);
+        const deadPlayer = ctx.db?.deadPlayers.player_id.find(myAccount.currentPlayerId);
         if (deadPlayer) 
         {
             console.log("Player is dead. Going to ClassSelectScene.");
@@ -368,16 +369,16 @@ const onSubscriptionApplied = () => {
     }
 };
 
-const onConnect = () => {
+const onConnect = (ctx: DbConnection, identity: Identity, token: string) => {
     console.log("SpacetimeDB connection established.");
     // Emit connection established event
-    gameEvents.emit(GameEvents.CONNECTION_ESTABLISHED);
+    gameEvents.emit(GameEvents.CONNECTION_ESTABLISHED, ctx, identity, token);
 };
 
-const onDisconnect = () => {
+const onDisconnect = (ctx: ErrorContext, error?: Error) => {
     console.log("SpacetimeDB connection lost.");
     // Emit connection lost event
-    gameEvents.emit(GameEvents.CONNECTION_LOST);
+    gameEvents.emit(GameEvents.CONNECTION_LOST, ctx, error);
 };
 
 const spacetimeDBClient = new SpacetimeDBClient(onSubscriptionApplied, onConnect, onDisconnect);

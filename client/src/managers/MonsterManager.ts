@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { Monsters, Entity } from "../autobindings";
+import { Monsters, Entity, EventContext } from "../autobindings";
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { MONSTER_ASSET_KEYS, MONSTER_SHADOW_OFFSETS, MONSTER_MAX_HP } from '../constants/MonsterConfig';
 import { GameEvents } from '../constants/GameEvents';
@@ -44,30 +44,26 @@ export default class MonsterManager {
         }
 
         console.log("Initializing existing monsters from SpacetimeDB...");
-        const allMonsters = Array.from(this.spacetimeDBClient.sdkConnection.db.monsters.iter());
-        const allEntities = Array.from(this.spacetimeDBClient.sdkConnection.db.entity.iter());
         
-        const entityIds = allEntities.map(e => e.entityId);
-        
-        // Force immediate update for all monsters with known entities
-        for (const monster of allMonsters) {
-            const matchingEntity = allEntities.find(e => e.entityId === monster.entityId);
-            const entityExists = !!matchingEntity;
-            
-            if (entityExists && matchingEntity) {
-                // Entity exists, create directly with correct position
-                this.createMonsterSprite(monster, matchingEntity.position);
-            } else {
-                // Entity doesn't exist yet, create at origin and track for updates
-                this.createOrUpdateMonster(monster);
-            }
-        }
-
         // Register monster listeners
         this.registerMonsterListeners();
         
         // Register entity event listeners
         this.registerEntityListeners();
+        
+        // Force immediate update for all monsters with known entities
+        for (const monster of this.spacetimeDBClient.sdkConnection.db.monsters.iter()) {
+            // Look up the entity directly using the entity_id index
+            const entityData = this.spacetimeDBClient.sdkConnection.db.entity.entity_id.find(monster.entityId);
+            
+            if (entityData) {
+                // Entity exists, create directly with correct position
+                this.createMonsterSprite(monster, entityData.position);
+            } else {
+                // Entity doesn't exist yet, create at origin and track for updates
+                this.createOrUpdateMonster(monster);
+            }
+        }
     }
 
     // Register monster-related event listeners
@@ -77,15 +73,15 @@ export default class MonsterManager {
             return;
         }
 
-        this.spacetimeDBClient.sdkConnection.db.monsters.onInsert((_ctx, monster: Monsters) => {
+        this.spacetimeDBClient.sdkConnection.db.monsters.onInsert((ctx, monster: Monsters) => {
             this.createOrUpdateMonster(monster);
         });
 
-        this.spacetimeDBClient.sdkConnection.db.monsters.onUpdate((_ctx, _oldMonster: Monsters, newMonster: Monsters) => {
+        this.spacetimeDBClient.sdkConnection.db.monsters.onUpdate((ctx, oldMonster: Monsters, newMonster: Monsters) => {
             this.createOrUpdateMonster(newMonster);
         });
 
-        this.spacetimeDBClient.sdkConnection.db.monsters.onDelete((_ctx, monster: Monsters) => {
+        this.spacetimeDBClient.sdkConnection.db.monsters.onDelete((ctx, monster: Monsters) => {
             this.removeMonster(monster.monsterId);
         });
     }
@@ -96,23 +92,22 @@ export default class MonsterManager {
         
         // Listen for entity events
         this.gameEvents.on(GameEvents.ENTITY_CREATED, this.handleEntityEvent, this);
-        this.gameEvents.on(GameEvents.ENTITY_UPDATED, (oldEntity: Entity, newEntity: Entity) => {
-            this.handleEntityEvent(newEntity);
+        this.gameEvents.on(GameEvents.ENTITY_UPDATED, (ctx: EventContext, oldEntity: Entity, newEntity: Entity) => {
+            this.handleEntityEvent(ctx, newEntity);
         }, this);
     }
 
     // Add method to handle entity events
-    handleEntityEvent(entity: Entity) {
+    handleEntityEvent(ctx: EventContext, entity: Entity) {
         // Call the existing handleEntityUpdate method
-        this.handleEntityUpdate(entity);
+        this.handleEntityUpdate(ctx, entity);
     }
 
     // Handle entity updates for monsters
-    handleEntityUpdate(entityData: Entity) {
+    handleEntityUpdate(ctx: EventContext, entityData: Entity) {
         // Check if we have a pending monster waiting for this entity
         const pendingMonster = this.pendingMonsters.get(entityData.entityId);
         if (pendingMonster) {
-            
             // Check if the monster sprite exists already
             const monsterContainer = this.monsters.get(pendingMonster.monsterId);
             if (monsterContainer) {
@@ -141,81 +136,118 @@ export default class MonsterManager {
             }
         }
         
-        // Check if this entity belongs to an existing monster
-        for (const monster of this.spacetimeDBClient.sdkConnection?.db?.monsters.iter() || []) {
-            if (monster.entityId === entityData.entityId) {
-                // Entity belongs to a monster, update its position
-                const monsterContainer = this.monsters.get(monster.monsterId);
-                if (monsterContainer) {
-                    // Cancel any existing tween to prevent overlapping animations
-                    this.scene.tweens.killTweensOf(monsterContainer);
-                    
-                    const monsterType = monster.bestiaryId.tag;
-                    
-                    // Store target position for lerping in update
-                    monsterContainer.setData('targetX', entityData.position.x);
-                    monsterContainer.setData('targetY', entityData.position.y);
-                    monsterContainer.setData('lastUpdateTime', Date.now());
-                    
-                    // Use tween for smooth movement instead of direct position setting
-                    const isMoving = entityData.isMoving;
-                    
-                    // If monster is far away from its current server position, teleport it instead of tweening
-                    const distSquared = Math.pow(monsterContainer.x - entityData.position.x, 2) + 
-                                       Math.pow(monsterContainer.y - entityData.position.y, 2);
-                    
-                    if (distSquared > 10000) { // More than 100 units away, teleport
-                        monsterContainer.x = entityData.position.x;
-                        monsterContainer.y = entityData.position.y;
-                    } else if (isMoving) {
-                        // Server tick rate is 50ms
-                        // Use a tween that finishes just before the next server update for smoothest motion
-                        // (49ms tween for a 50ms server tick)
-                        this.scene.tweens.add({
-                            targets: monsterContainer,
-                            x: entityData.position.x,
-                            y: entityData.position.y,
-                            duration: 49, // Just under the server tick rate of 50ms
-                            ease: 'Linear',
-                            onUpdate: () => {
-                                // Update depth on each tween update
-                                monsterContainer.setDepth(BASE_DEPTH + monsterContainer.y);
-                            }
-                        });
-                        
-                        // Debug log the monster type and movement details for diagnosis
-                        const moveDistance = Math.sqrt(
-                            Math.pow(entityData.position.x - monsterContainer.x, 2) + 
-                            Math.pow(entityData.position.y - monsterContainer.y, 2)
-                        );
-                        
-                    } else {
-                        // For non-moving monsters, use a shorter tween duration
-                        this.scene.tweens.add({
-                            targets: monsterContainer,
-                            x: entityData.position.x,
-                            y: entityData.position.y,
-                            duration: 40, // Even faster tween for stopped monsters
-                            ease: 'Power1',
-                            onUpdate: () => {
-                                monsterContainer.setDepth(BASE_DEPTH + monsterContainer.y);
-                            }
-                        });
-                    }
-                    
-                    // Store the movement state and monster type
-                    monsterContainer.setData('isMoving', isMoving);
-                    monsterContainer.setData('monsterType', monsterType);
-                    monsterContainer.setData('direction', {
-                        x: entityData.direction.x,
-                        y: entityData.direction.y
+        // Check if this entity belongs to an existing monster using the proper index
+        // Look up monsters by entityId using the entity_id index if available
+        const monster = ctx.db?.monsters.entity_id?.find(entityData.entityId);
+        
+        if (monster) {
+            // Entity belongs to a monster, update its position
+            const monsterContainer = this.monsters.get(monster.monsterId);
+            if (monsterContainer) {
+                // Cancel any existing tween to prevent overlapping animations
+                this.scene.tweens.killTweensOf(monsterContainer);
+                
+                const monsterType = monster.bestiaryId.tag;
+                
+                // Store target position for lerping in update
+                monsterContainer.setData('targetX', entityData.position.x);
+                monsterContainer.setData('targetY', entityData.position.y);
+                monsterContainer.setData('lastUpdateTime', Date.now());
+                
+                // Use tween for smooth movement instead of direct position setting
+                const isMoving = entityData.isMoving;
+                
+                // If monster is far away from its current server position, teleport it instead of tweening
+                const distSquared = Math.pow(monsterContainer.x - entityData.position.x, 2) + 
+                                   Math.pow(monsterContainer.y - entityData.position.y, 2);
+                
+                if (distSquared > 10000) { // More than 100 units away, teleport
+                    monsterContainer.x = entityData.position.x;
+                    monsterContainer.y = entityData.position.y;
+                } else if (isMoving) {
+                    // Server tick rate is 50ms
+                    // Use a tween that finishes just before the next server update for smoothest motion
+                    // (49ms tween for a 50ms server tick)
+                    this.scene.tweens.add({
+                        targets: monsterContainer,
+                        x: entityData.position.x,
+                        y: entityData.position.y,
+                        duration: 49, // Just under the server tick rate of 50ms
+                        ease: 'Linear',
+                        onUpdate: () => {
+                            // Update depth on each tween update
+                            monsterContainer.setDepth(BASE_DEPTH + monsterContainer.y);
+                        }
                     });
                     
-                    return true;
+                    // Debug log the monster type and movement details for diagnosis
+                    const moveDistance = Math.sqrt(
+                        Math.pow(entityData.position.x - monsterContainer.x, 2) + 
+                        Math.pow(entityData.position.y - monsterContainer.y, 2)
+                    );
+                    
                 } else {
-                    // If container doesn't exist yet, try to create it
-                    this.createMonsterSprite(monster, entityData.position);
-                    return true;
+                    // For non-moving monsters, use a shorter tween duration
+                    this.scene.tweens.add({
+                        targets: monsterContainer,
+                        x: entityData.position.x,
+                        y: entityData.position.y,
+                        duration: 40, // Even faster tween for stopped monsters
+                        ease: 'Power1',
+                        onUpdate: () => {
+                            monsterContainer.setDepth(BASE_DEPTH + monsterContainer.y);
+                        }
+                    });
+                }
+                
+                // Store the movement state and monster type
+                monsterContainer.setData('isMoving', isMoving);
+                monsterContainer.setData('monsterType', monsterType);
+                monsterContainer.setData('direction', {
+                    x: entityData.direction.x,
+                    y: entityData.direction.y
+                });
+                
+                return true;
+            } else {
+                // If container doesn't exist yet, try to create it
+                this.createMonsterSprite(monster, entityData.position);
+                return true;
+            }
+        }
+        
+        // If we didn't find the monster with the index above, try a fallback approach
+        // This is a slower method but will work if the index isn't defined
+        if (!monster) {
+            // Iterate through monsters to find one with this entityId
+            for (const iterMonster of ctx.db?.monsters.iter() || []) {
+                if (iterMonster.entityId === entityData.entityId) {
+                    // Update the monster
+                    const monsterContainer = this.monsters.get(iterMonster.monsterId);
+                    if (monsterContainer) {
+                        // Update position
+                        monsterContainer.setData('targetX', entityData.position.x);
+                        monsterContainer.setData('targetY', entityData.position.y);
+                        monsterContainer.setData('lastUpdateTime', Date.now());
+                        
+                        // Use tween for smooth movement
+                        this.scene.tweens.add({
+                            targets: monsterContainer,
+                            x: entityData.position.x,
+                            y: entityData.position.y,
+                            duration: 49,
+                            ease: 'Linear',
+                            onUpdate: () => {
+                                monsterContainer.setDepth(BASE_DEPTH + monsterContainer.y);
+                            }
+                        });
+                        
+                        return true;
+                    } else {
+                        // Create the monster container
+                        this.createMonsterSprite(iterMonster, entityData.position);
+                        return true;
+                    }
                 }
             }
         }
@@ -250,39 +282,34 @@ export default class MonsterManager {
                     
                     // Update HP data in container
                     existingMonster.setData('currentHP', monsterData.hp);
-                    existingMonster.setData('maxHP', monsterData.maxHp);
+                    existingMonster.setData('maxHP', maxHP);
                     break;
                 }
-            }
-            
-            // Add to pending monsters if we still don't have entity data
-            const entityData = this.spacetimeDBClient.sdkConnection.db.entity.entity_id.find(monsterData.entityId);
-            if (!entityData) {
-                this.pendingMonsters.set(monsterData.entityId, monsterData);
             }
             
             return;
         }
         
-        // Get entity data for the monster
+        // Get entity data for position
+        // Check if we have an entity for this monster
         const entityData = this.spacetimeDBClient.sdkConnection.db.entity.entity_id.find(monsterData.entityId);
-        if (!entityData) {
-            console.warn(`Monster ${monsterData.monsterId} (Type: ${monsterData.bestiaryId.tag}) has no entity data yet. Creating at default position.`);
+        
+        if (entityData) {
+            // We have entity data, so create the sprite at the correct position
+            this.createMonsterSprite(monsterData, entityData.position);
+        } else {
+            // No entity data yet, store monster as pending
             
-            // Instead of waiting for entity data, create the monster at a default position (0,0)
-            // The entity update will move it to the correct position when it arrives
-            const defaultPosition = { x: 0, y: 0 };
+            // Check if we already have a sprite - if so, we need to delay until we get entity data
+            let existingContainer = this.monsters.get(monsterData.monsterId);
+            if (!existingContainer) {
+                // No sprite yet, create a temporary one at origin for now
+                this.createMonsterSprite(monsterData, { x: 0, y: 0 });
+            }
             
-            // Create the monster with default position
-            this.createMonsterSprite(monsterData, defaultPosition);
-            
-            // Still store in pending monsters so we can update position when entity arrives
+            // Store monster data for later when we get entity data
             this.pendingMonsters.set(monsterData.entityId, monsterData);
-            return;
         }
-
-        // Create or update with actual entity data
-        this.createMonsterSprite(monsterData, entityData.position);
     }
     
     // Helper function to create monster sprite at a given position

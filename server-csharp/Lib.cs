@@ -91,7 +91,7 @@ public static partial class Module
 
         [Unique]
         public string name;
-
+        
         public uint current_player_id;
     }
 

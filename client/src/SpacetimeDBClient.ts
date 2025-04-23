@@ -10,14 +10,14 @@ class SpacetimeDBClient {
     // Initialize sdkClient to null, it will be set in handleConnect
     public sdkConnection: DbConnection | null = null;
     public identity: Identity | null = null;
-    public onSubscriptionApplied: (() => void) | null = null;
-    public onConnect: (() => void) | null = null;
-    public onDisconnect: (() => void) | null = null;
+    public onSubscriptionApplied: ((ctx: SubscriptionEventContext) => void) | null = null;
+    public onConnect: ((ctx: DbConnection, identity: Identity, token: string) => void) | null = null;
+    public onDisconnect: ((ctx: ErrorContext, error?: Error) => void) | null = null;
 
     constructor(
-        onSubscriptionApplied?: () => void,
-        onConnect?: () => void,
-        onDisconnect?: () => void
+        onSubscriptionApplied?: (ctx: SubscriptionEventContext) => void,
+        onConnect?: (ctx: DbConnection, identity: Identity, token: string) => void,
+        onDisconnect?: (ctx: ErrorContext, error?: Error) => void
     ) {
         console.log("Initializing SpacetimeDBClient and preparing connection...");
         
@@ -79,16 +79,16 @@ class SpacetimeDBClient {
 
         // Call external onConnect listener
         if (this.onConnect) {
-            this.onConnect();
+            this.onConnect(connection, identity, token);
         }
     }
 
     // Subscription applied callback
-    private handleSubscriptionApplied(/*ctx: SubscriptionEventContext*/) {
+    private handleSubscriptionApplied(ctx: SubscriptionEventContext) {
         console.log("SpacetimeDB subscription applied callback triggered.");
         
         if (this.onSubscriptionApplied) {
-            this.onSubscriptionApplied();
+            this.onSubscriptionApplied(ctx);
         }
     }
 
@@ -116,7 +116,7 @@ class SpacetimeDBClient {
         this.sdkConnection = null;
         this.identity = null;
         if (this.onDisconnect) {
-            this.onDisconnect();
+            this.onDisconnect(_ctx, error);
         }
     }
 
@@ -128,7 +128,7 @@ class SpacetimeDBClient {
         this.identity = null;
         // Call external disconnect handler
         if (this.onDisconnect) {
-            this.onDisconnect();
+            this.onDisconnect(_ctx, error);
         }
     }
 
