@@ -361,10 +361,10 @@ export default class GameScene extends Phaser.Scene {
 
         var playerId = account.currentPlayerId;
         
-        var localPlayerData = ctx.db?.player.player_id.find(playerId);
+        var localPlayerData = ctx.db?.player.playerId.find(playerId);
         if (!localPlayerData) {
             // Check if player is in the dead_players table
-            var deadPlayerData = ctx.db?.deadPlayers.player_id.find(playerId);
+            var deadPlayerData = ctx.db?.deadPlayers.playerId.find(playerId);
             if (deadPlayerData) {
                 console.error("Local player is dead! The game scene should not have been loaded.");
                 return; // Cannot proceed with dead player
@@ -415,7 +415,7 @@ export default class GameScene extends Phaser.Scene {
         }
         
         // Get the entity data for this player
-        const entityData = ctx.db?.entity.entity_id.find(player.entityId);
+        const entityData = ctx.db?.entity.entityId.find(player.entityId);
         if (!entityData) {
             console.log("Entity data not found for local player, adding to pending players");
             this.pendingPlayers.set(player.entityId, player);
@@ -487,7 +487,7 @@ export default class GameScene extends Phaser.Scene {
         // e.g., class, health, equipment, etc.
         
         // Get the latest entity data
-        const entityData = ctx.db?.entity.entity_id.find(player.entityId);
+        const entityData = ctx.db?.entity.entityId.find(player.entityId);
         if (entityData && this.serverPosition) {
             this.serverPosition.set(entityData.position.x, entityData.position.y);
         }
@@ -516,7 +516,7 @@ export default class GameScene extends Phaser.Scene {
                 
                 if (localAccount && localAccount.currentPlayerId > 0) {
                     // Get player by player_id from account
-                    const localPlayer = ctx.db?.player.player_id.find(
+                    const localPlayer = ctx.db?.player.playerId.find(
                         localAccount.currentPlayerId
                     );
                     
@@ -554,7 +554,7 @@ export default class GameScene extends Phaser.Scene {
                         
                         if (localAccount && localAccount.currentPlayerId > 0) {
                             // Get player by player_id from account
-                            const localPlayer = ctx.db?.player.player_id.find(
+                            const localPlayer = ctx.db?.player.playerId.find(
                                 localAccount.currentPlayerId
                             );
                             
@@ -646,7 +646,7 @@ export default class GameScene extends Phaser.Scene {
             let playerOwningEntity: Player | null = null;
             try {
                 // Find player by entity ID
-                playerOwningEntity = ctx.db?.player.entity_id.find(entityData.entityId) || null;
+                playerOwningEntity = ctx.db?.player.entityId.find(entityData.entityId) || null;
             } catch (error) {
                 console.error("Error finding player for entity:", error);
             }
@@ -779,7 +779,7 @@ export default class GameScene extends Phaser.Scene {
             // If we don't have a container for this player yet, we need to find its entity
             if (!this.otherPlayers.has(playerData.playerId)) {
                 if (playerData.entityId) {
-                    const entityData = ctx.db?.entity.entity_id.find(playerData.entityId);
+                    const entityData = ctx.db?.entity.entityId.find(playerData.entityId);
                     if (entityData) {
                         // Create the sprite with the entity data
                         this.createOtherPlayerSprite(playerData, entityData);
@@ -1058,9 +1058,9 @@ export default class GameScene extends Phaser.Scene {
         // First, handle local player if not already created
         if (!this.localPlayerSprite && localAccount.currentPlayerId > 0) {
             //const localPlayer = allPlayers.find(p => p.playerId === localAccount.currentPlayerId);
-            const localPlayer = ctx.db.player.player_id.find(localAccount.currentPlayerId) as Player;
+            const localPlayer = ctx.db.player.playerId.find(localAccount.currentPlayerId) as Player;
             if (localPlayer) {
-                const entityData = ctx.db.entity.entity_id.find(localPlayer.entityId) as Entity;
+                const entityData = ctx.db.entity.entityId.find(localPlayer.entityId) as Entity;
                 if (entityData) {
                     console.log(`Creating local player during sync: ${localPlayer.name} at (${entityData.position.x}, ${entityData.position.y})`);
                     this.handleEntityUpdate(ctx, entityData);
@@ -1079,7 +1079,7 @@ export default class GameScene extends Phaser.Scene {
                 continue;
             }
             
-            const entityData = ctx.db.entity.entity_id.find(player.entityId) as Entity;
+            const entityData = ctx.db.entity.entityId.find(player.entityId) as Entity;
             if (entityData) {
                 // Check if this player already has a sprite
                 const existingContainer = this.otherPlayers.get(player.playerId);
@@ -1119,7 +1119,7 @@ export default class GameScene extends Phaser.Scene {
             
             if (localAccount && localAccount.currentPlayerId > 0) {
                 // Then get the player from the account's currentPlayerId
-                const localPlayer = this.spacetimeDBClient.sdkConnection?.db.player.player_id.find(
+                const localPlayer = this.spacetimeDBClient.sdkConnection?.db.player.playerId.find(
                     localAccount.currentPlayerId
                 );
                 
@@ -1135,7 +1135,7 @@ export default class GameScene extends Phaser.Scene {
         // Check other players
         for (const [playerId, container] of this.otherPlayers.entries()) {
             // Find the player with this player ID
-            const player = this.spacetimeDBClient.sdkConnection?.db.player.player_id.find(playerId);
+            const player = this.spacetimeDBClient.sdkConnection?.db.player.playerId.find(playerId);
             if (player && player.entityId === entityId) {
                 return { 
                     x: container.x, 

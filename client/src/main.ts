@@ -149,7 +149,7 @@ const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
                 else 
                 {
                     // Check if the player exists and is alive
-                    const localPlayer = ctx.db?.player.player_id.find(account.currentPlayerId);
+                    const localPlayer = ctx.db?.player.playerId.find(account.currentPlayerId);
                     if (localPlayer) 
                     {
                         cleanupDOMElements(); // Clean up before transition
@@ -209,7 +209,7 @@ const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
                 
                 // Check if the new player exists
                 if (newAccount.currentPlayerId > 0) {
-                    const player = ctx.db?.player.player_id.find(newAccount.currentPlayerId);
+                    const player = ctx.db?.player.playerId.find(newAccount.currentPlayerId);
                     if (player) 
                     {
                         // Emit player created event if in LoadingScene
@@ -349,7 +349,7 @@ const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
     }
 
     // Check if player exists and is alive
-    const localPlayer = ctx.db?.player.player_id.find(myAccount.currentPlayerId);
+    const localPlayer = ctx.db?.player.playerId.find(myAccount.currentPlayerId);
     if (localPlayer) 
     {
         console.log("Account has name and living player. Going to GameScene.");
@@ -359,7 +359,7 @@ const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
     else 
     {
         // Check if player is in dead_players table
-        const deadPlayer = ctx.db?.deadPlayers.player_id.find(myAccount.currentPlayerId);
+        const deadPlayer = ctx.db?.deadPlayers.playerId.find(myAccount.currentPlayerId);
         if (deadPlayer) 
         {
             console.log("Player is dead. Going to ClassSelectScene.");

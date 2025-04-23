@@ -54,7 +54,7 @@ export default class MonsterManager {
         // Force immediate update for all monsters with known entities
         for (const monster of this.spacetimeDBClient.sdkConnection.db.monsters.iter()) {
             // Look up the entity directly using the entity_id index
-            const entityData = this.spacetimeDBClient.sdkConnection.db.entity.entity_id.find(monster.entityId);
+            const entityData = this.spacetimeDBClient.sdkConnection.db.entity.entityId.find(monster.entityId);
             
             if (entityData) {
                 // Entity exists, create directly with correct position
@@ -138,7 +138,7 @@ export default class MonsterManager {
         
         // Check if this entity belongs to an existing monster using the proper index
         // Look up monsters by entityId using the entity_id index if available
-        const monster = ctx.db?.monsters.entity_id?.find(entityData.entityId);
+        const monster = ctx.db?.monsters.entityId?.find(entityData.entityId);
         
         if (monster) {
             // Entity belongs to a monster, update its position
@@ -292,7 +292,7 @@ export default class MonsterManager {
         
         // Get entity data for position
         // Check if we have an entity for this monster
-        const entityData = this.spacetimeDBClient.sdkConnection.db.entity.entity_id.find(monsterData.entityId);
+        const entityData = this.spacetimeDBClient.sdkConnection.db.entity.entityId.find(monsterData.entityId);
         
         if (entityData) {
             // We have entity data, so create the sprite at the correct position
@@ -438,7 +438,7 @@ export default class MonsterManager {
         
         if (!DEBUG_COLLISIONS) return;
         
-        const entityData = this.spacetimeDBClient.sdkConnection?.db.entity.entity_id.find(entityId);
+        const entityData = this.spacetimeDBClient.sdkConnection?.db.entity.entityId.find(entityId);
         if (!entityData) return;
         
         // Get radius from entity data or fallback to defaults based on monster type
@@ -462,7 +462,7 @@ export default class MonsterManager {
         
         if (!DEBUG_COLLISIONS) return;
         
-        const entityData = this.spacetimeDBClient.sdkConnection?.db.entity.entity_id.find(entityId);
+        const entityData = this.spacetimeDBClient.sdkConnection?.db.entity.entityId.find(entityId);
         if (!entityData) return;
         
         // Get radius from entity data or fallback to defaults based on monster type
