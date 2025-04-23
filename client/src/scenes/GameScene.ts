@@ -52,6 +52,7 @@ const CLASS_ASSET_KEYS: Record<string, string> = {
 export default class GameScene extends Phaser.Scene {
     private spacetimeDBClient: SpacetimeDBClient;
     private gameEvents: Phaser.Events.EventEmitter;
+    private playerInitialized = false;
     private localPlayerSprite: Phaser.Physics.Arcade.Sprite | null = null;
     private localPlayerNameText: Phaser.GameObjects.Text | null = null;
     private localPlayerShadow: Phaser.GameObjects.Image | null = null; // Added for local player shadow
@@ -143,6 +144,8 @@ export default class GameScene extends Phaser.Scene {
         this.registerEventListeners();
         console.log("Game event listeners registered.");
 
+        this.playerInitialized = false;
+
         // Setup keyboard input
         this.cursors = this.input.keyboard?.createCursorKeys() ?? null;
         
@@ -216,10 +219,15 @@ export default class GameScene extends Phaser.Scene {
 
         // Initialize game world once event listeners are set up
         console.log("Waiting for player created event to initialize game world...");
-        this.gameEvents.once(GameEvents.PLAYER_CREATED, this.initializeGameWorld, this);
+
+        this.spacetimeDBClient.sdkConnection?.reducers.updateLastLogin();
     }
 
     private registerEventListeners() {
+
+        // Initialize game world once event listeners are set up
+        this.gameEvents.on(GameEvents.ACCOUNT_UPDATED, this.handleAccountUpdated, this);
+
         // Player events
         this.gameEvents.on(GameEvents.PLAYER_CREATED, this.handlePlayerCreated, this);
         this.gameEvents.on(GameEvents.PLAYER_UPDATED, this.handlePlayerUpdated, this);
@@ -233,6 +241,33 @@ export default class GameScene extends Phaser.Scene {
         
         // Connection events
         this.gameEvents.on(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
+    }
+
+    private handleAccountUpdated(ctx: EventContext, oldAccount: Account, newAccount: Account) {
+        //determine if its the local account
+        console.log("Account updated event received in GameScene");
+        
+        if (this.spacetimeDBClient.identity && newAccount.identity.isEqual(this.spacetimeDBClient.identity)) 
+        {
+            console.log("GameScene: Local account updated");
+            //Check if the login time was updated
+            if (oldAccount.lastLogin !== newAccount.lastLogin) {
+                //If we're getting this, then that means we sent the updateLastLogin reducer
+                //in the create, and are now getting the response.
+                //So we should initialize the game world at this point since
+                //hopefully all the data is ready.
+                console.log("New login detected, initializing game world");
+                this.initializeGameWorld(ctx);  
+            }
+            else
+            {
+                console.log("GameScene: Local account updated, but no new login detected");
+            }
+        }
+        else
+        {
+            console.log("GameScene: Another user has logged on: " + newAccount.identity.toString());
+        }
     }
 
     private handlePlayerCreated(ctx: EventContext, player: Player, isLocalPlayer: boolean = true) {
@@ -343,8 +378,7 @@ export default class GameScene extends Phaser.Scene {
             return;
         }
         
-        console.log("Local player data found:", localPlayerData);
-        console.log("Looking for entity with ID:", localPlayerData.entityId);
+        console.log("Local player data found during initialization:", localPlayerData);
         
         // Initialize local player
         this.initializeLocalPlayer(ctx, localPlayerData);
@@ -374,6 +408,11 @@ export default class GameScene extends Phaser.Scene {
      */
     private initializeLocalPlayer(ctx: EventContext, player: Player) {
         console.log("Initializing local player...");
+
+        if (this.playerInitialized) {
+            console.log("Local player already initialized, skipping...");
+            return;
+        }
         
         // Get the entity data for this player
         const entityData = ctx.db?.entity.entity_id.find(player.entityId);
@@ -427,6 +466,8 @@ export default class GameScene extends Phaser.Scene {
         
         // Set player data as ready
         this.isPlayerDataReady = true;
+
+        this.playerInitialized = true;
         
         // Debug output for verification
         console.log("Local player initialized at position:", entityData.position);

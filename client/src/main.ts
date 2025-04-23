@@ -171,7 +171,7 @@ const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
 
     localDb.account.onUpdate((ctx, oldAccount, newAccount) => {
         console.log("Account updated event received");
-        console.log("- Account data: ", newAccount.name + " - " + newAccount.currentPlayerId);
+        console.log("- Account data: ", newAccount.name + " - " + newAccount.currentPlayerId + " - " + newAccount.lastLogin);
 
         // Check if account is local
         if (newAccount.identity.isEqual(localIdentity)) 
@@ -224,6 +224,10 @@ const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
                     }
                 }
             }
+        }
+        else
+        {
+            console.log("Another user has logged on: " + newAccount.identity.toString());
         }
     });
 

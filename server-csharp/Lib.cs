@@ -93,6 +93,8 @@ public static partial class Module
         public string name;
         
         public uint current_player_id;
+
+        public Timestamp last_login;
     }
 
     [SpacetimeDB.Table(Name = "player", Public = true)] // Typically player table shouldn't be public, but adjusting per example
@@ -356,6 +358,28 @@ public static partial class Module
 
         ctx.Db.account.identity.Update(account);
         Log.Info($"Account {identity} name set to {account.name}.");
+    }
+
+    //last_login
+    [Reducer]
+    public static void UpdateLastLogin(ReducerContext ctx)
+    {
+        var identity = ctx.Sender;
+        Log.Info($"UpdateLastLogin called by identity: {identity}");
+
+        var accountOpt = ctx.Db.account.identity.Find(identity);
+        if (accountOpt == null)
+        {
+            throw new Exception($"UpdateLastLogin: Attempted to update last login for non-existent account {identity}.");
+        }
+        
+        var account = accountOpt.Value;
+
+        var now = ctx.Timestamp;
+        account.last_login = now;
+
+        ctx.Db.account.identity.Update(account);
+        Log.Info($"Updated last login for account {identity} to {now}.");
     }
 
 }
