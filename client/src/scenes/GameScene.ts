@@ -87,6 +87,14 @@ export default class GameScene extends Phaser.Scene {
     // Add property for tap marker visual
     private tapMarker: Phaser.GameObjects.Container | null = null;
 
+    // Add property to track boundary state
+    private isNearBoundary: {top: boolean, right: boolean, bottom: boolean, left: boolean} = {
+        top: false,
+        right: false,
+        bottom: false,
+        left: false
+    };
+
     constructor() {
         super('GameScene');
         this.spacetimeDBClient = (window as any).spacetimeDBClient;
@@ -1003,36 +1011,22 @@ export default class GameScene extends Phaser.Scene {
         
         // Handle tap target if no keyboard input
         if (dirX === 0 && dirY === 0 && this.tapTarget) {
+            // Get entity radius
+            const entityRadius = this.getPlayerEntityRadius();
+            
+            // Clamp the tap target to valid world bounds
+            const clampedTarget = this.clampToWorldBounds(this.tapTarget, entityRadius);
+            
+            // Update tap target if it was clamped
+            if (clampedTarget.x !== this.tapTarget.x || clampedTarget.y !== this.tapTarget.y) {
+                console.debug(`Clamping tap target: (${this.tapTarget.x.toFixed(1)}, ${this.tapTarget.y.toFixed(1)}) → (${clampedTarget.x.toFixed(1)}, ${clampedTarget.y.toFixed(1)})`);
+                this.tapTarget.set(clampedTarget.x, clampedTarget.y);
+                this.updateTapMarker();
+            }
+            
             // Calculate direction toward tap target
             const dx = this.tapTarget.x - this.localPlayerSprite.x;
             const dy = this.tapTarget.y - this.localPlayerSprite.y;
-            
-            // Check world boundaries
-            const worldBounds = this.physics.world.bounds;
-            const halfWidth = this.localPlayerSprite.width / 2;
-            const halfHeight = this.localPlayerSprite.height / 2;
-            
-            // If tap target is outside world bounds, clamp it
-            if (this.tapTarget.x < worldBounds.x + halfWidth || 
-                this.tapTarget.x > worldBounds.right - halfWidth ||
-                this.tapTarget.y < worldBounds.y + halfHeight || 
-                this.tapTarget.y > worldBounds.bottom - halfHeight) {
-                
-                const clampedX = Phaser.Math.Clamp(
-                    this.tapTarget.x,
-                    worldBounds.x + halfWidth,
-                    worldBounds.right - halfWidth
-                );
-                const clampedY = Phaser.Math.Clamp(
-                    this.tapTarget.y,
-                    worldBounds.y + halfHeight,
-                    worldBounds.bottom - halfHeight
-                );
-                
-                console.debug(`Clamping tap target: (${this.tapTarget.x.toFixed(1)}, ${this.tapTarget.y.toFixed(1)}) → (${clampedX.toFixed(1)}, ${clampedY.toFixed(1)})`);
-                this.tapTarget.set(clampedX, clampedY);
-                this.updateTapMarker();
-            }
             
             // Check if we're close enough to the target to stop moving
             const distanceSquared = dx * dx + dy * dy;
@@ -1053,8 +1047,7 @@ export default class GameScene extends Phaser.Scene {
         const directionChanged = (this.currentDirection.x !== dirX || this.currentDirection.y !== dirY);
         const timeForUpdate = (time - this.lastDirectionUpdateTime) > DIRECTION_UPDATE_RATE;
         
-        if ((directionChanged || (hasDirection && timeForUpdate))) {
-            
+        if (directionChanged || (hasDirection && timeForUpdate)) {
             // Update current direction
             this.currentDirection.set(dirX, dirY);
             this.isMoving = hasDirection;
@@ -1075,29 +1068,26 @@ export default class GameScene extends Phaser.Scene {
             const dx = this.currentDirection.x * speed;
             const dy = this.currentDirection.y * speed;
             
-            // Check world boundaries before applying movement
-            const worldBounds = this.physics.world.bounds;
-            const halfWidth = this.localPlayerSprite.width / 2;
-            const halfHeight = this.localPlayerSprite.height / 2;
+            // Get the entity radius for boundary checking
+            const entityRadius = this.getPlayerEntityRadius();
             
-            // Calculate new position while respecting boundaries
-            let newX = this.localPlayerSprite.x + dx;
-            let newY = this.localPlayerSprite.y + dy;
+            // Calculate new position
+            const predictedPosition = {
+                x: this.localPlayerSprite.x + dx,
+                y: this.localPlayerSprite.y + dy
+            };
             
-            // Enforce boundaries manually (matches physics system's setCollideWorldBounds)
-            const originalX = newX;
-            const originalY = newY;
-            newX = Phaser.Math.Clamp(newX, worldBounds.x + halfWidth, worldBounds.right - halfWidth);
-            newY = Phaser.Math.Clamp(newY, worldBounds.y + halfHeight, worldBounds.bottom - halfHeight);
+            // Clamp the predicted position to valid world bounds
+            const clampedPosition = this.clampToWorldBounds(predictedPosition, entityRadius);
             
             // Log when we hit boundaries for debugging
-            if (originalX !== newX || originalY !== newY) {
-                console.debug(`Boundary enforced: Original (${originalX.toFixed(1)}, ${originalY.toFixed(1)}) → Clamped (${newX.toFixed(1)}, ${newY.toFixed(1)})`);
+            if (clampedPosition.x !== predictedPosition.x || clampedPosition.y !== predictedPosition.y) {
+                console.debug(`Movement clamped to boundary: (${predictedPosition.x.toFixed(1)}, ${predictedPosition.y.toFixed(1)}) → (${clampedPosition.x.toFixed(1)}, ${clampedPosition.y.toFixed(1)})`);
             }
             
             // Move the player sprite to the clamped position
-            this.localPlayerSprite.x = newX;
-            this.localPlayerSprite.y = newY;
+            this.localPlayerSprite.x = clampedPosition.x;
+            this.localPlayerSprite.y = clampedPosition.y;
             
             // Update the depth based on new Y position
             this.localPlayerSprite.setDepth(BASE_DEPTH + this.localPlayerSprite.y);
@@ -1132,45 +1122,19 @@ export default class GameScene extends Phaser.Scene {
         
         // If server has sent an updated position that's far from our prediction, correct it
         if (this.serverPosition && this.localPlayerSprite) {
-            // Clamp server position to world bounds before applying
-            const worldBounds = this.physics.world.bounds;
-            const halfWidth = this.localPlayerSprite.width / 2;
-            const halfHeight = this.localPlayerSprite.height / 2;
+            // Get entity radius using helper function
+            const entityRadius = this.getPlayerEntityRadius();
             
-            // Log potential boundary conflicts with server
-            const isServerOutOfBounds = (
-                this.serverPosition.x < worldBounds.x + halfWidth ||
-                this.serverPosition.x > worldBounds.right - halfWidth ||
-                this.serverPosition.y < worldBounds.y + halfHeight ||
-                this.serverPosition.y > worldBounds.bottom - halfHeight
-            );
-            
-            if (isServerOutOfBounds) {
-                console.debug(`Server position out of bounds: (${this.serverPosition.x.toFixed(1)}, ${this.serverPosition.y.toFixed(1)})`);
-            }
-            
-            // Ensure server position is also within bounds
-            const clampedServerX = Phaser.Math.Clamp(
-                this.serverPosition.x, 
-                worldBounds.x + halfWidth, 
-                worldBounds.right - halfWidth
-            );
-            const clampedServerY = Phaser.Math.Clamp(
-                this.serverPosition.y, 
-                worldBounds.y + halfHeight, 
-                worldBounds.bottom - halfHeight
-            );
+            // Clamp server position to world bounds
+            const clampedServerPosition = this.clampToWorldBounds(this.serverPosition, entityRadius);
             
             // Calculate distance to clamped server position
-            const distX = clampedServerX - this.localPlayerSprite.x;
-            const distY = clampedServerY - this.localPlayerSprite.y;
+            const distX = clampedServerPosition.x - this.localPlayerSprite.x;
+            const distY = clampedServerPosition.y - this.localPlayerSprite.y;
             const distSquared = distX * distX + distY * distY;
             
-            // If difference is significant, interpolate toward server position
+            // If difference is significant, update to match server position
             if (distSquared > POSITION_CORRECTION_THRESHOLD) {
-                // Log significant corrections
-                console.debug(`Significant position correction: Client (${this.localPlayerSprite.x.toFixed(1)}, ${this.localPlayerSprite.y.toFixed(1)}) → Server (${clampedServerX.toFixed(1)}, ${clampedServerY.toFixed(1)})`);
-                
                 // Interpolate position
                 this.localPlayerSprite.x += distX * INTERPOLATION_SPEED;
                 this.localPlayerSprite.y += distY * INTERPOLATION_SPEED;
@@ -1538,5 +1502,62 @@ export default class GameScene extends Phaser.Scene {
         } catch (e) {
             console.error("Error in GameScene cleanupLingeringUIElements:", e);
         }
+    }
+
+    /**
+     * Get the player entity radius from server data
+     * @returns The entity radius, or 48 as fallback
+     */
+    private getPlayerEntityRadius(): number {
+        // Default fallback radius
+        let entityRadius = 48;
+        
+        try {
+            if (this.spacetimeDBClient?.identity && this.spacetimeDBClient?.sdkConnection?.db) {
+                const account = this.spacetimeDBClient.sdkConnection.db.account.identity.find(
+                    this.spacetimeDBClient.identity
+                );
+                
+                if (account && account.currentPlayerId > 0) {
+                    const player = this.spacetimeDBClient.sdkConnection.db.player.playerId.find(
+                        account.currentPlayerId
+                    );
+                    
+                    if (player && player.entityId) {
+                        const entity = this.spacetimeDBClient.sdkConnection.db.entity.entityId.find(player.entityId);
+                        if (entity && entity.radius) {
+                            entityRadius = entity.radius;
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error("Error getting entity radius:", error);
+        }
+        
+        return entityRadius;
+    }
+
+    /**
+     * Clamp a position to world boundaries
+     * @param position The position to clamp
+     * @param entityRadius The entity radius to use for boundary calculation
+     * @returns The clamped position
+     */
+    private clampToWorldBounds(position: {x: number, y: number}, entityRadius: number): {x: number, y: number} {
+        const worldBounds = this.physics.world.bounds;
+        
+        return {
+            x: Phaser.Math.Clamp(
+                position.x,
+                worldBounds.x + entityRadius,
+                worldBounds.right - entityRadius
+            ),
+            y: Phaser.Math.Clamp(
+                position.y,
+                worldBounds.y + entityRadius,
+                worldBounds.bottom - entityRadius
+            )
+        };
     }
 }

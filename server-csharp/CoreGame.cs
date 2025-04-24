@@ -128,6 +128,14 @@ public static partial class Module
             return;
         }
 
+        // Get world size from config
+        uint worldSize = 2000; // Default fallback
+        var configOpt = ctx.Db.config.id.Find(0);
+        if (configOpt != null)
+        {
+            worldSize = configOpt.Value.world_size;
+        }
+
         // Process all movable players
         foreach (var player in ctx.Db.player.Iter())
         {
@@ -154,6 +162,18 @@ public static partial class Module
             // Update entity with new position
             var updatedEntity = entity;
             updatedEntity.position = entity.position + moveOffset;
+            
+            // Apply world boundary clamping using entity radius
+            updatedEntity.position.x = Math.Clamp(
+                updatedEntity.position.x, 
+                updatedEntity.radius, 
+                worldSize - updatedEntity.radius
+            );
+            updatedEntity.position.y = Math.Clamp(
+                updatedEntity.position.y, 
+                updatedEntity.radius, 
+                worldSize - updatedEntity.radius
+            );
             
             // Update entity in database
             ctx.Db.entity.entity_id.Update(updatedEntity);
