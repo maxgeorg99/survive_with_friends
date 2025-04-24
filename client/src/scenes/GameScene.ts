@@ -41,6 +41,9 @@ const NAME_DEPTH_OFFSET = 2; // Always in front of the sprite
 const HEALTH_BG_DEPTH_OFFSET = 1; // Just behind health bar but in front of sprite
 const HEALTH_BAR_DEPTH_OFFSET = 1.1; // In front of background but behind name
 
+// Movement and position constants
+const POSITION_CORRECTION_THRESHOLD = 49; // Distance squared threshold for position correction (7 pixels)
+
 // Asset keys for different player classes
 const CLASS_ASSET_KEYS: Record<string, string> = {
     "Fighter": 'player_fighter',
@@ -1004,6 +1007,33 @@ export default class GameScene extends Phaser.Scene {
             const dx = this.tapTarget.x - this.localPlayerSprite.x;
             const dy = this.tapTarget.y - this.localPlayerSprite.y;
             
+            // Check world boundaries
+            const worldBounds = this.physics.world.bounds;
+            const halfWidth = this.localPlayerSprite.width / 2;
+            const halfHeight = this.localPlayerSprite.height / 2;
+            
+            // If tap target is outside world bounds, clamp it
+            if (this.tapTarget.x < worldBounds.x + halfWidth || 
+                this.tapTarget.x > worldBounds.right - halfWidth ||
+                this.tapTarget.y < worldBounds.y + halfHeight || 
+                this.tapTarget.y > worldBounds.bottom - halfHeight) {
+                
+                const clampedX = Phaser.Math.Clamp(
+                    this.tapTarget.x,
+                    worldBounds.x + halfWidth,
+                    worldBounds.right - halfWidth
+                );
+                const clampedY = Phaser.Math.Clamp(
+                    this.tapTarget.y,
+                    worldBounds.y + halfHeight,
+                    worldBounds.bottom - halfHeight
+                );
+                
+                console.debug(`Clamping tap target: (${this.tapTarget.x.toFixed(1)}, ${this.tapTarget.y.toFixed(1)}) → (${clampedX.toFixed(1)}, ${clampedY.toFixed(1)})`);
+                this.tapTarget.set(clampedX, clampedY);
+                this.updateTapMarker();
+            }
+            
             // Check if we're close enough to the target to stop moving
             const distanceSquared = dx * dx + dy * dy;
             if (distanceSquared > 100) { // Arbitrary threshold of 10 pixels squared
@@ -1045,9 +1075,29 @@ export default class GameScene extends Phaser.Scene {
             const dx = this.currentDirection.x * speed;
             const dy = this.currentDirection.y * speed;
             
-            // Move the player sprite
-            this.localPlayerSprite.x += dx;
-            this.localPlayerSprite.y += dy;
+            // Check world boundaries before applying movement
+            const worldBounds = this.physics.world.bounds;
+            const halfWidth = this.localPlayerSprite.width / 2;
+            const halfHeight = this.localPlayerSprite.height / 2;
+            
+            // Calculate new position while respecting boundaries
+            let newX = this.localPlayerSprite.x + dx;
+            let newY = this.localPlayerSprite.y + dy;
+            
+            // Enforce boundaries manually (matches physics system's setCollideWorldBounds)
+            const originalX = newX;
+            const originalY = newY;
+            newX = Phaser.Math.Clamp(newX, worldBounds.x + halfWidth, worldBounds.right - halfWidth);
+            newY = Phaser.Math.Clamp(newY, worldBounds.y + halfHeight, worldBounds.bottom - halfHeight);
+            
+            // Log when we hit boundaries for debugging
+            if (originalX !== newX || originalY !== newY) {
+                console.debug(`Boundary enforced: Original (${originalX.toFixed(1)}, ${originalY.toFixed(1)}) → Clamped (${newX.toFixed(1)}, ${newY.toFixed(1)})`);
+            }
+            
+            // Move the player sprite to the clamped position
+            this.localPlayerSprite.x = newX;
+            this.localPlayerSprite.y = newY;
             
             // Update the depth based on new Y position
             this.localPlayerSprite.setDepth(BASE_DEPTH + this.localPlayerSprite.y);
@@ -1082,12 +1132,44 @@ export default class GameScene extends Phaser.Scene {
         
         // If server has sent an updated position that's far from our prediction, correct it
         if (this.serverPosition && this.localPlayerSprite) {
-            const distX = this.serverPosition.x - this.localPlayerSprite.x;
-            const distY = this.serverPosition.y - this.localPlayerSprite.y;
+            // Clamp server position to world bounds before applying
+            const worldBounds = this.physics.world.bounds;
+            const halfWidth = this.localPlayerSprite.width / 2;
+            const halfHeight = this.localPlayerSprite.height / 2;
+            
+            // Log potential boundary conflicts with server
+            const isServerOutOfBounds = (
+                this.serverPosition.x < worldBounds.x + halfWidth ||
+                this.serverPosition.x > worldBounds.right - halfWidth ||
+                this.serverPosition.y < worldBounds.y + halfHeight ||
+                this.serverPosition.y > worldBounds.bottom - halfHeight
+            );
+            
+            if (isServerOutOfBounds) {
+                console.debug(`Server position out of bounds: (${this.serverPosition.x.toFixed(1)}, ${this.serverPosition.y.toFixed(1)})`);
+            }
+            
+            // Ensure server position is also within bounds
+            const clampedServerX = Phaser.Math.Clamp(
+                this.serverPosition.x, 
+                worldBounds.x + halfWidth, 
+                worldBounds.right - halfWidth
+            );
+            const clampedServerY = Phaser.Math.Clamp(
+                this.serverPosition.y, 
+                worldBounds.y + halfHeight, 
+                worldBounds.bottom - halfHeight
+            );
+            
+            // Calculate distance to clamped server position
+            const distX = clampedServerX - this.localPlayerSprite.x;
+            const distY = clampedServerY - this.localPlayerSprite.y;
             const distSquared = distX * distX + distY * distY;
             
-            // If difference is significant (more than 10 pixels), interpolate toward server position
-            if (distSquared > 100) {
+            // If difference is significant, interpolate toward server position
+            if (distSquared > POSITION_CORRECTION_THRESHOLD) {
+                // Log significant corrections
+                console.debug(`Significant position correction: Client (${this.localPlayerSprite.x.toFixed(1)}, ${this.localPlayerSprite.y.toFixed(1)}) → Server (${clampedServerX.toFixed(1)}, ${clampedServerY.toFixed(1)})`);
                 
                 // Interpolate position
                 this.localPlayerSprite.x += distX * INTERPOLATION_SPEED;
