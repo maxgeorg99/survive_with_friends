@@ -1547,6 +1547,10 @@ export default class GameScene extends Phaser.Scene {
     private clampToWorldBounds(position: {x: number, y: number}, entityRadius: number): {x: number, y: number} {
         const worldBounds = this.physics.world.bounds;
         
+        // Add extra vertical buffer to make top/bottom boundaries consistent with left/right
+        // This aligns the sprite's visual position with its collision boundary
+        const verticalBuffer = 8; // Extra buffer for top/bottom boundaries
+        
         return {
             x: Phaser.Math.Clamp(
                 position.x,
@@ -1555,8 +1559,8 @@ export default class GameScene extends Phaser.Scene {
             ),
             y: Phaser.Math.Clamp(
                 position.y,
-                worldBounds.y + entityRadius,
-                worldBounds.bottom - entityRadius
+                worldBounds.y + entityRadius + verticalBuffer, // Add buffer to top boundary
+                worldBounds.bottom - entityRadius - verticalBuffer // Add buffer to bottom boundary
             )
         };
     }
