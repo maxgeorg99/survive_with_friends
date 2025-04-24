@@ -438,15 +438,20 @@ export default class GameScene extends Phaser.Scene {
             this.localPlayerShadow.setAlpha(SHADOW_ALPHA);
             this.localPlayerShadow.setDepth(BASE_DEPTH + entityData.position.y + SHADOW_DEPTH_OFFSET);
             
-            // Add player name text
-            this.localPlayerNameText = this.add.text(entityData.position.x, entityData.position.y - 40, player.name, {
-                fontSize: '16px',
-                color: '#FFFFFF',
-                stroke: '#000000',
-                strokeThickness: 3,
-                fontStyle: 'bold'
-            }).setOrigin(0.5);
-            this.localPlayerNameText.setDepth(BASE_DEPTH + entityData.position.y + 1);
+            // Add player name text - Using consistent position calculation with NAME_OFFSET_Y
+            this.localPlayerNameText = this.add.text(
+                entityData.position.x, 
+                entityData.position.y - Math.floor(this.localPlayerSprite.height / 2) - NAME_OFFSET_Y, 
+                player.name, 
+                {
+                    fontSize: '16px',
+                    color: '#FFFFFF',
+                    stroke: '#000000',
+                    strokeThickness: 3,
+                    fontStyle: 'bold'
+                }
+            ).setOrigin(0.5);
+            this.localPlayerNameText.setDepth(BASE_DEPTH + entityData.position.y + NAME_DEPTH_OFFSET);
             
             // Create health bar
             const startX = entityData.position.x;
