@@ -33,17 +33,17 @@ export default class MonsterManager {
         this.scene = scene;
         this.spacetimeDBClient = client;
         this.gameEvents = (window as any).gameEvents;
-        console.log("MonsterManager initialized");
+        console.log("MonsterManager constructed");
     }
 
     // Initialize monster handlers
-    initializeMonsters() {
+    initializeMonsters(ctx: EventContext) {
         if (!this.spacetimeDBClient?.sdkConnection?.db) {
             console.error("Cannot initialize monsters: database connection not available");
             return;
         }
 
-        console.log("Initializing existing monsters from SpacetimeDB...");
+        console.log("MonsterManager initalizing monsters");
         
         // Register monster listeners
         this.registerMonsterListeners();
@@ -52,9 +52,9 @@ export default class MonsterManager {
         this.registerEntityListeners();
         
         // Force immediate update for all monsters with known entities
-        for (const monster of this.spacetimeDBClient.sdkConnection.db.monsters.iter()) {
+        for (const monster of ctx.db?.monsters.iter()) {
             // Look up the entity directly using the entity_id index
-            const entityData = this.spacetimeDBClient.sdkConnection.db.entity.entityId.find(monster.entityId);
+            const entityData = ctx.db?.entity.entityId.find(monster.entityId);
             
             if (entityData) {
                 // Entity exists, create directly with correct position
@@ -69,21 +69,16 @@ export default class MonsterManager {
     // Register monster-related event listeners
     registerMonsterListeners() {
         console.log("Registering monster listeners for MonsterManager");
-        
-        if (!this.spacetimeDBClient?.sdkConnection?.db) {
-            console.error("Cannot register monster listeners: database connection not available");
-            return;
-        }
 
-        this.spacetimeDBClient.sdkConnection.db.monsters.onInsert((ctx, monster: Monsters) => {
+        this.gameEvents.on(GameEvents.MONSTER_CREATED, (ctx: EventContext, monster: Monsters) => {
             this.createOrUpdateMonster(monster);
         });
 
-        this.spacetimeDBClient.sdkConnection.db.monsters.onUpdate((ctx, oldMonster: Monsters, newMonster: Monsters) => {
+        this.gameEvents.on(GameEvents.MONSTER_UPDATED, (ctx: EventContext, oldMonster: Monsters, newMonster: Monsters) => {
             this.createOrUpdateMonster(newMonster);
         });
 
-        this.spacetimeDBClient.sdkConnection.db.monsters.onDelete((ctx, monster: Monsters) => {
+        this.gameEvents.on(GameEvents.MONSTER_DELETED, (ctx: EventContext, monster: Monsters) => {
             this.removeMonster(monster.monsterId);
         });
     }
@@ -94,9 +89,6 @@ export default class MonsterManager {
         
         // Listen for entity events
         this.gameEvents.on(GameEvents.ENTITY_CREATED, this.handleEntityEvent, this);
-        this.gameEvents.on(GameEvents.ENTITY_UPDATED, (ctx: EventContext, oldEntity: Entity, newEntity: Entity) => {
-            this.handleEntityEvent(ctx, newEntity);
-        }, this);
     }
 
     // Add method to handle entity events
@@ -563,6 +555,14 @@ export default class MonsterManager {
         
         // Remove entity event listeners
         this.gameEvents.off(GameEvents.ENTITY_CREATED, this.handleEntityEvent, this);
-        this.gameEvents.off(GameEvents.ENTITY_UPDATED);
+
+        // Remove monster event listeners
+        this.gameEvents.off(GameEvents.MONSTER_CREATED);
+        this.gameEvents.off(GameEvents.MONSTER_UPDATED);
+        this.gameEvents.off(GameEvents.MONSTER_DELETED);
+    }
+
+    shutdown() {
+        this.unregisterListeners();
     }
 } 

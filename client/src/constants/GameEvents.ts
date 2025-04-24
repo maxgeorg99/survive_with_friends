@@ -21,6 +21,11 @@ export enum GameEvents {
     ENTITY_CREATED = 'entity:created',
     ENTITY_UPDATED = 'entity:updated',
     ENTITY_DELETED = 'entity:deleted',
+
+    // Monster events
+    MONSTER_CREATED = 'monster:created',
+    MONSTER_UPDATED = 'monster:updated',
+    MONSTER_DELETED = 'monster:deleted',
     
     // Loading events
     LOADING_COMPLETE = 'loading_complete',

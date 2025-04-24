@@ -64,7 +64,7 @@ export default class GameScene extends Phaser.Scene {
     private pendingPlayers: Map<number, Player> = new Map();
     
     // Replace monster-related properties with MonsterManager
-    private monsterManager: MonsterManager;
+    private monsterManager: MonsterManager | null = null;
     
     private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null;
     private wasdKeys: {
@@ -100,8 +100,6 @@ export default class GameScene extends Phaser.Scene {
         this.spacetimeDBClient = (window as any).spacetimeDBClient;
         this.gameEvents = (window as any).gameEvents;
         console.log("GameScene constructor called.");
-        // Initialize MonsterManager
-        this.monsterManager = new MonsterManager(this, this.spacetimeDBClient);
     }
 
     preload() {
@@ -230,6 +228,9 @@ export default class GameScene extends Phaser.Scene {
 
         // Initialize game world once event listeners are set up
         console.log("Waiting for account login updated event to initialize game world...");
+
+        // Initialize MonsterManager
+        this.monsterManager = new MonsterManager(this, this.spacetimeDBClient);
 
         this.spacetimeDBClient.sdkConnection?.reducers.updateLastLogin();
     }
@@ -398,19 +399,9 @@ export default class GameScene extends Phaser.Scene {
         console.log("Performing initial player synchronization...");
         this.syncPlayers(ctx);
 
-        console.log("Game world initialization complete.");
-    }
+        this.monsterManager?.initializeMonsters(ctx);
 
-    registerSpacetimeDBListeners(ctx: EventContext) {
-        console.log("Registering game event listeners...");
-        
-        // Player event listeners are already registered in registerEventListeners
-        // Entity event listeners are now also registered in registerEventListeners
-        
-        // Initialize the monster manager
-        this.monsterManager.initializeMonsters();
-        
-        console.log("Game event listeners registered successfully.");
+        console.log("Game world initialization complete.");
     }
 
     /**
@@ -600,7 +591,7 @@ export default class GameScene extends Phaser.Scene {
     // Helper function to handle entity updates and move corresponding sprites
     handleEntityUpdate(ctx: EventContext, entityData: Entity) {
         // First check if this is a monster entity through the monster manager
-        const wasMonsterEntity = this.monsterManager.handleEntityUpdate(ctx, entityData);
+        const wasMonsterEntity = this.monsterManager?.handleEntityUpdate(ctx, entityData);
         if (wasMonsterEntity) {
             // If it was a monster entity, we're done
             return;
@@ -609,7 +600,7 @@ export default class GameScene extends Phaser.Scene {
         // Get local player EntityId by first getting account, then player
         let localPlayerEntityId: number | undefined = undefined;
         try {
-            if (this.spacetimeDBClient?.identity && this.spacetimeDBClient?.sdkConnection?.db) 
+            if (this.spacetimeDBClient?.identity) 
             {
                 // Get account by identity
                 const localAccount = ctx.db?.account.identity.find(
@@ -1169,7 +1160,7 @@ export default class GameScene extends Phaser.Scene {
         });
         
         // Update monster positions with interpolation
-        this.monsterManager.update(time, delta);
+        this.monsterManager?.update(time, delta);
     }
 
     // Force a synchronization of player entities
@@ -1406,6 +1397,8 @@ export default class GameScene extends Phaser.Scene {
 
     shutdown() {
         console.log("GameScene shutting down...");
+
+        this.monsterManager?.shutdown();
         
         // Remove event listeners
         this.events.off("shutdown", this.shutdown, this);
