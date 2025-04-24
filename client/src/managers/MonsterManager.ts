@@ -68,6 +68,8 @@ export default class MonsterManager {
 
     // Register monster-related event listeners
     registerMonsterListeners() {
+        console.log("Registering monster listeners for MonsterManager");
+        
         if (!this.spacetimeDBClient?.sdkConnection?.db) {
             console.error("Cannot register monster listeners: database connection not available");
             return;

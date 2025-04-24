@@ -252,6 +252,8 @@ export default class GameScene extends Phaser.Scene {
         
         // Connection events
         this.gameEvents.on(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
+
+        this.events.on("shutdown", this.shutdown, this);
     }
 
     private handleAccountUpdated(ctx: EventContext, oldAccount: Account, newAccount: Account) {
@@ -296,15 +298,12 @@ export default class GameScene extends Phaser.Scene {
     }
 
     private handlePlayerUpdated(ctx: EventContext, oldPlayer: Player, newPlayer: Player, isLocalPlayer: boolean) {
-        console.log("Player updated event received in GameScene");
         
         if (isLocalPlayer) {
-            console.log("Local player updated:", newPlayer);
             // Update local player attributes if needed
             this.updateLocalPlayerAttributes(ctx, newPlayer);
         } else {
             // Update another player
-            console.log("Other player updated:", newPlayer);
             this.addOrUpdateOtherPlayer(newPlayer, ctx);
         }
     }
@@ -567,7 +566,6 @@ export default class GameScene extends Phaser.Scene {
             
             // Check if health values changed
             if (currentHp !== player.hp || currentMaxHp !== player.maxHp) {
-                console.log(`Updating health bar: ${player.hp}/${player.maxHp}`);
                 
                 // Update stored values
                 this.localPlayerSprite.setData('hp', player.hp);
@@ -601,12 +599,10 @@ export default class GameScene extends Phaser.Scene {
 
     // Helper function to handle entity updates and move corresponding sprites
     handleEntityUpdate(ctx: EventContext, entityData: Entity) {
-        console.log("Handling entity update for entity ID:", entityData.entityId);
         // First check if this is a monster entity through the monster manager
         const wasMonsterEntity = this.monsterManager.handleEntityUpdate(ctx, entityData);
         if (wasMonsterEntity) {
             // If it was a monster entity, we're done
-            console.log("Entity was handled as a monster");
             return;
         }
         
@@ -628,7 +624,6 @@ export default class GameScene extends Phaser.Scene {
                     
                     if (localPlayer) {
                         localPlayerEntityId = localPlayer.entityId;
-                        console.log("Local player entity ID:", localPlayerEntityId);
                     }
                 }
             }
@@ -638,7 +633,6 @@ export default class GameScene extends Phaser.Scene {
         
         // Check if this entity update is for the local player
         if (localPlayerEntityId === entityData.entityId) {
-            console.log("Entity update is for local player. Creating/updating sprite.");
             // If local player sprite doesn't exist yet, create it now
             if (!this.localPlayerSprite) {
                 const startX = Math.floor(entityData.position.x);
@@ -1019,7 +1013,6 @@ export default class GameScene extends Phaser.Scene {
             
             // Update tap target if it was clamped
             if (clampedTarget.x !== this.tapTarget.x || clampedTarget.y !== this.tapTarget.y) {
-                console.debug(`Clamping tap target: (${this.tapTarget.x.toFixed(1)}, ${this.tapTarget.y.toFixed(1)}) → (${clampedTarget.x.toFixed(1)}, ${clampedTarget.y.toFixed(1)})`);
                 this.tapTarget.set(clampedTarget.x, clampedTarget.y);
                 this.updateTapMarker();
             }
@@ -1376,7 +1369,7 @@ export default class GameScene extends Phaser.Scene {
             ease: 'Power2',
             onComplete: () => {
                 // Wait 3 seconds before transitioning to ClassSelectScene
-                this.time.delayedCall(3000, () => {
+                this.time.delayedCall(6000, () => {
                     console.log("Death screen timer complete, transitioning to ClassSelectScene");
                     this.scene.start('ClassSelectScene');
                 });
@@ -1415,6 +1408,10 @@ export default class GameScene extends Phaser.Scene {
         console.log("GameScene shutting down...");
         
         // Remove event listeners
+        this.events.off("shutdown", this.shutdown, this);
+
+        this.gameEvents.off(GameEvents.ACCOUNT_UPDATED, this.handleAccountUpdated, this);
+
         this.gameEvents.off(GameEvents.PLAYER_CREATED, this.handlePlayerCreated, this);
         this.gameEvents.off(GameEvents.PLAYER_UPDATED, this.handlePlayerUpdated, this);
         this.gameEvents.off(GameEvents.PLAYER_DELETED, this.handlePlayerDeleted, this);
@@ -1466,17 +1463,14 @@ export default class GameScene extends Phaser.Scene {
 
     // New entity event handlers
     private handleEntityCreated(ctx: EventContext, entity: Entity) {
-        console.log("Entity created event received in GameScene");
         this.handleEntityUpdate(ctx, entity);
     }
 
     private handleEntityUpdated(ctx: EventContext, oldEntity: Entity, newEntity: Entity) {
-        console.log("Entity updated event received in GameScene");
         this.handleEntityUpdate(ctx, newEntity);
     }
 
     private handleEntityDeleted(_ctx: EventContext, entity: Entity) {
-        console.log("Entity deleted event received in GameScene");
         // Handle entity deletion (if needed)
         // Currently no specific handling is needed as player/monster deletions are handled by respective events
     }

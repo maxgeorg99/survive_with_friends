@@ -271,8 +271,6 @@ const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
 
     // Listen for player updates
     localDb.player.onUpdate((ctx, oldPlayer, newPlayer) => {
-        console.log("Player updated event received");
-        console.log("- Player data: ", newPlayer.name + " - " + newPlayer.playerId);
         
         const myAccount = ctx.db?.account.identity.find(localIdentity);
         const isLocalPlayer = myAccount && myAccount.currentPlayerId === newPlayer.playerId;

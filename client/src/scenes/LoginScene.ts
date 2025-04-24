@@ -89,10 +89,8 @@ export default class LoginScene extends Phaser.Scene {
         
         // Handle window resize
         this.scale.on('resize', this.handleResize, this);
-        
-        // Only clean up when the scene is actually stopped/removed, not at scene start
-        this.events.off('stop', this.forceCleanupDOMElements, this); // Remove existing if any
-        this.events.on('shutdown', this.forceCleanupDOMElements, this); // Add to shutdown instead
+
+        this.events.on("shutdown", this.shutdown, this);
     }
     
     private createHTMLElements() {
@@ -283,6 +281,7 @@ export default class LoginScene extends Phaser.Scene {
         this.hideAllInputs();
         
         // Remove event listeners
+        this.events.off("shutdown", this.shutdown, this);
         this.gameEvents.off(GameEvents.CONNECTION_ESTABLISHED, this.handleConnectionEstablished, this);
         this.gameEvents.off(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
         this.gameEvents.off(GameEvents.ACCOUNT_CREATED, this.handleAccountCreated, this);

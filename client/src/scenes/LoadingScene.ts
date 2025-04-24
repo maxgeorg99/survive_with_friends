@@ -90,6 +90,8 @@ export default class LoadingScene extends Phaser.Scene {
         } else if (this.waitingFor === 'player') {
             this.gameEvents.on(GameEvents.PLAYER_CREATED, this.completeLoading, this);
         }
+
+        this.events.on("shutdown", this.shutdown, this);
     }
     
     private createSpinner(x: number, y: number) {
@@ -184,6 +186,7 @@ export default class LoadingScene extends Phaser.Scene {
         }
         
         // Remove event listeners
+        this.events.off("shutdown", this.shutdown, this);
         this.gameEvents.off(GameEvents.LOADING_COMPLETE, this.completeLoading, this);
         this.gameEvents.off(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
         

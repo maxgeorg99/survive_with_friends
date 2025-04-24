@@ -102,10 +102,10 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.scale.on('resize', this.handleResize, this);
         
         // Position HTML elements
-        this.positionHTMLElements();
+        this.positionHTMLElements();    
         
         // Only clean up when the scene is actually shut down, not at scene start
-        this.events.on('shutdown', this.cleanupHTMLElements, this);
+        this.events.on('shutdown', this.shutdown, this);
     }
     
     private createClassButtons() {
@@ -386,6 +386,7 @@ export default class ClassSelectScene extends Phaser.Scene {
         console.log("ClassSelectScene shutdown called");
         
         // Remove event listeners
+        this.events.off("shutdown", this.shutdown, this);
         this.gameEvents.off(GameEvents.PLAYER_CREATED, this.handlePlayerCreated, this);
         this.gameEvents.off(GameEvents.PLAYER_DIED, this.handlePlayerDied, this);
         this.gameEvents.off(GameEvents.NAME_SET, this.handleNameSet, this);
