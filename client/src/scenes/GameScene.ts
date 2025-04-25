@@ -448,7 +448,7 @@ export default class GameScene extends Phaser.Scene {
             this.localPlayerNameText = this.add.text(
                 entityData.position.x, 
                 entityData.position.y - Math.floor(this.localPlayerSprite.height / 2) - NAME_OFFSET_Y, 
-                player.name, 
+                `${player.name} (${player.level})`, 
                 {
                     fontSize: '16px',
                     color: '#FFFFFF',
@@ -551,8 +551,8 @@ export default class GameScene extends Phaser.Scene {
      */
     private updateLocalPlayerAttributes(ctx: EventContext, player: Player) {
         // Update player name if it changed
-        if (this.localPlayerNameText && this.localPlayerNameText.text !== player.name) {
-            this.localPlayerNameText.setText(player.name);
+        if (this.localPlayerNameText && this.localPlayerNameText.text !== `${player.name} (${player.level})`) {
+            this.localPlayerNameText.setText(`${player.name} (${player.level})`);
         }
         
         // Update health bar if health changed
