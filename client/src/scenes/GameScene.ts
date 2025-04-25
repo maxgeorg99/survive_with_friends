@@ -584,6 +584,58 @@ export default class GameScene extends Phaser.Scene {
                     }
                 }
             }
+            
+            // Add or remove glow effect based on grace period
+            if (player.spawnGracePeriodRemaining > 0) {
+                // Add a pulsing glow effect using a noticeable color tint
+                // Store the grace period state on the sprite if not already stored
+                if (!this.localPlayerSprite.getData('graceActive')) {
+                    this.localPlayerSprite.setData('graceActive', true);
+                    
+                    // Create pulsing tint effect between white and blue
+                    if (!this.localPlayerSprite.getData('graceTween')) {
+                        const graceTween = this.tweens.add({
+                            targets: this.localPlayerSprite,
+                            alpha: 0.7,
+                            yoyo: true,
+                            repeat: -1,
+                            duration: 500,
+                            onUpdate: () => {
+                                // Create cycling colors for more visible effect
+                                const t = Math.sin(this.time.now / 200) * 0.5 + 0.5;
+                                const color1 = new Phaser.Display.Color(255, 255, 255);
+                                const color2 = new Phaser.Display.Color(200, 200, 200);
+                                const color = Phaser.Display.Color.Interpolate.ColorWithColor(
+                                    color1,
+                                    color2,
+                                    100,
+                                    Math.floor(t * 100)
+                                );
+                                this.localPlayerSprite?.setTint(Phaser.Display.Color.GetColor(color.r, color.g, color.b));
+                            }
+                        });
+                        this.localPlayerSprite.setData('graceTween', graceTween);
+                    }
+                    
+                    console.log("Grace period active: " + player.spawnGracePeriodRemaining);
+                }
+            } else {
+                // Remove glow when grace period is over
+                if (this.localPlayerSprite.getData('graceActive')) {
+                    this.localPlayerSprite.setData('graceActive', false);
+                    
+                    // Stop the glow tween if it exists
+                    const graceTween = this.localPlayerSprite.getData('graceTween');
+                    if (graceTween) {
+                        graceTween.stop();
+                        this.localPlayerSprite.setData('graceTween', null);
+                    }
+                    
+                    // Reset alpha and clear tint
+                    this.localPlayerSprite.clearTint();
+                    this.localPlayerSprite.alpha = 1.0;
+                }
+            }
         }
         
         // Get the latest entity data
@@ -683,8 +735,6 @@ export default class GameScene extends Phaser.Scene {
                 
                 // Use Y position for depth instead of fixed value
                 const initialDepth = BASE_DEPTH + startY;
-                this.localPlayerSprite.setDepth(initialDepth);
-                
                 this.localPlayerNameText = this.add.text(startX, startY - Math.floor(this.localPlayerSprite.height / 2) - NAME_OFFSET_Y, 
                     `${playerName} (${playerLevel})`, PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
                 this.localPlayerNameText.setDepth(initialDepth + NAME_DEPTH_OFFSET);
