@@ -903,12 +903,49 @@ export default class GameScene extends Phaser.Scene {
         container.setData('entityId', entityData.entityId);
         container.setData('hp', playerData.hp);
         container.setData('maxHp', playerData.maxHp);
+        container.setData('sprite', sprite);
+        
+        // Name the elements so we can access them by name
+        sprite.setName('sprite');
+        text.setName('nameText');
+        healthBar.setName('healthBar');
+        healthBarBackground.setName('healthBarBackground');
         
         // Set the container depth based on Y position
         container.setDepth(initialDepth);
         
         // Store the container using player ID instead of identity
         this.otherPlayers.set(playerData.playerId, container);
+        
+        // Apply grace period effect if needed
+        if (playerData.spawnGracePeriodRemaining > 0) {
+            // Mark grace period as active
+            container.setData('graceActive', true);
+            
+            // Create pulsing tint effect
+            const graceTween = this.tweens.add({
+                targets: sprite,
+                alpha: 0.7,
+                yoyo: true,
+                repeat: -1,
+                duration: 500,
+                onUpdate: () => {
+                    // Create cycling colors for visible effect
+                    const t = Math.sin(this.time.now / 200) * 0.5 + 0.5;
+                    const color1 = new Phaser.Display.Color(255, 255, 255);
+                    const color2 = new Phaser.Display.Color(200, 200, 200);
+                    const color = Phaser.Display.Color.Interpolate.ColorWithColor(
+                        color1,
+                        color2,
+                        100,
+                        Math.floor(t * 100)
+                    );
+                    sprite.setTint(Phaser.Display.Color.GetColor(color.r, color.g, color.b));
+                }
+            });
+            container.setData('graceTween', graceTween);
+            console.log(`Player ${playerData.name} has grace period: ${playerData.spawnGracePeriodRemaining}`);
+        }
     }
 
     addOrUpdateOtherPlayer(playerData: Player, ctx: EventContext) {
@@ -955,6 +992,59 @@ export default class GameScene extends Phaser.Scene {
                             
                             // Position the health bar (it's left-aligned)
                             healthBar.x = -HEALTH_BAR_WIDTH / 2;
+                        }
+                    }
+                    
+                    // Add or remove grace period effect
+                    const sprite = container.getByName('sprite') as Phaser.GameObjects.Sprite;
+                    if (sprite) {
+                        // Handle grace period effect
+                        if (playerData.spawnGracePeriodRemaining > 0) {
+                            // Add grace period effect if not already present
+                            if (!container.getData('graceActive')) {
+                                container.setData('graceActive', true);
+                                
+                                // Create pulsing tint effect
+                                if (!container.getData('graceTween')) {
+                                    const graceTween = this.tweens.add({
+                                        targets: sprite,
+                                        alpha: 0.7,
+                                        yoyo: true,
+                                        repeat: -1,
+                                        duration: 500,
+                                        onUpdate: () => {
+                                            // Create cycling colors for visible effect
+                                            const t = Math.sin(this.time.now / 200) * 0.5 + 0.5;
+                                            const color1 = new Phaser.Display.Color(255, 255, 255);
+                                            const color2 = new Phaser.Display.Color(200, 200, 200);
+                                            const color = Phaser.Display.Color.Interpolate.ColorWithColor(
+                                                color1,
+                                                color2,
+                                                100,
+                                                Math.floor(t * 100)
+                                            );
+                                            sprite.setTint(Phaser.Display.Color.GetColor(color.r, color.g, color.b));
+                                        }
+                                    });
+                                    container.setData('graceTween', graceTween);
+                                }
+                            }
+                        } else {
+                            // Remove effect when grace period is over
+                            if (container.getData('graceActive')) {
+                                container.setData('graceActive', false);
+                                
+                                // Stop the glow tween
+                                const graceTween = container.getData('graceTween');
+                                if (graceTween) {
+                                    graceTween.stop();
+                                    container.setData('graceTween', null);
+                                }
+                                
+                                // Reset sprite to normal
+                                sprite.clearTint();
+                                sprite.alpha = 1.0;
+                            }
                         }
                     }
                 }
@@ -1008,6 +1098,12 @@ export default class GameScene extends Phaser.Scene {
     removeOtherPlayer(playerId: number) {
         const container = this.otherPlayers.get(playerId);
         if (container) {
+            // Stop any active tweens
+            const graceTween = container.getData('graceTween');
+            if (graceTween) {
+                graceTween.stop();
+            }
+            
             container.destroy();
             this.otherPlayers.delete(playerId);
         }
