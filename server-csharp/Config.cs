@@ -9,9 +9,13 @@ public static partial class Module
         public uint id; // We'll use id=0 for the main config
         
         public uint world_size; // Game world dimensions (in pixels)
+
+        public uint game_tick_rate; // Game tick rate in milliseconds
         
         // Add other config properties as needed
         public uint max_monsters; // Maximum number of monsters allowed at once
+
+        public uint player_spawn_grace_period; // Player spawn grace period in milliseconds
     }
     
     // Initialize the game configuration
@@ -31,7 +35,9 @@ public static partial class Module
         {
             id = 0,
             world_size = 2000, // Default world size in pixels
-            max_monsters = 20  // Default maximum monsters
+            game_tick_rate = 50, // Default game tick rate in milliseconds
+            max_monsters = 20,  // Default maximum monsters
+            player_spawn_grace_period = 5000 // Default player spawn grace period in milliseconds
         });
 
         Log.Info("Game configuration initialized successfully");

@@ -108,6 +108,8 @@ public static partial class Module
 
         public string name;
 
+        public uint spawn_grace_period_remaining;
+
         // New player attributes
         public PlayerClass player_class;
         public uint level;
@@ -136,11 +138,18 @@ public static partial class Module
         
         // Initialize game configuration first
         InitGameConfig(ctx);
+
+        var configOpt = ctx.Db.config.id.Find(0);
+        uint game_tick_rate = 50;
+        if(configOpt != null)
+        {
+            game_tick_rate = configOpt.Value.game_tick_rate;
+        }
         
         // Schedule game tick to run at regular intervals (50ms = 20 ticks/second)
         ctx.Db.game_tick_timer.Insert(new GameTickTimer
         {
-            scheduled_at = new ScheduleAt.Interval(TimeSpan.FromMilliseconds(50))
+            scheduled_at = new ScheduleAt.Interval(TimeSpan.FromMilliseconds(game_tick_rate))
         });
         
         Log.Info("Game tick scheduled successfully");
@@ -309,12 +318,20 @@ public static partial class Module
         Entity newEntity = newEntityOpt.Value;
         Log.Info($"Created new entity with ID: {newEntity.entity_id} for Player {name}.");
 
+        var configOpt = ctx.Db.config.id.Find(0);
+        uint player_spawn_grace_period = 5000;
+        if(configOpt != null)
+        {
+            player_spawn_grace_period = configOpt.Value.player_spawn_grace_period;
+        }
+
         // 2. Create the Player record, linking to the new entity
         Player? newPlayerOpt = ctx.Db.player.Insert(new Player
         {
             player_id = 0,
             name = name,
             entity_id = newEntity.entity_id,
+            spawn_grace_period_remaining = player_spawn_grace_period,
             player_class = playerClass,
             level = 1,
             exp = 0,

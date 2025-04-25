@@ -326,6 +326,11 @@ export default class GameScene extends Phaser.Scene {
         console.log("Player died event received in GameScene");
         // This is our local player that died
         console.log("Local player died:", player);
+        //play death animation
+        var center = this.localPlayerSprite?.getCenter();
+        if (center) {
+            this.createDeathEffects(center.x, center.y);
+        }
         this.showDeathScreen();
     }
 
@@ -1360,7 +1365,7 @@ export default class GameScene extends Phaser.Scene {
             ease: 'Power2',
             onComplete: () => {
                 // Wait 3 seconds before transitioning to ClassSelectScene
-                this.time.delayedCall(6000, () => {
+                this.time.delayedCall(3000, () => {
                     console.log("Death screen timer complete, transitioning to ClassSelectScene");
                     this.scene.start('ClassSelectScene');
                 });

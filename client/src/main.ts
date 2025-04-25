@@ -133,8 +133,6 @@ const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
             // Automatically go to login scene if account has no name
             if (!account.name) 
             {
-                cleanupDOMElements(); // Clean up before transition
-                game.scene.start('LoginScene');
                 return;
             } 
             else 
@@ -346,8 +344,6 @@ const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
     if (!myAccount.name) 
     {
         console.log("Account has no name. Going to LoginScene.");
-        cleanupDOMElements(); // Clean up before transition
-        game.scene.start('LoginScene');
         return;
     }
 

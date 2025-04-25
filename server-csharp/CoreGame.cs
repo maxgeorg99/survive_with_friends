@@ -61,6 +61,12 @@ public static partial class Module
         
         // Get the player and reduce HP
         var player = playerOpt.Value;
+
+        if(player.spawn_grace_period_remaining > 0)
+        {
+            // Player is still in spawn grace period - don't take damage
+            return false;
+        }
         
         // Make sure we don't underflow
         if (player.hp <= damage_amount)
@@ -130,15 +136,37 @@ public static partial class Module
 
         // Get world size from config
         uint worldSize = 2000; // Default fallback
+        uint tick_rate = 50;
         var configOpt = ctx.Db.config.id.Find(0);
         if (configOpt != null)
         {
             worldSize = configOpt.Value.world_size;
+            tick_rate = configOpt.Value.game_tick_rate;
         }
 
         // Process all movable players
         foreach (var player in ctx.Db.player.Iter())
         {
+            // Update player status
+            if(player.spawn_grace_period_remaining > 0)
+            {
+                var playerOpt = ctx.Db.player.player_id.Find(player.player_id);
+                if(playerOpt != null)
+                {
+                    var modifiedPlayer = playerOpt.Value;
+                    if(modifiedPlayer.spawn_grace_period_remaining >= tick_rate)
+                    {
+                        modifiedPlayer.spawn_grace_period_remaining -= tick_rate;
+                    }
+                    else
+                    {   
+                        modifiedPlayer.spawn_grace_period_remaining = 0;
+                    }
+                    ctx.Db.player.player_id.Update(modifiedPlayer);
+                }
+            }
+
+            // Process player movement
             float moveSpeed = player.speed;
 
             var entityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
