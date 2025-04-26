@@ -1,4 +1,5 @@
 using SpacetimeDB;
+using System;
 
 public static partial class Module
 {
@@ -44,6 +45,8 @@ public static partial class Module
         public uint player_id;        // The player who owns this attack
         public AttackType attack_type; // The type of attack
         public uint remaining_shots;   // How many shots remain in the burst
+        public uint parameter_u;      // Additional parameter for the attack
+        public int parameter_i;       // Additional parameter for the attack
         public ScheduleAt scheduled_at; // When the next shot should fire
     }
 
@@ -87,6 +90,8 @@ public static partial class Module
         public uint player_id;        // The player who will perform this attack
         public AttackType attack_type; // The type of attack
         public uint skill_level;      // The skill level for this attack
+        public uint parameter_u;      // Additional parameter for the attack
+        public int parameter_i;       // Additional parameter for the attack
         public ScheduleAt scheduled_at; // When to trigger the attack
     }
 
@@ -219,8 +224,8 @@ public static partial class Module
         
         var entity = entityOpt.Value;
         
-        // Get the direction from the entity
-        var direction = DetermineAttackDirection(ctx, playerId, attackType, idWithinBurst);
+        // Get attack direction using AttackUtils
+        var direction = AttackUtils.DetermineAttackDirection(ctx, playerId, attackType, idWithinBurst);
         
         // Create a new entity for the projectile and get its ID
         var projectileEntity = ctx.Db.entity.Insert(new Entity
@@ -249,70 +254,8 @@ public static partial class Module
         
         // Note: This method would be expanded with actual game logic for creating
         // projectiles, applying damage, etc. For now it just creates the active attack record.
-        Log.Info($"Created attack projectile for player {playerId}, type {attackType}, id within burst: {idWithinBurst}, direction: ({direction.x}, {direction.y}), speed: {attackData.Value.speed}");
+        Log.Info($"Created attack projectile for player {playerId}, type {attackType}, id within burst: {idWithinBurst}, direction: ({direction.x}, {direction.y}), speed: {attackData.speed}");
     }
-
-    // Determine the direction of the attack
-    private static DbVector2 DetermineAttackDirection(ReducerContext ctx, uint playerId, AttackType attackType, uint idWithinBurst)
-    {
-        // Get the player
-        var playerOpt = ctx.Db.player.player_id.Find(playerId); 
-        if (playerOpt == null)
-        {
-            throw new Exception($"DetermineAttackDirection: Player {playerId} not found");
-        }
-
-        var player = playerOpt.Value;
-        
-        // Get the entity
-        var entityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
-        if (entityOpt == null)
-        {
-            throw new Exception($"DetermineAttackDirection: Entity {player.entity_id} not found for player {playerId}");
-        }
-
-        var entity = entityOpt.Value;   
-
-        switch (attackType)
-        {
-            case AttackType.Sword:
-            {
-                // Sword attacks swing Right then Left
-                if (idWithinBurst % 2 == 0 )
-                {
-                    return new DbVector2(1, 0);
-                }
-                else
-                {
-                    return new DbVector2(-1, 0);
-                }
-            }
-            case AttackType.Wand:
-            {
-                //Wands shoot at the nearest enemy
-                var nearestEnemy = FindNearestEnemy(ctx, playerId);
-                if (nearestEnemy == null)
-                {
-                    return entity.direction;
-                }
-                
-            }
-            case AttackType.Knives:
-            {
-                // Knives attacks are thrown and follow the player's direction
-                return entity.direction;
-            }
-            case AttackType.Shield:
-            {
-                // Shield attacks are defensive and follow the player's direction
-                return entity.direction;
-            }
-            default:
-            {
-                throw new Exception($"DetermineAttackDirection: Unknown attack type {attackType}");
-            }
-        }
-    }   
 
     // Handler for attack burst cooldown expiration
     [Reducer]
@@ -372,6 +315,9 @@ public static partial class Module
             Log.Error($"Attack type {attack.attack_type} not found when triggering attack");
             return;
         }
+
+        var parameterU = AttackUtils.GetParameterU(ctx, attack);
+        attack.parameter_u = parameterU;
         
         // Handle case where we have multiple projectiles
         if (attackData.Value.projectiles > 1)
@@ -388,7 +334,7 @@ public static partial class Module
             {
                 // Fire first projectile with id_within_burst = 0
                 TriggerAttackProjectile(ctx, playerId, attack.attack_type, 0);
-                
+                 
                 Log.Info($"Scheduled {attackData.Value.projectiles - 1} projectiles for player {playerId}, attack type {attack.attack_type}, fire delay: {attackData.Value.fire_delay}");
 
                 // If there are more projectiles and fire_delay > 0, schedule the rest
@@ -397,6 +343,8 @@ public static partial class Module
                     player_id = playerId,
                     attack_type = attack.attack_type,
                     remaining_shots = attackData.Value.projectiles - 1,
+                    parameter_u = attack.parameter_u,
+                    parameter_i = attack.parameter_i,
                     scheduled_at = new ScheduleAt.Interval(TimeSpan.FromMilliseconds(attackData.Value.fire_delay))
                 });
             }
@@ -422,11 +370,13 @@ public static partial class Module
         }
 
         // Schedule the first attack
-        ctx.Db.server_scheduled_attacks.Insert(new PlayerScheduledAttack
+        ctx.Db.player_scheduled_attacks.Insert(new PlayerScheduledAttack
         {
             player_id = playerId,
             attack_type = attackType,
             skill_level = skillLevel,
+            parameter_u = 0,
+            parameter_i = 0,
             scheduled_at = new ScheduleAt.Interval(TimeSpan.FromMilliseconds(attackData.Value.cooldown))
         });
         
