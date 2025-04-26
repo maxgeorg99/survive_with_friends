@@ -179,7 +179,7 @@ public static partial class Module
     }
 
     // Helper method to find attack data by attack type
-    private static AttackData? FindAttackDataByType(ReducerContext ctx, AttackType attackType)
+    public static AttackData? FindAttackDataByType(ReducerContext ctx, AttackType attackType)
     {
         foreach (var attackData in ctx.Db.attack_data.Iter())
         {
@@ -412,11 +412,14 @@ public static partial class Module
 
         var entity = entityOpt.Value;
 
+        // Clean up any damage records associated with this attack
+        CleanupAttackDamageRecords(ctx, entity.entity_id);
+        
         // Delete the entity
-        ctx.Db.entity.Delete(entity.entity_id);
+        ctx.Db.entity.entity_id.Delete(entity.entity_id);
 
         // Delete the active attack
-        ctx.Db.active_attacks.Delete(cleanup.active_attack_id);
+        ctx.Db.active_attacks.active_attack_id.Delete(cleanup.active_attack_id);
     }   
 
     // Call this from the existing Init method

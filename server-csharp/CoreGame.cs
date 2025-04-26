@@ -1,8 +1,130 @@
 using SpacetimeDB;
+using System;
+using System.Collections.Generic;
 
 public static partial class Module
 {
     static bool errorFlag = false;
+    
+    // Time delta in seconds for movement calculations
+    private const float DELTA_TIME = 0.05f; // 50ms game tick = 0.05 seconds
+
+    // Table to track which monsters have been hit by which attacks
+    [SpacetimeDB.Table(Name = "monster_damage", Public = true)]
+    public partial struct MonsterDamage
+    {
+        [PrimaryKey, AutoInc]
+        public uint damage_id;
+        
+        public uint monster_id;       // The monster that was hit
+        public uint attack_entity_id; // The attack entity that hit the monster
+    }
+
+    // Helper function to check if a monster has already been hit by an attack
+    private static bool HasMonsterBeenHitByAttack(ReducerContext ctx, uint monsterId, uint attackEntityId)
+    {
+        foreach (var damage in ctx.Db.monster_damage.Iter())
+        {
+            if (damage.monster_id == monsterId && damage.attack_entity_id == attackEntityId)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Helper function to record a monster being hit by an attack
+    private static void RecordMonsterHitByAttack(ReducerContext ctx, uint monsterId, uint attackEntityId)
+    {
+        ctx.Db.monster_damage.Insert(new MonsterDamage
+        {
+            monster_id = monsterId,
+            attack_entity_id = attackEntityId
+        });
+    }
+
+    // Helper function to remove all damage records for a given attack entity
+    private static void CleanupAttackDamageRecords(ReducerContext ctx, uint attackEntityId)
+    {
+        var damageRecords = new List<uint>();
+        
+        foreach (var damage in ctx.Db.monster_damage.Iter())
+        {
+            if (damage.attack_entity_id == attackEntityId)
+            {
+                damageRecords.Add(damage.damage_id);
+            }
+        }
+        
+        // Delete all found damage records
+        foreach (var damageId in damageRecords)
+        {
+            ctx.Db.monster_damage.damage_id.Delete(damageId);
+        }
+    }
+
+    // Helper function to remove all damage records for a given monster
+    private static void CleanupMonsterDamageRecords(ReducerContext ctx, uint monsterId)
+    {
+        var damageRecords = new List<uint>();
+        
+        foreach (var damage in ctx.Db.monster_damage.Iter())
+        {
+            if (damage.monster_id == monsterId)
+            {
+                damageRecords.Add(damage.damage_id);
+            }
+        }
+        
+        // Delete all found damage records
+        foreach (var damageId in damageRecords)
+        {
+            ctx.Db.monster_damage.damage_id.Delete(damageId);
+        }
+    }
+
+    // Helper function to damage a monster
+    // Returns true if the monster died, false otherwise
+    public static bool DamageMonster(ReducerContext ctx, uint monsterId, uint damageAmount)
+    {
+        // Find the monster
+        var monsterOpt = ctx.Db.monsters.monster_id.Find(monsterId);
+        if (monsterOpt is null)
+        {
+            return false;
+        }
+        
+        var monster = monsterOpt.Value;
+        
+        // Make sure we don't underflow
+        if (monster.hp <= damageAmount)
+        {
+            // Monster is dead - log and delete
+            Log.Info($"Monster {monster.monster_id} (type: {monster.bestiary_id}) was killed!");
+            
+            // Clean up any monster damage records for this monster
+            CleanupMonsterDamageRecords(ctx, monsterId);
+            
+            // Delete the monster
+            ctx.Db.monsters.monster_id.Delete(monsterId);
+            
+            // Delete the entity
+            ctx.Db.entity.entity_id.Delete(monster.entity_id);
+            
+            return true;
+        }
+        else
+        {
+            // Monster is still alive, update with reduced HP
+            monster.hp -= damageAmount;
+            ctx.Db.monsters.monster_id.Update(monster);
+            
+            // Log the damage
+            Log.Info($"Monster {monster.monster_id} (type: {monster.bestiary_id}) took {damageAmount} damage. HP: {monster.hp}/{monster.max_hp}");
+            
+            return false;
+        }
+    }
 
     [Reducer]
     public static void UpdatePlayerDirection(ReducerContext ctx, float dirX, float dirY)
@@ -209,9 +331,238 @@ public static partial class Module
         
         // Process monster movements
         ProcessMonsterMovements(ctx);
+        
+        // Process attack movements
+        ProcessAttackMovements(ctx, worldSize);
 
         // Check for collisions between players and monsters
         ProcessPlayerMonsterCollisions(ctx);
+        
+        // Check for collisions between attacks and monsters
+        ProcessMonsterAttackCollisions(ctx);
+    }
+    
+    // Helper method to process attack movements
+    private static void ProcessAttackMovements(ReducerContext ctx, uint worldSize)
+    {
+        // Process each active attack
+        foreach (var activeAttack in ctx.Db.active_attacks.Iter())
+        {
+            // Get the attack entity
+            var entityOpt = ctx.Db.entity.entity_id.Find(activeAttack.entity_id);
+            if (entityOpt is null)
+            {
+                continue; // Skip if entity not found
+            }
+            
+            var entity = entityOpt.Value;
+            
+            // Get attack data
+            var attackDataOpt = FindAttackDataByType(ctx, activeAttack.attack_type);
+            if (attackDataOpt is null)
+            {
+                continue; // Skip if attack data not found
+            }
+            
+            var attackData = attackDataOpt.Value;
+            
+            // Handle special case for Shield attack type
+            if (activeAttack.attack_type == AttackType.Shield)
+            {
+                // Shield follows the player - update its position to match player's position
+                var playerOpt = ctx.Db.player.player_id.Find(activeAttack.player_id);
+                if (playerOpt is null)
+                {
+                    continue; // Skip if player not found
+                }
+                
+                var player = playerOpt.Value;
+                var playerEntityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
+                if (playerEntityOpt is null)
+                {
+                    continue; // Skip if player entity not found
+                }
+                
+                var playerEntity = playerEntityOpt.Value;
+                
+                // Calculate shield position offset based on id_within_burst
+                // For multiple shields, position them in a circle around the player
+                float angle = 0;
+                if (activeAttack.id_within_burst == 0)
+                {
+                    angle = 0; // First shield in front
+                }
+                else
+                {
+                    angle = 180; // Second shield behind
+                }
+                
+                // Convert angle to radians
+                float radians = angle * (float)Math.PI / 180.0f;
+                
+                // Calculate offset (distance from player center)
+                float offsetDistance = playerEntity.radius + entity.radius;
+                float offsetX = (float)Math.Cos(radians) * offsetDistance;
+                float offsetY = (float)Math.Sin(radians) * offsetDistance;
+                
+                // Update shield entity with new position
+                var updatedEntity = entity;
+                updatedEntity.position = new DbVector2(
+                    playerEntity.position.x + offsetX,
+                    playerEntity.position.y + offsetY
+                );
+                
+                // Apply world boundary clamping
+                updatedEntity.position.x = Math.Clamp(
+                    updatedEntity.position.x, 
+                    updatedEntity.radius, 
+                    worldSize - updatedEntity.radius
+                );
+                updatedEntity.position.y = Math.Clamp(
+                    updatedEntity.position.y, 
+                    updatedEntity.radius, 
+                    worldSize - updatedEntity.radius
+                );
+                
+                ctx.Db.entity.entity_id.Update(updatedEntity);
+            }
+            else
+            {
+                // Regular projectile movement based on direction and speed
+                float moveSpeed = attackData.speed;
+                
+                // Calculate movement based on direction, speed and time delta
+                float moveDistance = moveSpeed * DELTA_TIME;
+                var moveOffset = entity.direction * moveDistance;
+                
+                // Update entity with new position
+                var updatedEntity = entity;
+                updatedEntity.position = entity.position + moveOffset;
+                
+                // Apply world boundary clamping
+                updatedEntity.position.x = Math.Clamp(
+                    updatedEntity.position.x, 
+                    updatedEntity.radius, 
+                    worldSize - updatedEntity.radius
+                );
+                updatedEntity.position.y = Math.Clamp(
+                    updatedEntity.position.y, 
+                    updatedEntity.radius, 
+                    worldSize - updatedEntity.radius
+                );
+                
+                // Check if entity hit the world boundary, if so mark for deletion
+                bool hitBoundary = 
+                    updatedEntity.position.x <= updatedEntity.radius ||
+                    updatedEntity.position.x >= worldSize - updatedEntity.radius ||
+                    updatedEntity.position.y <= updatedEntity.radius ||
+                    updatedEntity.position.y >= worldSize - updatedEntity.radius;
+                
+                if (hitBoundary)
+                {
+                    // Delete attack entity and active attack record
+                    ctx.Db.entity.entity_id.Delete(entity.entity_id);
+                    ctx.Db.active_attacks.active_attack_id.Delete(activeAttack.active_attack_id);
+                    
+                    // Clean up any damage records associated with this attack
+                    CleanupAttackDamageRecords(ctx, entity.entity_id);
+                }
+                else
+                {
+                    // Update entity position
+                    ctx.Db.entity.entity_id.Update(updatedEntity);
+                }
+            }
+        }
+    }
+    
+    // Helper method to process collisions between attacks and monsters
+    private static void ProcessMonsterAttackCollisions(ReducerContext ctx)
+    {
+        // Load all monsters with entities
+        var monsterEntities = new Dictionary<uint, (Entity entity, Monsters monster)>();
+        
+        foreach (var monster in ctx.Db.monsters.Iter())
+        {
+            var entityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
+            if (entityOpt != null)
+            {
+                monsterEntities[monster.entity_id] = (entityOpt.Value, monster);
+            }
+        }
+        
+        // Check each active attack for collisions with monsters
+        foreach (var activeAttack in ctx.Db.active_attacks.Iter())
+        {
+            // Get the attack entity
+            var attackEntityOpt = ctx.Db.entity.entity_id.Find(activeAttack.entity_id);
+            if (attackEntityOpt is null)
+            {
+                continue; // Skip if entity not found
+            }
+            
+            var attackEntity = attackEntityOpt.Value;
+            
+            // Get attack data for damage calculation
+            var attackDataOpt = FindAttackDataByType(ctx, activeAttack.attack_type);
+            if (attackDataOpt is null)
+            {
+                continue; // Skip if attack data not found
+            }
+            
+            var attackData = attackDataOpt.Value;
+            
+            bool attackHitMonster = false;
+            
+            // Check for collisions with monsters
+            foreach (var monsterEntry in monsterEntities)
+            {
+                uint monsterEntityId = monsterEntry.Key;
+                var (monsterEntity, monster) = monsterEntry.Value;
+                
+                // Check if the attack is colliding with this monster
+                if (AreEntitiesColliding(attackEntity, monsterEntity))
+                {
+                    // Check if this monster has already been hit by this attack
+                    if (HasMonsterBeenHitByAttack(ctx, monster.monster_id, attackEntity.entity_id))
+                    {
+                        continue; // Skip if monster already hit by this attack
+                    }
+                    
+                    // Record the hit
+                    RecordMonsterHitByAttack(ctx, monster.monster_id, attackEntity.entity_id);
+                    
+                    // Apply damage to monster
+                    uint damage = attackData.damage;
+                    
+                    // Apply armor piercing if available
+                    // Monster armor would need to be added to bestiary or monster table
+                    // For now, just apply full damage
+                    
+                    bool monsterKilled = DamageMonster(ctx, monster.monster_id, damage);
+                    attackHitMonster = true;
+                    
+                    // For non-piercing attacks, stop checking other monsters and destroy the attack
+                    if (!attackData.piercing)
+                    {
+                        break;
+                    }
+                }
+            }
+            
+            // If the attack hit a monster and it's not piercing, remove the attack
+            if (attackHitMonster && !attackData.piercing)
+            {
+                // Delete the attack entity
+                ctx.Db.entity.entity_id.Delete(attackEntity.entity_id);
+                
+                // Delete the active attack record
+                ctx.Db.active_attacks.active_attack_id.Delete(activeAttack.active_attack_id);
+                
+                // Clean up any damage records for this attack
+                CleanupAttackDamageRecords(ctx, attackEntity.entity_id);
+            }
+        }
     }
     
     // Helper method to process collisions between players and monsters and apply damage

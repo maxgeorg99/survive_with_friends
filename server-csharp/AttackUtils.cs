@@ -8,6 +8,9 @@ public static partial class Module
     {
         public static uint GetParameterU(ReducerContext ctx, PlayerScheduledAttack attack)
         {
+            var playerId = attack.player_id;
+            var attackType = attack.attack_type;
+            
             var playerOpt = ctx.Db.player.player_id.Find(playerId);
             if (playerOpt == null)
             {
@@ -29,14 +32,14 @@ public static partial class Module
                 case AttackType.Knives:
                 {
                     //Random angle on a circle
-                    var random = ctx.Random;
+                    var random = ctx.Rng;
                     var angle = random.NextDouble() * 360.0;
                     return (uint)(angle);
                 }
-            }
-            default:
-            {
-                return 0;
+                default:
+                {
+                    return 0;
+                }
             }
         }   
 
