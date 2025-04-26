@@ -1,18 +1,18 @@
 using SpacetimeDB;
 using System;
 
+// Attack type enum
+[SpacetimeDB.Type]
+public enum AttackType
+{
+    Sword,
+    Wand,
+    Knives,
+    Shield
+}
+
 public static partial class Module
 {
-    // Attack type enum
-    [SpacetimeDB.Type]
-    public enum AttackType
-    {
-        Sword,
-        Wand,
-        Knives,
-        Shield
-    }
-
     // Attack data table - stores the base data for various attacks
     [SpacetimeDB.Table(Name = "attack_data", Public = true)]
     public partial struct AttackData
@@ -87,8 +87,11 @@ public static partial class Module
         [PrimaryKey, AutoInc]
         public ulong scheduled_id;
         
+        [SpacetimeDB.Index.BTree]
         public uint player_id;        // The player who will perform this attack
+        
         public AttackType attack_type; // The type of attack
+        
         public uint skill_level;      // The skill level for this attack
         public uint parameter_u;      // Additional parameter for the attack
         public int parameter_i;       // Additional parameter for the attack
@@ -277,7 +280,7 @@ public static partial class Module
         if (burstCooldown.remaining_shots == 0)
         {
             Log.Error($"Remaining shots is 0 for player {burstCooldown.player_id}, attack type {burstCooldown.attack_type}");
-            ctx.Db.attack_burst_cooldowns.Delete(burstCooldown.scheduled_id);
+            ctx.Db.attack_burst_cooldowns.Delete(burstCooldown);
             return;
         }
         
@@ -292,7 +295,7 @@ public static partial class Module
         if (burstCooldown.remaining_shots == 0)
         {
             Log.Info($"All projectiles fired for player {burstCooldown.player_id}, attack type {burstCooldown.attack_type}");
-            ctx.Db.attack_burst_cooldowns.Delete(burstCooldown.scheduled_id);
+            ctx.Db.attack_burst_cooldowns.Delete(burstCooldown);
         }
     }
 

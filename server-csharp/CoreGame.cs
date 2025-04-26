@@ -5,9 +5,6 @@ using System.Collections.Generic;
 public static partial class Module
 {
     static bool errorFlag = false;
-    
-    // Time delta in seconds for movement calculations
-    private const float DELTA_TIME = 0.05f; // 50ms game tick = 0.05 seconds
 
     // Table to track which monsters have been hit by which attacks
     [SpacetimeDB.Table(Name = "monster_damage", Public = true)]
@@ -16,10 +13,10 @@ public static partial class Module
         [PrimaryKey, AutoInc]
         public uint damage_id;
         
-        [Index.BTree]
+        [SpacetimeDB.Index.BTree]
         public uint monster_id;       // The monster that was hit
 
-        [Index.BTree]
+        [SpacetimeDB.Index.BTree]
         public uint attack_entity_id; // The attack entity that hit the monster
     }
 
@@ -58,7 +55,7 @@ public static partial class Module
 
         var attackDamageRecords = ctx.Db.monster_damage.attack_entity_id.Filter(attackEntityId);
         
-        foreach (var damage in attackDamageRecords))
+        foreach (var damage in attackDamageRecords)
         {
             damageRecords.Add(damage.damage_id);
         }

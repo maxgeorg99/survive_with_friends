@@ -64,6 +64,12 @@ public static partial class Module
 
             var entity = entityOpt.Value;
 
+            var attackData = FindAttackDataByType(ctx, attackType);
+            if (attackData == null)
+            {
+                throw new Exception($"DetermineAttackDirection: Attack data not found for type {attackType}");
+            }
+
             // Handle different attack types
             switch (attackType)
             {
@@ -82,12 +88,14 @@ public static partial class Module
                 case AttackType.Wand:
                 {
                     // Wands shoot at the nearest enemy
-                    var nearestEnemy = FindNearestEnemy(ctx, entity);
+                    Entity? nearestEnemy = FindNearestEnemy(ctx, entity);
                     if (nearestEnemy != null)
                     {
+                        var enemyActual = nearestEnemy.Value;
+
                         // Calculate direction vector to the enemy
-                        var dx = nearestEnemy.position.x - entity.position.x;
-                        var dy = nearestEnemy.position.y - entity.position.y;
+                        var dx = enemyActual.position.x - entity.position.x;
+                        var dy = enemyActual.position.y - entity.position.y;
                         
                         // Normalize the direction
                         var length = Math.Sqrt(dx * dx + dy * dy);
@@ -104,7 +112,12 @@ public static partial class Module
                 {
                     //Knives attack in a circle around the player starting at the angle specified in the parameter_u
                     //The angle is in degrees, so we need to convert it to radians
-                    var startAngle = (double)parameterU * Math.PI / 180.0;                       var angleStep = 360.0 / (double)attackData.Value.projectiles;
+                    var playerAttacks = ctx.Db.player_scheduled_attacks.player_id.Filter(playerId);
+                    var playerAttackOfThisType = playerAttacks.Where(attack => attack.attack_type == attackType).OrderBy(attack => attack.scheduled_at).FirstOrDefault();
+
+                    var parameterU = playerAttackOfThisType.parameter_u;
+                    var startAngle = (double)parameterU * Math.PI / 180.0;                       
+                    var angleStep = 360.0 / (double)attackData.Value.projectiles;
                     var attackAngle = startAngle + (angleStep * (double)idWithinBurst);
                     return new DbVector2((float)Math.Cos(attackAngle), (float)Math.Sin(attackAngle));   
                 }
@@ -127,7 +140,7 @@ public static partial class Module
             float nearestDistanceSquared = float.MaxValue;
 
             // Iterate through all monsters in the game
-            foreach (var monster in ctx.Db.monster.Iter())
+            foreach (var monster in ctx.Db.monsters.Iter())
             {
                 // Get the monster's entity
                 var monsterEntityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
