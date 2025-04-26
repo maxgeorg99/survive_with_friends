@@ -113,15 +113,15 @@ public static partial class Module
             attack_id = 1,
             attack_type = AttackType.Sword,
             name = "Sword Slash",
-            cooldown = 1000,          // 1 second cooldown
-            duration = 500,           // 0.5 second duration
-            projectiles = 1,          // Single slash
-            fire_delay = 0,           // No delay
-            speed = 150,              // Short range attack moves quickly
-            piercing = true,          // Hits all enemies in range
-            radius = 60,              // Short range
-            damage = 25,              // Base damage
-            armor_piercing = 5        // Slight armor piercing
+            cooldown = 600,          
+            duration = 500,          
+            projectiles = 1,          
+            fire_delay = 0,          
+            speed = 5,              
+            piercing = true,         
+            radius = 60,             
+            damage = 25,             
+            armor_piercing = 0       
         });
 
         // Wand - magic projectile
@@ -130,15 +130,15 @@ public static partial class Module
             attack_id = 2,
             attack_type = AttackType.Wand,
             name = "Magic Bolt",
-            cooldown = 1500,          // 1.5 second cooldown
-            duration = 2000,          // 2 second duration for projectile
-            projectiles = 1,          // Single bolt
-            fire_delay = 0,           // No burst fire
-            speed = 250,              // Bolt speed
-            piercing = false,         // Doesn't pierce
-            radius = 20,              // Bolt radius
-            damage = 30,              // High damage
-            armor_piercing = 15       // Good armor piercing
+            cooldown = 400,           
+            duration = 1000,          
+            projectiles = 1,          
+            fire_delay = 0,          
+            speed = 7,                
+            piercing = false,         
+            radius = 20,              
+            damage = 20,              
+            armor_piercing = 10       
         });
 
         // Knives - multiple projectiles in burst
@@ -147,15 +147,15 @@ public static partial class Module
             attack_id = 3,
             attack_type = AttackType.Knives,
             name = "Throwing Knives",
-            cooldown = 2000,          // 2 second cooldown
-            duration = 1500,          // 1.5 second duration for projectiles
-            projectiles = 3,          // Three knives per burst
-            fire_delay = 150,         // 150ms between knives
-            speed = 300,              // Fast knives
-            piercing = false,         // Doesn't pierce
-            radius = 15,              // Small knife hitbox
-            damage = 15,              // Lower individual damage
-            armor_piercing = 10       // Medium armor piercing
+            cooldown = 500,          
+            duration = 800,          
+            projectiles = 5,          
+            fire_delay = 1,           
+            speed = 10,               
+            piercing = false,         
+            radius = 15,              
+            damage = 15,              
+            armor_piercing = 0       
         });
 
         // Shield - defensive area attack
@@ -164,15 +164,15 @@ public static partial class Module
             attack_id = 4,
             attack_type = AttackType.Shield,
             name = "Shield Bash",
-            cooldown = 3000,          // 3 second cooldown
-            duration = 800,           // 0.8 second duration
-            projectiles = 1,          // Single attack
-            fire_delay = 0,           // No burst
-            speed = 120,              // Short range attack with modest speed
-            piercing = true,          // Hits all enemies in range
-            radius = 80,              // Large radius
-            damage = 20,              // Medium damage
-            armor_piercing = 0        // No armor piercing
+            cooldown = 5000,          
+            duration = 4250,         
+            projectiles = 2,          
+            fire_delay = 0,           
+            speed = 4,              
+            piercing = true,         
+            radius = 32,             
+            damage = 20,             
+            armor_piercing = 10       
         });
 
         Log.Info("Attack data initialized successfully.");
