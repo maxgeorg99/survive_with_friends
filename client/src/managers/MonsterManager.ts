@@ -250,6 +250,17 @@ export default class MonsterManager {
         return false;
     }
 
+    // Helper function to determine health bar color based on percentage
+    private getHealthBarColor(healthPercent: number): number {
+        if (healthPercent > 0.6) {
+            return 0x00FF00; // Green
+        } else if (healthPercent > 0.3) {
+            return 0xFFFF00; // Yellow
+        } else {
+            return 0xFF0000; // Red
+        }
+    }
+
     // Helper function to create or update monster sprites
     createOrUpdateMonster(monsterData: Monsters) {
         // Ensure database connection exists
@@ -273,6 +284,9 @@ export default class MonsterManager {
                     // Update health bar width based on current HP percentage
                     const healthPercent = monsterData.hp / maxHP;
                     healthBar.width = MONSTER_HEALTH_BAR_WIDTH * healthPercent;
+                    
+                    // Update health bar color based on percentage
+                    healthBar.fillColor = this.getHealthBarColor(healthPercent);
                     
                     // Update HP data in container
                     existingMonster.setData('currentHP', monsterData.hp);
@@ -343,6 +357,9 @@ export default class MonsterManager {
                         const healthPercent = monsterData.hp / maxHP;
                         healthBar.width = MONSTER_HEALTH_BAR_WIDTH * healthPercent;
                         
+                        // Update health bar color based on percentage
+                        healthBar.fillColor = this.getHealthBarColor(healthPercent);
+                        
                         // Update HP data in container
                         monsterContainer.setData('currentHP', monsterData.hp);
                         monsterContainer.setData('maxHP', monsterData.maxHp);
@@ -403,7 +420,7 @@ export default class MonsterManager {
                 -sprite.height/2 - MONSTER_HEALTH_BAR_OFFSET_Y,
                 MONSTER_HEALTH_BAR_WIDTH * healthPercent,
                 MONSTER_HEALTH_BAR_HEIGHT,
-                0xFF0000, // Red health bar for monsters
+                this.getHealthBarColor(healthPercent), // Use color based on health percentage
                 1
             );
             healthBar.setOrigin(0, 0.5);
