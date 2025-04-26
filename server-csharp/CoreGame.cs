@@ -16,21 +16,29 @@ public static partial class Module
         [PrimaryKey, AutoInc]
         public uint damage_id;
         
+        [Index.BTree]
         public uint monster_id;       // The monster that was hit
+
+        [Index.BTree]
         public uint attack_entity_id; // The attack entity that hit the monster
     }
 
     // Helper function to check if a monster has already been hit by an attack
     private static bool HasMonsterBeenHitByAttack(ReducerContext ctx, uint monsterId, uint attackEntityId)
     {
-        foreach (var damage in ctx.Db.monster_damage.Iter())
+        // First filter: Use the BTree index to efficiently find all damage records for this attack
+        var attackDamageRecords = ctx.Db.monster_damage.attack_entity_id.Filter(attackEntityId);
+        
+        // Second filter: Check if any of those records match our monster
+        foreach (var damage in attackDamageRecords)
         {
-            if (damage.monster_id == monsterId && damage.attack_entity_id == attackEntityId)
+            if (damage.monster_id == monsterId)
             {
-                return true;
+                return true; // Found a record - this monster was hit by this attack
             }
         }
-        return false;
+        
+        return false; // No matching record found
     }
 
     // Helper function to record a monster being hit by an attack
@@ -47,13 +55,12 @@ public static partial class Module
     private static void CleanupAttackDamageRecords(ReducerContext ctx, uint attackEntityId)
     {
         var damageRecords = new List<uint>();
+
+        var attackDamageRecords = ctx.Db.monster_damage.attack_entity_id.Filter(attackEntityId);
         
-        foreach (var damage in ctx.Db.monster_damage.Iter())
+        foreach (var damage in attackDamageRecords))
         {
-            if (damage.attack_entity_id == attackEntityId)
-            {
-                damageRecords.Add(damage.damage_id);
-            }
+            damageRecords.Add(damage.damage_id);
         }
         
         // Delete all found damage records
@@ -67,13 +74,12 @@ public static partial class Module
     private static void CleanupMonsterDamageRecords(ReducerContext ctx, uint monsterId)
     {
         var damageRecords = new List<uint>();
+
+        var monsterDamageRecords = ctx.Db.monster_damage.monster_id.Filter(monsterId);
         
-        foreach (var damage in ctx.Db.monster_damage.Iter())
+        foreach (var damage in monsterDamageRecords)
         {
-            if (damage.monster_id == monsterId)
-            {
-                damageRecords.Add(damage.damage_id);
-            }
+            damageRecords.Add(damage.damage_id);
         }
         
         // Delete all found damage records
