@@ -700,5 +700,4 @@ public static partial class Module
         
         return new DbVector2(nx * repulsionStrength, ny * repulsionStrength);
     }
-
 }

@@ -138,6 +138,9 @@ public static partial class Module
         
         // Initialize game configuration first
         InitGameConfig(ctx);
+        
+        // Initialize class data
+        InitializeClassData(ctx);
 
         var configOpt = ctx.Db.config.id.Find(0);
         uint game_tick_rate = 50;
@@ -302,6 +305,30 @@ public static partial class Module
     // Helper function that takes a position parameter
     private static Player? CreateNewPlayerWithPosition(ReducerContext ctx, string name, PlayerClass playerClass, DbVector2 position)
     {
+        // Look up class data to use for stats
+        var classDataOpt = ctx.Db.class_data.ClassId.Find((uint)playerClass);
+        if (classDataOpt == null)
+        {
+            Log.Error($"CreateNewPlayerWithPosition: No class data found for {playerClass}");
+            // Fall back to default values if class data not found
+        }
+        
+        // Define default stats in case class data isn't found
+        int maxHp = 100;
+        int armor = 0;
+        float speed = PLAYER_SPEED;
+        AttackType startingAttackType = AttackType.Sword;
+        
+        // Use class data if available
+        if (classDataOpt != null)
+        {
+            ClassData classData = classDataOpt;
+            maxHp = classData.MaxHp;
+            armor = classData.Armor;
+            speed = classData.Speed;
+            startingAttackType = classData.StartingAttackType;
+        }
+        
         // 1. Create the Entity for the player with default direction and not moving
         Entity? newEntityOpt = ctx.Db.entity.Insert(new Entity
         {
@@ -329,6 +356,7 @@ public static partial class Module
         }
 
         // 2. Create the Player record, linking to the new entity
+        // Use class data for stats
         Player? newPlayerOpt = ctx.Db.player.Insert(new Player
         {
             player_id = 0,
@@ -338,10 +366,10 @@ public static partial class Module
             player_class = playerClass,
             level = 1,
             exp = 0,
-            max_hp = 100,
-            hp = 100,
-            speed = PLAYER_SPEED,
-            armor = 0
+            max_hp = (uint)maxHp,
+            hp = (uint)maxHp,
+            speed = speed,
+            armor = (uint)armor
         });
 
         // Check if player insertion failed
@@ -349,6 +377,10 @@ public static partial class Module
         {
             throw new Exception("Failed to insert new player for {identity}! Insert returned null.");
         }
+        
+        // Schedule the starting attack for this class
+        ScheduleAttack(ctx, newPlayerOpt.Value.player_id, startingAttackType);
+        Log.Info($"Scheduled starting attack type {startingAttackType} for player {newPlayerOpt.Value.player_id}");
 
         return newPlayerOpt;
     }

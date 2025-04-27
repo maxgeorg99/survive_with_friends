@@ -32,7 +32,7 @@ export class AttackManager {
 
         // Force immediate update for all attacks with known entities
         for (const attack of ctx.db?.activeAttacks.iter()) {
-            this.createOrUpdateAttackGraphic(attack);
+            this.createOrUpdateAttackGraphic(ctx, attack);
         }
         
     }
@@ -56,24 +56,14 @@ export class AttackManager {
         console.log(`AttackManager: Local player ID set to ${playerId}`);
     }
 
-    public checkExistingAttacks() {
-        if (!this.spacetimeClient.sdkConnection) return;
-        
-        console.log("Checking for existing attacks...");
-        const attacks = this.spacetimeClient.sdkConnection.db.activeAttacks.iter();
-        for (const attack of attacks) {
-            this.createOrUpdateAttackGraphic(attack);
-        }
-    }
-
-    private handleAttackInsert(_ctx: EventContext, attack: ActiveAttack) {
+    private handleAttackInsert(ctx: EventContext, attack: ActiveAttack) {
         console.log(`Attack inserted: ${attack.activeAttackId}, type: ${attack.attackType}`);
-        this.createOrUpdateAttackGraphic(attack);
+        this.createOrUpdateAttackGraphic(ctx, attack);
     }
 
-    private handleAttackUpdate(_ctx: EventContext, _oldAttack: ActiveAttack, newAttack: ActiveAttack) {
+    private handleAttackUpdate(ctx: EventContext, _oldAttack: ActiveAttack, newAttack: ActiveAttack) {
         console.log(`Attack updated: ${newAttack.activeAttackId}`);
-        this.createOrUpdateAttackGraphic(newAttack);
+        this.createOrUpdateAttackGraphic(ctx, newAttack);
     }
 
     private handleAttackDelete(_ctx: EventContext, attack: ActiveAttack) {
@@ -85,7 +75,7 @@ export class AttackManager {
         }
     }
 
-    private createOrUpdateAttackGraphic(attack: ActiveAttack) {
+    private createOrUpdateAttackGraphic(ctx: EventContext, attack: ActiveAttack) {
         if (!this.spacetimeClient.sdkConnection) return;
         
         // Find the entity for this attack
@@ -96,7 +86,7 @@ export class AttackManager {
         }
 
         // Find attack data for this attack type
-        const attackData = this.findAttackDataByType(attack.attackType);
+        const attackData = this.findAttackDataByType(ctx, attack.attackType);
         if (!attackData) {
             console.error(`Attack data not found for type ${attack.attackType}`);
             return;
@@ -125,10 +115,8 @@ export class AttackManager {
         graphic.strokeCircle(entity.position.x, entity.position.y, attackData.radius);
     }
 
-    private findAttackDataByType(attackType: AttackType): AttackData | undefined {
-        if (!this.spacetimeClient.sdkConnection) return undefined;
-        
-        const attackDataItems = this.spacetimeClient.sdkConnection.db.attackData.iter();
+    private findAttackDataByType(ctx: EventContext, attackType: AttackType): AttackData | undefined {
+        const attackDataItems = ctx.db?.attackData.iter();
         for (const data of attackDataItems) {
             if (data.attackType === attackType) {
                 return data;
