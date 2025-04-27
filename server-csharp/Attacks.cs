@@ -127,7 +127,7 @@ public static partial class Module
             fire_delay = 0,          
             speed = 800,              
             piercing = true,         
-            radius = 48,             
+            radius = 32,             
             damage = 4,        
             armor_piercing = 0       
         });

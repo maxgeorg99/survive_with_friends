@@ -1327,8 +1327,8 @@ export default class GameScene extends Phaser.Scene {
         // Update monster positions with interpolation
         this.monsterManager?.update(time, delta);
         
-        // Update attack visuals
-        this.attackManager?.update();
+        // Update attack visuals with time for prediction
+        this.attackManager?.update(time);
     }
 
     // Force a synchronization of player entities

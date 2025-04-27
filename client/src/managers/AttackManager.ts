@@ -4,12 +4,27 @@ import { AttackData } from '../autobindings';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { GameEvents } from '../constants/GameEvents';
 
-// Define a type for our attack graphic data
+// Define a type for our attack graphic data with prediction capabilities
 interface AttackGraphicData {
     graphic: Phaser.GameObjects.Graphics;
     radius: number;
     alpha: number;
+    // Add prediction-related properties
+    lastUpdateTime: number;
+    predictedPosition: Phaser.Math.Vector2;
+    serverPosition: Phaser.Math.Vector2;
+    direction: Phaser.Math.Vector2;
+    speed: number;
+    isShield: boolean;
+    playerId: number | null;
+    parameterU: number;
+    ticksElapsed: number;
 }
+
+// Constants for prediction behavior
+const PREDICTION_CORRECTION_THRESHOLD = 25; // Distance squared before we snap to server position
+const DELTA_TIME = 1/60; // Assume 60fps for client prediction (should match server tick rate closely)
+const SHIELD_ORBIT_DISTANCE = 42; // Distance from player center for shield orbits
 
 export class AttackManager {
     private scene: Phaser.Scene;
@@ -17,6 +32,7 @@ export class AttackManager {
     private localPlayerId: number | null = null;
     private spacetimeClient: SpacetimeDBClient;
     private gameEvents: Phaser.Events.EventEmitter;
+    private gameTime: number = 0;
 
     constructor(scene: Phaser.Scene, spacetimeClient: SpacetimeDBClient) {
         this.scene = scene;
@@ -63,17 +79,14 @@ export class AttackManager {
     }
 
     private handleAttackInsert(ctx: EventContext, attack: ActiveAttack) {
-        console.log(`Attack inserted: ${attack.activeAttackId}, type: ${attack.attackType}`);
         this.createOrUpdateAttackGraphic(ctx, attack);
     }
 
     private handleAttackUpdate(ctx: EventContext, _oldAttack: ActiveAttack, newAttack: ActiveAttack) {
-        console.log(`Attack updated: ${newAttack.activeAttackId}`);
         this.createOrUpdateAttackGraphic(ctx, newAttack);
     }
 
     private handleAttackDelete(_ctx: EventContext, attack: ActiveAttack) {
-        console.log(`Attack deleted: ${attack.activeAttackId}`);
         const attackData = this.attackGraphics.get(attack.activeAttackId);
         if (attackData) {
             attackData.graphic.destroy();
@@ -94,13 +107,16 @@ export class AttackManager {
         // Find attack data for this attack type
         const attackData = this.findAttackDataByType(ctx, attack.attackType);
         if (!attackData) {
-            console.error(`Attack data not found for type ${attack.attackType}`);
+            console.error(`Attack data not found for type ${attack.attackType.tag}`);
             return;
         }
 
         // Calculate alpha based on ownership
         const isLocalPlayerAttack = attack.playerId === this.localPlayerId;
         const alpha = isLocalPlayerAttack ? 0.7 : 0.4;
+        
+        // Determine if this is a shield attack
+        const isShield = attack.attackType.tag === "Shield";
 
         // Get or create attack graphic data
         let attackGraphicData = this.attackGraphics.get(attack.activeAttackId);
@@ -108,38 +124,69 @@ export class AttackManager {
             // Create a new graphics object
             const graphic = this.scene.add.graphics();
             
-            // Store the attack graphic data with pre-calculated values
+            // Setup direction vector based on entity direction
+            const direction = new Phaser.Math.Vector2(entity.direction.x, entity.direction.y);
+            
+            // Store the attack graphic data with prediction values
             attackGraphicData = {
                 graphic,
                 radius: attackData.radius,
-                alpha
+                alpha,
+                lastUpdateTime: this.gameTime,
+                predictedPosition: new Phaser.Math.Vector2(entity.position.x, entity.position.y),
+                serverPosition: new Phaser.Math.Vector2(entity.position.x, entity.position.y),
+                direction: direction,
+                speed: attackData.speed,
+                isShield,
+                playerId: attack.playerId,
+                parameterU: attack.parameterU,
+                ticksElapsed: attack.ticksElapsed
             };
             
             this.attackGraphics.set(attack.activeAttackId, attackGraphicData);
+        } else {
+            // Update the server position and time for existing attack graphic
+            attackGraphicData.serverPosition.set(entity.position.x, entity.position.y);
+            attackGraphicData.lastUpdateTime = this.gameTime;
+            attackGraphicData.ticksElapsed = attack.ticksElapsed;
+            
+            // Check if predicted position is too far from server position
+            const dx = attackGraphicData.predictedPosition.x - entity.position.x;
+            const dy = attackGraphicData.predictedPosition.y - entity.position.y;
+            const distSquared = dx * dx + dy * dy;
+            
+            if (distSquared > PREDICTION_CORRECTION_THRESHOLD) {
+                // Correction needed - reset prediction to match server
+                attackGraphicData.predictedPosition.set(entity.position.x, entity.position.y);
+            }
         }
 
+        // Update the graphic right away
+        this.updateAttackGraphic(attackGraphicData);
+    }
+
+    private updateAttackGraphic(attackGraphicData: AttackGraphicData) {
         // Clear previous drawing
         attackGraphicData.graphic.clear();
 
         // Draw the attack as a blue circle using stored values
         attackGraphicData.graphic.fillStyle(0x0088ff, attackGraphicData.alpha);
         attackGraphicData.graphic.fillCircle(
-            entity.position.x, 
-            entity.position.y, 
+            attackGraphicData.predictedPosition.x, 
+            attackGraphicData.predictedPosition.y, 
             attackGraphicData.radius
         );
         
         // Add a border for better visibility
         attackGraphicData.graphic.lineStyle(2, 0x0066cc, attackGraphicData.alpha + 0.2);
         attackGraphicData.graphic.strokeCircle(
-            entity.position.x, 
-            entity.position.y, 
+            attackGraphicData.predictedPosition.x, 
+            attackGraphicData.predictedPosition.y, 
             attackGraphicData.radius
         );
     }
 
     private findAttackDataByType(ctx: EventContext, attackType: AttackType): AttackData | undefined {
-        
         const attackDataItems = ctx.db?.attackData.iter();
         for (const data of attackDataItems) {
             if (data.attackType.tag === attackType.tag) {
@@ -149,35 +196,110 @@ export class AttackManager {
         return undefined;
     }
     
-    public update() {
+    // Get the player entity's position by playerId
+    private getPlayerPosition(playerId: number): Phaser.Math.Vector2 | null {
+        if (!this.spacetimeClient.sdkConnection) return null;
+        
+        // Find the player and their entity
+        const player = this.spacetimeClient.sdkConnection.db.player.playerId.find(playerId);
+        if (!player) return null;
+        
+        const entity = this.spacetimeClient.sdkConnection.db.entity.entityId.find(player.entityId);
+        if (!entity) return null;
+        
+        return new Phaser.Math.Vector2(entity.position.x, entity.position.y);
+    }
+    
+    public update(time?: number) {
         if (!this.spacetimeClient.sdkConnection) return;
         
-        // Update position of all attack graphics based on their entity position
+        // Update game time
+        if (time) {
+            this.gameTime = time;
+        }
+        
+        // Update position of all attack graphics based on prediction
         for (const [attackId, attackGraphicData] of this.attackGraphics.entries()) {
             const attack = this.spacetimeClient.sdkConnection.db.activeAttacks.activeAttackId.find(attackId);
             if (!attack) continue;
             
-            const entity = this.spacetimeClient.sdkConnection.db.entity.entityId.find(attack.entityId);
-            if (!entity) continue;
+            if (attackGraphicData.isShield) {
+                // Special handling for shields - orbit around player
+                const playerPos = this.getPlayerPosition(attackGraphicData.playerId || 0);
+                if (playerPos) {
+                    // Get all shields for this player to determine total count
+                    let totalShields = 0;
+                    let indexWithinShields = 0;
+                    let shieldIndex = 0;
+                    
+                    for (const shieldAttack of this.spacetimeClient.sdkConnection.db.activeAttacks.iter()) {
+                        if (shieldAttack.playerId === attackGraphicData.playerId && 
+                            shieldAttack.attackType.tag === "Shield") {
+                            totalShields++;
+                            
+                            // Keep track of this shield's position in the sequence
+                            if (shieldAttack.activeAttackId === attackId) {
+                                indexWithinShields = shieldIndex;
+                            }
+                            shieldIndex++;
+                        }
+                    }
+                    
+                    if (totalShields > 0) {
+                        // Calculate orbit angle for shield - replicate server logic
+                        // Parameter angle in radians 
+                        const parameterAngle = attackGraphicData.parameterU * Math.PI / 180.0;
+                        
+                        // Get total elapsed ticks for smooth animation
+                        const clientTicks = attackGraphicData.ticksElapsed + 
+                                           (this.gameTime - attackGraphicData.lastUpdateTime) / 16.67; // Assuming ~60 FPS
+                        
+                        // Calculate rotation speed (matches server)
+                        const rotationSpeed = 0.05;
+                        const baseAngle = parameterAngle + (2 * Math.PI * attack.idWithinBurst / totalShields);
+                        const shieldAngle = baseAngle + rotationSpeed * clientTicks;
+                        
+                        // Calculate new position 
+                        const offsetX = Math.cos(shieldAngle) * SHIELD_ORBIT_DISTANCE;
+                        const offsetY = Math.sin(shieldAngle) * SHIELD_ORBIT_DISTANCE;
+                        
+                        // Update predicted position
+                        attackGraphicData.predictedPosition.set(
+                            playerPos.x + offsetX,
+                            playerPos.y + offsetY
+                        );
+                        
+                        // Draw at predicted position
+                        this.updateAttackGraphic(attackGraphicData);
+                    }
+                }
+            } else {
+                // Normal projectile with directional movement
+                if (attackGraphicData.direction.length() > 0) {
+                    const moveDistance = attackGraphicData.speed * DELTA_TIME;
+                    attackGraphicData.predictedPosition.x += attackGraphicData.direction.x * moveDistance;
+                    attackGraphicData.predictedPosition.y += attackGraphicData.direction.y * moveDistance;
+                    
+                    // Draw at predicted position
+                    this.updateAttackGraphic(attackGraphicData);
+                }
+            }
             
-            // Clear and redraw at new position using stored values
-            attackGraphicData.graphic.clear();
+            // Check if the server position is significantly different from prediction
+            const dx = attackGraphicData.serverPosition.x - attackGraphicData.predictedPosition.x;
+            const dy = attackGraphicData.serverPosition.y - attackGraphicData.predictedPosition.y;
+            const distSquared = dx * dx + dy * dy;
             
-            // Draw the attack using stored values
-            attackGraphicData.graphic.fillStyle(0x0088ff, attackGraphicData.alpha);
-            attackGraphicData.graphic.fillCircle(
-                entity.position.x, 
-                entity.position.y, 
-                attackGraphicData.radius
-            );
-            
-            // Add a border for better visibility
-            attackGraphicData.graphic.lineStyle(2, 0x0066cc, attackGraphicData.alpha + 0.2);
-            attackGraphicData.graphic.strokeCircle(
-                entity.position.x, 
-                entity.position.y, 
-                attackGraphicData.radius
-            );
+            if (distSquared > PREDICTION_CORRECTION_THRESHOLD) {
+                // Correction needed - snap to server position
+                attackGraphicData.predictedPosition.set(
+                    attackGraphicData.serverPosition.x,
+                    attackGraphicData.serverPosition.y
+                );
+                
+                // Redraw after correction
+                this.updateAttackGraphic(attackGraphicData);
+            }
         }
     }
 
