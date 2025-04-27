@@ -42,6 +42,7 @@ public static partial class Module
         [PrimaryKey, AutoInc]
         public ulong scheduled_id;
         
+        [SpacetimeDB.Index.BTree]
         public uint player_id;        // The player who owns this attack
         public AttackType attack_type; // The type of attack
         public uint remaining_shots;   // How many shots remain in the burst
@@ -59,6 +60,7 @@ public static partial class Module
         public uint active_attack_id;
         
         public uint entity_id;        // The projectile entity ID
+        [SpacetimeDB.Index.BTree]
         public uint player_id;        // The player who created this attack
         public AttackType attack_type; // The type of attack
         public uint id_within_burst;   // Position within a burst (0-based index)
@@ -75,6 +77,7 @@ public static partial class Module
 
         public ScheduleAt scheduled_at; // When to cleanup the active attack
 
+        [SpacetimeDB.Index.BTree]
         public uint active_attack_id; // The active attack to cleanup
     }
 

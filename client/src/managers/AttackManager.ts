@@ -4,9 +4,16 @@ import { AttackData } from '../autobindings';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { GameEvents } from '../constants/GameEvents';
 
+// Define a type for our attack graphic data
+interface AttackGraphicData {
+    graphic: Phaser.GameObjects.Graphics;
+    radius: number;
+    alpha: number;
+}
+
 export class AttackManager {
     private scene: Phaser.Scene;
-    private attackGraphics: Map<number, Phaser.GameObjects.Graphics> = new Map();
+    private attackGraphics: Map<number, AttackGraphicData> = new Map();
     private localPlayerId: number | null = null;
     private spacetimeClient: SpacetimeDBClient;
     private gameEvents: Phaser.Events.EventEmitter;
@@ -34,7 +41,6 @@ export class AttackManager {
         for (const attack of ctx.db?.activeAttacks.iter()) {
             this.createOrUpdateAttackGraphic(ctx, attack);
         }
-        
     }
 
     public registerAttackListeners() {
@@ -68,9 +74,9 @@ export class AttackManager {
 
     private handleAttackDelete(_ctx: EventContext, attack: ActiveAttack) {
         console.log(`Attack deleted: ${attack.activeAttackId}`);
-        const graphic = this.attackGraphics.get(attack.activeAttackId);
-        if (graphic) {
-            graphic.destroy();
+        const attackData = this.attackGraphics.get(attack.activeAttackId);
+        if (attackData) {
+            attackData.graphic.destroy();
             this.attackGraphics.delete(attack.activeAttackId);
         }
     }
@@ -79,7 +85,7 @@ export class AttackManager {
         if (!this.spacetimeClient.sdkConnection) return;
         
         // Find the entity for this attack
-        const entity = this.spacetimeClient.sdkConnection.db.entity.entityId.find(attack.entityId);
+        const entity = ctx.db?.entity.entityId.find(attack.entityId);
         if (!entity) {
             console.error(`Entity ${attack.entityId} not found for attack ${attack.activeAttackId}`);
             return;
@@ -92,33 +98,51 @@ export class AttackManager {
             return;
         }
 
-        // Get or create graphics object
-        let graphic = this.attackGraphics.get(attack.activeAttackId);
-        if (!graphic) {
-            graphic = this.scene.add.graphics();
-            this.attackGraphics.set(attack.activeAttackId, graphic);
-        }
-
-        // Clear previous drawing
-        graphic.clear();
-
-        // Set alpha based on ownership
+        // Calculate alpha based on ownership
         const isLocalPlayerAttack = attack.playerId === this.localPlayerId;
         const alpha = isLocalPlayerAttack ? 0.7 : 0.4;
 
-        // Draw the attack as a blue circle
-        graphic.fillStyle(0x0088ff, alpha);
-        graphic.fillCircle(entity.position.x, entity.position.y, attackData.radius);
+        // Get or create attack graphic data
+        let attackGraphicData = this.attackGraphics.get(attack.activeAttackId);
+        if (!attackGraphicData) {
+            // Create a new graphics object
+            const graphic = this.scene.add.graphics();
+            
+            // Store the attack graphic data with pre-calculated values
+            attackGraphicData = {
+                graphic,
+                radius: attackData.radius,
+                alpha
+            };
+            
+            this.attackGraphics.set(attack.activeAttackId, attackGraphicData);
+        }
+
+        // Clear previous drawing
+        attackGraphicData.graphic.clear();
+
+        // Draw the attack as a blue circle using stored values
+        attackGraphicData.graphic.fillStyle(0x0088ff, attackGraphicData.alpha);
+        attackGraphicData.graphic.fillCircle(
+            entity.position.x, 
+            entity.position.y, 
+            attackGraphicData.radius
+        );
         
         // Add a border for better visibility
-        graphic.lineStyle(2, 0x0066cc, alpha + 0.2);
-        graphic.strokeCircle(entity.position.x, entity.position.y, attackData.radius);
+        attackGraphicData.graphic.lineStyle(2, 0x0066cc, attackGraphicData.alpha + 0.2);
+        attackGraphicData.graphic.strokeCircle(
+            entity.position.x, 
+            entity.position.y, 
+            attackGraphicData.radius
+        );
     }
 
     private findAttackDataByType(ctx: EventContext, attackType: AttackType): AttackData | undefined {
+        
         const attackDataItems = ctx.db?.attackData.iter();
         for (const data of attackDataItems) {
-            if (data.attackType === attackType) {
+            if (data.attackType.tag === attackType.tag) {
                 return data;
             }
         }
@@ -129,38 +153,39 @@ export class AttackManager {
         if (!this.spacetimeClient.sdkConnection) return;
         
         // Update position of all attack graphics based on their entity position
-        for (const [attackId, graphic] of this.attackGraphics.entries()) {
+        for (const [attackId, attackGraphicData] of this.attackGraphics.entries()) {
             const attack = this.spacetimeClient.sdkConnection.db.activeAttacks.activeAttackId.find(attackId);
             if (!attack) continue;
             
             const entity = this.spacetimeClient.sdkConnection.db.entity.entityId.find(attack.entityId);
             if (!entity) continue;
             
-            const attackData = this.findAttackDataByType(attack.attackType);
-            if (!attackData) continue;
+            // Clear and redraw at new position using stored values
+            attackGraphicData.graphic.clear();
             
-            // Clear and redraw at new position
-            graphic.clear();
-            
-            // Set alpha based on ownership
-            const isLocalPlayerAttack = attack.playerId === this.localPlayerId;
-            const alpha = isLocalPlayerAttack ? 0.7 : 0.4;
-            
-            // Draw the attack
-            graphic.fillStyle(0x0088ff, alpha);
-            graphic.fillCircle(entity.position.x, entity.position.y, attackData.radius);
+            // Draw the attack using stored values
+            attackGraphicData.graphic.fillStyle(0x0088ff, attackGraphicData.alpha);
+            attackGraphicData.graphic.fillCircle(
+                entity.position.x, 
+                entity.position.y, 
+                attackGraphicData.radius
+            );
             
             // Add a border for better visibility
-            graphic.lineStyle(2, 0x0066cc, alpha + 0.2);
-            graphic.strokeCircle(entity.position.x, entity.position.y, attackData.radius);
+            attackGraphicData.graphic.lineStyle(2, 0x0066cc, attackGraphicData.alpha + 0.2);
+            attackGraphicData.graphic.strokeCircle(
+                entity.position.x, 
+                entity.position.y, 
+                attackGraphicData.radius
+            );
         }
     }
 
     public shutdown() 
     {
         // Clean up all graphics
-        for (const graphic of this.attackGraphics.values()) {
-            graphic.destroy();
+        for (const attackGraphicData of this.attackGraphics.values()) {
+            attackGraphicData.graphic.destroy();
         }
         this.attackGraphics.clear();
         

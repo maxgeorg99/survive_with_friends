@@ -1,6 +1,7 @@
 using SpacetimeDB;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 public static partial class Module
 {
@@ -220,6 +221,9 @@ public static partial class Module
 
             Log.Info($"Player {player.name} (ID: {player.player_id}) moved to dead_players table.");
             
+            // Clean up all attack-related data for this player
+            CleanupPlayerAttacks(ctx, player_id);
+            
             // Delete the player and their entity
             // Note: The client will detect this deletion through the onDelete handler
 
@@ -245,6 +249,97 @@ public static partial class Module
         }
     }
     
+    // Helper method to clean up all attack-related data for a player
+    private static void CleanupPlayerAttacks(ReducerContext ctx, uint playerId)
+    {
+        Log.Info($"Cleaning up all attack data for player {playerId}");
+        
+        // Step 1: Clean up active attacks using filter on player_id
+        var activeAttacksToDelete = new List<uint>();
+        var attackEntitiesToDelete = new List<uint>();
+        
+        // Use player_id filter on active_attacks if BTtree index exists
+        foreach (var activeAttack in ctx.Db.active_attacks.player_id.Filter(playerId))
+        {
+            activeAttacksToDelete.Add(activeAttack.active_attack_id);
+            attackEntitiesToDelete.Add(activeAttack.entity_id);
+            
+            // Clean up any damage records associated with this attack
+            CleanupAttackDamageRecords(ctx, activeAttack.entity_id);
+        }
+        
+        // Delete the active attacks
+        foreach (var attackId in activeAttacksToDelete)
+        {
+            ctx.Db.active_attacks.active_attack_id.Delete(attackId);
+        }
+        
+        // Delete the attack entities
+        foreach (var entityId in attackEntitiesToDelete)
+        {
+            ctx.Db.entity.entity_id.Delete(entityId);
+        }
+        
+        Log.Info($"Deleted {activeAttacksToDelete.Count} active attacks and their associated entities for player {playerId}");
+        
+        // Step 2: Clean up attack burst cooldowns using filter on player_id
+        var burstCooldownsToDelete = new List<ulong>();
+        
+        foreach (var burstCooldown in ctx.Db.attack_burst_cooldowns.player_id.Filter(playerId))
+        {
+            burstCooldownsToDelete.Add(burstCooldown.scheduled_id);
+        }
+        
+        // Delete the burst cooldowns
+        foreach (var scheduledId in burstCooldownsToDelete)
+        {
+            ctx.Db.attack_burst_cooldowns.scheduled_id.Delete(scheduledId);
+        }
+        
+        Log.Info($"Deleted {burstCooldownsToDelete.Count} attack burst cooldowns for player {playerId}");
+        
+        // Step 3: Clean up scheduled attacks using filter on player_id
+        var scheduledAttacksToDelete = new List<ulong>();
+        
+        foreach (var scheduledAttack in ctx.Db.player_scheduled_attacks.player_id.Filter(playerId))
+        {
+            scheduledAttacksToDelete.Add(scheduledAttack.scheduled_id);
+        }
+        
+        // Delete the scheduled attacks
+        foreach (var scheduledId in scheduledAttacksToDelete)
+        {
+            ctx.Db.player_scheduled_attacks.scheduled_id.Delete(scheduledId);
+        }
+        
+        Log.Info($"Deleted {scheduledAttacksToDelete.Count} scheduled attacks for player {playerId}");
+        
+        // Step 4: Clean up active attack cleanup schedules
+        // We need to do this more efficiently using the attackIDs we already collected
+        if (activeAttacksToDelete.Any())
+        {
+            var attackCleanupsToDelete = new List<ulong>();
+            
+            // Process cleanup entries in batches for better performance
+            foreach (var attackId in activeAttacksToDelete)
+            {
+                // Filter by active_attack_id if available as an index
+                foreach (var cleanup in ctx.Db.active_attack_cleanup.active_attack_id.Filter(attackId))
+                {
+                    attackCleanupsToDelete.Add(cleanup.scheduled_id);
+                }
+            }
+            
+            // Delete the attack cleanups
+            foreach (var scheduledId in attackCleanupsToDelete)
+            {
+                ctx.Db.active_attack_cleanup.scheduled_id.Delete(scheduledId);
+            }
+            
+            Log.Info($"Deleted {attackCleanupsToDelete.Count} attack cleanup schedules for player {playerId}");
+        }
+    }
+
     [Reducer]
     public static void GameTick(ReducerContext ctx, GameTickTimer timer)
     {
