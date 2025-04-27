@@ -74,7 +74,9 @@ class SpacetimeDBClient {
                 "SELECT * FROM player",
                 "SELECT * FROM dead_players",
                 "SELECT * FROM entity",
-                "SELECT * FROM monsters"
+                "SELECT * FROM monsters",
+                "SELECT * FROM active_attacks",
+                "SELECT * FROM attack_data"
             ]);
 
         // Call external onConnect listener

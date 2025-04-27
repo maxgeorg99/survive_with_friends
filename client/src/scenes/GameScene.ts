@@ -5,6 +5,7 @@ import { Identity } from '@clockworklabs/spacetimedb-sdk';
 import { MONSTER_ASSET_KEYS, MONSTER_SHADOW_OFFSETS, MONSTER_MAX_HP } from '../constants/MonsterConfig';
 import MonsterManager from '../managers/MonsterManager';
 import { GameEvents } from '../constants/GameEvents';
+import { AttackManager } from '../managers/AttackManager';
 
 // Constants
 const PLAYER_SPEED = 200;
@@ -65,6 +66,9 @@ export default class GameScene extends Phaser.Scene {
     
     // Replace monster-related properties with MonsterManager
     private monsterManager: MonsterManager | null = null;
+    
+    // Add attack manager for player attack visualization
+    private attackManager: AttackManager | null = null;
     
     private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null;
     private wasdKeys: {
@@ -231,6 +235,9 @@ export default class GameScene extends Phaser.Scene {
 
         // Initialize MonsterManager
         this.monsterManager = new MonsterManager(this, this.spacetimeDBClient);
+        
+        // Initialize AttackManager
+        this.attackManager = new AttackManager(this, this.spacetimeDBClient);
 
         this.spacetimeDBClient.sdkConnection?.reducers.updateLastLogin();
     }
@@ -405,6 +412,13 @@ export default class GameScene extends Phaser.Scene {
         this.syncPlayers(ctx);
 
         this.monsterManager?.initializeMonsters(ctx);
+        
+        // Check for existing attacks
+        if (this.attackManager) {
+            this.attackManager.setLocalPlayerId(playerId);
+            this.attackManager.initializeAttacks(ctx);
+            console.log("Existing attacks checked");
+        }
 
         console.log("Game world initialization complete.");
     }
@@ -1312,6 +1326,9 @@ export default class GameScene extends Phaser.Scene {
         
         // Update monster positions with interpolation
         this.monsterManager?.update(time, delta);
+        
+        // Update attack visuals
+        this.attackManager?.update();
     }
 
     // Force a synchronization of player entities
@@ -1551,6 +1568,9 @@ export default class GameScene extends Phaser.Scene {
 
         this.monsterManager?.shutdown();
         
+        // Clean up AttackManager properly
+        this.attackManager?.shutdown();
+
         // Remove event listeners
         this.events.off("shutdown", this.shutdown, this);
 

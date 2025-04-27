@@ -331,6 +331,19 @@ const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
         gameEvents.emit(GameEvents.MONSTER_DELETED, ctx, monster);
     });
 
+    // Attack event listeners
+    localDb.activeAttacks.onInsert((ctx, attack) => {
+        gameEvents.emit(GameEvents.ATTACK_CREATED, ctx, attack);
+    });
+
+    localDb.activeAttacks.onUpdate((ctx, oldAttack, newAttack) => {
+        gameEvents.emit(GameEvents.ATTACK_UPDATED, ctx, oldAttack, newAttack);
+    });
+
+    localDb.activeAttacks.onDelete((ctx, attack) => {
+        gameEvents.emit(GameEvents.ATTACK_DELETED, ctx, attack);
+    });
+
     // Check initial state and load appropriate scene
     console.log("Checking current account and player state...");
     const myAccount = ctx.db?.account.identity.find(localIdentity);
