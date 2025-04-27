@@ -22,7 +22,7 @@ interface AttackGraphicData {
 }
 
 // Constants for prediction behavior
-const PREDICTION_CORRECTION_THRESHOLD = 25; // Distance squared before we snap to server position
+const PREDICTION_CORRECTION_THRESHOLD = 64; // Distance squared before we snap to server position
 const DELTA_TIME = 1/60; // Assume 60fps for client prediction (should match server tick rate closely)
 const SHIELD_ORBIT_DISTANCE = 42; // Distance from player center for shield orbits
 
@@ -154,9 +154,12 @@ export class AttackManager {
             const dx = attackGraphicData.predictedPosition.x - entity.position.x;
             const dy = attackGraphicData.predictedPosition.y - entity.position.y;
             const distSquared = dx * dx + dy * dy;
+
+            var threshold = (DELTA_TIME * attackGraphicData.speed) * (DELTA_TIME * attackGraphicData.speed);
             
-            if (distSquared > PREDICTION_CORRECTION_THRESHOLD) {
+            if (distSquared > threshold) {
                 // Correction needed - reset prediction to match server
+                //console.log(`Attack ${attack.activeAttackId} correction needed - resetting prediction to server position. dx: ${dx}, dy: ${dy}, distSquared: ${distSquared}, threshold: ${threshold}`);
                 attackGraphicData.predictedPosition.set(entity.position.x, entity.position.y);
             }
         }
@@ -210,14 +213,20 @@ export class AttackManager {
         return new Phaser.Math.Vector2(entity.position.x, entity.position.y);
     }
     
-    public update(time?: number) {
+    public update(time?: number, delta?: number) {
         if (!this.spacetimeClient.sdkConnection) return;
         
         // Update game time
         if (time) {
             this.gameTime = time;
         }
-        
+
+        var deltaTime = DELTA_TIME;
+        if (delta) 
+        {
+            deltaTime = delta / 1000;
+        }
+
         // Update position of all attack graphics based on prediction
         for (const [attackId, attackGraphicData] of this.attackGraphics.entries()) {
             const attack = this.spacetimeClient.sdkConnection.db.activeAttacks.activeAttackId.find(attackId);
@@ -276,29 +285,13 @@ export class AttackManager {
             } else {
                 // Normal projectile with directional movement
                 if (attackGraphicData.direction.length() > 0) {
-                    const moveDistance = attackGraphicData.speed * DELTA_TIME;
+                    const moveDistance = attackGraphicData.speed * deltaTime;
                     attackGraphicData.predictedPosition.x += attackGraphicData.direction.x * moveDistance;
                     attackGraphicData.predictedPosition.y += attackGraphicData.direction.y * moveDistance;
                     
                     // Draw at predicted position
                     this.updateAttackGraphic(attackGraphicData);
                 }
-            }
-            
-            // Check if the server position is significantly different from prediction
-            const dx = attackGraphicData.serverPosition.x - attackGraphicData.predictedPosition.x;
-            const dy = attackGraphicData.serverPosition.y - attackGraphicData.predictedPosition.y;
-            const distSquared = dx * dx + dy * dy;
-            
-            if (distSquared > PREDICTION_CORRECTION_THRESHOLD) {
-                // Correction needed - snap to server position
-                attackGraphicData.predictedPosition.set(
-                    attackGraphicData.serverPosition.x,
-                    attackGraphicData.serverPosition.y
-                );
-                
-                // Redraw after correction
-                this.updateAttackGraphic(attackGraphicData);
             }
         }
     }

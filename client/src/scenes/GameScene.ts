@@ -1328,7 +1328,7 @@ export default class GameScene extends Phaser.Scene {
         this.monsterManager?.update(time, delta);
         
         // Update attack visuals with time for prediction
-        this.attackManager?.update(time);
+        this.attackManager?.update(time, delta);
     }
 
     // Force a synchronization of player entities
@@ -1391,53 +1391,6 @@ export default class GameScene extends Phaser.Scene {
         
         // Debug output of all tracked players
         console.log(`Total tracked other players after sync: ${this.otherPlayers.size}`);
-    }
-
-    // Helper function to find an entity's position by ID
-    private getEntityPosition(entityId: number): { x: number, y: number } | null {
-        // Try to find the entity in the local cache before it gets removed
-        const entities = Array.from(this.spacetimeDBClient.sdkConnection?.db.entity.iter() || []);
-        for (const entity of entities) {
-            if (entity.entityId === entityId) {
-                return { x: entity.position.x, y: entity.position.y };
-            }
-        }
-        
-        // If we have a local player and this is its entity ID
-        if (this.localPlayerSprite && this.spacetimeDBClient?.identity) {
-            // Get the local account first
-            const localAccount = this.spacetimeDBClient.sdkConnection?.db.account.identity.find(
-                this.spacetimeDBClient.identity
-            );
-            
-            if (localAccount && localAccount.currentPlayerId > 0) {
-                // Then get the player from the account's currentPlayerId
-                const localPlayer = this.spacetimeDBClient.sdkConnection?.db.player.playerId.find(
-                    localAccount.currentPlayerId
-                );
-                
-                if (localPlayer && localPlayer.entityId === entityId) {
-                    return { 
-                        x: this.localPlayerSprite.x, 
-                        y: this.localPlayerSprite.y 
-                    };
-                }
-            }
-        }
-        
-        // Check other players
-        for (const [playerId, container] of this.otherPlayers.entries()) {
-            // Find the player with this player ID
-            const player = this.spacetimeDBClient.sdkConnection?.db.player.playerId.find(playerId);
-            if (player && player.entityId === entityId) {
-                return { 
-                    x: container.x, 
-                    y: container.y 
-                };
-            }
-        }
-        
-        return null;
     }
     
     // Create blood splatter particles
