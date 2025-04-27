@@ -281,7 +281,6 @@ export default class MonsterManager {
             if (monsterData.hp < currentHp) {
                 const sprite = existingMonster.getByName('sprite') as Phaser.GameObjects.Sprite;
                 if (sprite) {
-                    console.log(`Monster ${monsterData.monsterId} took damage: ${currentHp} -> ${monsterData.hp}`);
                     createMonsterDamageEffect(sprite);
                 }
             }

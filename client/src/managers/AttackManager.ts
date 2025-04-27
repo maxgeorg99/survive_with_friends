@@ -7,6 +7,7 @@ import { GameEvents } from '../constants/GameEvents';
 // Define a type for our attack graphic data with prediction capabilities
 interface AttackGraphicData {
     graphic: Phaser.GameObjects.Graphics;
+    sprite: Phaser.GameObjects.Sprite | null;
     radius: number;
     alpha: number;
     // Add prediction-related properties
@@ -19,11 +20,18 @@ interface AttackGraphicData {
     playerId: number | null;
     parameterU: number;
     ticksElapsed: number;
+    attackType: string;
 }
 
 // Constants for prediction behavior
 const PREDICTION_CORRECTION_THRESHOLD = 64; // Distance squared before we snap to server position
 const DELTA_TIME = 1/60; // Assume 60fps for client prediction (should match server tick rate closely)
+
+// Constants for attack graphics
+const ATTACK_CIRCLE_COLOR = 0xcccccc; // Light gray
+const ATTACK_CIRCLE_ALPHA = 0.3; // More transparent
+const ATTACK_CIRCLE_BORDER_ALPHA = 0.4; // Slightly more visible border
+const ATTACK_CIRCLE_BORDER_WIDTH = 1;
 
 export class AttackManager {
     private scene: Phaser.Scene;
@@ -95,6 +103,9 @@ export class AttackManager {
         const attackData = this.attackGraphics.get(attack.activeAttackId);
         if (attackData) {
             attackData.graphic.destroy();
+            if (attackData.sprite) {
+                attackData.sprite.destroy();
+            }
             this.attackGraphics.delete(attack.activeAttackId);
         }
     }
@@ -122,12 +133,18 @@ export class AttackManager {
         
         // Determine if this is a shield attack
         const isShield = attack.attackType.tag === "Shield";
+        const attackType = attack.attackType.tag;
 
         // Get or create attack graphic data
         let attackGraphicData = this.attackGraphics.get(attack.activeAttackId);
         if (!attackGraphicData) {
-            // Create a new graphics object
+            // Create a new graphics object (for the circle)
             const graphic = this.scene.add.graphics();
+            // Set depth to be behind sprites
+            graphic.setDepth(1.4);
+            
+            // Create sprite based on attack type
+            const sprite = this.createAttackSprite(attackType, entity.position.x, entity.position.y);
             
             // Setup direction vector based on entity direction
             const direction = new Phaser.Math.Vector2(entity.direction.x, entity.direction.y);
@@ -135,6 +152,7 @@ export class AttackManager {
             // Store the attack graphic data with prediction values
             attackGraphicData = {
                 graphic,
+                sprite,
                 radius: attackData.radius,
                 alpha,
                 lastUpdateTime: this.gameTime,
@@ -145,7 +163,8 @@ export class AttackManager {
                 isShield,
                 playerId: attack.playerId,
                 parameterU: attack.parameterU,
-                ticksElapsed: attack.ticksElapsed
+                ticksElapsed: attack.ticksElapsed,
+                attackType
             };
             
             this.attackGraphics.set(attack.activeAttackId, attackGraphicData);
@@ -154,6 +173,7 @@ export class AttackManager {
             attackGraphicData.serverPosition.set(entity.position.x, entity.position.y);
             attackGraphicData.lastUpdateTime = this.gameTime;
             attackGraphicData.ticksElapsed = attack.ticksElapsed;
+            attackGraphicData.attackType = attackType;
             
             // Check if predicted position is too far from server position
             const dx = attackGraphicData.predictedPosition.x - entity.position.x;
@@ -164,7 +184,6 @@ export class AttackManager {
             
             if (distSquared > threshold) {
                 // Correction needed - reset prediction to match server
-                //console.log(`Attack ${attack.activeAttackId} correction needed - resetting prediction to server position. dx: ${dx}, dy: ${dy}, distSquared: ${distSquared}, threshold: ${threshold}`);
                 attackGraphicData.predictedPosition.set(entity.position.x, entity.position.y);
             }
         }
@@ -173,25 +192,99 @@ export class AttackManager {
         this.updateAttackGraphic(attackGraphicData);
     }
 
+    private createAttackSprite(attackType: string, x: number, y: number): Phaser.GameObjects.Sprite | null {
+        // Create a sprite based on attack type
+        let spriteKey = '';
+        
+        switch (attackType) {
+            case 'Sword':
+                spriteKey = 'attack_sword';
+                break;
+            case 'Wand':
+                spriteKey = 'attack_wand';
+                break;
+            case 'Knives':
+                spriteKey = 'attack_knife';
+                break;
+            case 'Shield':
+                spriteKey = 'attack_shield';
+                break;
+            default:
+                console.error(`Unknown attack type: ${attackType}`);
+                return null;
+        }
+        
+        // Create the sprite with a higher depth to show in front of the circle
+        const sprite = this.scene.add.sprite(x, y, spriteKey);
+        sprite.setDepth(1.5); // Set depth higher than circle but below UI
+        
+        // Scale down the sprite if needed
+        sprite.setScale(1.0); // Adjust this value if sprites need resizing
+        
+        return sprite;
+    }
+
     private updateAttackGraphic(attackGraphicData: AttackGraphicData) {
         // Clear previous drawing
         attackGraphicData.graphic.clear();
 
-        // Draw the attack as a blue circle using stored values
-        attackGraphicData.graphic.fillStyle(0x0088ff, attackGraphicData.alpha);
+        // Draw the attack as a light gray transparent circle
+        attackGraphicData.graphic.fillStyle(ATTACK_CIRCLE_COLOR, ATTACK_CIRCLE_ALPHA);
         attackGraphicData.graphic.fillCircle(
             attackGraphicData.predictedPosition.x, 
             attackGraphicData.predictedPosition.y, 
             attackGraphicData.radius
         );
         
-        // Add a border for better visibility
-        attackGraphicData.graphic.lineStyle(2, 0x0066cc, attackGraphicData.alpha + 0.2);
+        // Add a thin border for better visibility
+        attackGraphicData.graphic.lineStyle(ATTACK_CIRCLE_BORDER_WIDTH, ATTACK_CIRCLE_COLOR, ATTACK_CIRCLE_BORDER_ALPHA);
         attackGraphicData.graphic.strokeCircle(
             attackGraphicData.predictedPosition.x, 
             attackGraphicData.predictedPosition.y, 
             attackGraphicData.radius
         );
+
+        // Update the sprite position and rotation
+        if (attackGraphicData.sprite) {
+            const sprite = attackGraphicData.sprite;
+            
+            // Position sprite at predicted position
+            sprite.x = attackGraphicData.predictedPosition.x;
+            sprite.y = attackGraphicData.predictedPosition.y;
+            
+            // Handle different attack types
+            switch (attackGraphicData.attackType) {
+                case 'Sword':
+                    // Mirror horizontally if moving left
+                    if (attackGraphicData.direction.x < 0) {
+                        sprite.setFlipX(true);
+                    } else {
+                        sprite.setFlipX(false);
+                    }
+                    sprite.setRotation(0); // Reset rotation
+                    break;
+                    
+                case 'Wand':
+                case 'Knives':
+                    // Rotate to point in the direction of motion
+                    if (attackGraphicData.direction.length() > 0) {
+                        sprite.setRotation(Math.atan2(attackGraphicData.direction.y, attackGraphicData.direction.x));
+                    }
+                    sprite.setFlipX(false); // Reset flip
+                    break;
+                    
+                case 'Shield':
+                    // Shield just draws normally
+                    sprite.setRotation(0); // Reset rotation
+                    sprite.setFlipX(false); // Reset flip
+                    break;
+                    
+                default:
+                    // Default handling
+                    sprite.setRotation(0);
+                    sprite.setFlipX(false);
+            }
+        }
     }
 
     private findAttackDataByType(ctx: EventContext, attackType: AttackType): AttackData | undefined {
@@ -285,6 +378,9 @@ export class AttackManager {
         // Clean up all graphics
         for (const attackGraphicData of this.attackGraphics.values()) {
             attackGraphicData.graphic.destroy();
+            if (attackGraphicData.sprite) {
+                attackGraphicData.sprite.destroy();
+            }
         }
         this.attackGraphics.clear();
         

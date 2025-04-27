@@ -122,6 +122,12 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('monster_slime', '/assets/monster_slime.png');
         this.load.image('monster_orc', '/assets/monster_orc.png');
         
+        // Load attack assets
+        this.load.image('attack_sword', '/assets/attack_sword.png');
+        this.load.image('attack_wand', '/assets/attack_wand.png');
+        this.load.image('attack_knife', '/assets/attack_knife.png');
+        this.load.image('attack_shield', '/assets/attack_shield.png');
+        
         // Add error handling for file loading errors
         this.load.on('loaderror', (fileObj: any) => {
             console.error(`Error loading asset: ${fileObj.key} (${fileObj.url})`, fileObj);
@@ -138,6 +144,10 @@ export default class GameScene extends Phaser.Scene {
             console.log("monster_rat:", this.textures.exists('monster_rat'));
             console.log("monster_slime:", this.textures.exists('monster_slime'));
             console.log("monster_orc:", this.textures.exists('monster_orc'));
+            console.log("attack_sword:", this.textures.exists('attack_sword'));
+            console.log("attack_wand:", this.textures.exists('attack_wand'));
+            console.log("attack_knife:", this.textures.exists('attack_knife'));
+            console.log("attack_shield:", this.textures.exists('attack_shield'));
             console.log(GRASS_ASSET_KEY + ":", this.textures.exists(GRASS_ASSET_KEY));
             console.log(SHADOW_ASSET_KEY + ":", this.textures.exists(SHADOW_ASSET_KEY));
         });
