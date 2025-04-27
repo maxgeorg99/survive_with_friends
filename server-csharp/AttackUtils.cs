@@ -29,6 +29,17 @@ public static partial class Module
             
             switch (attackType)
             {
+                case AttackType.Sword:
+                {
+                    if (attack.parameter_u == 0)
+                    {
+                        return 1;
+                    }
+                    else
+                    {
+                        return 0;
+                    }
+                }
                 case AttackType.Knives:
                 {
                     //Random angle on a circle
@@ -44,7 +55,7 @@ public static partial class Module
         }   
 
         // Determine the direction of the attack based on attack type and other factors
-        public static DbVector2 DetermineAttackDirection(ReducerContext ctx, uint playerId, AttackType attackType, uint idWithinBurst)
+        public static DbVector2 DetermineAttackDirection(ReducerContext ctx, uint playerId, AttackType attackType, uint idWithinBurst, uint parameterU, int parameterI)
         {
             // Get the player
             var playerOpt = ctx.Db.player.player_id.Find(playerId);
@@ -76,7 +87,8 @@ public static partial class Module
                 case AttackType.Sword:
                 {
                     // Sword attacks swing Right then Left
-                    if (idWithinBurst % 2 == 0)
+                    var countParam = parameterU + idWithinBurst;
+                    if (countParam % 2 == 0)
                     {
                         return new DbVector2(1, 0);
                     }
@@ -112,10 +124,6 @@ public static partial class Module
                 {
                     //Knives attack in a circle around the player starting at the angle specified in the parameter_u
                     //The angle is in degrees, so we need to convert it to radians
-                    var playerAttacks = ctx.Db.player_scheduled_attacks.player_id.Filter(playerId);
-                    var playerAttackOfThisType = playerAttacks.Where(attack => attack.attack_type == attackType).OrderBy(attack => attack.scheduled_at).FirstOrDefault();
-
-                    var parameterU = playerAttackOfThisType.parameter_u;
                     var startAngle = (double)parameterU * Math.PI / 180.0;                       
                     var angleStep = 360.0 / (double)attackData.Value.projectiles;
                     var attackAngle = startAngle + (angleStep * (double)idWithinBurst);

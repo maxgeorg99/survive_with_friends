@@ -198,7 +198,7 @@ public static partial class Module
     }
 
     // Helper method to trigger a single projectile of an attack
-    private static void TriggerAttackProjectile(ReducerContext ctx, uint playerId, AttackType attackType, uint idWithinBurst = 0)
+    private static void TriggerAttackProjectile(ReducerContext ctx, uint playerId, AttackType attackType, uint idWithinBurst = 0, uint parameterU = 0, int parameterI = 0)
     {
         // Get attack data
         var attackDataOpt = FindAttackDataByType(ctx, attackType);
@@ -231,7 +231,7 @@ public static partial class Module
         var entity = entityOpt.Value;
         
         // Get attack direction using AttackUtils
-        var direction = AttackUtils.DetermineAttackDirection(ctx, playerId, attackType, idWithinBurst);
+        var direction = AttackUtils.DetermineAttackDirection(ctx, playerId, attackType, idWithinBurst, parameterU, parameterI);
         
         // Create a new entity for the projectile and get its ID
         var projectileEntity = ctx.Db.entity.Insert(new Entity
@@ -291,7 +291,7 @@ public static partial class Module
         uint currentProjectileIndex = totalProjectiles - burstCooldown.remaining_shots;
 
         // Create the next projectile in the burst with the correct id_within_burst
-        TriggerAttackProjectile(ctx, burstCooldown.player_id, burstCooldown.attack_type, currentProjectileIndex);
+        TriggerAttackProjectile(ctx, burstCooldown.player_id, burstCooldown.attack_type, currentProjectileIndex, burstCooldown.parameter_u, burstCooldown.parameter_i);
 
         // If there are more shots remaining in the burst, schedule the next one
         burstCooldown.remaining_shots -= 1;
@@ -335,8 +335,11 @@ public static partial class Module
             return;
         }
 
+        //Update the parameters for the attack
         var parameterU = AttackUtils.GetParameterU(ctx, attack);
         attack.parameter_u = parameterU;
+
+        ctx.Db.player_scheduled_attacks.scheduled_id.Update(attack);
         
         // Handle case where we have multiple projectiles
         if (attackData.Value.projectiles > 1)
@@ -346,13 +349,13 @@ public static partial class Module
                 // If fire_delay is 0, spawn all projectiles at once
                 for (uint i = 0; i < attackData.Value.projectiles; i++)
                 {
-                    TriggerAttackProjectile(ctx, playerId, attack.attack_type, i);
+                    TriggerAttackProjectile(ctx, playerId, attack.attack_type, i, attack.parameter_u, attack.parameter_i);
                 }
             }
             else
             {
                 // Fire first projectile with id_within_burst = 0
-                TriggerAttackProjectile(ctx, playerId, attack.attack_type, 0);
+                TriggerAttackProjectile(ctx, playerId, attack.attack_type, 0, attack.parameter_u, attack.parameter_i);
                  
                 Log.Info($"Scheduled {attackData.Value.projectiles - 1} projectiles for player {playerId}, attack type {attack.attack_type}, fire delay: {attackData.Value.fire_delay}");
 
@@ -371,7 +374,7 @@ public static partial class Module
         else
         {
             // Single projectile case - just trigger it with id_within_burst = 0
-            TriggerAttackProjectile(ctx, playerId, attack.attack_type, 0);
+            TriggerAttackProjectile(ctx, playerId, attack.attack_type, 0, attack.parameter_u, attack.parameter_i);
         }
         
         Log.Info($"Server triggered attack {attack.attack_type} for player {playerId} with skill level {attack.skill_level}");
