@@ -530,7 +530,7 @@ public static partial class Module
                 double shieldAngle = baseAngle + rotationSpeed * activeAttack.ticks_elapsed;
                 
                 // Calculate offset distance from player center
-                float offsetDistance = playerEntity.radius + entity.radius * 2; // Added some spacing
+                float offsetDistance = (playerEntity.radius + entity.radius) * 2; // Added some spacing
                 
                 // Calculate new position using angle
                 float offsetX = (float)Math.Cos(shieldAngle) * offsetDistance;

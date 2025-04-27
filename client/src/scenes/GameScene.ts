@@ -442,6 +442,8 @@ export default class GameScene extends Phaser.Scene {
             return;
         }
 
+        this.attackManager?.setLocalPlayerRadius(entityData.radius);
+
         console.log("Found entity data for player:", entityData);
 
         // Set up the player sprite based on their class
@@ -656,6 +658,10 @@ export default class GameScene extends Phaser.Scene {
         const entityData = ctx.db?.entity.entityId.find(player.entityId);
         if (entityData && this.serverPosition) {
             this.serverPosition.set(entityData.position.x, entityData.position.y);
+        }
+        if(entityData)
+        {
+            this.attackManager?.setLocalPlayerRadius(entityData.radius);
         }
     }
 

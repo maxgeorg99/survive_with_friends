@@ -24,12 +24,12 @@ interface AttackGraphicData {
 // Constants for prediction behavior
 const PREDICTION_CORRECTION_THRESHOLD = 64; // Distance squared before we snap to server position
 const DELTA_TIME = 1/60; // Assume 60fps for client prediction (should match server tick rate closely)
-const SHIELD_ORBIT_DISTANCE = 42; // Distance from player center for shield orbits
 
 export class AttackManager {
     private scene: Phaser.Scene;
     private attackGraphics: Map<number, AttackGraphicData> = new Map();
     private localPlayerId: number | null = null;
+    private localPlayerRadius: number = 0;
     private spacetimeClient: SpacetimeDBClient;
     private gameEvents: Phaser.Events.EventEmitter;
     private gameTime: number = 0;
@@ -76,6 +76,11 @@ export class AttackManager {
     public setLocalPlayerId(playerId: number) {
         this.localPlayerId = playerId;
         console.log(`AttackManager: Local player ID set to ${playerId}`);
+    }
+
+    public setLocalPlayerRadius(radius: number)
+    {
+        this.localPlayerRadius = radius;
     }
 
     private handleAttackInsert(ctx: EventContext, attack: ActiveAttack) {
@@ -236,51 +241,30 @@ export class AttackManager {
                 // Special handling for shields - orbit around player
                 const playerPos = this.getPlayerPosition(attackGraphicData.playerId || 0);
                 if (playerPos) {
-                    // Get all shields for this player to determine total count
-                    let totalShields = 0;
-                    let indexWithinShields = 0;
-                    let shieldIndex = 0;
+                        
+                    var orbitDistance = (this.localPlayerRadius + attackGraphicData.radius) * 2;
+
+                    //Get current angle
+                    var dx = attackGraphicData.predictedPosition.x - playerPos.x;
+                    var dy = attackGraphicData.predictedPosition.y - playerPos.y;
+                    var curAngle = Math.atan2(dy, dx);
+
+                    //Calculate new angle
+                    var rotationSpeed = attackGraphicData.speed * deltaTime * Math.PI / 180.0 / 2;
+                    var newAngle = curAngle + rotationSpeed;
+
+                    //Calculate new position
+                    var newX = playerPos.x + Math.cos(newAngle) * orbitDistance;
+                    var newY = playerPos.y + Math.sin(newAngle) * orbitDistance;
                     
-                    for (const shieldAttack of this.spacetimeClient.sdkConnection.db.activeAttacks.iter()) {
-                        if (shieldAttack.playerId === attackGraphicData.playerId && 
-                            shieldAttack.attackType.tag === "Shield") {
-                            totalShields++;
-                            
-                            // Keep track of this shield's position in the sequence
-                            if (shieldAttack.activeAttackId === attackId) {
-                                indexWithinShields = shieldIndex;
-                            }
-                            shieldIndex++;
-                        }
-                    }
+                    // Update predicted position
+                    attackGraphicData.predictedPosition.set(
+                        newX,
+                        newY
+                    );
                     
-                    if (totalShields > 0) {
-                        // Calculate orbit angle for shield - replicate server logic
-                        // Parameter angle in radians 
-                        const parameterAngle = attackGraphicData.parameterU * Math.PI / 180.0;
-                        
-                        // Get total elapsed ticks for smooth animation
-                        const clientTicks = attackGraphicData.ticksElapsed + 
-                                           (this.gameTime - attackGraphicData.lastUpdateTime) / 16.67; // Assuming ~60 FPS
-                        
-                        // Calculate rotation speed (matches server)
-                        const rotationSpeed = 0.05;
-                        const baseAngle = parameterAngle + (2 * Math.PI * attack.idWithinBurst / totalShields);
-                        const shieldAngle = baseAngle + rotationSpeed * clientTicks;
-                        
-                        // Calculate new position 
-                        const offsetX = Math.cos(shieldAngle) * SHIELD_ORBIT_DISTANCE;
-                        const offsetY = Math.sin(shieldAngle) * SHIELD_ORBIT_DISTANCE;
-                        
-                        // Update predicted position
-                        attackGraphicData.predictedPosition.set(
-                            playerPos.x + offsetX,
-                            playerPos.y + offsetY
-                        );
-                        
-                        // Draw at predicted position
-                        this.updateAttackGraphic(attackGraphicData);
-                    }
+                    // Draw at predicted position
+                    this.updateAttackGraphic(attackGraphicData);
                 }
             } else {
                 // Normal projectile with directional movement
