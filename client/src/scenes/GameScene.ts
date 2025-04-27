@@ -6,6 +6,7 @@ import { MONSTER_ASSET_KEYS, MONSTER_SHADOW_OFFSETS, MONSTER_MAX_HP } from '../c
 import MonsterManager from '../managers/MonsterManager';
 import { GameEvents } from '../constants/GameEvents';
 import { AttackManager } from '../managers/AttackManager';
+import { createPlayerDamageEffect, createMonsterDamageEffect } from '../utils/DamageEffects';
 
 // Constants
 const PLAYER_SPEED = 200;
@@ -578,6 +579,10 @@ export default class GameScene extends Phaser.Scene {
             
             // Check if health values changed
             if (currentHp !== player.hp || currentMaxHp !== player.maxHp) {
+                // If HP decreased, show damage effect
+                if (currentHp !== undefined && player.hp < currentHp) {
+                    createPlayerDamageEffect(this.localPlayerSprite);
+                }
                 
                 // Update stored values
                 this.localPlayerSprite.setData('hp', player.hp);
@@ -1004,6 +1009,21 @@ export default class GameScene extends Phaser.Scene {
                     
                     // Update health bar if needed
                     if (playerData.hp !== undefined && playerData.maxHp !== undefined) {
+                        // Get current HP to compare
+                        const currentHp = container.getData('hp') || playerData.maxHp;
+                        
+                        // Show damage effect if HP decreased
+                        if (playerData.hp < currentHp) {
+                            const sprite = container.getByName('sprite') as Phaser.GameObjects.Sprite;
+                            if (sprite) {
+                                createPlayerDamageEffect(sprite);
+                            }
+                        }
+                        
+                        // Store new HP value
+                        container.setData('hp', playerData.hp);
+                        container.setData('maxHp', playerData.maxHp);
+                        
                         const healthBar = container.getByName('healthBar') as Phaser.GameObjects.Rectangle;
                         if (healthBar) {
                             // Adjust health bar width based on current HP

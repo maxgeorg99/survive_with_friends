@@ -3,6 +3,7 @@ import { Monsters, Entity, EventContext } from "../autobindings";
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { MONSTER_ASSET_KEYS, MONSTER_SHADOW_OFFSETS, MONSTER_MAX_HP } from '../constants/MonsterConfig';
 import { GameEvents } from '../constants/GameEvents';
+import { createMonsterDamageEffect } from '../utils/DamageEffects';
 
 // Constants from GameScene
 const SHADOW_ASSET_KEY = 'shadow';
@@ -273,6 +274,18 @@ export default class MonsterManager {
         const existingMonster = this.monsters.get(monsterData.monsterId);
         if (existingMonster && (existingMonster.x !== 0 || existingMonster.y !== 0)) {
             
+            // Get current HP to compare
+            const currentHp = existingMonster.getData('currentHP') || monsterData.maxHp;
+            
+            // Show damage effect if HP decreased
+            if (monsterData.hp < currentHp) {
+                const sprite = existingMonster.getByName('sprite') as Phaser.GameObjects.Sprite;
+                if (sprite) {
+                    console.log(`Monster ${monsterData.monsterId} took damage: ${currentHp} -> ${monsterData.hp}`);
+                    createMonsterDamageEffect(sprite);
+                }
+            }
+            
             // Just update health and other properties, but keep the position
             const children = existingMonster.getAll();
             for (const child of children) {
@@ -391,6 +404,7 @@ export default class MonsterManager {
             // Add sprite
             const sprite = this.scene.add.sprite(0, 0, spriteKey);
             sprite.setDepth(0); // Base sprite at 0 relative to container
+            sprite.name = 'sprite'; // Name the sprite for easier identification later
             
             // Use the server-provided max_hp instead of hardcoded values
             const maxHP = monsterData.maxHp;
