@@ -64,6 +64,8 @@ public static partial class Module
         public uint player_id;        // The player who created this attack
         public AttackType attack_type; // The type of attack
         public uint id_within_burst;   // Position within a burst (0-based index)
+        public uint parameter_u;       // Parameter used for special attacks
+        public uint ticks_elapsed;    // Number of ticks since the attack was created
     }
 
     //Scheduled cleanup of active attacks
@@ -120,12 +122,12 @@ public static partial class Module
             attack_type = AttackType.Sword,
             name = "Sword Slash",
             cooldown = 600,          
-            duration = 500,          
+            duration = 340,          
             projectiles = 1,          
             fire_delay = 0,          
-            speed = 600,              
+            speed = 800,              
             piercing = true,         
-            radius = 60,             
+            radius = 48,             
             damage = 4,        
             armor_piercing = 0       
         });
@@ -240,14 +242,15 @@ public static partial class Module
             direction = direction,
             radius = attackData.radius
         });
-        
+
         // Create active attack (represents visible/active projectile or area attack)
         var activeAttack = ctx.Db.active_attacks.Insert(new ActiveAttack
         {
             entity_id = projectileEntity.entity_id,
             player_id = playerId,           // The player who created the attack
             attack_type = attackType,
-            id_within_burst = idWithinBurst
+            id_within_burst = idWithinBurst,
+            parameter_u = parameterU
         });
 
         // Schedule cleanup of the active attack
@@ -448,5 +451,159 @@ public static partial class Module
     public static void InitializeAttackSystem(ReducerContext ctx)
     {
         InitAttackData(ctx);
+    }
+    
+    // Helper method to process attack movements - moved from CoreGame.cs
+    public static void ProcessAttackMovements(ReducerContext ctx, uint worldSize)
+    {
+        // Process each active attack
+        foreach (var rawActiveAttack in ctx.Db.active_attacks.Iter())
+        {
+            var activeAttackOpt = ctx.Db.active_attacks.active_attack_id.Find(rawActiveAttack.active_attack_id);
+            if (activeAttackOpt == null)
+            {
+                continue; // Skip if active attack not found
+            }
+
+            var activeAttack = activeAttackOpt.Value;
+
+            activeAttack.ticks_elapsed += 1; 
+            ctx.Db.active_attacks.active_attack_id.Update(activeAttack);
+
+            // Get the attack entity
+            var entityOpt = ctx.Db.entity.entity_id.Find(activeAttack.entity_id);
+            if (entityOpt is null)
+            {
+                continue; // Skip if entity not found
+            }
+            
+            var entity = entityOpt.Value;
+            
+            // Get attack data
+            var attackDataOpt = FindAttackDataByType(ctx, activeAttack.attack_type);
+            if (attackDataOpt is null)
+            {
+                continue; // Skip if attack data not found
+            }
+            
+            var attackData = attackDataOpt.Value;
+            
+            // Handle special case for Shield attack type
+            if (activeAttack.attack_type == AttackType.Shield)
+            {
+                // Shield orbits around the player - update its position based on time
+                var playerOpt = ctx.Db.player.player_id.Find(activeAttack.player_id);
+                if (playerOpt is null)
+                {
+                    continue; // Skip if player not found
+                }
+                
+                var player = playerOpt.Value;
+                var playerEntityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
+                if (playerEntityOpt is null)
+                {
+                    continue; // Skip if player entity not found
+                }
+                
+                var playerEntity = playerEntityOpt.Value;
+                
+                // Get all shields for this player to determine total count and positioning
+                int totalShields = 0;
+                foreach (var attack in ctx.Db.active_attacks.player_id.Filter(activeAttack.player_id))
+                {
+                    if (attack.attack_type == AttackType.Shield)
+                    {
+                        totalShields++;
+                    }
+                }
+                
+                if (totalShields == 0)
+                {
+                    continue; // Something's wrong, skip this iteration
+                }
+                
+                // Calculate orbit angle based on shield's offset value and current position in burst
+                double rotationSpeed = attackData.speed * Math.PI / 180.0 * DELTA_TIME;
+                //convert parameter_u from degrees to radians
+                double parameterAngle = activeAttack.parameter_u * Math.PI / 180.0;
+                double baseAngle = parameterAngle + (2 * Math.PI * activeAttack.id_within_burst / totalShields);
+                double shieldAngle = baseAngle + rotationSpeed * activeAttack.ticks_elapsed;
+                
+                // Calculate offset distance from player center
+                float offsetDistance = playerEntity.radius + entity.radius * 2; // Added some spacing
+                
+                // Calculate new position using angle
+                float offsetX = (float)Math.Cos(shieldAngle) * offsetDistance;
+                float offsetY = (float)Math.Sin(shieldAngle) * offsetDistance;
+                
+                // Update shield entity with new position
+                var updatedEntity = entity;
+                updatedEntity.position = new DbVector2(
+                    playerEntity.position.x + offsetX,
+                    playerEntity.position.y + offsetY
+                );
+                
+                // Apply world boundary clamping
+                updatedEntity.position.x = Math.Clamp(
+                    updatedEntity.position.x, 
+                    updatedEntity.radius, 
+                    worldSize - updatedEntity.radius
+                );
+                updatedEntity.position.y = Math.Clamp(
+                    updatedEntity.position.y, 
+                    updatedEntity.radius, 
+                    worldSize - updatedEntity.radius
+                );
+                
+                ctx.Db.entity.entity_id.Update(updatedEntity);
+            }
+            else
+            {
+                // Regular projectile movement based on direction and speed
+                float moveSpeed = attackData.speed;
+                
+                // Calculate movement based on direction, speed and time delta
+                float moveDistance = moveSpeed * DELTA_TIME;
+                var moveOffset = entity.direction * moveDistance;
+                
+                // Update entity with new position
+                var updatedEntity = entity;
+                updatedEntity.position = entity.position + moveOffset;
+                
+                // Apply world boundary clamping
+                updatedEntity.position.x = Math.Clamp(
+                    updatedEntity.position.x, 
+                    updatedEntity.radius, 
+                    worldSize - updatedEntity.radius
+                );
+                updatedEntity.position.y = Math.Clamp(
+                    updatedEntity.position.y, 
+                    updatedEntity.radius, 
+                    worldSize - updatedEntity.radius
+                );
+                
+                // Check if entity hit the world boundary, if so mark for deletion
+                bool hitBoundary = 
+                    updatedEntity.position.x <= updatedEntity.radius ||
+                    updatedEntity.position.x >= worldSize - updatedEntity.radius ||
+                    updatedEntity.position.y <= updatedEntity.radius ||
+                    updatedEntity.position.y >= worldSize - updatedEntity.radius;
+                
+                if (hitBoundary)
+                {
+                    // Delete attack entity and active attack record
+                    ctx.Db.entity.entity_id.Delete(entity.entity_id);
+                    ctx.Db.active_attacks.active_attack_id.Delete(activeAttack.active_attack_id);
+                    
+                    // Clean up any damage records associated with this attack
+                    CleanupAttackDamageRecords(ctx, entity.entity_id);
+                }
+                else
+                {
+                    // Update entity position
+                    ctx.Db.entity.entity_id.Update(updatedEntity);
+                }
+            }
+        }
     }
 } 

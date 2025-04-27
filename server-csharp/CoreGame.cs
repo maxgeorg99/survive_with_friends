@@ -430,7 +430,7 @@ public static partial class Module
         // Process monster movements
         ProcessMonsterMovements(ctx);
         
-        // Process attack movements
+        // Process attack movements (moved to Attacks.cs)
         ProcessAttackMovements(ctx, worldSize);
 
         // Check for collisions between players and monsters
@@ -438,140 +438,6 @@ public static partial class Module
         
         // Check for collisions between attacks and monsters
         ProcessMonsterAttackCollisions(ctx);
-    }
-    
-    // Helper method to process attack movements
-    private static void ProcessAttackMovements(ReducerContext ctx, uint worldSize)
-    {
-        // Process each active attack
-        foreach (var activeAttack in ctx.Db.active_attacks.Iter())
-        {
-            // Get the attack entity
-            var entityOpt = ctx.Db.entity.entity_id.Find(activeAttack.entity_id);
-            if (entityOpt is null)
-            {
-                continue; // Skip if entity not found
-            }
-            
-            var entity = entityOpt.Value;
-            
-            // Get attack data
-            var attackDataOpt = FindAttackDataByType(ctx, activeAttack.attack_type);
-            if (attackDataOpt is null)
-            {
-                continue; // Skip if attack data not found
-            }
-            
-            var attackData = attackDataOpt.Value;
-            
-            // Handle special case for Shield attack type
-            if (activeAttack.attack_type == AttackType.Shield)
-            {
-                // Shield follows the player - update its position to match player's position
-                var playerOpt = ctx.Db.player.player_id.Find(activeAttack.player_id);
-                if (playerOpt is null)
-                {
-                    continue; // Skip if player not found
-                }
-                
-                var player = playerOpt.Value;
-                var playerEntityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
-                if (playerEntityOpt is null)
-                {
-                    continue; // Skip if player entity not found
-                }
-                
-                var playerEntity = playerEntityOpt.Value;
-                
-                // Calculate shield position offset based on id_within_burst
-                // For multiple shields, position them in a circle around the player
-                float angle = 0;
-                if (activeAttack.id_within_burst == 0)
-                {
-                    angle = 0; // First shield in front
-                }
-                else
-                {
-                    angle = 180; // Second shield behind
-                }
-                
-                // Convert angle to radians
-                float radians = angle * (float)Math.PI / 180.0f;
-                
-                // Calculate offset (distance from player center)
-                float offsetDistance = playerEntity.radius + entity.radius;
-                float offsetX = (float)Math.Cos(radians) * offsetDistance;
-                float offsetY = (float)Math.Sin(radians) * offsetDistance;
-                
-                // Update shield entity with new position
-                var updatedEntity = entity;
-                updatedEntity.position = new DbVector2(
-                    playerEntity.position.x + offsetX,
-                    playerEntity.position.y + offsetY
-                );
-                
-                // Apply world boundary clamping
-                updatedEntity.position.x = Math.Clamp(
-                    updatedEntity.position.x, 
-                    updatedEntity.radius, 
-                    worldSize - updatedEntity.radius
-                );
-                updatedEntity.position.y = Math.Clamp(
-                    updatedEntity.position.y, 
-                    updatedEntity.radius, 
-                    worldSize - updatedEntity.radius
-                );
-                
-                ctx.Db.entity.entity_id.Update(updatedEntity);
-            }
-            else
-            {
-                // Regular projectile movement based on direction and speed
-                float moveSpeed = attackData.speed;
-                
-                // Calculate movement based on direction, speed and time delta
-                float moveDistance = moveSpeed * DELTA_TIME;
-                var moveOffset = entity.direction * moveDistance;
-                
-                // Update entity with new position
-                var updatedEntity = entity;
-                updatedEntity.position = entity.position + moveOffset;
-                
-                // Apply world boundary clamping
-                updatedEntity.position.x = Math.Clamp(
-                    updatedEntity.position.x, 
-                    updatedEntity.radius, 
-                    worldSize - updatedEntity.radius
-                );
-                updatedEntity.position.y = Math.Clamp(
-                    updatedEntity.position.y, 
-                    updatedEntity.radius, 
-                    worldSize - updatedEntity.radius
-                );
-                
-                // Check if entity hit the world boundary, if so mark for deletion
-                bool hitBoundary = 
-                    updatedEntity.position.x <= updatedEntity.radius ||
-                    updatedEntity.position.x >= worldSize - updatedEntity.radius ||
-                    updatedEntity.position.y <= updatedEntity.radius ||
-                    updatedEntity.position.y >= worldSize - updatedEntity.radius;
-                
-                if (hitBoundary)
-                {
-                    // Delete attack entity and active attack record
-                    ctx.Db.entity.entity_id.Delete(entity.entity_id);
-                    ctx.Db.active_attacks.active_attack_id.Delete(activeAttack.active_attack_id);
-                    
-                    // Clean up any damage records associated with this attack
-                    CleanupAttackDamageRecords(ctx, entity.entity_id);
-                }
-                else
-                {
-                    // Update entity position
-                    ctx.Db.entity.entity_id.Update(updatedEntity);
-                }
-            }
-        }
     }
     
     // Helper method to process collisions between attacks and monsters

@@ -45,7 +45,13 @@ public static partial class Module
                     //Random angle on a circle
                     var random = ctx.Rng;
                     var angle = random.NextDouble() * 360.0;
-                    return (uint)(angle);
+                    return (uint)angle;
+                }
+                case AttackType.Shield:
+                {
+                    var random = ctx.Rng;
+                    var angle = random.NextDouble() * 360.0;
+                    return (uint)angle;
                 }
                 default:
                 {
