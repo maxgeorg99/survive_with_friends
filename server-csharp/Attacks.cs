@@ -123,10 +123,10 @@ public static partial class Module
             duration = 500,          
             projectiles = 1,          
             fire_delay = 0,          
-            speed = 5,              
+            speed = 600,              
             piercing = true,         
             radius = 60,             
-            damage = 25,             
+            damage = 4,        
             armor_piercing = 0       
         });
 
@@ -140,10 +140,10 @@ public static partial class Module
             duration = 1000,          
             projectiles = 1,          
             fire_delay = 0,          
-            speed = 7,                
+            speed = 800,                
             piercing = false,         
             radius = 20,              
-            damage = 20,              
+            damage = 2,              
             armor_piercing = 10       
         });
 
@@ -157,10 +157,10 @@ public static partial class Module
             duration = 800,          
             projectiles = 5,          
             fire_delay = 1,           
-            speed = 10,               
+            speed = 1000,               
             piercing = false,         
             radius = 15,              
-            damage = 15,              
+            damage = 1,              
             armor_piercing = 0       
         });
 
@@ -174,10 +174,10 @@ public static partial class Module
             duration = 4250,         
             projectiles = 2,          
             fire_delay = 0,           
-            speed = 4,              
+            speed = 200,              
             piercing = true,         
             radius = 32,             
-            damage = 20,             
+            damage = 4,             
             armor_piercing = 10       
         });
 
@@ -298,7 +298,20 @@ public static partial class Module
         if (burstCooldown.remaining_shots == 0)
         {
             Log.Info($"All projectiles fired for player {burstCooldown.player_id}, attack type {burstCooldown.attack_type}");
-            ctx.Db.attack_burst_cooldowns.Delete(burstCooldown);
+        }
+        else
+        {
+            // update the scheduled_at to the next shot
+            // If there are more projectiles and fire_delay > 0, schedule the next
+            ctx.Db.attack_burst_cooldowns.Insert(new AttackBurstCooldown
+            {
+                player_id = burstCooldown.player_id,
+                attack_type = burstCooldown.attack_type,
+                remaining_shots = burstCooldown.remaining_shots,
+                parameter_u = burstCooldown.parameter_u,
+                parameter_i = burstCooldown.parameter_i,
+                scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(attackData.Value.fire_delay))
+            });
         }
     }
 
@@ -351,7 +364,7 @@ public static partial class Module
                     remaining_shots = attackData.Value.projectiles - 1,
                     parameter_u = attack.parameter_u,
                     parameter_i = attack.parameter_i,
-                    scheduled_at = new ScheduleAt.Interval(TimeSpan.FromMilliseconds(attackData.Value.fire_delay))
+                    scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(attackData.Value.fire_delay))
                 });
             }
         }
