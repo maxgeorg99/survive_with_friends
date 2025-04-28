@@ -116,8 +116,10 @@ public static partial class Module
         public uint exp;
         public uint max_hp;
         public uint hp;
+        public uint hp_regen;
         public float speed;
         public uint armor; 
+        public uint unspent_upgrades;
     }
 
     // Table to store dead players (same structure as Player)
@@ -368,8 +370,10 @@ public static partial class Module
             exp = 0,
             max_hp = (uint)maxHp,
             hp = (uint)maxHp,
+            hp_regen = 0,
             speed = speed,
-            armor = (uint)armor
+            armor = (uint)armor,
+            unspent_upgrades = 0
         });
 
         // Check if player insertion failed

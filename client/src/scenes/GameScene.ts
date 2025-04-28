@@ -181,6 +181,9 @@ export default class GameScene extends Phaser.Scene {
                 S: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
                 D: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D)
             };
+            
+            // Add debug key to toggle attack circles (use backtick key)
+            this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.BACKTICK).on('down', this.toggleAttackDebugCircles, this);
         }
         console.log("Keyboard input set up.");
 
@@ -1611,6 +1614,18 @@ export default class GameScene extends Phaser.Scene {
             this.tapMarker = null;
         }
         
+        // Remove debug key binding
+        if (this.input?.keyboard) {
+            try {
+                // Try different approach to remove the listener
+                this.input.keyboard.removeCapture(Phaser.Input.Keyboard.KeyCodes.BACKTICK);
+                // Just create a new key without listeners to replace the old one
+                this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.BACKTICK);
+            } catch (e) {
+                console.warn("Could not clean up debug key binding:", e);
+            }
+        }
+        
         console.log("GameScene shutdown complete.");
     }
 
@@ -1710,5 +1725,26 @@ export default class GameScene extends Phaser.Scene {
                 worldBounds.bottom - entityRadius - verticalBuffer // Add buffer to bottom boundary
             )
         };
+    }
+
+    // Add a debug key binding to toggle attack circles visibility
+    private toggleAttackDebugCircles() {
+        if (this.attackManager) {
+            // Create a private variable in the class to track the current state
+            if (this.attackManager['debugCirclesEnabled'] === undefined) {
+                this.attackManager['debugCirclesEnabled'] = false;
+            }
+            
+            // Toggle the state
+            const newState = !this.attackManager['debugCirclesEnabled'];
+            this.attackManager['debugCirclesEnabled'] = newState;
+            
+            // Call the method to update the attack manager
+            this.attackManager.setDebugCirclesEnabled(newState);
+            
+            console.log(`Attack debug circles ${newState ? 'enabled' : 'disabled'}`);
+        } else {
+            console.log("Attack manager not initialized, can't toggle debug circles");
+        }
     }
 }

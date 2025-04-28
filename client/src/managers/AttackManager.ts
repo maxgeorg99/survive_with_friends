@@ -32,6 +32,7 @@ const ATTACK_CIRCLE_COLOR = 0xcccccc; // Light gray
 const ATTACK_CIRCLE_ALPHA = 0.3; // More transparent
 const ATTACK_CIRCLE_BORDER_ALPHA = 0.4; // Slightly more visible border
 const ATTACK_CIRCLE_BORDER_WIDTH = 1;
+const DEBUG_CIRCLES_ENABLED = false; // Debug flag, set to false by default
 
 export class AttackManager {
     private scene: Phaser.Scene;
@@ -41,6 +42,7 @@ export class AttackManager {
     private spacetimeClient: SpacetimeDBClient;
     private gameEvents: Phaser.Events.EventEmitter;
     private gameTime: number = 0;
+    private debugCirclesEnabled: boolean = DEBUG_CIRCLES_ENABLED;
 
     constructor(scene: Phaser.Scene, spacetimeClient: SpacetimeDBClient) {
         this.scene = scene;
@@ -228,23 +230,26 @@ export class AttackManager {
         // Clear previous drawing
         attackGraphicData.graphic.clear();
 
-        // Draw the attack as a light gray transparent circle
-        attackGraphicData.graphic.fillStyle(ATTACK_CIRCLE_COLOR, ATTACK_CIRCLE_ALPHA);
-        attackGraphicData.graphic.fillCircle(
-            attackGraphicData.predictedPosition.x, 
-            attackGraphicData.predictedPosition.y, 
-            attackGraphicData.radius
-        );
-        
-        // Add a thin border for better visibility
-        attackGraphicData.graphic.lineStyle(ATTACK_CIRCLE_BORDER_WIDTH, ATTACK_CIRCLE_COLOR, ATTACK_CIRCLE_BORDER_ALPHA);
-        attackGraphicData.graphic.strokeCircle(
-            attackGraphicData.predictedPosition.x, 
-            attackGraphicData.predictedPosition.y, 
-            attackGraphicData.radius
-        );
+        // Only draw the circle if debug mode is enabled
+        if (this.debugCirclesEnabled) {
+            // Draw the attack as a light gray transparent circle
+            attackGraphicData.graphic.fillStyle(ATTACK_CIRCLE_COLOR, ATTACK_CIRCLE_ALPHA);
+            attackGraphicData.graphic.fillCircle(
+                attackGraphicData.predictedPosition.x, 
+                attackGraphicData.predictedPosition.y, 
+                attackGraphicData.radius
+            );
+            
+            // Add a thin border for better visibility
+            attackGraphicData.graphic.lineStyle(ATTACK_CIRCLE_BORDER_WIDTH, ATTACK_CIRCLE_COLOR, ATTACK_CIRCLE_BORDER_ALPHA);
+            attackGraphicData.graphic.strokeCircle(
+                attackGraphicData.predictedPosition.x, 
+                attackGraphicData.predictedPosition.y, 
+                attackGraphicData.radius
+            );
+        }
 
-        // Update the sprite position and rotation
+        // Update the sprite position and rotation - always visible regardless of debug mode
         if (attackGraphicData.sprite) {
             const sprite = attackGraphicData.sprite;
             
@@ -386,5 +391,16 @@ export class AttackManager {
         
         // Remove event listeners
         this.unregisterAttackListeners();
+    }
+
+    // Add method to toggle debug circles
+    public setDebugCirclesEnabled(enabled: boolean) {
+        this.debugCirclesEnabled = enabled;
+        console.log(`Attack debug circles ${enabled ? 'enabled' : 'disabled'}`);
+        
+        // Update all existing graphics
+        for (const attackGraphicData of this.attackGraphics.values()) {
+            this.updateAttackGraphic(attackGraphicData);
+        }
     }
 } 
