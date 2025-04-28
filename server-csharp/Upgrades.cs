@@ -98,10 +98,12 @@ public static partial class Module
         }
 
         //Insert upgrade options into database
-        foreach (var upgradeType in upgradeOptions)
+        for (uint i = 0; i < 3; i++)
         {
+            var upgradeType = upgradeOptions[(int)i];
             var upgradeOptionData = CreateUpgradeOptionData(ctx, upgradeType);
             upgradeOptionData.player_id = playerId;
+            upgradeOptionData.upgrade_index = i;
             ctx.Db.upgrade_options.Insert(upgradeOptionData);
         }
     }
@@ -240,5 +242,96 @@ public static partial class Module
         }
         
         return upgradeData;
+    }
+
+    [Reducer]
+    public static void ChooseUpgrade(ReducerContext ctx, uint playerId, uint upgradeIndex)
+    {
+        // Ensure the caller is authorized
+        if (ctx.Sender != ctx.Identity)
+        {
+            throw new Exception("ChooseUpgrade may not be invoked by clients.");
+        }
+
+        // Get the upgrade option data for the player
+        var upgradeOptionsData = ctx.Db.upgrade_options.player_id.Filter(playerId);
+
+        // Ensure the player has upgrades to choose from
+        if (upgradeOptionsData.Count() == 0)
+        {
+            throw new Exception("Player has no available upgrades to choose from");
+        }
+
+        // Find the specific upgrade option selected
+        UpgradeOptionData? selectedUpgrade = null;
+        foreach (var option in upgradeOptionsData)
+        {
+            if (option.upgrade_index == upgradeIndex)
+            {
+                selectedUpgrade = option;
+                break;
+            }
+        }
+
+        if (selectedUpgrade == null)
+        {
+            throw new Exception($"Upgrade with index {upgradeIndex} not found");
+        }
+
+        // Get count of player's current chosen upgrades to determine the order
+        uint upgradeOrder = (uint)ctx.Db.chosen_upgrades.player_id.Filter(playerId).Count();
+
+        // Create a chosen upgrade entry based on the selected upgrade
+        var chosenUpgrade = new ChosenUpgradeData
+        {
+            player_id = playerId,
+            upgrade_type = selectedUpgrade.Value.upgrade_type,
+            is_attack_upgrade = selectedUpgrade.Value.is_attack_upgrade,
+            value = selectedUpgrade.Value.value,
+            attack_type = selectedUpgrade.Value.attack_type,
+            damage = selectedUpgrade.Value.damage,
+            cooldown_ratio = selectedUpgrade.Value.cooldown_ratio,
+            projectiles = selectedUpgrade.Value.projectiles,
+            speed = selectedUpgrade.Value.speed,
+            radius = selectedUpgrade.Value.radius
+        };
+
+        // Insert the chosen upgrade
+        ctx.Db.chosen_upgrades.Insert(chosenUpgrade);
+        
+        Console.WriteLine($"Player {playerId} chose upgrade: {selectedUpgrade.Value.upgrade_type}, Order: {upgradeOrder}");
+
+        // Delete all upgrade options for the player
+        var deleteCount = 0;
+        foreach (var option in upgradeOptionsData)
+        {
+            if (ctx.Db.upgrade_options.upgrade_id.Delete(option.upgrade_id))
+            {
+                deleteCount++;
+            }
+        }
+        
+        Console.WriteLine($"Deleted {deleteCount} upgrade options for player {playerId}");
+
+        // Try to get player data to update their unspent upgrades
+        var playerOpt = ctx.Db.player.player_id.Find(playerId);
+        if (playerOpt != null)
+        {
+            var player = playerOpt.Value;
+            
+            // Check if player has unspent upgrades
+            if (player.unspent_upgrades > 0)
+            {
+                // Decrement unspent upgrades
+                player.unspent_upgrades--;
+                ctx.Db.player.player_id.Update(player);
+                
+                // If player still has unspent upgrades, draw new options
+                if (player.unspent_upgrades > 0)
+                {
+                    DrawUpgradeOptions(ctx, playerId);
+                }
+            }
+        }
     }
 } 
