@@ -49,6 +49,8 @@ public static partial class Module
         public uint projectiles;
         public uint speed;
         public uint radius;
+
+        public bool is_new_attack;
     }
 
     [SpacetimeDB.Table(Name = "chosen_upgrades", Public = true)]
@@ -71,6 +73,7 @@ public static partial class Module
         public uint projectiles;
         public uint speed;
         public uint radius; 
+        public bool is_new_attack;
     }
     public static void DrawUpgradeOptions(ReducerContext ctx, uint playerId)
     {
@@ -101,7 +104,7 @@ public static partial class Module
         for (uint i = 0; i < 3; i++)
         {
             var upgradeType = upgradeOptions[(int)i];
-            var upgradeOptionData = CreateUpgradeOptionData(ctx, upgradeType);
+            var upgradeOptionData = CreateUpgradeOptionData(ctx, upgradeType, playerId);
             upgradeOptionData.player_id = playerId;
             upgradeOptionData.upgrade_index = i;
             ctx.Db.upgrade_options.Insert(upgradeOptionData);
@@ -109,10 +112,54 @@ public static partial class Module
     }
 
     //Helper function for creating upgrade option data based on upgrade type
-    private static UpgradeOptionData CreateUpgradeOptionData(ReducerContext ctx, UpgradeType upgradeType)
+    private static UpgradeOptionData CreateUpgradeOptionData(ReducerContext ctx, UpgradeType upgradeType, uint playerId)
     {
         var random = new Random();
         
+        // Check if this is an attack upgrade
+        bool isAttackUpgrade = upgradeType == UpgradeType.AttackSword || 
+                            upgradeType == UpgradeType.AttackWand || 
+                            upgradeType == UpgradeType.AttackKnives || 
+                            upgradeType == UpgradeType.AttackShield;
+
+        // If it's an attack upgrade, check if player already has it
+        if (isAttackUpgrade)
+        {
+            AttackType attackType = GetAttackTypeFromUpgrade(upgradeType);
+            bool playerHasAttack = false;
+            
+            // Check player's scheduled attacks to see if they already have this attack type
+            foreach (var attack in ctx.Db.player_scheduled_attacks.player_id.Filter(playerId))
+            {
+                if (attack.attack_type == attackType)
+                {
+                    playerHasAttack = true;
+                    break;
+                }
+            }
+            
+            // If player doesn't have this attack yet, return a "new attack" upgrade option
+            if (!playerHasAttack)
+            {
+                Console.WriteLine($"Player {playerId} doesn't have {attackType} yet, offering as new attack");
+                
+                return new UpgradeOptionData
+                {
+                    upgrade_type = upgradeType,
+                    is_attack_upgrade = true,
+                    is_new_attack = true,  // Flag to indicate this is a new attack
+                    attack_type = (uint)attackType,
+                    value = 0,   // No stat upgrades for new attacks
+                    damage = 0,
+                    cooldown_ratio = 0,
+                    projectiles = 0,
+                    speed = 0,
+                    radius = 0
+                };
+            }
+        }
+        
+        // For non-attack upgrades or attacks the player already has, proceed with normal upgrade options
         switch (upgradeType)
         {
             case UpgradeType.MaxHp:
@@ -121,7 +168,8 @@ public static partial class Module
                 {
                     upgrade_type = upgradeType, 
                     value = 40,
-                    is_attack_upgrade = false
+                    is_attack_upgrade = false,
+                    is_new_attack = false
                 };
             }   
             case UpgradeType.HpRegen:
@@ -130,7 +178,8 @@ public static partial class Module
                 {
                     upgrade_type = upgradeType,
                     value = 1,
-                    is_attack_upgrade = false
+                    is_attack_upgrade = false,
+                    is_new_attack = false
                 };
             }
             case UpgradeType.Speed:
@@ -139,7 +188,8 @@ public static partial class Module
                 {
                     upgrade_type = upgradeType,
                     value = 25,
-                    is_attack_upgrade = false
+                    is_attack_upgrade = false,
+                    is_new_attack = false
                 };
             }
             case UpgradeType.Armor:
@@ -148,7 +198,8 @@ public static partial class Module
                 {
                     upgrade_type = upgradeType,
                     value = 1,
-                    is_attack_upgrade = false
+                    is_attack_upgrade = false,
+                    is_new_attack = false
                 };
             }
             case UpgradeType.AttackSword:
@@ -217,6 +268,7 @@ public static partial class Module
         {
             upgrade_type = upgradeType,
             is_attack_upgrade = true,
+            is_new_attack = false,
             attack_type = attackType,
             value = upgradeValue
         };
@@ -293,11 +345,15 @@ public static partial class Module
             cooldown_ratio = selectedUpgrade.Value.cooldown_ratio,
             projectiles = selectedUpgrade.Value.projectiles,
             speed = selectedUpgrade.Value.speed,
-            radius = selectedUpgrade.Value.radius
+            radius = selectedUpgrade.Value.radius,
+            is_new_attack = selectedUpgrade.Value.is_new_attack
         };
 
         // Insert the chosen upgrade
         ctx.Db.chosen_upgrades.Insert(chosenUpgrade);
+        
+        // Apply the upgrade to the player
+        ApplyPlayerUpgrade(ctx, chosenUpgrade);
         
         Console.WriteLine($"Player {playerId} chose upgrade: {selectedUpgrade.Value.upgrade_type}, Order: {upgradeOrder}");
 
@@ -332,6 +388,213 @@ public static partial class Module
                     DrawUpgradeOptions(ctx, playerId);
                 }
             }
+        }
+    }
+
+    // Helper method to apply an upgrade to a player
+    private static void ApplyPlayerUpgrade(ReducerContext ctx, ChosenUpgradeData upgrade)
+    {
+        uint playerId = upgrade.player_id;
+        
+        // Get player data
+        var playerOpt = ctx.Db.player.player_id.Find(playerId);
+        if (playerOpt == null)
+        {
+            Console.WriteLine($"Cannot apply upgrade - player {playerId} not found");
+            return;
+        }
+        
+        var player = playerOpt.Value;
+        
+        Console.WriteLine($"Applying upgrade {upgrade.upgrade_type} to player {playerId}");
+        
+        // Handle different upgrade types
+        if (!upgrade.is_attack_upgrade)
+        {
+            // Handle non-attack upgrades (directly modify player stats)
+            switch (upgrade.upgrade_type)
+            {
+                case UpgradeType.MaxHp:
+                    player.max_hp += upgrade.value;
+                    player.hp += upgrade.value; // Heal player when max HP increases
+                    Console.WriteLine($"Increased player {playerId} max HP by {upgrade.value} to {player.max_hp}");
+                    break;
+                    
+                case UpgradeType.HpRegen:
+                    player.hp_regen += upgrade.value;
+                    Console.WriteLine($"Increased player {playerId} HP regen by {upgrade.value} to {player.hp_regen}");
+                    break;
+                    
+                case UpgradeType.Speed:
+                    player.speed += (float)upgrade.value / 100.0f; // Convert percent to speed factor
+                    Console.WriteLine($"Increased player {playerId} speed by {upgrade.value}% to {player.speed}");
+                    break;
+                    
+                case UpgradeType.Armor:
+                    player.armor += upgrade.value;
+                    Console.WriteLine($"Increased player {playerId} armor by {upgrade.value} to {player.armor}");
+                    break;
+                    
+                default:
+                    Console.WriteLine($"Unknown non-attack upgrade type: {upgrade.upgrade_type}");
+                    break;
+            }
+            
+            // Update player record with modified stats
+            ctx.Db.player.player_id.Update(player);
+        }
+        else
+        {
+            // Handle attack upgrades
+            // First, determine which attack type we're upgrading
+            AttackType attackType = GetAttackTypeFromUpgrade(upgrade.upgrade_type);
+            
+            // Check if this is a new attack
+            if (upgrade.is_new_attack)
+            {
+                // Simply schedule the new attack with base stats
+                Console.WriteLine($"Adding new attack {attackType} for player {playerId}");
+                ScheduleNewPlayerAttack(ctx, playerId, attackType);
+                return; // No other modifications needed for new attacks
+            }
+            
+            // This is an upgrade to an existing attack
+            // Check if this player already has a scheduled attack of this type
+            bool hasExistingAttack = false;
+            ulong scheduledAttackId = 0;
+            PlayerScheduledAttack existingAttack = new PlayerScheduledAttack();
+            
+            foreach (var attack in ctx.Db.player_scheduled_attacks.player_id.Filter(playerId))
+            {
+                if (attack.attack_type == attackType)
+                {
+                    hasExistingAttack = true;
+                    scheduledAttackId = attack.scheduled_id;
+                    existingAttack = attack;
+                    break;
+                }
+            }
+            
+            // Get base attack data
+            var baseAttackDataOpt = FindAttackDataByType(ctx, attackType);
+            if (baseAttackDataOpt == null)
+            {
+                Console.WriteLine($"Base attack data not found for attack type {attackType}");
+                return;
+            }
+            
+            var baseAttackData = baseAttackDataOpt.Value;
+            
+            if (!hasExistingAttack)
+            {
+                // Player doesn't have this attack yet (shouldn't happen with is_new_attack flag, but handle anyway)
+                Console.WriteLine($"Player {playerId} doesn't have attack {attackType} yet, scheduling new attack");
+                ScheduleNewPlayerAttack(ctx, playerId, attackType);
+                
+                // Fetch the newly created attack to apply upgrades
+                foreach (var attack in ctx.Db.player_scheduled_attacks.player_id.Filter(playerId))
+                {
+                    if (attack.attack_type == attackType)
+                    {
+                        hasExistingAttack = true;
+                        scheduledAttackId = attack.scheduled_id;
+                        existingAttack = attack;
+                        break;
+                    }
+                }
+                
+                if (!hasExistingAttack)
+                {
+                    Console.WriteLine($"Failed to schedule new attack for player {playerId}, attack type {attackType}");
+                    return;
+                }
+            }
+            
+            // Now apply the upgrade to the attack's stats
+            bool updateScheduleInterval = false;
+            bool updateScheduledAttack = false;
+            
+            // Create a modifier for the attack
+            var modifiedAttack = existingAttack;
+            uint cooldownReduction = 0;
+            
+            // Apply the specific stat upgrade
+            if (upgrade.damage > 0)
+            {
+                // Damage upgrade
+                modifiedAttack.parameter_u += upgrade.damage;
+                updateScheduledAttack = true;
+                Console.WriteLine($"Increased attack {attackType} damage by {upgrade.damage}");
+            }
+            
+            if (upgrade.cooldown_ratio > 0)
+            {
+                // Cooldown reduction (increased fire rate)
+                cooldownReduction = upgrade.cooldown_ratio;
+                updateScheduleInterval = true;
+                Console.WriteLine($"Increased attack {attackType} fire rate by {upgrade.cooldown_ratio}%");
+            }
+            
+            if (upgrade.projectiles > 0)
+            {
+                // More projectiles
+                modifiedAttack.parameter_i += (int)upgrade.projectiles;
+                updateScheduledAttack = true;
+                Console.WriteLine($"Increased attack {attackType} projectiles by {upgrade.projectiles}");
+            }
+            
+            // Speed and radius changes are applied at attack creation time
+            // We don't need to update these in the scheduled attack
+            
+            // Update the scheduled attack if needed
+            if (updateScheduledAttack)
+            {
+                ctx.Db.player_scheduled_attacks.scheduled_id.Update(modifiedAttack);
+                Console.WriteLine($"Updated scheduled attack for player {playerId}, attack type {attackType}");
+            }
+            
+            // Handle cooldown reduction by updating the schedule interval
+            if (updateScheduleInterval && cooldownReduction > 0)
+            {
+                // Recalculate cooldown based on upgrade percentage
+                // Higher percentage = faster attacks = less cooldown time
+                var upgradedAttack = ctx.Db.player_scheduled_attacks.scheduled_id.Find(scheduledAttackId);
+                if (upgradedAttack != null)
+                {
+                    // Calculate the new cooldown reduction factor
+                    // For example, 25% cooldown_ratio means fire rate is 1.25x faster
+                    float fireRateMultiplier = 1.0f + (cooldownReduction / 100.0f);
+                    
+                    // Adjust attack cooldown by the fire rate multiplier (shorter cooldown = faster firing)
+                    uint newCooldown = (uint)(baseAttackData.cooldown / fireRateMultiplier);
+                    
+                    // Create a new schedule with the updated cooldown
+                    var updatedAttack = upgradedAttack.Value;
+                    updatedAttack.scheduled_at = new ScheduleAt.Interval(TimeSpan.FromMilliseconds(newCooldown));
+                    
+                    // Update the scheduled attack with the new interval
+                    ctx.Db.player_scheduled_attacks.scheduled_id.Update(updatedAttack);
+                    Console.WriteLine($"Updated attack {attackType} cooldown for player {playerId}: {baseAttackData.cooldown}ms -> {newCooldown}ms");
+                }
+            }
+        }
+    }
+
+    // Helper method to convert from UpgradeType to AttackType
+    private static AttackType GetAttackTypeFromUpgrade(UpgradeType upgradeType)
+    {
+        switch (upgradeType)
+        {
+            case UpgradeType.AttackSword:
+                return AttackType.Sword;
+            case UpgradeType.AttackWand:
+                return AttackType.Wand;
+            case UpgradeType.AttackKnives:
+                return AttackType.Knives;
+            case UpgradeType.AttackShield:
+                return AttackType.Shield;
+            default:
+                throw new Exception($"Cannot convert upgrade type {upgradeType} to attack type");
         }
     }
 } 
