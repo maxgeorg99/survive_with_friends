@@ -28,8 +28,12 @@ const PLAYER_NAME_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
 // Health bar configuration
 const HEALTH_BAR_WIDTH = 50;
 const HEALTH_BAR_HEIGHT = 6;
-const HEALTH_BAR_OFFSET_Y = 17; // Increased vertical offset for health bar
-const NAME_OFFSET_Y = HEALTH_BAR_OFFSET_Y + 15; // Increased vertical offset for player name
+const HEALTH_BAR_OFFSET_Y = 18; // Position health bar above the exp bar
+// EXP bar configuration
+const EXP_BAR_WIDTH = 50;
+const EXP_BAR_HEIGHT = 4;
+const EXP_BAR_OFFSET_Y = 8; // Place the exp bar below the health bar
+const NAME_OFFSET_Y = HEALTH_BAR_OFFSET_Y + 16; // Increased vertical offset for player name
 
 // Monster rendering constants
 const MONSTER_SHADOW_OFFSET_Y = 8; // Vertical offset for monster shadows
@@ -43,6 +47,8 @@ const SHADOW_DEPTH_OFFSET = -1; // Always behind the sprite
 const NAME_DEPTH_OFFSET = 2; // Always in front of the sprite
 const HEALTH_BG_DEPTH_OFFSET = 1; // Just behind health bar but in front of sprite
 const HEALTH_BAR_DEPTH_OFFSET = 1.1; // In front of background but behind name
+const EXP_BG_DEPTH_OFFSET = 1; // Same as health background
+const EXP_BAR_DEPTH_OFFSET = 1.1; // Same as health bar
 
 // Movement and position constants
 const POSITION_CORRECTION_THRESHOLD = 49; // Distance squared threshold for position correction (7 pixels)
@@ -533,9 +539,36 @@ export default class GameScene extends Phaser.Scene {
                 1
             ).setOrigin(0, 0.5);
             
+            // Create exp bar
+            const expBarBackground = this.add.rectangle(
+                startX,
+                startY - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y,
+                EXP_BAR_WIDTH,
+                EXP_BAR_HEIGHT,
+                0x000000,
+                0.7
+            ).setOrigin(0.5, 0.5);
+            
+            // Calculate exp progress percentage
+            const expProgress = player.expForNextLevel > 0 
+                ? Math.min(1, player.exp / player.expForNextLevel) 
+                : 0;
+            
+            // Exp bar foreground (blue)
+            const expBar = this.add.rectangle(
+                startX - (EXP_BAR_WIDTH / 2),
+                startY - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y,
+                EXP_BAR_WIDTH * expProgress,
+                EXP_BAR_HEIGHT,
+                0x3498db, // Blue color
+                1
+            ).setOrigin(0, 0.5);
+            
             // Set appropriate depths
             healthBarBackground.setDepth(BASE_DEPTH + entityData.position.y + HEALTH_BG_DEPTH_OFFSET);
             healthBar.setDepth(BASE_DEPTH + entityData.position.y + HEALTH_BAR_DEPTH_OFFSET);
+            expBarBackground.setDepth(BASE_DEPTH + entityData.position.y + EXP_BG_DEPTH_OFFSET);
+            expBar.setDepth(BASE_DEPTH + entityData.position.y + EXP_BAR_DEPTH_OFFSET);
             
             // Store references to health bar elements and current health values
             this.localPlayerSprite.setData('healthBarBackground', healthBarBackground);
@@ -543,7 +576,14 @@ export default class GameScene extends Phaser.Scene {
             this.localPlayerSprite.setData('hp', player.hp);
             this.localPlayerSprite.setData('maxHp', player.maxHp);
             
+            // Store references to exp bar elements and current exp values
+            this.localPlayerSprite.setData('expBarBackground', expBarBackground);
+            this.localPlayerSprite.setData('expBar', expBar);
+            this.localPlayerSprite.setData('exp', player.exp);
+            this.localPlayerSprite.setData('expForNextLevel', player.expForNextLevel);
+            
             console.log(`Created health bar for player: ${player.hp}/${player.maxHp}`);
+            console.log(`Created exp bar for player: ${player.exp}/${player.expForNextLevel}`);
             
             // Set collision bounds
             this.localPlayerSprite.setCollideWorldBounds(true);
@@ -580,6 +620,35 @@ export default class GameScene extends Phaser.Scene {
                 console.log(`Updated health bar: ${player.hp}/${player.maxHp}`);
             } else {
                 console.warn("Health bar elements not found on existing sprite");
+            }
+            
+            // Update exp bar if it exists
+            const expBar = this.localPlayerSprite.getData('expBar');
+            const expBarBackground = this.localPlayerSprite.getData('expBarBackground');
+            
+            if (expBar && expBarBackground) {
+                // Update exp bar position
+                expBarBackground.x = entityData.position.x;
+                expBarBackground.y = entityData.position.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
+                
+                expBar.x = entityData.position.x - (EXP_BAR_WIDTH / 2);
+                expBar.y = entityData.position.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
+                
+                // Calculate exp progress percentage
+                const expProgress = player.expForNextLevel > 0 
+                    ? Math.min(1, player.exp / player.expForNextLevel) 
+                    : 0;
+                    
+                // Update exp bar width
+                expBar.width = EXP_BAR_WIDTH * expProgress;
+                
+                // Update stored exp values
+                this.localPlayerSprite.setData('exp', player.exp);
+                this.localPlayerSprite.setData('expForNextLevel', player.expForNextLevel);
+                
+                console.log(`Updated exp bar: ${player.exp}/${player.expForNextLevel}`);
+            } else {
+                console.warn("Exp bar elements not found on existing sprite");
             }
         }
         
@@ -635,6 +704,42 @@ export default class GameScene extends Phaser.Scene {
                         healthBar.fillColor = 0xFFFF00; // Yellow
                     } else {
                         healthBar.fillColor = 0xFF0000; // Red
+                    }
+                }
+            }
+            
+            // Update exp bar if exp changed
+            const currentExp = this.localPlayerSprite.getData('exp');
+            const currentExpForNextLevel = this.localPlayerSprite.getData('expForNextLevel');
+            
+            // Check if exp values changed
+            if (currentExp !== player.exp || currentExpForNextLevel !== player.expForNextLevel) {
+                // Update stored values
+                this.localPlayerSprite.setData('exp', player.exp);
+                this.localPlayerSprite.setData('expForNextLevel', player.expForNextLevel);
+                
+                // Update exp bar visuals
+                const expBar = this.localPlayerSprite.getData('expBar');
+                if (expBar) {
+                    // Calculate progress percentage
+                    const expProgress = player.expForNextLevel > 0 
+                        ? Math.min(1, player.exp / player.expForNextLevel) 
+                        : 0;
+                    
+                    // Update the width of the exp bar based on current exp percentage
+                    expBar.width = EXP_BAR_WIDTH * expProgress;
+                    
+                    // Briefly flash the exp bar when gaining exp
+                    if (currentExp !== undefined && player.exp > currentExp) {
+                        this.tweens.add({
+                            targets: expBar,
+                            fillColor: 0x00ffff, // Bright cyan
+                            duration: 200,
+                            yoyo: true,
+                            onComplete: () => {
+                                expBar.fillColor = 0x3498db; // Return to blue
+                            }
+                        });
                     }
                 }
             }
@@ -750,6 +855,8 @@ export default class GameScene extends Phaser.Scene {
                 let playerLevel = 1; // Default level
                 let playerMaxHp = 100; // Default max HP
                 let playerHp = 100; // Default HP
+                let playerExp = 0; // Default EXP
+                let playerExpForNextLevel = 100; // Default EXP for next level
                 
                 try {
                     if (this.spacetimeDBClient?.identity) {
@@ -779,6 +886,12 @@ export default class GameScene extends Phaser.Scene {
                                 }
                                 if (localPlayer.hp) {
                                     playerHp = localPlayer.hp;
+                                }
+                                if (localPlayer.exp !== undefined) {
+                                    playerExp = localPlayer.exp;
+                                }
+                                if (localPlayer.expForNextLevel) {
+                                    playerExpForNextLevel = localPlayer.expForNextLevel;
                                 }
                             }
                         }
@@ -816,15 +929,48 @@ export default class GameScene extends Phaser.Scene {
                     1
                 ).setOrigin(0, 0.5);
                 
+                // Create exp bar
+                const expBarBackground = this.add.rectangle(
+                    startX,
+                    startY - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y,
+                    EXP_BAR_WIDTH,
+                    EXP_BAR_HEIGHT,
+                    0x000000,
+                    0.7
+                ).setOrigin(0.5, 0.5);
+                
+                // Calculate exp progress percentage
+                const expProgress = playerExpForNextLevel > 0 
+                    ? Math.min(1, playerExp / playerExpForNextLevel) 
+                    : 0;
+                
+                // Exp bar foreground (blue)
+                const expBar = this.add.rectangle(
+                    startX - (EXP_BAR_WIDTH / 2),
+                    startY - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y,
+                    EXP_BAR_WIDTH * expProgress,
+                    EXP_BAR_HEIGHT,
+                    0x3498db, // Blue color
+                    1
+                ).setOrigin(0, 0.5);
+                
                 // Set health bar properties with Y-based depth
                 healthBarBackground.setDepth(initialDepth + HEALTH_BG_DEPTH_OFFSET);
                 healthBar.setDepth(initialDepth + HEALTH_BAR_DEPTH_OFFSET);
+                expBarBackground.setDepth(initialDepth + EXP_BG_DEPTH_OFFSET);
+                expBar.setDepth(initialDepth + EXP_BAR_DEPTH_OFFSET);
                 
                 // Store health bar references
                 this.localPlayerSprite.setData('healthBarBackground', healthBarBackground);
                 this.localPlayerSprite.setData('healthBar', healthBar);
                 this.localPlayerSprite.setData('hp', playerHp);
                 this.localPlayerSprite.setData('maxHp', playerMaxHp);
+                
+                // Store exp bar references
+                this.localPlayerSprite.setData('expBarBackground', expBarBackground);
+                this.localPlayerSprite.setData('expBar', expBar);
+                this.localPlayerSprite.setData('exp', playerExp);
+                this.localPlayerSprite.setData('expForNextLevel', playerExpForNextLevel);
                 
                 this.localPlayerShadow = this.add.image(startX, startY + SHADOW_OFFSET_Y, SHADOW_ASSET_KEY)
                     .setAlpha(SHADOW_ALPHA)
@@ -956,11 +1102,38 @@ export default class GameScene extends Phaser.Scene {
             1
         ).setOrigin(0, 0.5);
         
+        // EXP bar background
+        const expBarBackground = this.add.rectangle(
+            0,
+            -Math.floor(sprite.height / 2) - EXP_BAR_OFFSET_Y,
+            EXP_BAR_WIDTH,
+            EXP_BAR_HEIGHT,
+            0x000000,
+            0.7
+        ).setOrigin(0.5, 0.5);
+        
+        // Calculate exp progress percentage
+        const expProgress = playerData.expForNextLevel > 0 
+            ? Math.min(1, playerData.exp / playerData.expForNextLevel) 
+            : 0;
+        
+        // EXP bar fill
+        const expBar = this.add.rectangle(
+            -EXP_BAR_WIDTH / 2, // Offset to align with background
+            -Math.floor(sprite.height / 2) - EXP_BAR_OFFSET_Y,
+            EXP_BAR_WIDTH * expProgress,
+            EXP_BAR_HEIGHT,
+            0x3498db, // Blue color
+            1
+        ).setOrigin(0, 0.5);
+        
         // Create container and add all elements
-        const container = this.add.container(startX, startY, [shadow, sprite, text, healthBarBackground, healthBar]);
+        const container = this.add.container(startX, startY, [shadow, sprite, text, healthBarBackground, healthBar, expBarBackground, expBar]);
         container.setData('entityId', entityData.entityId);
         container.setData('hp', playerData.hp);
         container.setData('maxHp', playerData.maxHp);
+        container.setData('exp', playerData.exp);
+        container.setData('expForNextLevel', playerData.expForNextLevel);
         container.setData('sprite', sprite);
         
         // Name the elements so we can access them by name
@@ -968,6 +1141,8 @@ export default class GameScene extends Phaser.Scene {
         text.setName('nameText');
         healthBar.setName('healthBar');
         healthBarBackground.setName('healthBarBackground');
+        expBar.setName('expBar');
+        expBarBackground.setName('expBarBackground');
         
         // Set the container depth based on Y position
         container.setDepth(initialDepth);
@@ -1065,6 +1240,44 @@ export default class GameScene extends Phaser.Scene {
                             
                             // Position the health bar (it's left-aligned)
                             healthBar.x = -HEALTH_BAR_WIDTH / 2;
+                        }
+                    }
+                    
+                    // Update exp bar if exp changed
+                    if (playerData.exp !== undefined && playerData.expForNextLevel !== undefined) {
+                        // Get current exp to compare
+                        const currentExp = container.getData('exp') || 0;
+                        const currentExpForNextLevel = container.getData('expForNextLevel') || 100;
+                        
+                        // Store new exp values
+                        container.setData('exp', playerData.exp);
+                        container.setData('expForNextLevel', playerData.expForNextLevel);
+                        
+                        const expBar = container.getByName('expBar') as Phaser.GameObjects.Rectangle;
+                        if (expBar) {
+                            // Calculate progress percentage
+                            const expProgress = playerData.expForNextLevel > 0 
+                                ? Math.min(1, playerData.exp / playerData.expForNextLevel) 
+                                : 0;
+                            
+                            // Adjust exp bar width based on current exp
+                            expBar.width = EXP_BAR_WIDTH * expProgress;
+                            
+                            // Position the exp bar (it's left-aligned)
+                            expBar.x = -EXP_BAR_WIDTH / 2;
+                            
+                            // Briefly flash the exp bar when gaining exp
+                            if (playerData.exp > currentExp) {
+                                this.tweens.add({
+                                    targets: expBar,
+                                    fillColor: 0x00ffff, // Bright cyan
+                                    duration: 200,
+                                    yoyo: true,
+                                    onComplete: () => {
+                                        expBar.fillColor = 0x3498db; // Return to blue
+                                    }
+                                });
+                            }
                         }
                     }
                     
@@ -1326,6 +1539,19 @@ export default class GameScene extends Phaser.Scene {
                 healthBar.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
                 healthBar.setDepth(BASE_DEPTH + this.localPlayerSprite.y + HEALTH_BAR_DEPTH_OFFSET);
             }
+            
+            // Update exp bar position and depth
+            const expBarBackground = this.localPlayerSprite.getData('expBarBackground');
+            const expBar = this.localPlayerSprite.getData('expBar');
+            if (expBarBackground && expBar) {
+                expBarBackground.x = this.localPlayerSprite.x;
+                expBarBackground.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
+                expBarBackground.setDepth(BASE_DEPTH + this.localPlayerSprite.y + EXP_BG_DEPTH_OFFSET);
+                
+                expBar.x = this.localPlayerSprite.x - (EXP_BAR_WIDTH / 2);
+                expBar.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
+                expBar.setDepth(BASE_DEPTH + this.localPlayerSprite.y + EXP_BAR_DEPTH_OFFSET);
+            }
         }
         
         // If server has sent an updated position that's far from our prediction, correct it
@@ -1374,6 +1600,19 @@ export default class GameScene extends Phaser.Scene {
                     healthBar.x = this.localPlayerSprite.x - (HEALTH_BAR_WIDTH / 2);
                     healthBar.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
                     healthBar.setDepth(BASE_DEPTH + this.localPlayerSprite.y + HEALTH_BAR_DEPTH_OFFSET);
+                }
+                
+                // Update exp bar with interpolated position and depth
+                const expBarBackground = this.localPlayerSprite.getData('expBarBackground');
+                const expBar = this.localPlayerSprite.getData('expBar');
+                if (expBarBackground && expBar) {
+                    expBarBackground.x = this.localPlayerSprite.x;
+                    expBarBackground.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
+                    expBarBackground.setDepth(BASE_DEPTH + this.localPlayerSprite.y + EXP_BG_DEPTH_OFFSET);
+                    
+                    expBar.x = this.localPlayerSprite.x - (EXP_BAR_WIDTH / 2);
+                    expBar.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
+                    expBar.setDepth(BASE_DEPTH + this.localPlayerSprite.y + EXP_BAR_DEPTH_OFFSET);
                 }
             }
         }
