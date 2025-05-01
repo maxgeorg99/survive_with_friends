@@ -299,10 +299,16 @@ public static partial class Module
     [Reducer]
     public static void ChooseUpgrade(ReducerContext ctx, uint playerId, uint upgradeIndex)
     {
-        // Ensure the caller is authorized
-        if (ctx.Sender != ctx.Identity)
+        //Ensure the caller's identity is the player's identity
+        var identityAccount = ctx.Db.account.identity.Find(ctx.Sender);
+        if (identityAccount == null)
         {
-            throw new Exception("ChooseUpgrade may not be invoked by clients.");
+            throw new Exception("ChooseUpgrade called by null identity");
+        }
+
+        if (identityAccount.Value.current_player_id != playerId)
+        {
+            throw new Exception("ChooseUpgrade called by wrong player");
         }
 
         // Get the upgrade option data for the player

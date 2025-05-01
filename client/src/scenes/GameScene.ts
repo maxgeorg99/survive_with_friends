@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import SpacetimeDBClient from '../SpacetimeDBClient';
-import { Player, Entity, PlayerClass, UpdatePlayerDirection, Monsters, MonsterType, Bestiary, Account, DeadPlayer, EventContext, ErrorContext } from "../autobindings";
+import { Player, Entity, PlayerClass, UpdatePlayerDirection, Monsters, MonsterType, Bestiary, Account, DeadPlayer, EventContext, ErrorContext, UpgradeOptionData } from "../autobindings";
 import { Identity } from '@clockworklabs/spacetimedb-sdk';
 import { MONSTER_ASSET_KEYS, MONSTER_SHADOW_OFFSETS, MONSTER_MAX_HP } from '../constants/MonsterConfig';
 import MonsterManager from '../managers/MonsterManager';
@@ -8,6 +8,7 @@ import { GameEvents } from '../constants/GameEvents';
 import { AttackManager } from '../managers/AttackManager';
 import GemManager from '../managers/GemManager';
 import { createPlayerDamageEffect, createMonsterDamageEffect } from '../utils/DamageEffects';
+import UpgradeUI from '../ui/UpgradeUI';
 
 // Constants
 const PLAYER_SPEED = 200;
@@ -81,6 +82,10 @@ export default class GameScene extends Phaser.Scene {
     // Add gem manager for gem visualization
     private gemManager: GemManager | null = null;
     
+    // Add upgrade UI manager
+    private upgradeUI: UpgradeUI | null = null;
+    private localPlayerId: number = 0;
+    
     private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null;
     private wasdKeys: {
         W: Phaser.Input.Keyboard.Key;
@@ -137,6 +142,13 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('attack_wand', '/assets/attack_wand.png');
         this.load.image('attack_knife', '/assets/attack_knife.png');
         this.load.image('attack_shield', '/assets/attack_shield.png');
+        
+        // Load upgrade assets
+        this.load.image('card_blank', '/assets/card_blank.png');
+        this.load.image('upgrade_maxHP', '/assets/upgrade_maxHP.png');
+        this.load.image('upgrade_regenHP', '/assets/upgrade_regenHP.png');
+        this.load.image('upgrade_speed', '/assets/upgrade_speed.png');
+        this.load.image('upgrade_armor', '/assets/upgrade_armor.png');
         
         // Load gem assets
         this.load.image('gem_1', '/assets/gem_1.png');
@@ -294,6 +306,17 @@ export default class GameScene extends Phaser.Scene {
         // Connection events
         this.gameEvents.on(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
 
+        // Add table event handlers for upgrade options
+        if (this.spacetimeDBClient.sdkConnection) {
+            // Listen for upgrade options
+            this.spacetimeDBClient.sdkConnection.db.upgradeOptions.onInsert(
+                (ctx: EventContext, upgrade: UpgradeOptionData) => this.handleUpgradeOptionCreated(ctx, upgrade)
+            );
+            this.spacetimeDBClient.sdkConnection.db.upgradeOptions.onDelete(
+                (ctx: EventContext, upgrade: UpgradeOptionData) => this.handleUpgradeOptionDeleted(ctx, upgrade)
+            );
+        }
+
         this.events.on("shutdown", this.shutdown, this);
     }
 
@@ -339,12 +362,35 @@ export default class GameScene extends Phaser.Scene {
     }
 
     private handlePlayerUpdated(ctx: EventContext, oldPlayer: Player, newPlayer: Player, isLocalPlayer: boolean) {
+        console.log("Player updated:", newPlayer.playerId, "Local:", isLocalPlayer);
         
+        // If local player and unspent upgrades increased, check for upgrade options
+        if (isLocalPlayer && newPlayer.unspentUpgrades > oldPlayer.unspentUpgrades) {
+            console.log("Player level up: upgrade points available:", newPlayer.unspentUpgrades);
+            
+            // Ensure we have the upgrade UI
+            if (!this.upgradeUI && this.spacetimeDBClient.sdkConnection) {
+                this.upgradeUI = new UpgradeUI(this, this.spacetimeDBClient, newPlayer.playerId);
+                
+                // Check for upgrade options
+                const playerUpgrades = Array.from(ctx.db.upgradeOptions.iter())
+                    .filter(option => option.playerId === newPlayer.playerId);
+                    
+                if (playerUpgrades.length > 0) {
+                    this.upgradeUI.setUpgradeOptions(playerUpgrades);
+                }
+            }
+            
+            // Play level up effect
+            if (this.localPlayerSprite) {
+                this.createLevelUpEffect(this.localPlayerSprite);
+            }
+        }
+
+        // Rest of existing player update handling
         if (isLocalPlayer) {
-            // Update local player attributes if needed
             this.updateLocalPlayerAttributes(ctx, newPlayer);
         } else {
-            // Update another player
             this.addOrUpdateOtherPlayer(newPlayer, ctx);
         }
     }
@@ -470,6 +516,9 @@ export default class GameScene extends Phaser.Scene {
             console.log("Local player already initialized, skipping...");
             return;
         }
+
+        // Store the local player ID for upgrade handling
+        this.localPlayerId = player.playerId;
         
         // Get the entity data for this player
         const entityData = ctx.db?.entity.entityId.find(player.entityId);
@@ -649,17 +698,34 @@ export default class GameScene extends Phaser.Scene {
             }
         }
         
-        // Store the server position
+        // Add player sprite to registry for other components to access
+        this.registry.set('localPlayerSprite', this.localPlayerSprite);
+        
+        // Store server position for interpolation
         this.serverPosition = new Phaser.Math.Vector2(entityData.position.x, entityData.position.y);
         
-        // Set player data as ready
+        // Store initial direction
+        this.currentDirection.x = entityData.direction.x;
+        this.currentDirection.y = entityData.direction.y;
+        this.isMoving = entityData.isMoving;
+        
+        // Mark as initialized
+        this.playerInitialized = true;
         this.isPlayerDataReady = true;
 
-        this.playerInitialized = true;
-        
-        // Debug output for verification
-        console.log("Local player initialized at position:", entityData.position);
-        console.log("Camera following:", this.cameras.main.followOffset);
+        // Check if player has pending upgrades and initialize the upgrade UI if needed
+        if (player.unspentUpgrades > 0 && this.spacetimeDBClient.sdkConnection) {
+            const playerUpgrades = Array.from(this.spacetimeDBClient.sdkConnection.db.upgradeOptions.iter())
+                .filter(option => option.playerId === this.localPlayerId);
+                
+            if (playerUpgrades.length > 0) {
+                console.log("Player has pending upgrades, initializing upgrade UI");
+                this.upgradeUI = new UpgradeUI(this, this.spacetimeDBClient, this.localPlayerId);
+                this.upgradeUI.setUpgradeOptions(playerUpgrades);
+            }
+        }
+
+        console.log("Local player initialized successfully");
     }
 
     /**
@@ -1734,6 +1800,11 @@ export default class GameScene extends Phaser.Scene {
         if (this.gemManager) {
             this.gemManager.update(time, delta);
         }
+        
+        // Update upgrade UI if visible
+        if (this.upgradeUI) {
+            this.upgradeUI.update(time, delta);
+        }
     }
 
     // Force a synchronization of player entities
@@ -1931,6 +2002,16 @@ export default class GameScene extends Phaser.Scene {
 
         // Clean up GemManager
         this.gemManager?.shutdown();
+        
+        // Clean up UpgradeUI
+        if (this.upgradeUI) {
+            this.upgradeUI.destroy();
+            this.upgradeUI = null;
+        }
+        
+        // Note: SpacetimeDB event handlers are managed by the SDK
+        // The connection to the database will be cleaned up when the game is closed
+        // or when we move to a different scene
 
         // Remove event listeners
         this.events.off("shutdown", this.shutdown, this);
@@ -2207,5 +2288,39 @@ export default class GameScene extends Phaser.Scene {
         this.time.delayedCall(200, () => {
             sprite.setTint(initialTint); // Reset tint
         });
+    }
+
+    private handleUpgradeOptionCreated(ctx: EventContext, upgrade: UpgradeOptionData): void {
+        // Only handle options for the local player
+        if (upgrade.playerId === this.localPlayerId) {
+            console.log("Received upgrade option:", upgrade);
+            
+            // Initialize upgrade UI if not already done
+            if (!this.upgradeUI && this.localPlayerId > 0) {
+                this.upgradeUI = new UpgradeUI(this, this.spacetimeDBClient, this.localPlayerId);
+            }
+            
+            // Collect all upgrades for this player by filtering the rows manually
+            if (this.upgradeUI && this.spacetimeDBClient.sdkConnection) {
+                const playerUpgrades = Array.from(this.spacetimeDBClient.sdkConnection.db.upgradeOptions.iter())
+                    .filter(option => option.playerId === this.localPlayerId);
+                
+                this.upgradeUI.setUpgradeOptions(playerUpgrades);
+            }
+        }
+    }
+
+    private handleUpgradeOptionDeleted(ctx: EventContext, upgrade: UpgradeOptionData): void {
+        // When upgrades are deleted (usually after selection), hide the UI
+        if (upgrade.playerId === this.localPlayerId && this.upgradeUI && this.spacetimeDBClient.sdkConnection) {
+            const remainingUpgrades = Array.from(this.spacetimeDBClient.sdkConnection.db.upgradeOptions.iter())
+                .filter(option => option.playerId === this.localPlayerId);
+            
+            if (remainingUpgrades.length === 0) {
+                this.upgradeUI.hide();
+            } else {
+                this.upgradeUI.setUpgradeOptions(remainingUpgrades);
+            }
+        }
     }
 }
