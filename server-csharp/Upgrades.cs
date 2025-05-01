@@ -465,72 +465,41 @@ public static partial class Module
             }
             
             // This is an upgrade to an existing attack
-            // Check if this player already has a scheduled attack of this type
-            bool hasExistingAttack = false;
+            // Find the player's scheduled attack for this type
+            PlayerScheduledAttack? existingAttack = null;
             ulong scheduledAttackId = 0;
-            PlayerScheduledAttack existingAttack = new PlayerScheduledAttack();
             
             foreach (var attack in ctx.Db.player_scheduled_attacks.player_id.Filter(playerId))
             {
                 if (attack.attack_type == attackType)
                 {
-                    hasExistingAttack = true;
-                    scheduledAttackId = attack.scheduled_id;
                     existingAttack = attack;
+                    scheduledAttackId = attack.scheduled_id;
                     break;
                 }
             }
             
-            // Get base attack data
-            var baseAttackDataOpt = FindAttackDataByType(ctx, attackType);
-            if (baseAttackDataOpt == null)
-            {
-                Console.WriteLine($"Base attack data not found for attack type {attackType}");
-                return;
-            }
-            
-            var baseAttackData = baseAttackDataOpt.Value;
-            
-            if (!hasExistingAttack)
+            if (existingAttack == null)
             {
                 // Player doesn't have this attack yet (shouldn't happen with is_new_attack flag, but handle anyway)
                 Console.WriteLine($"Player {playerId} doesn't have attack {attackType} yet, scheduling new attack");
                 ScheduleNewPlayerAttack(ctx, playerId, attackType);
-                
-                // Fetch the newly created attack to apply upgrades
-                foreach (var attack in ctx.Db.player_scheduled_attacks.player_id.Filter(playerId))
-                {
-                    if (attack.attack_type == attackType)
-                    {
-                        hasExistingAttack = true;
-                        scheduledAttackId = attack.scheduled_id;
-                        existingAttack = attack;
-                        break;
-                    }
-                }
-                
-                if (!hasExistingAttack)
-                {
-                    Console.WriteLine($"Failed to schedule new attack for player {playerId}, attack type {attackType}");
-                    return;
-                }
+                return;
             }
             
-            // Now apply the upgrade to the attack's stats
-            bool updateScheduleInterval = false;
+            // Create a copy of the attack to modify
+            var modifiedAttack = existingAttack.Value;
             bool updateScheduledAttack = false;
-            
-            // Create a modifier for the attack
-            var modifiedAttack = existingAttack;
+            bool updateScheduleInterval = false;
             uint cooldownReduction = 0;
             
-            // Apply the specific stat upgrade
+            // Apply upgrades to the attack stats
             if (upgrade.damage > 0)
             {
-                // Damage upgrade
-                modifiedAttack.parameter_u += upgrade.damage;
+                // Damage upgrade - increase the damage stat directly
+                modifiedAttack.damage += upgrade.damage;
                 updateScheduledAttack = true;
-                Console.WriteLine($"Increased attack {attackType} damage by {upgrade.damage}");
+                Console.WriteLine($"Increased attack {attackType} damage by {upgrade.damage} to {modifiedAttack.damage}");
             }
             
             if (upgrade.cooldown_ratio > 0)
@@ -543,16 +512,29 @@ public static partial class Module
             
             if (upgrade.projectiles > 0)
             {
-                // More projectiles
-                modifiedAttack.parameter_i += (int)upgrade.projectiles;
+                // More projectiles - update the projectiles count
+                modifiedAttack.projectiles += upgrade.projectiles;
                 updateScheduledAttack = true;
-                Console.WriteLine($"Increased attack {attackType} projectiles by {upgrade.projectiles}");
+                Console.WriteLine($"Increased attack {attackType} projectiles by {upgrade.projectiles} to {modifiedAttack.projectiles}");
             }
             
-            // Speed and radius changes are applied at attack creation time
-            // We don't need to update these in the scheduled attack
+            if (upgrade.speed > 0)
+            {
+                // Projectile speed upgrade
+                modifiedAttack.speed += (modifiedAttack.speed * (float)upgrade.speed / 100.0f);
+                updateScheduledAttack = true;
+                Console.WriteLine($"Increased attack {attackType} speed by {upgrade.speed}% to {modifiedAttack.speed}");
+            }
             
-            // Update the scheduled attack if needed
+            if (upgrade.radius > 0)
+            {
+                // Attack radius upgrade
+                modifiedAttack.radius += upgrade.radius;
+                updateScheduledAttack = true;
+                Console.WriteLine($"Increased attack {attackType} radius by {upgrade.radius} to {modifiedAttack.radius}");
+            }
+            
+            // Update the scheduled attack record if any stats were changed
             if (updateScheduledAttack)
             {
                 ctx.Db.player_scheduled_attacks.scheduled_id.Update(modifiedAttack);
@@ -562,25 +544,40 @@ public static partial class Module
             // Handle cooldown reduction by updating the schedule interval
             if (updateScheduleInterval && cooldownReduction > 0)
             {
-                // Recalculate cooldown based on upgrade percentage
-                // Higher percentage = faster attacks = less cooldown time
-                var upgradedAttack = ctx.Db.player_scheduled_attacks.scheduled_id.Find(scheduledAttackId);
-                if (upgradedAttack != null)
+                // Get base attack data to get original cooldown
+                var attackDataOpt = FindAttackDataByType(ctx, attackType);
+                if (attackDataOpt != null)
                 {
-                    // Calculate the new cooldown reduction factor
-                    // For example, 25% cooldown_ratio means fire rate is 1.25x faster
-                    float fireRateMultiplier = 1.0f + (cooldownReduction / 100.0f);
+                    var attackData = attackDataOpt.Value;
                     
-                    // Adjust attack cooldown by the fire rate multiplier (shorter cooldown = faster firing)
-                    uint newCooldown = (uint)(baseAttackData.cooldown / fireRateMultiplier);
+                    // Calculate new cooldown (apply percentage reduction)
+                    var baseCooldown = attackData.cooldown;
+                    var reduction = baseCooldown * cooldownReduction / 100;
+                    var newCooldown = baseCooldown - reduction;
                     
-                    // Create a new schedule with the updated cooldown
-                    var updatedAttack = upgradedAttack.Value;
-                    updatedAttack.scheduled_at = new ScheduleAt.Interval(TimeSpan.FromMilliseconds(newCooldown));
+                    // Update the attack scheduling interval
+                    ctx.Db.player_scheduled_attacks.scheduled_id.Delete(scheduledAttackId);
                     
-                    // Update the scheduled attack with the new interval
-                    ctx.Db.player_scheduled_attacks.scheduled_id.Update(updatedAttack);
-                    Console.WriteLine($"Updated attack {attackType} cooldown for player {playerId}: {baseAttackData.cooldown}ms -> {newCooldown}ms");
+                    // Create a new scheduled attack with the updated interval
+                    ctx.Db.player_scheduled_attacks.Insert(new PlayerScheduledAttack
+                    {
+                        player_id = playerId,
+                        attack_type = modifiedAttack.attack_type,
+                        skill_level = modifiedAttack.skill_level,
+                        parameter_u = modifiedAttack.parameter_u,
+                        parameter_i = modifiedAttack.parameter_i,
+                        duration = modifiedAttack.duration,
+                        projectiles = modifiedAttack.projectiles,
+                        fire_delay = modifiedAttack.fire_delay,
+                        speed = modifiedAttack.speed,
+                        piercing = modifiedAttack.piercing,
+                        radius = modifiedAttack.radius,
+                        damage = modifiedAttack.damage,
+                        armor_piercing = modifiedAttack.armor_piercing,
+                        scheduled_at = new ScheduleAt.Interval(TimeSpan.FromMilliseconds(newCooldown))
+                    });
+                    
+                    Console.WriteLine($"Updated attack cooldown: reduced from {baseCooldown}ms to {newCooldown}ms");
                 }
             }
         }

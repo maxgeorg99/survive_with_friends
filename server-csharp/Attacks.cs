@@ -66,6 +66,9 @@ public static partial class Module
         public uint id_within_burst;   // Position within a burst (0-based index)
         public uint parameter_u;       // Parameter used for special attacks
         public uint ticks_elapsed;    // Number of ticks since the attack was created
+        public uint damage;           // Damage of this specific attack instance
+        public float radius;          // Radius of this attack (for area effects)
+        public bool piercing;         // Whether this attack pierces through enemies
     }
 
     //Scheduled cleanup of active attacks
@@ -100,6 +103,17 @@ public static partial class Module
         public uint skill_level;      // The skill level for this attack
         public uint parameter_u;      // Additional parameter for the attack
         public int parameter_i;       // Additional parameter for the attack
+        
+        // Combat stats copied from AttackData but can be modified by upgrades
+        public uint duration;         // Duration in milliseconds that attack lasts
+        public uint projectiles;      // Number of projectiles in a single burst
+        public uint fire_delay;       // Delay in milliseconds between shots in a burst
+        public float speed;           // Movement speed of projectiles
+        public bool piercing;         // Whether projectiles pierce through enemies
+        public float radius;          // Radius of attack/projectile
+        public uint damage;           // Base damage of the attack
+        public uint armor_piercing;   // Amount of enemy armor ignored
+        
         public ScheduleAt scheduled_at; // When to trigger the attack
     }
 
@@ -212,6 +226,23 @@ public static partial class Module
 
         var attackData = attackDataOpt.Value;
         
+        // Get player's scheduled attack to use actual stats (which may have been upgraded)
+        PlayerScheduledAttack? scheduledAttack = null;
+        foreach (var attack in ctx.Db.player_scheduled_attacks.player_id.Filter(playerId))
+        {
+            if (attack.attack_type == attackType)
+            {
+                scheduledAttack = attack;
+                break;
+            }
+        }
+        
+        if (scheduledAttack == null)
+        {
+            Log.Error($"Scheduled attack not found for player {playerId}, attack type {attackType}");
+            return;
+        }
+        
         // Get player data
         var playerOpt = ctx.Db.player.player_id.Find(playerId);
         if (playerOpt == null)
@@ -240,7 +271,7 @@ public static partial class Module
         {
             position = entity.position,
             direction = direction,
-            radius = attackData.radius
+            radius = scheduledAttack.Value.radius
         });
 
         // Create active attack (represents visible/active projectile or area attack)
@@ -250,11 +281,14 @@ public static partial class Module
             player_id = playerId,           // The player who created the attack
             attack_type = attackType,
             id_within_burst = idWithinBurst,
-            parameter_u = parameterU
+            parameter_u = parameterU,
+            damage = scheduledAttack.Value.damage,
+            radius = scheduledAttack.Value.radius,
+            piercing = scheduledAttack.Value.piercing
         });
 
         // Schedule cleanup of the active attack
-        var duration = attackData.duration;
+        var duration = scheduledAttack.Value.duration;
         ctx.Db.active_attack_cleanup.Insert(new ActiveAttackCleanup
         {
             active_attack_id = activeAttack.active_attack_id,
@@ -263,7 +297,7 @@ public static partial class Module
         
         // Note: This method would be expanded with actual game logic for creating
         // projectiles, applying damage, etc. For now it just creates the active attack record.
-        Log.Info($"Created attack projectile for player {playerId}, type {attackType}, id within burst: {idWithinBurst}, direction: ({direction.x}, {direction.y}), speed: {attackData.speed}");
+        Log.Info($"Created attack projectile for player {playerId}, type {attackType}, id within burst: {idWithinBurst}, direction: ({direction.x}, {direction.y}), speed: {scheduledAttack.Value.speed}, damage: {scheduledAttack.Value.damage}");
     }
 
     // Handler for attack burst cooldown expiration
@@ -273,6 +307,24 @@ public static partial class Module
         if (ctx.Sender != ctx.Identity)
         {
             throw new Exception("HandleAttackBurstCooldown may not be invoked by clients, only via scheduling.");
+        }
+
+        // Find the player's scheduled attack for this attack type
+        PlayerScheduledAttack? scheduledAttack = null;
+        foreach (var attack in ctx.Db.player_scheduled_attacks.player_id.Filter(burstCooldown.player_id))
+        {
+            if (attack.attack_type == burstCooldown.attack_type)
+            {
+                scheduledAttack = attack;
+                break;
+            }
+        }
+        
+        if (scheduledAttack == null)
+        {
+            Log.Error($"Scheduled attack not found for player {burstCooldown.player_id}, attack type {burstCooldown.attack_type}");
+            ctx.Db.attack_burst_cooldowns.Delete(burstCooldown);
+            return;
         }
 
         // Calculate the id_within_burst based on attack data and remaining shots
@@ -290,7 +342,7 @@ public static partial class Module
             return;
         }
         
-        uint totalProjectiles = attackData.Value.projectiles;
+        uint totalProjectiles = scheduledAttack.Value.projectiles;
         uint currentProjectileIndex = totalProjectiles - burstCooldown.remaining_shots;
 
         // Create the next projectile in the burst with the correct id_within_burst
@@ -313,7 +365,7 @@ public static partial class Module
                 remaining_shots = burstCooldown.remaining_shots,
                 parameter_u = burstCooldown.parameter_u,
                 parameter_i = burstCooldown.parameter_i,
-                scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(attackData.Value.fire_delay))
+                scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(scheduledAttack.Value.fire_delay))
             });
         }
     }
@@ -338,19 +390,20 @@ public static partial class Module
             return;
         }
 
-        //Update the parameters for the attack
+        // Update the parameters for the attack
         var parameterU = AttackUtils.GetParameterU(ctx, attack);
         attack.parameter_u = parameterU;
 
+        // Update the scheduled attack in the database
         ctx.Db.player_scheduled_attacks.scheduled_id.Update(attack);
         
         // Handle case where we have multiple projectiles
-        if (attackData.Value.projectiles > 1)
+        if (attack.projectiles > 1)
         {
-            if (attackData.Value.fire_delay == 0)
+            if (attack.fire_delay == 0)
             {
                 // If fire_delay is 0, spawn all projectiles at once
-                for (uint i = 0; i < attackData.Value.projectiles; i++)
+                for (uint i = 0; i < attack.projectiles; i++)
                 {
                     TriggerAttackProjectile(ctx, playerId, attack.attack_type, i, attack.parameter_u, attack.parameter_i);
                 }
@@ -360,17 +413,17 @@ public static partial class Module
                 // Fire first projectile with id_within_burst = 0
                 TriggerAttackProjectile(ctx, playerId, attack.attack_type, 0, attack.parameter_u, attack.parameter_i);
                  
-                Log.Info($"Scheduled {attackData.Value.projectiles - 1} projectiles for player {playerId}, attack type {attack.attack_type}, fire delay: {attackData.Value.fire_delay}");
+                Log.Info($"Scheduled {attack.projectiles - 1} projectiles for player {playerId}, attack type {attack.attack_type}, fire delay: {attack.fire_delay}");
 
                 // If there are more projectiles and fire_delay > 0, schedule the rest
                 ctx.Db.attack_burst_cooldowns.Insert(new AttackBurstCooldown
                 {
                     player_id = playerId,
                     attack_type = attack.attack_type,
-                    remaining_shots = attackData.Value.projectiles - 1,
+                    remaining_shots = attack.projectiles - 1,
                     parameter_u = attack.parameter_u,
                     parameter_i = attack.parameter_i,
-                    scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(attackData.Value.fire_delay))
+                    scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(attack.fire_delay))
                 });
             }
         }
@@ -394,7 +447,7 @@ public static partial class Module
             return;
         }
 
-        // Schedule the first attack
+        // Schedule the first attack with all properties copied from base attack data
         ctx.Db.player_scheduled_attacks.Insert(new PlayerScheduledAttack
         {
             player_id = playerId,
@@ -402,10 +455,18 @@ public static partial class Module
             skill_level = skillLevel,
             parameter_u = 0,
             parameter_i = 0,
+            duration = attackData.Value.duration,
+            projectiles = attackData.Value.projectiles,
+            fire_delay = attackData.Value.fire_delay,
+            speed = attackData.Value.speed,
+            piercing = attackData.Value.piercing,
+            radius = attackData.Value.radius,
+            damage = attackData.Value.damage,
+            armor_piercing = attackData.Value.armor_piercing,
             scheduled_at = new ScheduleAt.Interval(TimeSpan.FromMilliseconds(attackData.Value.cooldown))
         });
         
-        Log.Info($"Scheduled initial attack of type {attackType} for player {playerId}");
+        Log.Info($"Scheduled initial attack of type {attackType} for player {playerId} with damage {attackData.Value.damage}");
     }
 
     // Cleanup active attacks

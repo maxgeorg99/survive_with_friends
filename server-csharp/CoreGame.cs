@@ -479,15 +479,6 @@ public static partial class Module
             
             var attackEntity = attackEntityOpt.Value;
             
-            // Get attack data for damage calculation
-            var attackDataOpt = FindAttackDataByType(ctx, activeAttack.attack_type);
-            if (attackDataOpt is null)
-            {
-                continue; // Skip if attack data not found
-            }
-            
-            var attackData = attackDataOpt.Value;
-            
             bool attackHitMonster = false;
             
             // Check for collisions with monsters
@@ -508,18 +499,19 @@ public static partial class Module
                     // Record the hit
                     RecordMonsterHitByAttack(ctx, monster.monster_id, attackEntity.entity_id);
                     
-                    // Apply damage to monster
-                    uint damage = attackData.damage;
+                    // Apply damage to monster using the active attack's damage value
+                    uint damage = activeAttack.damage;
                     
-                    // Apply armor piercing if available
-                    // Monster armor would need to be added to bestiary or monster table
-                    // For now, just apply full damage
+                    // Apply armor piercing if needed
+                    // (Not implemented in this version)
+                    
+                    Log.Info($"Player attack hit monster {monster.monster_id}: Type={activeAttack.attack_type}, Damage={damage}");
                     
                     bool monsterKilled = DamageMonster(ctx, monster.monster_id, damage);
                     attackHitMonster = true;
                     
                     // For non-piercing attacks, stop checking other monsters and destroy the attack
-                    if (!attackData.piercing)
+                    if (!activeAttack.piercing)
                     {
                         break;
                     }
@@ -527,7 +519,7 @@ public static partial class Module
             }
             
             // If the attack hit a monster and it's not piercing, remove the attack
-            if (attackHitMonster && !attackData.piercing)
+            if (attackHitMonster && !activeAttack.piercing)
             {
                 // Delete the attack entity
                 ctx.Db.entity.entity_id.Delete(attackEntity.entity_id);
