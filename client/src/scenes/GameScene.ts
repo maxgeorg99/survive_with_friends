@@ -6,6 +6,7 @@ import { MONSTER_ASSET_KEYS, MONSTER_SHADOW_OFFSETS, MONSTER_MAX_HP } from '../c
 import MonsterManager from '../managers/MonsterManager';
 import { GameEvents } from '../constants/GameEvents';
 import { AttackManager } from '../managers/AttackManager';
+import GemManager from '../managers/GemManager';
 import { createPlayerDamageEffect, createMonsterDamageEffect } from '../utils/DamageEffects';
 
 // Constants
@@ -71,6 +72,9 @@ export default class GameScene extends Phaser.Scene {
     // Add attack manager for player attack visualization
     private attackManager: AttackManager | null = null;
     
+    // Add gem manager for gem visualization
+    private gemManager: GemManager | null = null;
+    
     private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null;
     private wasdKeys: {
         W: Phaser.Input.Keyboard.Key;
@@ -127,6 +131,15 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('attack_wand', '/assets/attack_wand.png');
         this.load.image('attack_knife', '/assets/attack_knife.png');
         this.load.image('attack_shield', '/assets/attack_shield.png');
+        
+        // Load gem assets
+        this.load.image('gem_1', '/assets/gem_1.png');
+        this.load.image('gem_2', '/assets/gem_2.png');
+        this.load.image('gem_3', '/assets/gem_3.png');
+        this.load.image('gem_4', '/assets/gem_4.png');
+        
+        // Load a white pixel for particle effects
+        this.load.image('white_pixel', '/assets/white_pixel.png');
         
         // Add error handling for file loading errors
         this.load.on('loaderror', (fileObj: any) => {
@@ -252,6 +265,9 @@ export default class GameScene extends Phaser.Scene {
         
         // Initialize AttackManager
         this.attackManager = new AttackManager(this, this.spacetimeDBClient);
+
+        // Initialize GemManager
+        this.gemManager = new GemManager(this, this.spacetimeDBClient);
 
         this.spacetimeDBClient.sdkConnection?.reducers.updateLastLogin();
     }
@@ -433,6 +449,10 @@ export default class GameScene extends Phaser.Scene {
             this.attackManager.initializeAttacks(ctx);
             console.log("Existing attacks checked");
         }
+
+        // Create and initialize the gem manager
+        this.gemManager = new GemManager(this, this.spacetimeDBClient);
+        this.gemManager.initializeGems(ctx);
 
         console.log("Game world initialization complete.");
     }
@@ -1368,6 +1388,11 @@ export default class GameScene extends Phaser.Scene {
         
         // Update attack visuals with time for prediction
         this.attackManager?.update(time, delta);
+        
+        // Let gem manager update animations
+        if (this.gemManager) {
+            this.gemManager.update(time, delta);
+        }
     }
 
     // Force a synchronization of player entities
@@ -1562,6 +1587,9 @@ export default class GameScene extends Phaser.Scene {
         
         // Clean up AttackManager properly
         this.attackManager?.shutdown();
+
+        // Clean up GemManager
+        this.gemManager?.shutdown();
 
         // Remove event listeners
         this.events.off("shutdown", this.shutdown, this);

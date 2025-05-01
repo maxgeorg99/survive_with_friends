@@ -114,15 +114,15 @@ public static partial class Module
             
             // Clean up any monster damage records for this monster
             CleanupMonsterDamageRecords(ctx, monsterId);
+
+            // Spawn a gem at the monster's position
+            SpawnGemOnMonsterDeath(ctx, monsterId, position);
             
             // Delete the monster
             ctx.Db.monsters.monster_id.Delete(monsterId);
             
             // Delete the entity
             ctx.Db.entity.entity_id.Delete(monster.entity_id);
-            
-            // Spawn a gem at the monster's position
-            SpawnGemOnMonsterDeath(ctx, monsterId, position);
             
             return true;
         }

@@ -1,6 +1,7 @@
 import { Identity, ErrorContextInterface } from '@clockworklabs/spacetimedb-sdk';
 // Import generated classes, including the generated DbConnection
 import { RemoteReducers, SetReducerFlags, RemoteTables, DbConnection, ErrorContext, SubscriptionEventContext } from "./autobindings"; // Removed Reducer, EventContext import as they seem unused here
+import { GameEvents } from './constants/GameEvents';
 
 // Define your SpacetimeDB connection details
 const SPACETIMEDB_DB_NAME = "vibesurvivors";
@@ -13,6 +14,7 @@ class SpacetimeDBClient {
     public onSubscriptionApplied: ((ctx: SubscriptionEventContext) => void) | null = null;
     public onConnect: ((ctx: DbConnection, identity: Identity, token: string) => void) | null = null;
     public onDisconnect: ((ctx: ErrorContext, error?: Error) => void) | null = null;
+    private gameEvents: any;
 
     constructor(
         onSubscriptionApplied?: (ctx: SubscriptionEventContext) => void,
@@ -20,6 +22,9 @@ class SpacetimeDBClient {
         onDisconnect?: (ctx: ErrorContext, error?: Error) => void
     ) {
         console.log("Initializing SpacetimeDBClient and preparing connection...");
+        
+        // Access the game events
+        this.gameEvents = (window as any).gameEvents;
         
         // Store callback handlers
         this.onSubscriptionApplied = onSubscriptionApplied || null;
@@ -76,12 +81,93 @@ class SpacetimeDBClient {
                 "SELECT * FROM entity",
                 "SELECT * FROM monsters",
                 "SELECT * FROM active_attacks",
-                "SELECT * FROM attack_data"
+                "SELECT * FROM attack_data",
+                "SELECT * FROM gems"
             ]);
+
+        // Register table event callbacks
+        this.registerTableCallbacks(connection);
 
         // Call external onConnect listener
         if (this.onConnect) {
             this.onConnect(connection, identity, token);
+        }
+    }
+
+    // Register callbacks for table events
+    private registerTableCallbacks(connection: DbConnection) {
+        // Player Events
+        if (connection.db.player) {
+            connection.db.player.onInsert((ctx, player) => {
+                this.gameEvents.emit(GameEvents.PLAYER_CREATED, ctx, player);
+            });
+            connection.db.player.onUpdate((ctx, oldPlayer, newPlayer) => {
+                this.gameEvents.emit(GameEvents.PLAYER_UPDATED, ctx, oldPlayer, newPlayer);
+            });
+            connection.db.player.onDelete((ctx, player) => {
+                this.gameEvents.emit(GameEvents.PLAYER_DELETED, ctx, player);
+            });
+        }
+
+        // Entity Events
+        if (connection.db.entity) {
+            connection.db.entity.onInsert((ctx, entity) => {
+                this.gameEvents.emit(GameEvents.ENTITY_CREATED, ctx, entity);
+            });
+            connection.db.entity.onUpdate((ctx, oldEntity, newEntity) => {
+                this.gameEvents.emit(GameEvents.ENTITY_UPDATED, ctx, oldEntity, newEntity);
+            });
+            connection.db.entity.onDelete((ctx, entity) => {
+                this.gameEvents.emit(GameEvents.ENTITY_DELETED, ctx, entity);
+            });
+        }
+
+        // Monster Events
+        if (connection.db.monsters) {
+            connection.db.monsters.onInsert((ctx, monster) => {
+                this.gameEvents.emit(GameEvents.MONSTER_CREATED, ctx, monster);
+            });
+            connection.db.monsters.onUpdate((ctx, oldMonster, newMonster) => {
+                this.gameEvents.emit(GameEvents.MONSTER_UPDATED, ctx, oldMonster, newMonster);
+            });
+            connection.db.monsters.onDelete((ctx, monster) => {
+                this.gameEvents.emit(GameEvents.MONSTER_DELETED, ctx, monster);
+            });
+        }
+
+        // Attack Events
+        if (connection.db.activeAttacks) {
+            connection.db.activeAttacks.onInsert((ctx, attack) => {
+                this.gameEvents.emit(GameEvents.ATTACK_CREATED, ctx, attack);
+            });
+            connection.db.activeAttacks.onUpdate((ctx, oldAttack, newAttack) => {
+                this.gameEvents.emit(GameEvents.ATTACK_UPDATED, ctx, oldAttack, newAttack);
+            });
+            connection.db.activeAttacks.onDelete((ctx, attack) => {
+                this.gameEvents.emit(GameEvents.ATTACK_DELETED, ctx, attack);
+            });
+        }
+
+        // Gem Events - Check if the gems table exists in the bindings
+        try {
+            // @ts-ignore - Ignore TS error since table might not exist in current bindings
+            if (connection.db.gems) {
+                // @ts-ignore
+                connection.db.gems.onInsert((ctx, gem) => {
+                    this.gameEvents.emit(GameEvents.GEM_CREATED, ctx, gem);
+                });
+                // @ts-ignore
+                connection.db.gems.onUpdate((ctx, oldGem, newGem) => {
+                    this.gameEvents.emit(GameEvents.GEM_UPDATED, ctx, oldGem, newGem);
+                });
+                // @ts-ignore
+                connection.db.gems.onDelete((ctx, gem) => {
+                    this.gameEvents.emit(GameEvents.GEM_DELETED, ctx, gem);
+                });
+                console.log("Registered gem event handlers successfully");
+            }
+        } catch (e) {
+            console.warn("Could not register gem event handlers - the gems table might not be in current bindings yet:", e);
         }
     }
 

@@ -32,6 +32,11 @@ export enum GameEvents {
     ATTACK_UPDATED = 'attack:updated',
     ATTACK_DELETED = 'attack:deleted',
     
+    // Gem events
+    GEM_CREATED = 'gem:created',
+    GEM_UPDATED = 'gem:updated',
+    GEM_DELETED = 'gem:deleted',
+    
     // Loading events
     LOADING_COMPLETE = 'loading_complete',
     LOADING_ERROR = 'loading_error',
