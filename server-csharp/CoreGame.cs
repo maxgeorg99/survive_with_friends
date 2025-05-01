@@ -106,6 +106,12 @@ public static partial class Module
             // Monster is dead - log and delete
             Log.Info($"Monster {monster.monster_id} (type: {monster.bestiary_id}) was killed!");
             
+            // Get the monster's position before deleting it
+            var entityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
+            DbVector2 position = entityOpt != null
+                ? entityOpt.Value.position
+                : new DbVector2(0, 0); // Fallback if entity not found
+            
             // Clean up any monster damage records for this monster
             CleanupMonsterDamageRecords(ctx, monsterId);
             
@@ -114,6 +120,9 @@ public static partial class Module
             
             // Delete the entity
             ctx.Db.entity.entity_id.Delete(monster.entity_id);
+            
+            // Spawn a gem at the monster's position
+            SpawnGemOnMonsterDeath(ctx, monsterId, position);
             
             return true;
         }
@@ -438,6 +447,9 @@ public static partial class Module
         
         // Check for collisions between attacks and monsters
         ProcessMonsterAttackCollisions(ctx);
+        
+        // Check for collisions between players and gems
+        ProcessGemCollisions(ctx);
     }
     
     // Helper method to process collisions between attacks and monsters

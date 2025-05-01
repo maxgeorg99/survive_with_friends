@@ -162,6 +162,9 @@ public static partial class Module
         // Initialize bestiary with monster data
         InitBestiary(ctx);
         
+        // Initialize experience system
+        InitExpSystem(ctx);
+        
         // Initialize attack system
         InitializeAttackSystem(ctx);
         
