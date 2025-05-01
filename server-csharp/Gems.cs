@@ -242,8 +242,8 @@ public static partial class Module
         uint currentLevel = player.level;
         bool leveledUp = false;
         
-        // Check for level up
-        uint expNeeded = CalculateExpForLevel(ctx, currentLevel);
+        // Get exp needed for current level from player data
+        uint expNeeded = player.exp_for_next_level;
         
         // Loop to handle multiple level ups
         while (newExp >= expNeeded)
@@ -263,6 +263,9 @@ public static partial class Module
         if (leveledUp)
         {
             player.level = currentLevel;
+            // Store the new exp needed for next level
+            player.exp_for_next_level = expNeeded;
+            
             // Grant an unspent upgrade point for each level gained
             player.unspent_upgrades += (currentLevel - playerOpt.Value.level);
 

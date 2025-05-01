@@ -114,6 +114,7 @@ public static partial class Module
         public PlayerClass player_class;
         public uint level;
         public uint exp;
+        public uint exp_for_next_level;
         public uint max_hp;
         public uint hp;
         public uint hp_regen;
@@ -334,6 +335,9 @@ public static partial class Module
             startingAttackType = classData.StartingAttackType;
         }
         
+        // Calculate initial experience needed for level 2
+        uint initialExpNeeded = CalculateExpForLevel(ctx, 1);
+        
         // 1. Create the Entity for the player with default direction and not moving
         Entity? newEntityOpt = ctx.Db.entity.Insert(new Entity
         {
@@ -371,6 +375,7 @@ public static partial class Module
             player_class = playerClass,
             level = 1,
             exp = 0,
+            exp_for_next_level = initialExpNeeded,
             max_hp = (uint)maxHp,
             hp = (uint)maxHp,
             hp_regen = 0,
