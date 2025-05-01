@@ -116,7 +116,7 @@ export default class UpgradeUI {
         background.on('pointerout', () => background.clearTint());
         
         // Add number text (1, 2, or 3)
-        const numberText = this.scene.add.text(0, background.height * CARD_SCALE * 0.4, `${index + 1}`, {
+        const numberText = this.scene.add.text(0, background.height * CARD_SCALE, `${index + 1}`, {
             fontSize: '48px',
             fontFamily: 'Arial',
             color: '#ffffff',
@@ -158,31 +158,31 @@ export default class UpgradeUI {
         // Handle base stat upgrades
         switch (upgradeType) {
             case 'MaxHp':
-                return `Max HP\n+${option.value}`;
+                return `HP`;
             case 'HpRegen':
-                return `HP Regen\n+${option.value}`;
+                return `Regen`;
             case 'Speed':
-                return `Speed\n+${option.value}%`;
+                return `Speed`;
             case 'Armor':
-                return `Armor\n+${option.value}`;
+                return `Armor`;
         }
         
         // Handle attack upgrades
         if (option.isNewAttack) {
-            return `New Attack!\n${upgradeType.replace('Attack', '')}`;
+            return "New"
         }
         
         // Handle attack stat upgrades
         if (option.damage > 0) {
-            return `${upgradeType.replace('Attack', '')}\nDamage +${option.damage}`;
+            return `Atk`;
         } else if (option.cooldownRatio > 0) {
-            return `${upgradeType.replace('Attack', '')}\nCooldown -${option.cooldownRatio}%`;
+            return `CD`;
         } else if (option.projectiles > 0) {
-            return `${upgradeType.replace('Attack', '')}\nProjectiles +${option.projectiles}`;
+            return `Count`;
         } else if (option.speed > 0) {
-            return `${upgradeType.replace('Attack', '')}\nSpeed +${option.speed}%`;
+            return `Speed`;
         } else if (option.radius > 0) {
-            return `${upgradeType.replace('Attack', '')}\nRadius +${option.radius}`;
+            return `Size`;
         }
         
         return upgradeType;

@@ -362,24 +362,11 @@ export default class GameScene extends Phaser.Scene {
     }
 
     private handlePlayerUpdated(ctx: EventContext, oldPlayer: Player, newPlayer: Player, isLocalPlayer: boolean) {
-        console.log("Player updated:", newPlayer.playerId, "Local:", isLocalPlayer);
+        //console.log("Player updated:", newPlayer.playerId, "Local:", isLocalPlayer);
         
         // If local player and unspent upgrades increased, check for upgrade options
         if (isLocalPlayer && newPlayer.unspentUpgrades > oldPlayer.unspentUpgrades) {
             console.log("Player level up: upgrade points available:", newPlayer.unspentUpgrades);
-            
-            // Ensure we have the upgrade UI
-            if (!this.upgradeUI && this.spacetimeDBClient.sdkConnection) {
-                this.upgradeUI = new UpgradeUI(this, this.spacetimeDBClient, newPlayer.playerId);
-                
-                // Check for upgrade options
-                const playerUpgrades = Array.from(ctx.db.upgradeOptions.iter())
-                    .filter(option => option.playerId === newPlayer.playerId);
-                    
-                if (playerUpgrades.length > 0) {
-                    this.upgradeUI.setUpgradeOptions(playerUpgrades);
-                }
-            }
             
             // Play level up effect
             if (this.localPlayerSprite) {
@@ -714,8 +701,8 @@ export default class GameScene extends Phaser.Scene {
         this.isPlayerDataReady = true;
 
         // Check if player has pending upgrades and initialize the upgrade UI if needed
-        if (player.unspentUpgrades > 0 && this.spacetimeDBClient.sdkConnection) {
-            const playerUpgrades = Array.from(this.spacetimeDBClient.sdkConnection.db.upgradeOptions.iter())
+        if (player.unspentUpgrades > 0) {
+            const playerUpgrades = Array.from(ctx.db.upgradeOptions.iter())
                 .filter(option => option.playerId === this.localPlayerId);
                 
             if (playerUpgrades.length > 0) {
@@ -723,8 +710,15 @@ export default class GameScene extends Phaser.Scene {
                 this.upgradeUI = new UpgradeUI(this, this.spacetimeDBClient, this.localPlayerId);
                 this.upgradeUI.setUpgradeOptions(playerUpgrades);
             }
+            else
+            {
+                console.log("No pending upgrades found for player");
+            }
         }
-
+        else
+        {
+            console.log("No pending upgrades found for player");
+        }
         console.log("Local player initialized successfully");
     }
 
@@ -2301,19 +2295,23 @@ export default class GameScene extends Phaser.Scene {
             }
             
             // Collect all upgrades for this player by filtering the rows manually
-            if (this.upgradeUI && this.spacetimeDBClient.sdkConnection) {
-                const playerUpgrades = Array.from(this.spacetimeDBClient.sdkConnection.db.upgradeOptions.iter())
+            if (this.upgradeUI) {
+                const playerUpgrades = Array.from(ctx.db?.upgradeOptions.iter())
                     .filter(option => option.playerId === this.localPlayerId);
                 
                 this.upgradeUI.setUpgradeOptions(playerUpgrades);
             }
         }
+        else
+        {
+            console.log("Received upgrade option for other player:" + upgrade.playerId + ", local player id:" + this.localPlayerId);
+        }
     }
 
     private handleUpgradeOptionDeleted(ctx: EventContext, upgrade: UpgradeOptionData): void {
         // When upgrades are deleted (usually after selection), hide the UI
-        if (upgrade.playerId === this.localPlayerId && this.upgradeUI && this.spacetimeDBClient.sdkConnection) {
-            const remainingUpgrades = Array.from(this.spacetimeDBClient.sdkConnection.db.upgradeOptions.iter())
+        if (upgrade.playerId === this.localPlayerId && this.upgradeUI) {
+            const remainingUpgrades = Array.from(ctx.db.upgradeOptions.iter())
                 .filter(option => option.playerId === this.localPlayerId);
             
             if (remainingUpgrades.length === 0) {

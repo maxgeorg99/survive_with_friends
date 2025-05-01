@@ -77,11 +77,6 @@ public static partial class Module
     }
     public static void DrawUpgradeOptions(ReducerContext ctx, uint playerId)
     {
-        if (ctx.Sender != ctx.Identity)
-        {
-            throw new Exception("DrawUpgradeOptions may not be invoked by clients.");
-        }
-
         //See if player has any upgrade options
         var existingUpgradeOptions = ctx.Db.upgrade_options.player_id.Filter(playerId);
         if (existingUpgradeOptions.Count() != 0)
