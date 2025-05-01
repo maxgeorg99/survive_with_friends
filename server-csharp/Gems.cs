@@ -21,7 +21,7 @@ public static partial class Module
         [PrimaryKey, AutoInc]
         public uint gem_id;
 
-        [SpacetimeDB.Index.BTree]
+        [Unique]
         public uint entity_id; // Associated entity for this gem
 
         public GemLevel level; // Level of the gem (1-4)

@@ -32,14 +32,18 @@ export default class GemManager {
         this.gameEvents = (window as any).gameEvents;
         console.log("GemManager constructed");
 
-        // Initialize particles - in Phaser 3.60+ add.particles() returns a ParticleEmitter directly
+        // Initialize a single persistent particle emitter (initially inactive)
         this.particleEmitter = this.scene.add.particles(0, 0, 'white_pixel', {
             speed: { min: 50, max: 150 },
             scale: 0.6,
             blendMode: Phaser.BlendModes.ADD,
             lifespan: 800,
-            tint: 0xffffff // Default white tint
+            tint: 0xffffff, // Default white, will be changed on use
+            quantity: GEM_ANIMATION.COLLECTION_PARTICLES
         });
+        
+        // Make sure the emitter is initially stopped to prevent particles in top-left corner
+        this.particleEmitter.stop();
     }
 
     // Initialize gem handlers
@@ -57,32 +61,16 @@ export default class GemManager {
         // Register entity event listeners
         this.registerEntityListeners();
         
-        // Force immediate update for all gems with known entities
-        // Check if gems table exists in the database
-        if (this.spacetimeDBClient.sdkConnection.db.entity) {
-            try {
-                // Try to access the gems table - if bindings aren't updated yet this might fail
-                // @ts-ignore - Ignore TS error since table might not exist in bindings
-                const gemsTable = this.spacetimeDBClient.sdkConnection.db.gems;
-                
-                if (gemsTable && typeof gemsTable.iter === 'function') {
-                    for (const gem of gemsTable.iter()) {
-                        // Look up the entity directly using the entity_id index
-                        const entityData = this.spacetimeDBClient.sdkConnection.db.entity.entityId.find(gem.entityId);
-                        
-                        if (entityData) {
-                            // Entity exists, create directly with correct position
-                            this.createGemSprite(gem, entityData.position);
-                        } else {
-                            // Entity doesn't exist yet, track for updates
-                            this.createOrUpdateGem(gem);
-                        }
-                    }
-                } else {
-                    console.log("Gems table not found or not accessible, waiting for gem events");
-                }
-            } catch (e) {
-                console.warn("Error accessing gems table, it might not be available in the current bindings:", e);
+        for (const gem of ctx.db?.gems.iter()) {
+            // Look up the entity directly using the entity_id index
+            const entityData = ctx.db.entity.entityId.find(gem.entityId);
+            
+            if (entityData) {
+                // Entity exists, create directly with correct position
+                this.createGemSprite(gem, entityData.position);
+            } else {
+                // Entity doesn't exist yet, track for updates
+                this.createOrUpdateGem(ctx, gem);
             }
         }
     }
@@ -92,11 +80,11 @@ export default class GemManager {
         console.log("Registering gem listeners for GemManager");
 
         this.gameEvents.on(GameEvents.GEM_CREATED, (ctx: EventContext, gem: any) => {
-            this.createOrUpdateGem(gem);
+            this.createOrUpdateGem(ctx, gem);
         });
 
         this.gameEvents.on(GameEvents.GEM_UPDATED, (ctx: EventContext, oldGem: any, newGem: any) => {
-            this.createOrUpdateGem(newGem);
+            this.createOrUpdateGem(ctx, newGem);
         });
 
         this.gameEvents.on(GameEvents.GEM_DELETED, (ctx: EventContext, gem: any) => {
@@ -147,41 +135,28 @@ export default class GemManager {
             }
         }
         
-        // Check if this entity belongs to an existing gem
-        try {
-            // Try to look up gems by entityId - might fail if bindings aren't updated
-            // @ts-ignore - Ignore TS error since table might not exist in bindings
-            const gemsTable = ctx.db?.gems;
-            // @ts-ignore - We're handling potential errors with try-catch
-            if (gemsTable && typeof gemsTable.entityId?.find === 'function') {
-                // @ts-ignore - We're handling potential errors with try-catch
-                const gem = gemsTable.entityId.find(entityData.entityId);
+        const gem = ctx.db?.gems.entityId.find(entityData.entityId);
                 
-                if (gem) {
-                    // Entity belongs to a gem, update its position
-                    const gemContainer = this.gems.get(gem.gemId);
-                    if (gemContainer) {
-                        // Update the position immediately since gems don't move
-                        gemContainer.x = entityData.position.x;
-                        gemContainer.y = entityData.position.y;
-                        
-                        // Update depth based on Y position
-                        gemContainer.setDepth(BASE_DEPTH + entityData.position.y);
-                        
-                        return true;
-                    }
-                }
+        if (gem) {
+            // Entity belongs to a gem, update its position
+            const gemContainer = this.gems.get(gem.gemId);
+            if (gemContainer) {
+                // Update the position immediately since gems don't move
+                gemContainer.x = entityData.position.x;
+                gemContainer.y = entityData.position.y;
+                
+                // Update depth based on Y position
+                gemContainer.setDepth(BASE_DEPTH + entityData.position.y);
+                
+                return true;
             }
-        } catch (e) {
-            // Ignore error, it means the gems table is not available in bindings
         }
         
         return false;
     }
 
     // Create or update a gem in the pending list
-    createOrUpdateGem(gemData: any) {
-        console.log(`Creating/updating gem ${gemData.gemId} of level ${gemData.level}`);
+    createOrUpdateGem(ctx: EventContext, gemData: any) {
         
         // If we already have this gem, update it
         if (this.gems.has(gemData.gemId)) {
@@ -192,11 +167,9 @@ export default class GemManager {
 
         // Check if the entity exists
         let entityPosition = null;
-        if (this.spacetimeDBClient?.sdkConnection?.db?.entity) {
-            const entityData = this.spacetimeDBClient.sdkConnection.db.entity.entityId.find(gemData.entityId);
-            if (entityData) {
-                entityPosition = entityData.position;
-            }
+        const entityData = ctx.db?.entity.entityId.find(gemData.entityId);
+        if (entityData) {
+            entityPosition = entityData.position;
         }
 
         if (entityPosition) {
@@ -204,14 +177,12 @@ export default class GemManager {
             this.createGemSprite(gemData, entityPosition);
         } else {
             // Entity doesn't exist yet, add to pending
-            console.log(`Gem ${gemData.gemId} waiting for entity ${gemData.entityId}`);
             this.pendingGems.set(gemData.entityId, gemData);
         }
     }
 
     // Create a gem sprite with animations
     createGemSprite(gemData: any, position: { x: number, y: number }) {
-        console.log(`Creating gem sprite for gem ${gemData.gemId}, level ${gemData.level}`);
 
         // Create a container for the gem and its shadow
         const container = this.scene.add.container(position.x, position.y);
@@ -267,34 +238,28 @@ export default class GemManager {
         const gemLevel = gemContainer.getData('gemLevel');
         const color = GEM_PARTICLE_COLORS[gemLevel] || GEM_PARTICLE_COLORS[0];
         
-        // In Phaser 3.60+, we need to recreate the particle emitter to change its color
-        // Create a new particle emitter with the correct color for this burst
-        const burstEmitter = this.scene.add.particles(0, 0, 'white_pixel', {
+        // Position the emitter at the gem's location
+        this.particleEmitter.setPosition(gemContainer.x, gemContainer.y);
+        
+        // Update particle color based on gem type (using a rebuild approach)
+        this.particleEmitter.stop();
+        this.particleEmitter.setConfig({
             speed: { min: 50, max: 150 },
             scale: 0.6,
             blendMode: Phaser.BlendModes.ADD,
             lifespan: 800,
-            tint: color
+            tint: color,
+            quantity: GEM_ANIMATION.COLLECTION_PARTICLES
         });
         
-        // Set position and emit particles
-        burstEmitter.explode(
-            GEM_ANIMATION.COLLECTION_PARTICLES,
-            gemContainer.x, 
-            gemContainer.y
-        );
-        
-        // Destroy the emitter after particles have expired (after lifespan)
-        this.scene.time.delayedCall(800, () => {
-            burstEmitter.destroy();
-        });
+        // Emit a burst of particles (without creating a new emitter)
+        this.particleEmitter.explode(GEM_ANIMATION.COLLECTION_PARTICLES);
     }
 
     // Remove a gem and play collection animation
     removeGem(gemId: number) {
         const gemContainer = this.gems.get(gemId);
         if (gemContainer) {
-            console.log(`Removing gem ${gemId}`);
             
             // Play collection effect
             this.createCollectionEffect(gemContainer);
@@ -348,12 +313,6 @@ export default class GemManager {
             
             // Update gem position for hover
             container.y = hoverY;
-            
-            // Apply slight rotation to gem sprite (not the whole container to keep shadow underneath)
-            const gemSprite = container.getAt(1) as Phaser.GameObjects.Image;
-            if (gemSprite) {
-                gemSprite.rotation += GEM_ANIMATION.ROTATION_SPEED * (delta / 1000);
-            }
         }
     }
 
@@ -382,8 +341,9 @@ export default class GemManager {
         this.gems.clear();
         this.pendingGems.clear();
         
-        // Destroy particle emitter
+        // Ensure the particle emitter is stopped and destroyed
         if (this.particleEmitter) {
+            this.particleEmitter.stop();
             this.particleEmitter.destroy();
         }
     }
