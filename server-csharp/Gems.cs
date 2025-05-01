@@ -72,7 +72,7 @@ public static partial class Module
             exp_medium_gem = 25,
             exp_large_gem = 50,
             exp_huge_gem = 100,
-            base_exp_per_level = 50,
+            base_exp_per_level = 40,
             level_exp_factor = 1.2f,
             gem_radius = 18.0f
         });
@@ -187,7 +187,7 @@ public static partial class Module
         }
 
         var config = configOpt.Value;
-        return (uint)(config.base_exp_per_level * Math.Pow(level-1, config.level_exp_factor));
+        return (uint)(config.base_exp_per_level * Math.Pow(level, config.level_exp_factor));
     }
 
     // Get exp value for a gem level
