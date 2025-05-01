@@ -183,35 +183,39 @@ export default class GemManager {
 
     // Create a gem sprite with animations
     createGemSprite(gemData: any, position: { x: number, y: number }) {
+        // Store the original position for reference
+        const originalX = position.x;
+        const originalY = position.y;
 
         // Create a container for the gem and its shadow
-        const container = this.scene.add.container(position.x, position.y);
+        const container = this.scene.add.container(originalX, originalY);
         
         // Get the asset key based on gem level
         const gemLevel = gemData.level; // This is an enum (0, 1, 2, 3 for Small, Medium, etc.)
         const assetKey = GEM_ASSET_KEYS[gemLevel] || GEM_ASSET_KEYS[0]; // Default to small gem if not found
         
-        // Create shadow
-        const shadow = this.scene.add.image(0, 0, SHADOW_ASSET_KEY);
+        // Create shadow DIRECTLY on the scene (not in the container) so it stays fixed
+        var shadowX = originalX - 4;
+        const shadow = this.scene.add.image(shadowX, originalY, SHADOW_ASSET_KEY);
         shadow.setAlpha(SHADOW_ALPHA);
         shadow.setScale(0.5); // Smaller shadow for gems
-        shadow.setDepth(SHADOW_DEPTH_OFFSET);
+        shadow.setDepth(BASE_DEPTH + originalY + SHADOW_DEPTH_OFFSET);
         
-        // Create gem sprite
+        // Create gem sprite in the container
         const gemSprite = this.scene.add.image(0, 0, assetKey);
         
-        // Add to container
-        container.add(shadow);
+        // Add only the gem sprite to the container (not the shadow)
         container.add(gemSprite);
         
         // Set container depth based on Y position
-        container.setDepth(BASE_DEPTH + position.y);
+        container.setDepth(BASE_DEPTH + originalY);
         
         // Store gem data
         container.setData('gemId', gemData.gemId);
         container.setData('gemLevel', gemLevel);
         container.setData('entityId', gemData.entityId);
-        container.setData('baseY', position.y); // Store original Y for hover animation
+        container.setData('baseY', originalY); // Store original Y for hover animation
+        container.setData('shadow', shadow); // Store reference to shadow for cleanup
         
         // Store hover animation time offset with a random start time for variety
         container.setData('hoverOffset', Math.random() * Math.PI * 2);
@@ -219,8 +223,8 @@ export default class GemManager {
         // Create hover animation
         this.scene.tweens.add({
             targets: container,
-            scaleX: 1.1,
-            scaleY: 1.1,
+            scaleX: 1.0,
+            scaleY: 1.0,
             duration: 1000,
             yoyo: true,
             repeat: -1,
@@ -260,9 +264,11 @@ export default class GemManager {
     removeGem(gemId: number) {
         const gemContainer = this.gems.get(gemId);
         if (gemContainer) {
-            
             // Play collection effect
             this.createCollectionEffect(gemContainer);
+            
+            // Get the shadow associated with this gem
+            const shadow = gemContainer.getData('shadow') as Phaser.GameObjects.Image;
             
             // Play scale-down animation before destroying
             this.scene.tweens.add({
@@ -274,6 +280,11 @@ export default class GemManager {
                 onComplete: () => {
                     // Destroy container and all children
                     gemContainer.destroy(true);
+                    
+                    // Destroy the shadow separately since it's not in the container
+                    if (shadow) {
+                        shadow.destroy();
+                    }
                     
                     // Remove from gems map
                     this.gems.delete(gemId);
@@ -311,7 +322,7 @@ export default class GemManager {
             const hoverOffset = container.getData('hoverOffset') || 0;
             const hoverY = baseY + Math.sin((time / 1000 * GEM_ANIMATION.HOVER_SPEED) + hoverOffset) * GEM_ANIMATION.HOVER_AMPLITUDE;
             
-            // Update gem position for hover
+            // Update ONLY gem position for hover (shadow stays fixed)
             container.y = hoverY;
         }
     }
@@ -332,8 +343,15 @@ export default class GemManager {
         // Unregister event listeners
         this.unregisterListeners();
         
-        // Destroy all gem sprites
+        // Destroy all gem sprites and their shadows
         for (const [gemId, container] of this.gems.entries()) {
+            // Get the shadow reference and destroy it
+            const shadow = container.getData('shadow') as Phaser.GameObjects.Image;
+            if (shadow) {
+                shadow.destroy();
+            }
+            
+            // Destroy the container
             container.destroy(true);
         }
         
