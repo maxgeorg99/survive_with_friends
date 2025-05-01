@@ -3,6 +3,7 @@ import { EventContext } from "../autobindings";
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { GameEvents } from '../constants/GameEvents';
 import { GEM_ASSET_KEYS, GEM_ANIMATION, GEM_PARTICLE_COLORS } from '../constants/GemConfig';
+import GemLevel from '../autobindings/gem_level_type';
 
 // Constants from GameScene
 const SHADOW_ASSET_KEY = 'shadow';
@@ -190,9 +191,21 @@ export default class GemManager {
         // Create a container for the gem and its shadow
         const container = this.scene.add.container(originalX, originalY);
         
-        // Get the asset key based on gem level
-        const gemLevel = gemData.level; // This is an enum (0, 1, 2, 3 for Small, Medium, etc.)
-        const assetKey = GEM_ASSET_KEYS[gemLevel] || GEM_ASSET_KEYS[0]; // Default to small gem if not found
+        // Get the asset key based on gem level tag
+        const gemLevel = gemData.level; // This contains the enum with a 'tag' property
+        let gemLevelTag = 'Small'; // Default fallback
+
+        // Extract the tag if available
+        if (gemLevel && typeof gemLevel === 'object' && gemLevel.tag) {
+            gemLevelTag = gemLevel.tag;
+        } else if (typeof gemLevel === 'number') {
+            // Legacy fallback for numeric levels (0=Small, 1=Medium, etc.)
+            const tags = ['Small', 'Medium', 'Large', 'Huge'];
+            gemLevelTag = tags[gemLevel] || 'Small';
+        }
+        
+        const assetKey = GEM_ASSET_KEYS[gemLevelTag] || GEM_ASSET_KEYS['Small']; // Default to small gem if not found
+        console.log(`Gem level tag: ${gemLevelTag} Asset key: ${assetKey}`);
         
         // Create shadow DIRECTLY on the scene (not in the container) so it stays fixed
         var shadowX = originalX - 4;
@@ -212,7 +225,7 @@ export default class GemManager {
         
         // Store gem data
         container.setData('gemId', gemData.gemId);
-        container.setData('gemLevel', gemLevel);
+        container.setData('gemLevel', gemLevelTag); // Store the tag string instead of numeric level
         container.setData('entityId', gemData.entityId);
         container.setData('baseY', originalY); // Store original Y for hover animation
         container.setData('shadow', shadow); // Store reference to shadow for cleanup
@@ -239,8 +252,8 @@ export default class GemManager {
     
     // Create particles effect when a gem is collected
     createCollectionEffect(gemContainer: Phaser.GameObjects.Container) {
-        const gemLevel = gemContainer.getData('gemLevel');
-        const color = GEM_PARTICLE_COLORS[gemLevel] || GEM_PARTICLE_COLORS[0];
+        const gemLevelTag = gemContainer.getData('gemLevel'); // This is now the tag string
+        const color = GEM_PARTICLE_COLORS[gemLevelTag] || GEM_PARTICLE_COLORS['Small'];
         
         // Position the emitter at the gem's location
         this.particleEmitter.setPosition(gemContainer.x, gemContainer.y);
