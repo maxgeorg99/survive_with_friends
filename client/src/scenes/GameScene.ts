@@ -272,9 +272,6 @@ export default class GameScene extends Phaser.Scene {
         // Initialize AttackManager
         this.attackManager = new AttackManager(this, this.spacetimeDBClient);
 
-        // Initialize GemManager
-        this.gemManager = new GemManager(this, this.spacetimeDBClient);
-
         this.spacetimeDBClient.sdkConnection?.reducers.updateLastLogin();
     }
 
