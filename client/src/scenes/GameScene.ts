@@ -670,8 +670,16 @@ export default class GameScene extends Phaser.Scene {
      */
     private updateLocalPlayerAttributes(ctx: EventContext, player: Player) {
         // Update player name if it changed
+        const previousLevel = this.localPlayerNameText ? 
+            parseInt(this.localPlayerNameText.text.split('(')[1].split(')')[0]) : player.level;
+            
         if (this.localPlayerNameText && this.localPlayerNameText.text !== `${player.name} (${player.level})`) {
             this.localPlayerNameText.setText(`${player.name} (${player.level})`);
+            
+            // If level increased, play level up effect
+            if (player.level > previousLevel && this.localPlayerSprite) {
+                this.createLevelUpEffect(this.localPlayerSprite);
+            }
         }
         
         // Update health bar if health changed
@@ -806,6 +814,94 @@ export default class GameScene extends Phaser.Scene {
         {
             this.attackManager?.setLocalPlayerRadius(entityData.radius);
         }
+    }
+    
+    /**
+     * Creates visual effects for level up
+     */
+    private createLevelUpEffect(playerSprite: Phaser.Physics.Arcade.Sprite) {
+        if (!playerSprite) return;
+        
+        console.log("Playing level up effect!");
+        
+        // Create "LEVEL UP!" text
+        const levelUpText = this.add.text(
+            playerSprite.x,
+            playerSprite.y - 100, // Start above the player
+            "LEVEL UP!",
+            {
+                fontFamily: 'Arial',
+                fontSize: '32px',
+                color: '#ffff00', // Bright yellow
+                stroke: '#000000',
+                strokeThickness: 6,
+                fontStyle: 'bold'
+            }
+        );
+        levelUpText.setOrigin(0.5);
+        levelUpText.setDepth(BASE_DEPTH + playerSprite.y + 100); // Ensure it appears above the player
+        
+        // Animate the text
+        this.tweens.add({
+            targets: levelUpText,
+            y: levelUpText.y - 80, // Float upward
+            alpha: { from: 1, to: 0 }, // Fade out
+            scale: { from: 0.5, to: 2 }, // Grow
+            duration: 2000,
+            ease: 'Power2',
+            onComplete: () => {
+                levelUpText.destroy(); // Remove when animation is done
+            }
+        });
+        
+        // Create glow effect around player
+        const glowCircle = this.add.circle(
+            playerSprite.x,
+            playerSprite.y,
+            playerSprite.width / 1.5, // Slightly larger than the player
+            0xffff00, // Yellow glow
+            0.5 // Semi-transparent
+        );
+        glowCircle.setDepth(BASE_DEPTH + playerSprite.y - 1); // Just below the player
+        
+        // Expand and fade the glow
+        this.tweens.add({
+            targets: glowCircle,
+            scale: 3,
+            alpha: 0,
+            duration: 500, // Reduced from 1000 to 500
+            ease: 'Sine.easeOut',
+            onComplete: () => {
+                glowCircle.destroy();
+            }
+        });
+        
+        // Create particle effect
+        const particles = this.add.particles(playerSprite.x, playerSprite.y, 'white_pixel', {
+            speed: { min: 50, max: 150 },
+            scale: { start: 0.5, end: 0 },
+            blendMode: 'ADD',
+            lifespan: 1000,
+            gravityY: -50, // Float upward
+            tint: 0xffff00, // Yellow particles
+            emitting: false
+        });
+        
+        // Emit particles in a burst
+        particles.explode(30, playerSprite.x, playerSprite.y);
+        
+        // Clean up particles after animation
+        this.time.delayedCall(700, () => {
+            particles.destroy();
+        });
+        
+        // Add a flash to the player sprite
+        const initialTint = playerSprite.tintTopLeft;
+        playerSprite.setTint(0xffffff); // White flash
+        
+        this.time.delayedCall(200, () => {
+            playerSprite.setTint(initialTint); // Reset tint
+        });
     }
 
     // Helper function to handle entity updates and move corresponding sprites
@@ -1212,7 +1308,16 @@ export default class GameScene extends Phaser.Scene {
                     // Update player name on the text object if changed
                     const nameText = container.getByName('nameText') as Phaser.GameObjects.Text;
                     if (nameText && nameText.text !== `${playerData.name} (${playerData.level})`) {
+                        // Extract previous level from the name text
+                        const previousLevel = parseInt(nameText.text.split('(')[1].split(')')[0]);
+                        
+                        // Update the text
                         nameText.setText(`${playerData.name} (${playerData.level})`);
+                        
+                        // If level increased, play level up effect
+                        if (playerData.level > previousLevel) {
+                            this.createOtherPlayerLevelUpEffect(container);
+                        }
                     }
                     
                     // Update health bar if needed
@@ -2013,5 +2118,97 @@ export default class GameScene extends Phaser.Scene {
         } else {
             console.log("Attack manager not initialized, can't toggle debug circles");
         }
+    }
+
+    /**
+     * Creates visual effects for level up for other players
+     */
+    private createOtherPlayerLevelUpEffect(container: Phaser.GameObjects.Container) {
+        if (!container) return;
+        
+        console.log("Playing level up effect for other player!");
+        
+        // Get the sprite component from the container
+        const sprite = container.getByName('sprite') as Phaser.GameObjects.Sprite;
+        if (!sprite) return;
+        
+        // Create "LEVEL UP!" text
+        const levelUpText = this.add.text(
+            container.x,
+            container.y - 100, // Start above the player
+            "LEVEL UP!",
+            {
+                fontFamily: 'Arial',
+                fontSize: '28px',
+                color: '#ffff00', // Bright yellow
+                stroke: '#000000',
+                strokeThickness: 5,
+                fontStyle: 'bold'
+            }
+        );
+        levelUpText.setOrigin(0.5);
+        levelUpText.setDepth(BASE_DEPTH + container.y + 100); // Ensure it appears above the player
+        
+        // Animate the text
+        this.tweens.add({
+            targets: levelUpText,
+            y: levelUpText.y - 80, // Float upward
+            alpha: { from: 1, to: 0 }, // Fade out
+            scale: { from: 0.5, to: 2 }, // Grow
+            duration: 2000,
+            ease: 'Power2',
+            onComplete: () => {
+                levelUpText.destroy(); // Remove when animation is done
+            }
+        });
+        
+        // Create glow effect around player
+        const glowCircle = this.add.circle(
+            container.x,
+            container.y,
+            sprite.width / 1.5, // Slightly larger than the player
+            0xffff00, // Yellow glow
+            0.5 // Semi-transparent
+        );
+        glowCircle.setDepth(BASE_DEPTH + container.y - 1); // Just below the player
+        
+        // Expand and fade the glow
+        this.tweens.add({
+            targets: glowCircle,
+            scale: 3,
+            alpha: 0,
+            duration: 500, // Reduced from 1000 to 500
+            ease: 'Sine.easeOut',
+            onComplete: () => {
+                glowCircle.destroy();
+            }
+        });
+        
+        // Create particle effect
+        const particles = this.add.particles(container.x, container.y, 'white_pixel', {
+            speed: { min: 50, max: 150 },
+            scale: { start: 0.5, end: 0 },
+            blendMode: 'ADD',
+            lifespan: 1000,
+            gravityY: -50, // Float upward
+            tint: 0xffff00, // Yellow particles
+            emitting: false
+        });
+        
+        // Emit particles in a burst
+        particles.explode(30, container.x, container.y);
+        
+        // Clean up particles after animation
+        this.time.delayedCall(700, () => {
+            particles.destroy();
+        });
+        
+        // Add a flash to the player sprite
+        const initialTint = sprite.tintTopLeft;
+        sprite.setTint(0xffffff); // White flash
+        
+        this.time.delayedCall(200, () => {
+            sprite.setTint(initialTint); // Reset tint
+        });
     }
 }

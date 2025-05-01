@@ -164,18 +164,7 @@ public static partial class Module
             return; // Monster not found (likely already deleted)
         }
 
-        // Get bestiary entry for this monster type
-        var monsterType = monsterOpt.Value.bestiary_id;
-        var bestiaryOpt = ctx.Db.bestiary.bestiary_id.Find((uint)monsterType);
-        if (bestiaryOpt == null)
-        {
-            // Use default drop chance if no bestiary entry exists
-            SpawnRandomGem(ctx, position);
-            return;
-        }
-
-        // Get drop chance from bestiary (assuming a drop_chance field exists)
-        // If no such field exists, use a default value (e.g., 50%)
+        // Set a default drop chance
         float dropChance = 0.5f; // Default 50% drop chance
 
         // Roll for gem drop
@@ -183,6 +172,7 @@ public static partial class Module
         if (roll <= dropChance)
         {
             SpawnRandomGem(ctx, position);
+            Log.Info($"Monster {monsterId} dropped a gem at position {position.x}, {position.y}");
         }
     }
 
