@@ -8,7 +8,7 @@ const CARD_WIDTH = 200;
 const CARD_HEIGHT = 260;
 const CARD_SPACING = 20;
 const CARD_SCALE = 0.8;
-const UI_DEPTH = 1000; // High depth to stay on top
+const UI_DEPTH = 100000; // Extremely high depth to ensure UI stays on top of all game elements
 
 // Define upgrade icon mapping
 const UPGRADE_ICON_MAP: { [key: string]: string } = {
