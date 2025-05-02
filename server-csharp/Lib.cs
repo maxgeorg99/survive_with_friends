@@ -121,6 +121,7 @@ public static partial class Module
         public float speed;
         public uint armor; 
         public uint unspent_upgrades;
+        public uint rerolls; // Number of upgrade rerolls available (starting at 999 for testing)
     }
 
     // Table to store dead players (same structure as Player)
@@ -384,7 +385,8 @@ public static partial class Module
             hp_regen = 0,
             speed = speed,
             armor = (uint)armor,
-            unspent_upgrades = 0
+            unspent_upgrades = 0,
+            rerolls = 999
         });
 
         // Check if player insertion failed

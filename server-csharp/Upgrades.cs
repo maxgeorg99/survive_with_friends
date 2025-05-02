@@ -615,4 +615,63 @@ public static partial class Module
                 throw new Exception($"Cannot convert upgrade type {upgradeType} to attack type");
         }
     }
+
+    // Reroll upgrade options for a player
+    [Reducer]
+    public static void RerollUpgrades(ReducerContext ctx, uint playerId)
+    {
+        // Ensure the caller's identity is the player's identity
+        var identityAccount = ctx.Db.account.identity.Find(ctx.Sender);
+        if (identityAccount == null)
+        {
+            throw new Exception("RerollUpgrades called by null identity");
+        }
+
+        if (identityAccount.Value.current_player_id != playerId)
+        {
+            throw new Exception("RerollUpgrades called by wrong player");
+        }
+        
+        // Get player data
+        var playerOpt = ctx.Db.player.player_id.Find(playerId);
+        if (playerOpt == null)
+        {
+            throw new Exception($"Player with ID {playerId} not found");
+        }
+        
+        var player = playerOpt.Value;
+        
+        // Check if player has rerolls and unspent upgrades
+        if (player.rerolls <= 0)
+        {
+            throw new Exception("Player has no rerolls available");
+        }
+        
+        if (player.unspent_upgrades <= 0)
+        {
+            throw new Exception("Player has no unspent upgrades to reroll");
+        }
+        
+        // Delete existing upgrade options
+        var upgradeOptionsData = ctx.Db.upgrade_options.player_id.Filter(playerId);
+        var deleteCount = 0;
+        foreach (var option in upgradeOptionsData)
+        {
+            if (ctx.Db.upgrade_options.upgrade_id.Delete(option.upgrade_id))
+            {
+                deleteCount++;
+            }
+        }
+        
+        Console.WriteLine($"Deleted {deleteCount} upgrade options for player {playerId} during reroll");
+        
+        // Decrement player's rerolls
+        player.rerolls--;
+        ctx.Db.player.player_id.Update(player);
+        
+        Console.WriteLine($"Player {playerId} used a reroll. Remaining rerolls: {player.rerolls}");
+        
+        // Draw new upgrade options
+        DrawUpgradeOptions(ctx, playerId);
+    }
 } 

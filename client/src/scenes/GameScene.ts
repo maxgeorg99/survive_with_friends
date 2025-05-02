@@ -9,6 +9,7 @@ import { AttackManager } from '../managers/AttackManager';
 import GemManager from '../managers/GemManager';
 import { createPlayerDamageEffect, createMonsterDamageEffect } from '../utils/DamageEffects';
 import UpgradeUI from '../ui/UpgradeUI';
+import PlayerHUD from '../ui/PlayerHUD';
 
 // Constants
 const PLAYER_SPEED = 200;
@@ -84,6 +85,10 @@ export default class GameScene extends Phaser.Scene {
     
     // Add upgrade UI manager
     private upgradeUI: UpgradeUI | null = null;
+    
+    // Add player HUD
+    private playerHUD: PlayerHUD | null = null;
+    
     private localPlayerId: number = 0;
     
     private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null;
@@ -215,6 +220,9 @@ export default class GameScene extends Phaser.Scene {
             
             // Add debug key to toggle attack circles (use backtick key)
             this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.BACKTICK).on('down', this.toggleAttackDebugCircles, this);
+            
+            // Add R key for rerolling upgrades
+            this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R).on('down', this.rerollUpgrades, this);
         }
         console.log("Keyboard input set up.");
 
@@ -513,6 +521,9 @@ export default class GameScene extends Phaser.Scene {
 
         // Store the local player ID for upgrade handling
         this.localPlayerId = player.playerId;
+        
+        // Initialize PlayerHUD for reroll count display
+        this.playerHUD = new PlayerHUD(this, this.spacetimeDBClient, this.localPlayerId);
         
         // Get the entity data for this player
         const entityData = ctx.db?.entity.entityId.find(player.entityId);
@@ -1806,6 +1817,11 @@ export default class GameScene extends Phaser.Scene {
         if (this.upgradeUI) {
             this.upgradeUI.update(time, delta);
         }
+        
+        // Update the player HUD if it exists
+        if (this.playerHUD) {
+            this.playerHUD.update(time, delta);
+        }
     }
 
     // Force a synchronization of player entities
@@ -2077,6 +2093,12 @@ export default class GameScene extends Phaser.Scene {
             }
         }
         
+        // Clean up PlayerHUD
+        if (this.playerHUD) {
+            this.playerHUD.destroy();
+            this.playerHUD = null;
+        }
+        
         console.log("GameScene shutdown complete.");
     }
 
@@ -2327,5 +2349,126 @@ export default class GameScene extends Phaser.Scene {
                 this.upgradeUI.setUpgradeOptions(remainingUpgrades);
             }
         }
+    }
+    
+    /**
+     * Handle rerolling upgrades when the 'R' key is pressed
+     */
+    private rerollUpgrades(): void {
+        if (!this.spacetimeDBClient.sdkConnection?.db || this.localPlayerId <= 0) {
+            console.log("Cannot reroll: Connection not available or player not initialized");
+            return;
+        }
+        
+        // Get player data
+        const player = this.spacetimeDBClient.sdkConnection.db.player.playerId.find(this.localPlayerId);
+        if (!player) {
+            console.log("Cannot reroll: Player data not found");
+            return;
+        }
+        
+        // Check if player has unspent upgrades and rerolls
+        if (player.unspentUpgrades <= 0) {
+            console.log("Cannot reroll: No unspent upgrades available");
+            return;
+        }
+        
+        if (player.rerolls <= 0) {
+            console.log("Cannot reroll: No rerolls available");
+            return;
+        }
+        
+        console.log("Rerolling upgrades...");
+        
+        // Hide the upgrade UI
+        if (this.upgradeUI) {
+            this.upgradeUI.hide();
+        }
+        
+        // Create reroll effect
+        if (this.localPlayerSprite) {
+            this.createRerollEffect(this.localPlayerSprite);
+        }
+        
+        // Call the reroll reducer
+        this.spacetimeDBClient.sdkConnection.reducers.rerollUpgrades(this.localPlayerId);
+    }
+    
+    /**
+     * Creates visual effects for rerolling upgrades
+     */
+    private createRerollEffect(playerSprite: Phaser.Physics.Arcade.Sprite): void {
+        if (!playerSprite) return;
+        
+        console.log("Playing reroll effect!");
+        
+        // Create "REROLL!" text
+        const rerollText = this.add.text(
+            playerSprite.x,
+            playerSprite.y - 80, // Above the player
+            "REROLL!",
+            {
+                fontFamily: 'Arial',
+                fontSize: '28px',
+                color: '#00ffff', // Cyan
+                stroke: '#000000',
+                strokeThickness: 5,
+                fontStyle: 'bold'
+            }
+        );
+        rerollText.setOrigin(0.5);
+        rerollText.setDepth(BASE_DEPTH + playerSprite.y + 100); // Ensure it appears above the player
+        
+        // Animate the text
+        this.tweens.add({
+            targets: rerollText,
+            y: rerollText.y - 50, // Float upward
+            alpha: { from: 1, to: 0 }, // Fade out
+            scale: { from: 0.8, to: 1.5 }, // Grow
+            duration: 1000,
+            ease: 'Power2',
+            onComplete: () => {
+                rerollText.destroy(); // Remove when animation is done
+            }
+        });
+        
+        // Create swirl effect around player
+        const particles = this.add.particles(playerSprite.x, playerSprite.y, 'white_pixel', {
+            speed: { min: 80, max: 180 },
+            scale: { start: 0.5, end: 0 },
+            blendMode: 'ADD',
+            lifespan: 800,
+            gravityY: 0,
+            tint: 0x00ffff, // Cyan particles
+            emitting: false,
+            emitCallback: (particle: Phaser.GameObjects.Particles.Particle) => {
+                // Make particles move in a circular pattern
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Phaser.Math.Between(80, 180);
+                const radius = Phaser.Math.Between(30, 80);
+                
+                particle.velocityX = Math.cos(angle) * speed;
+                particle.velocityY = Math.sin(angle) * speed;
+                
+                // Add some rotation to each particle
+                particle.rotation = angle;
+            }
+        });
+        
+        // Emit particles in a burst
+        particles.explode(40, playerSprite.x, playerSprite.y);
+        
+        // Add a flash to the player sprite
+        const initialTint = playerSprite.tintTopLeft;
+        playerSprite.setTint(0x00ffff); // Cyan flash
+        
+        this.time.delayedCall(300, () => {
+            playerSprite.setTint(initialTint); // Reset tint
+        });
+        
+        // Clean up particles after animation
+        this.time.delayedCall(800, () => {
+            particles.destroy();
+        });
     }
 }

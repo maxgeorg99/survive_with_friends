@@ -3,6 +3,26 @@ import { UpgradeOptionData, UpgradeType } from '../autobindings';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { ChooseUpgrade } from '../autobindings';
 
+// Define a type for our attack graphic data with prediction capabilities
+interface AttackGraphicData {
+    graphic: Phaser.GameObjects.Graphics;
+    sprite: Phaser.GameObjects.Sprite | null;
+    radius: number;
+    baseRadius: number; // Store the base radius from attack data for scaling calculation
+    alpha: number;
+    // Add prediction-related properties
+    lastUpdateTime: number;
+    predictedPosition: Phaser.Math.Vector2;
+    serverPosition: Phaser.Math.Vector2;
+    direction: Phaser.Math.Vector2;
+    speed: number;
+    isShield: boolean;
+    playerId: number | null;
+    parameterU: number;
+    ticksElapsed: number;
+    attackType: string;
+}
+
 // Constants
 const CARD_WIDTH = 200;
 const CARD_HEIGHT = 260;
@@ -31,6 +51,7 @@ export default class UpgradeUI {
     private upgradeOptions: UpgradeOptionData[] = [];
     private isVisible: boolean = false;
     private keyListeners: Phaser.Input.Keyboard.Key[] = [];
+    private rerollText: Phaser.GameObjects.Text | null = null;
 
     constructor(scene: Phaser.Scene, spacetimeClient: SpacetimeDBClient, localPlayerId: number) {
         this.scene = scene;
@@ -48,6 +69,17 @@ export default class UpgradeUI {
             this.scene.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.TWO),
             this.scene.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.THREE)
         ].filter((key): key is Phaser.Input.Keyboard.Key => key !== undefined);
+
+        // Create reroll text with instruction 
+        this.rerollText = this.scene.add.text(0, -CARD_HEIGHT, "Press R to reroll (Available: 0)", {
+            fontSize: '18px',
+            fontFamily: 'Arial',
+            color: '#ffffff',
+            stroke: '#000000',
+            strokeThickness: 3,
+        });
+        this.rerollText.setOrigin(0.5);
+        this.container.add(this.rerollText);
 
         console.log('UpgradeUI initialized');
     }
@@ -74,6 +106,14 @@ export default class UpgradeUI {
     public setUpgradeOptions(options: UpgradeOptionData[]): void {
         console.log('Setting upgrade options:', options);
         this.upgradeOptions = options;
+        
+        // Update reroll text with current count if player data is available
+        if (this.rerollText && this.spacetimeClient.sdkConnection?.db) {
+            const player = this.spacetimeClient.sdkConnection.db.player.playerId.find(this.localPlayerId);
+            if (player && player.rerolls !== undefined) {
+                this.rerollText.setText(`Press R to reroll (Available: ${player.rerolls})`);
+            }
+        }
         
         if (options.length > 0) {
             this.createUpgradeCards();
@@ -293,4 +333,4 @@ export default class UpgradeUI {
         this.cards.forEach(card => card.destroy());
         this.container.destroy();
     }
-} 
+}
