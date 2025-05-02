@@ -1,6 +1,7 @@
 using SpacetimeDB;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 // Attack type enum
 [SpacetimeDB.Type]
@@ -77,32 +78,51 @@ public static partial class Module
     }
     public static void DrawUpgradeOptions(ReducerContext ctx, uint playerId)
     {
-        //See if player has any upgrade options
+        // See if player has any upgrade options
         var existingUpgradeOptions = ctx.Db.upgrade_options.player_id.Filter(playerId);
         if (existingUpgradeOptions.Count() != 0)
         {
-            //Skip drawing upgrade options      
+            // Skip drawing upgrade options      
             return;
         }
 
-        //Draw 3 random upgrade options
-        var random = new Random();
-        var upgradeTypes = Enum.GetValues(typeof(UpgradeType));
-        var upgradeOptions = new List<UpgradeType>();
-        for (int i = 0; i < 3; i++)
-        {   
-            var randomIndex = random.Next(upgradeTypes.Length);
-            upgradeOptions.Add((UpgradeType)upgradeTypes.GetValue(randomIndex));
-        }
-
-        //Insert upgrade options into database
-        for (uint i = 0; i < 3; i++)
+        // Create a list of all upgrade types
+        var allUpgradeTypes = new List<UpgradeType>();
+        foreach (UpgradeType type in Enum.GetValues(typeof(UpgradeType)))
         {
-            var upgradeType = upgradeOptions[(int)i];
+            allUpgradeTypes.Add(type);
+        }
+        
+        // Shuffle the list randomly
+        var random = new Random();
+        ShuffleList(allUpgradeTypes, random);
+        
+        // Pick the first 3 types
+        var selectedTypes = allUpgradeTypes.Take(3).ToList();
+        
+        Log.Info($"Selected upgrade types for player {playerId}: {string.Join(", ", selectedTypes)}");
+        
+        // Insert upgrade options into database
+        for (uint i = 0; i < selectedTypes.Count; i++)
+        {
+            var upgradeType = selectedTypes[(int)i];
             var upgradeOptionData = CreateUpgradeOptionData(ctx, upgradeType, playerId);
             upgradeOptionData.player_id = playerId;
             upgradeOptionData.upgrade_index = i;
             ctx.Db.upgrade_options.Insert(upgradeOptionData);
+        }
+    }
+    
+    // Helper method to shuffle a list using Fisher-Yates algorithm
+    private static void ShuffleList<T>(List<T> list, Random random)
+    {
+        int n = list.Count;
+        for (int i = n - 1; i > 0; i--)
+        {
+            int j = random.Next(0, i + 1);
+            T temp = list[i];
+            list[i] = list[j];
+            list[j] = temp;
         }
     }
 
