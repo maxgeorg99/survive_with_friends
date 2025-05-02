@@ -71,6 +71,7 @@ export default class UpgradeUI {
         ].filter((key): key is Phaser.Input.Keyboard.Key => key !== undefined);
 
         // Create reroll text with instruction 
+        /*
         this.rerollText = this.scene.add.text(0, -CARD_HEIGHT, "Press R to reroll (Available: 0)", {
             fontSize: '18px',
             fontFamily: 'Arial',
@@ -80,6 +81,7 @@ export default class UpgradeUI {
         });
         this.rerollText.setOrigin(0.5);
         this.container.add(this.rerollText);
+        */
 
         console.log('UpgradeUI initialized');
     }
