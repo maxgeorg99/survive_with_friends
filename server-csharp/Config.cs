@@ -16,6 +16,8 @@ public static partial class Module
         public uint max_monsters; // Maximum number of monsters allowed at once
 
         public uint player_spawn_grace_period; // Player spawn grace period in milliseconds
+        
+        public uint monster_hit_cleanup_delay; // Delay in milliseconds before monster hit records are cleaned up
     }
     
     // Initialize the game configuration
@@ -37,7 +39,8 @@ public static partial class Module
             world_size = 2000, // Default world size in pixels
             game_tick_rate = 50, // Default game tick rate in milliseconds
             max_monsters = 20,  // Default maximum monsters
-            player_spawn_grace_period = 5000 // Default player spawn grace period in milliseconds
+            player_spawn_grace_period = 5000, // Default player spawn grace period in milliseconds
+            monster_hit_cleanup_delay = 500 // Default monster hit cleanup delay in milliseconds
         });
 
         Log.Info("Game configuration initialized successfully");

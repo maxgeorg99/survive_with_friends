@@ -21,6 +21,19 @@ public static partial class Module
         public uint attack_entity_id; // The attack entity that hit the monster
     }
 
+    // Scheduled table for monster hit cleanup
+    [SpacetimeDB.Table(Name = "monster_hit_cleanup", 
+                       Scheduled = nameof(CleanupMonsterHitRecord), 
+                       ScheduledAt = nameof(scheduled_at))]
+    public partial struct MonsterHitCleanup
+    {
+        [PrimaryKey, AutoInc]
+        public ulong scheduled_id;
+        
+        public uint damage_id;        // The damage record to clean up
+        public ScheduleAt scheduled_at; // When to clean up the record
+    }
+
     // Helper function to check if a monster has already been hit by an attack
     private static bool HasMonsterBeenHitByAttack(ReducerContext ctx, uint monsterId, uint attackEntityId)
     {
@@ -42,11 +55,35 @@ public static partial class Module
     // Helper function to record a monster being hit by an attack
     private static void RecordMonsterHitByAttack(ReducerContext ctx, uint monsterId, uint attackEntityId)
     {
-        ctx.Db.monster_damage.Insert(new MonsterDamage
+        // Insert the damage record
+        MonsterDamage? damageRecord = ctx.Db.monster_damage.Insert(new MonsterDamage
         {
             monster_id = monsterId,
             attack_entity_id = attackEntityId
         });
+        
+        if (damageRecord == null)
+        {
+            Log.Error($"Failed to insert monster damage record for monster {monsterId}, attack {attackEntityId}");
+            return;
+        }
+        
+        // Get cleanup delay from config
+        uint cleanupDelay = 500; // Default to 500ms if config not found
+        var configOpt = ctx.Db.config.id.Find(0);
+        if (configOpt != null)
+        {
+            cleanupDelay = configOpt.Value.monster_hit_cleanup_delay;
+        }
+        
+        // Schedule cleanup after the configured delay
+        ctx.Db.monster_hit_cleanup.Insert(new MonsterHitCleanup
+        {
+            damage_id = damageRecord.Value.damage_id,
+            scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(cleanupDelay))
+        });
+        
+        Log.Info($"Recorded monster {monsterId} hit by attack {attackEntityId}, cleanup scheduled in {cleanupDelay}ms");
     }
 
     // Helper function to remove all damage records for a given attack entity
@@ -693,5 +730,18 @@ public static partial class Module
         float repulsionStrength = overlap * 0.5f; // Adjust this factor as needed
         
         return new DbVector2(nx * repulsionStrength, ny * repulsionStrength);
+    }
+
+    // Reducer to clean up a monster hit record
+    [Reducer]
+    public static void CleanupMonsterHitRecord(ReducerContext ctx, MonsterHitCleanup cleanup)
+    {
+        if (ctx.Sender != ctx.Identity)
+        {
+            throw new Exception("CleanupMonsterHitRecord may not be invoked by clients, only via scheduling.");
+        }
+        
+        // Delete the damage record
+        ctx.Db.monster_damage.damage_id.Delete(cleanup.damage_id);
     }
 }
