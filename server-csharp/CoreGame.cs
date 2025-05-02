@@ -233,6 +233,9 @@ public static partial class Module
             // Clean up all attack-related data for this player
             CleanupPlayerAttacks(ctx, player_id);
             
+            // Clean up all pending upgrade options for this player
+            CleanupPlayerUpgradeOptions(ctx, player_id);
+            
             // Delete the player and their entity
             // Note: The client will detect this deletion through the onDelete handler
 
@@ -347,6 +350,29 @@ public static partial class Module
             
             Log.Info($"Deleted {attackCleanupsToDelete.Count} attack cleanup schedules for player {playerId}");
         }
+    }
+
+    // Helper method to clean up all pending upgrade options for a player
+    private static void CleanupPlayerUpgradeOptions(ReducerContext ctx, uint playerId)
+    {
+        Log.Info($"Cleaning up all upgrade options for player {playerId}");
+        
+        // Get all upgrade options for this player
+        var upgradeOptionsToDelete = new List<uint>();
+        
+        // Use player_id filter on upgrade_options to find all options for this player
+        foreach (var option in ctx.Db.upgrade_options.player_id.Filter(playerId))
+        {
+            upgradeOptionsToDelete.Add(option.upgrade_id);
+        }
+        
+        // Delete all found upgrade options
+        foreach (var optionId in upgradeOptionsToDelete)
+        {
+            ctx.Db.upgrade_options.upgrade_id.Delete(optionId);
+        }
+        
+        Log.Info($"Deleted {upgradeOptionsToDelete.Count} upgrade options for player {playerId}");
     }
 
     [Reducer]

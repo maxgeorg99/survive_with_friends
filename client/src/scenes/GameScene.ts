@@ -399,6 +399,13 @@ export default class GameScene extends Phaser.Scene {
         console.log("Player died event received in GameScene");
         // This is our local player that died
         console.log("Local player died:", player);
+        
+        // Clear any upgrade UI that may be open
+        if (this.upgradeUI) {
+            console.log("Clearing upgrade UI for dying player");
+            this.upgradeUI.hide();
+        }
+        
         //play death animation
         var center = this.localPlayerSprite?.getCenter();
         if (center) {
