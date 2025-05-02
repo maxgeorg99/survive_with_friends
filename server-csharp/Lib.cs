@@ -115,8 +115,8 @@ public static partial class Module
         public uint level;
         public uint exp;
         public uint exp_for_next_level;
-        public uint max_hp;
-        public uint hp;
+        public float max_hp;
+        public float hp;
         public uint hp_regen;
         public float speed;
         public uint armor; 
@@ -168,6 +168,9 @@ public static partial class Module
         
         // Initialize attack system
         InitializeAttackSystem(ctx);
+        
+        // Initialize health regeneration system
+        InitHealthRegenSystem(ctx);
         
         // Schedule monster spawning
         ScheduleMonsterSpawning(ctx);
@@ -320,7 +323,7 @@ public static partial class Module
         }
         
         // Define default stats in case class data isn't found
-        int maxHp = 100;
+        float maxHp = 100;
         int armor = 0;
         float speed = PLAYER_SPEED;
         AttackType startingAttackType = AttackType.Sword;
@@ -329,7 +332,7 @@ public static partial class Module
         if (classDataOpt != null)
         {
             ClassData classData = classDataOpt;
-            maxHp = classData.MaxHp;
+            maxHp = (float)classData.MaxHp;
             armor = classData.Armor;
             speed = classData.Speed;
             startingAttackType = classData.StartingAttackType;
@@ -376,8 +379,8 @@ public static partial class Module
             level = 1,
             exp = 0,
             exp_for_next_level = initialExpNeeded,
-            max_hp = (uint)maxHp,
-            hp = (uint)maxHp,
+            max_hp = maxHp,
+            hp = maxHp,
             hp_regen = 0,
             speed = speed,
             armor = (uint)armor,

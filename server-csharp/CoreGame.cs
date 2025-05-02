@@ -184,7 +184,7 @@ public static partial class Module
     
     //Helper function to damage a player
     //Returns true if the player is dead, false otherwise
-    public static bool DamagePlayer(ReducerContext ctx, uint player_id, uint damage_amount)
+    public static bool DamagePlayer(ReducerContext ctx, uint player_id, float damage_amount)
     {
         // Find the player
         var playerOpt = ctx.Db.player.player_id.Find(player_id);
@@ -203,8 +203,20 @@ public static partial class Module
             return false;
         }
         
+        // Apply armor damage reduction
+        // Formula: DR = armor/(armor+3)
+        // At 3 armor, they take 50% damage
+        // At 6 armor, they take 33% damage
+        float reducedDamage = damage_amount;
+        if (player.armor > 0)
+        {
+            float damageReduction = (float)player.armor / (player.armor + 3f);
+            float remainingDamagePercent = 1f - damageReduction;
+            reducedDamage = damage_amount * remainingDamagePercent;
+        }
+        
         // Make sure we don't underflow
-        if (player.hp <= damage_amount)
+        if (player.hp <= reducedDamage)
         {
             // Player is dead - set HP to 0
             player.hp = 0;
@@ -251,11 +263,8 @@ public static partial class Module
         else
         {
             // Player is still alive, update with reduced HP
-            player.hp -= damage_amount;
+            player.hp -= reducedDamage;
             ctx.Db.player.player_id.Update(player);
-            
-            // Log the damage
-            Log.Info($"Player {player.name} (ID: {player.player_id}) took {damage_amount} damage. HP: {player.hp}/{player.max_hp}");
 
             return false;
         }
@@ -531,8 +540,6 @@ public static partial class Module
                     // Apply armor piercing if needed
                     // (Not implemented in this version)
                     
-                    Log.Info($"Player attack hit monster {monster.monster_id}: Type={activeAttack.attack_type}, Damage={damage}");
-                    
                     bool monsterKilled = DamageMonster(ctx, monster.monster_id, damage);
                     attackHitMonster = true;
                     
@@ -613,12 +620,8 @@ public static partial class Module
                     // Get monster attack value
                     float monsterAtk = monsterAtks.GetValueOrDefault(monsterId, 1.0f);
                     
-                    // Calculate damage, taking player armor into account
-                    // Armor reduces damage by its value (minimum damage is 1)
-                    uint finalDamage = (uint)Math.Max(1, Math.Ceiling(monsterAtk - (player.armor * 0.1f)));
-                    
                     // Apply damage to player
-                    playerIsDead = DamagePlayer(ctx, player.player_id, finalDamage);
+                    playerIsDead = DamagePlayer(ctx, player.player_id, monsterAtk);
 
                     if(playerIsDead)
                     {

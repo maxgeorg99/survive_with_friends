@@ -46,7 +46,7 @@ public static partial class Module
             max_hp = 10,
             speed = 160.0f,
             exp = 1,
-            atk = 0.1f,
+            atk = 1.0f,
             radius = 24.0f
         });
 
@@ -58,7 +58,7 @@ public static partial class Module
             max_hp = 25,
             speed = 100.0f,
             exp = 2,
-            atk = 0.5f,
+            atk = 1.5f,
             radius = 30.0f
         });
 
@@ -70,7 +70,7 @@ public static partial class Module
             max_hp = 50,
             speed = 140.0f, 
             exp = 5,
-            atk = 1.0f,
+            atk = 2.0f,
             radius = 40.0f
         });
 

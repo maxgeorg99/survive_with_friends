@@ -294,10 +294,6 @@ public static partial class Module
             active_attack_id = activeAttack.active_attack_id,
             scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(duration))
         });
-        
-        // Note: This method would be expanded with actual game logic for creating
-        // projectiles, applying damage, etc. For now it just creates the active attack record.
-        Log.Info($"Created attack projectile for player {playerId}, type {attackType}, id within burst: {idWithinBurst}, direction: ({direction.x}, {direction.y}), speed: {scheduledAttack.Value.speed}, damage: {scheduledAttack.Value.damage}");
     }
 
     // Handler for attack burst cooldown expiration
@@ -350,11 +346,7 @@ public static partial class Module
 
         // If there are more shots remaining in the burst, schedule the next one
         burstCooldown.remaining_shots -= 1;
-        if (burstCooldown.remaining_shots == 0)
-        {
-            Log.Info($"All projectiles fired for player {burstCooldown.player_id}, attack type {burstCooldown.attack_type}");
-        }
-        else
+        if (burstCooldown.remaining_shots > 0)
         {
             // update the scheduled_at to the next shot
             // If there are more projectiles and fire_delay > 0, schedule the next
@@ -412,8 +404,6 @@ public static partial class Module
             {
                 // Fire first projectile with id_within_burst = 0
                 TriggerAttackProjectile(ctx, playerId, attack.attack_type, 0, attack.parameter_u, attack.parameter_i);
-                 
-                Log.Info($"Scheduled {attack.projectiles - 1} projectiles for player {playerId}, attack type {attack.attack_type}, fire delay: {attack.fire_delay}");
 
                 // If there are more projectiles and fire_delay > 0, schedule the rest
                 ctx.Db.attack_burst_cooldowns.Insert(new AttackBurstCooldown
@@ -432,8 +422,6 @@ public static partial class Module
             // Single projectile case - just trigger it with id_within_burst = 0
             TriggerAttackProjectile(ctx, playerId, attack.attack_type, 0, attack.parameter_u, attack.parameter_i);
         }
-        
-        Log.Info($"Server triggered attack {attack.attack_type} for player {playerId} with skill level {attack.skill_level}");
     }
 
     // Helper method to schedule attacks for a player
