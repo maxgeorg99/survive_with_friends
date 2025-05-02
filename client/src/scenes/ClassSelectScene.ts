@@ -300,6 +300,8 @@ export default class ClassSelectScene extends Phaser.Scene {
                 
                 // Try to clean up HTML elements immediately before transition
                 this.cleanupHTMLElements();
+
+                console.log("Spawning player with class: " + this.selectedClass.tag + " (ID: " + classId + ")");
                 
                 // Show loading scene while player is being spawned
                 this.scene.start('LoadingScene', { 

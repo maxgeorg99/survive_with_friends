@@ -193,6 +193,7 @@ const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
                     const loadingScene = game.scene.getScene('LoadingScene') as any;
                     if (loadingScene.completeLoading) 
                     {
+                        console.log("Completing loading for name set");
                         loadingScene.completeLoading();
                     }
                 }
@@ -216,6 +217,7 @@ const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
                             const loadingScene = game.scene.getScene('LoadingScene') as any;
                             if (loadingScene.completeLoading) 
                             {
+                                console.log("Completing loading for player id change");
                                 loadingScene.completeLoading();
                             }
                         }
@@ -254,6 +256,7 @@ const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
                 const loadingScene = game.scene.getScene('LoadingScene') as any;
                 if (loadingScene.completeLoading) 
                 {
+                    console.log("Completing loading for player creation");
                     loadingScene.completeLoading();
                 }
             }

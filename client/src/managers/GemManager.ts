@@ -27,11 +27,18 @@ export default class GemManager {
     // Particle emitter for gems
     private particleEmitter: Phaser.GameObjects.Particles.ParticleEmitter;
 
+    static nextGemManagerId: number = 0;
+    private gemManagerId: number;
+
     constructor(scene: Phaser.Scene, client: SpacetimeDBClient) {
         this.scene = scene;
         this.spacetimeDBClient = client;
         this.gameEvents = (window as any).gameEvents;
-        console.log("GemManager constructed");
+
+        GemManager.nextGemManagerId +=1 ;
+        this.gemManagerId = GemManager.nextGemManagerId;
+
+        console.log("GemManager constructed", this.gemManagerId);
 
         // Initialize a single persistent particle emitter (initially inactive)
         this.particleEmitter = this.scene.add.particles(0, 0, 'white_pixel', {
@@ -54,7 +61,7 @@ export default class GemManager {
             return;
         }
 
-        console.log("GemManager initializing gems");
+        console.log("GemManager initializing gems", this.gemManagerId);
         
         // Register gem listeners
         this.registerGemListeners();
@@ -78,7 +85,7 @@ export default class GemManager {
 
     // Register gem-related event listeners
     registerGemListeners() {
-        console.log("Registering gem listeners for GemManager");
+        console.log("Registering gem listeners for GemManager", this.gemManagerId);
 
         this.gameEvents.on(GameEvents.GEM_CREATED, (ctx: EventContext, gem: any) => {
             this.createOrUpdateGem(ctx, gem);
@@ -95,7 +102,7 @@ export default class GemManager {
 
     // Register entity event listeners
     registerEntityListeners() {
-        console.log("Registering entity event listeners for GemManager");
+        console.log("Registering entity event listeners for GemManager", this.gemManagerId);
         
         // Listen for entity events
         this.gameEvents.on(GameEvents.ENTITY_CREATED, this.handleEntityEvent, this);
@@ -158,7 +165,7 @@ export default class GemManager {
 
     // Create or update a gem in the pending list
     createOrUpdateGem(ctx: EventContext, gemData: any) {
-        
+
         // If we already have this gem, update it
         if (this.gems.has(gemData.gemId)) {
             // Update gem data if needed
@@ -205,7 +212,6 @@ export default class GemManager {
         }
         
         const assetKey = GEM_ASSET_KEYS[gemLevelTag] || GEM_ASSET_KEYS['Small']; // Default to small gem if not found
-        console.log(`Gem level tag: ${gemLevelTag} Asset key: ${assetKey}`);
         
         // Create shadow DIRECTLY on the scene (not in the container) so it stays fixed
         var shadowX = originalX - 4;
@@ -342,16 +348,17 @@ export default class GemManager {
 
     // Unregister event listeners
     unregisterListeners() {
-        this.gameEvents.off(GameEvents.GEM_CREATED, undefined, this);
-        this.gameEvents.off(GameEvents.GEM_UPDATED, undefined, this);
-        this.gameEvents.off(GameEvents.GEM_DELETED, undefined, this);
+        console.log("Unregistering event listeners for GemManager", this.gemManagerId);
+        this.gameEvents.off(GameEvents.GEM_CREATED);
+        this.gameEvents.off(GameEvents.GEM_UPDATED);
+        this.gameEvents.off(GameEvents.GEM_DELETED);
         this.gameEvents.off(GameEvents.ENTITY_CREATED, this.handleEntityEvent, this);
         this.gameEvents.off(GameEvents.ENTITY_UPDATED, this.handleEntityEvent, this);
     }
 
     // Clean up on shutdown
     shutdown() {
-        console.log("Shutting down GemManager");
+        console.log("Shutting down GemManager", this.gemManagerId);
         
         // Unregister event listeners
         this.unregisterListeners();

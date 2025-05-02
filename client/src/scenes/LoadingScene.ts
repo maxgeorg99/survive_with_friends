@@ -86,8 +86,10 @@ export default class LoadingScene extends Phaser.Scene {
         
         // Listen for specific events based on what we're waiting for
         if (this.waitingFor === 'name') {
+            console.log("done waiting for name");
             this.gameEvents.on(GameEvents.NAME_SET, this.completeLoading, this);
         } else if (this.waitingFor === 'player') {
+            console.log("done waiting for player");
             this.gameEvents.on(GameEvents.PLAYER_CREATED, this.completeLoading, this);
         }
 
@@ -162,6 +164,7 @@ export default class LoadingScene extends Phaser.Scene {
         
         if (this.nextScene) {
             this.proceedToNextScene();
+            this.nextScene = "";
         }
     }
     
@@ -198,6 +201,8 @@ export default class LoadingScene extends Phaser.Scene {
         
         // Remove resize listener
         this.scale.off('resize', this.handleResize);
+
+        this.nextScene = "";
     }
     
     private cleanupLingeringUIElements() {

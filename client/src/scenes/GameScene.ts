@@ -292,6 +292,7 @@ export default class GameScene extends Phaser.Scene {
         // Initialize AttackManager
         this.attackManager = new AttackManager(this, this.spacetimeDBClient);
 
+        console.log("\n\n\n\n!!!!!!Updating last login");
         this.spacetimeDBClient.sdkConnection?.reducers.updateLastLogin();
     }
 
@@ -336,12 +337,12 @@ export default class GameScene extends Phaser.Scene {
         {
             console.log("GameScene: Local account updated");
             //Check if the login time was updated
-            if (oldAccount.lastLogin !== newAccount.lastLogin) {
+            if (oldAccount.lastLogin.microsSinceUnixEpoch !== newAccount.lastLogin.microsSinceUnixEpoch) {
                 //If we're getting this, then that means we sent the updateLastLogin reducer
                 //in the create, and are now getting the response.
                 //So we should initialize the game world at this point since
                 //hopefully all the data is ready.
-                console.log("New login detected, initializing game world");
+                console.log("New login detected, initializing game world: " + oldAccount.lastLogin.microsSinceUnixEpoch + " -> " + newAccount.lastLogin.microsSinceUnixEpoch);
                 this.initializeGameWorld(ctx);  
             }
             else
@@ -2019,6 +2020,7 @@ export default class GameScene extends Phaser.Scene {
 
         // Clean up GemManager
         this.gemManager?.shutdown();
+        this.gemManager = null;
         
         // Clean up UpgradeUI
         if (this.upgradeUI) {
