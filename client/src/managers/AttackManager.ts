@@ -9,6 +9,7 @@ interface AttackGraphicData {
     graphic: Phaser.GameObjects.Graphics;
     sprite: Phaser.GameObjects.Sprite | null;
     radius: number;
+    baseRadius: number; // Store the base radius from attack data for scaling calculation
     alpha: number;
     // Add prediction-related properties
     lastUpdateTime: number;
@@ -155,7 +156,8 @@ export class AttackManager {
             attackGraphicData = {
                 graphic,
                 sprite,
-                radius: attackData.radius,
+                radius: attack.radius, // Use the actual radius from the active attack
+                baseRadius: attackData.radius, // Store base radius from attack data for scaling
                 alpha,
                 lastUpdateTime: this.gameTime,
                 predictedPosition: new Phaser.Math.Vector2(entity.position.x, entity.position.y),
@@ -176,6 +178,7 @@ export class AttackManager {
             attackGraphicData.lastUpdateTime = this.gameTime;
             attackGraphicData.ticksElapsed = attack.ticksElapsed;
             attackGraphicData.attackType = attackType;
+            attackGraphicData.radius = attack.radius; // Update radius value
             
             // Check if predicted position is too far from server position
             const dx = attackGraphicData.predictedPosition.x - entity.position.x;
@@ -220,8 +223,7 @@ export class AttackManager {
         const sprite = this.scene.add.sprite(x, y, spriteKey);
         sprite.setDepth(1.5); // Set depth higher than circle but below UI
         
-        // Scale down the sprite if needed
-        sprite.setScale(1.0); // Adjust this value if sprites need resizing
+        // The scale will be set in updateAttackGraphic based on radius comparison
         
         return sprite;
     }
@@ -256,6 +258,13 @@ export class AttackManager {
             // Position sprite at predicted position
             sprite.x = attackGraphicData.predictedPosition.x;
             sprite.y = attackGraphicData.predictedPosition.y;
+            
+            // Calculate scale based on radius compared to base radius
+            // Only apply if baseRadius is not zero to avoid division by zero
+            if (attackGraphicData.baseRadius > 0) {
+                const scale = attackGraphicData.radius / attackGraphicData.baseRadius;
+                sprite.setScale(scale);
+            }
             
             // Handle different attack types
             switch (attackGraphicData.attackType) {
