@@ -22,7 +22,7 @@ public static partial class Module
     }
 
     // Timer table for spawning monsters
-    [Table(Name = "monster_spawn_timer", Scheduled = nameof(SpawnMonster), ScheduledAt = nameof(scheduled_at))]
+    [Table(Name = "monster_spawn_timer", Scheduled = nameof(PreSpawnMonster), ScheduledAt = nameof(scheduled_at))]
     public partial struct MonsterSpawnTimer
     {
         [PrimaryKey, AutoInc]
@@ -30,19 +30,32 @@ public static partial class Module
         public ScheduleAt scheduled_at;
     }
     
+    // New table for monster spawners (scheduled)
+    [Table(Name = "monster_spawners", Public = true, Scheduled = nameof(SpawnMonster), ScheduledAt = nameof(scheduled_at))]
+    public partial struct MonsterSpawners
+    {
+        [PrimaryKey, AutoInc]
+        public ulong scheduled_id;
+        
+        public DbVector2 position;          // Where the monster will spawn
+        public MonsterType monster_type;    // The type of monster to spawn
+        public uint target_entity_id;       // The player entity ID to target
+        public ScheduleAt scheduled_at;     // When the monster will be spawned
+    }
+    
     [Reducer]
-    public static void SpawnMonster(ReducerContext ctx, MonsterSpawnTimer timer)
+    public static void PreSpawnMonster(ReducerContext ctx, MonsterSpawnTimer timer)
     {
         if (ctx.Sender != ctx.Identity)
         {
-            throw new Exception("Reducer SpawnMonster may not be invoked by clients, only via scheduling.");
+            throw new Exception("Reducer PreSpawnMonster may not be invoked by clients, only via scheduling.");
         }
 
         // Check if there are any players online
         var playerCount = ctx.Db.player.Count;
         if (playerCount == 0)
         {
-            //Log.Info("SpawnMonster: No players online, skipping monster spawn.");
+            //Log.Info("PreSpawnMonster: No players online, skipping monster spawn.");
             return;
         }
         
@@ -50,7 +63,7 @@ public static partial class Module
         var configOpt = ctx.Db.config.id.Find(0);
         if (configOpt == null)
         {
-            throw new Exception("SpawnMonster: Could not find game configuration!");
+            throw new Exception("PreSpawnMonster: Could not find game configuration!");
         }
         var config = configOpt.Value;
         
@@ -58,7 +71,7 @@ public static partial class Module
         var monsterCount = ctx.Db.monsters.Count;
         if (monsterCount >= config.max_monsters)
         {
-            //Log.Info($"SpawnMonster: At maximum monster capacity ({monsterCount}/{config.max_monsters}), skipping spawn.");
+            //Log.Info($"PreSpawnMonster: At maximum monster capacity ({monsterCount}/{config.max_monsters}), skipping spawn.");
             return;
         }
         
@@ -72,7 +85,7 @@ public static partial class Module
         var bestiaryEntry = ctx.Db.bestiary.bestiary_id.Find((uint)monsterType);
         if (bestiaryEntry == null)
         {
-            throw new Exception($"SpawnMonster: Could not find bestiary entry for monster type: {monsterType}");
+            throw new Exception($"PreSpawnMonster: Could not find bestiary entry for monster type: {monsterType}");
         }
         
         // Calculate spawn position on the edge of the game world
@@ -101,10 +114,68 @@ public static partial class Module
                 break;
         }
         
-        // Create an entity for the monster
-        Entity? entityOpt = ctx.Db.entity.Insert(new Entity
+        // Choose a random player to target without loading all players into memory
+        var randomSkip = rng.Next(0, (int)playerCount); // Convert playerCount to int
+        var targetPlayer = ctx.Db.player.Iter().Skip(randomSkip).First();
+        
+        // Instead of immediately spawning the monster, schedule it for actual spawning
+        // with a delay to give the player time to respond
+        const int PRE_SPAWN_DELAY_MS = 2000; // 2 seconds warning before monster spawns
+        
+        ctx.Db.monster_spawners.Insert(new MonsterSpawners
         {
             position = position,
+            monster_type = monsterType,
+            target_entity_id = targetPlayer.entity_id,
+            scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(PRE_SPAWN_DELAY_MS))
+        });
+        
+        Log.Info($"PreSpawned {monsterType} monster for position ({position.x}, {position.y}) targeting player: {targetPlayer.name}. Will spawn in {PRE_SPAWN_DELAY_MS}ms");
+    }
+    
+    [Reducer]
+    public static void SpawnMonster(ReducerContext ctx, MonsterSpawners spawner)
+    {
+        if (ctx.Sender != ctx.Identity)
+        {
+            throw new Exception("Reducer SpawnMonster may not be invoked by clients, only via scheduling.");
+        }
+
+        // Double-check if there are still players online
+        var playerCount = ctx.Db.player.Count;
+        if (playerCount == 0)
+        {
+            Log.Info("SpawnMonster: No players online, skipping monster spawn.");
+            return;
+        }
+        
+        // Get game configuration
+        var configOpt = ctx.Db.config.id.Find(0);
+        if (configOpt == null)
+        {
+            throw new Exception("SpawnMonster: Could not find game configuration!");
+        }
+        var config = configOpt.Value;
+        
+        // Check if we're at monster capacity (player could have spawned during delay)
+        var monsterCount = ctx.Db.monsters.Count;
+        if (monsterCount >= config.max_monsters)
+        {
+            Log.Info($"SpawnMonster: At maximum monster capacity ({monsterCount}/{config.max_monsters}), skipping spawn.");
+            return;
+        }
+        
+        // Get monster stats from bestiary using the monster type as numerical ID
+        var bestiaryEntry = ctx.Db.bestiary.bestiary_id.Find((uint)spawner.monster_type);
+        if (bestiaryEntry == null)
+        {
+            throw new Exception($"SpawnMonster: Could not find bestiary entry for monster type: {spawner.monster_type}");
+        }
+        
+        // Create an entity for the monster using the pre-determined position
+        Entity? entityOpt = ctx.Db.entity.Insert(new Entity
+        {
+            position = spawner.position,
             direction = new DbVector2(0, 0), // Initial direction
             is_moving = false,  // Not moving initially
             radius = bestiaryEntry.Value.radius // Set radius from bestiary entry
@@ -115,18 +186,26 @@ public static partial class Module
             throw new Exception("SpawnMonster: Failed to create entity for monster!");
         }
         
-        // Choose a random player to target without loading all players into memory
-        var randomSkip = rng.Next(0, (int)playerCount); // Convert playerCount to int
-        var targetPlayer = ctx.Db.player.Iter().Skip(randomSkip).First();
+        // Check if the target player still exists
+        var targetEntityOpt = ctx.Db.entity.entity_id.Find(spawner.target_entity_id);
+        uint targetEntityId = spawner.target_entity_id;
+        
+        // If the target player is no longer available, pick a new random player
+        if (targetEntityOpt == null)
+        {
+            var randomSkip = ctx.Rng.Next(0, (int)playerCount); // Convert playerCount to int
+            var targetPlayer = ctx.Db.player.Iter().Skip(randomSkip).First();
+            targetEntityId = targetPlayer.entity_id;
+        }
         
         // Create the monster
         Monsters? monsterOpt = ctx.Db.monsters.Insert(new Monsters
         {
             entity_id = entityOpt.Value.entity_id,
-            bestiary_id = monsterType,
+            bestiary_id = spawner.monster_type,
             hp = bestiaryEntry.Value.max_hp,
             max_hp = bestiaryEntry.Value.max_hp, // Store max_hp from bestiary
-            target_entity_id = targetPlayer.entity_id
+            target_entity_id = targetEntityId
         });
         
         if (monsterOpt is null)
@@ -134,7 +213,18 @@ public static partial class Module
             throw new Exception("SpawnMonster: Failed to create monster!");
         }
 
-        Log.Info($"Spawned {monsterType} monster (entity: {entityOpt.Value.entity_id}) targeting player: {targetPlayer.name} with HP: {bestiaryEntry.Value.max_hp}/{bestiaryEntry.Value.max_hp}");
+        // Get player name for logging
+        string targetPlayerName = "unknown";
+        foreach (var player in ctx.Db.player.Iter())
+        {
+            if (player.entity_id == targetEntityId)
+            {
+                targetPlayerName = player.name;
+                break;
+            }
+        }
+
+        Log.Info($"Spawned {spawner.monster_type} monster (entity: {entityOpt.Value.entity_id}) targeting player: {targetPlayerName} with HP: {bestiaryEntry.Value.max_hp}/{bestiaryEntry.Value.max_hp}");
     }
     
     // Method to schedule monster spawning - called from Init in Lib.cs

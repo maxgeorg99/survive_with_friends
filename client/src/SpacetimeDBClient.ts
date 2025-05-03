@@ -84,7 +84,8 @@ class SpacetimeDBClient {
                 "SELECT * FROM attack_data",
                 "SELECT * FROM gems",
                 "SELECT * FROM upgrade_options",
-                "SELECT * FROM chosen_upgrades"
+                "SELECT * FROM chosen_upgrades",
+                "SELECT * FROM monster_spawners"
             ]);
 
         // Register table event callbacks

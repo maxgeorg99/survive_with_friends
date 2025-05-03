@@ -4,6 +4,7 @@ import { Player, Entity, PlayerClass, UpdatePlayerDirection, Monsters, MonsterTy
 import { Identity } from '@clockworklabs/spacetimedb-sdk';
 import { MONSTER_ASSET_KEYS, MONSTER_SHADOW_OFFSETS, MONSTER_MAX_HP } from '../constants/MonsterConfig';
 import MonsterManager from '../managers/MonsterManager';
+import MonsterSpawnerManager from '../managers/MonsterSpawnerManager';
 import { GameEvents } from '../constants/GameEvents';
 import { AttackManager } from '../managers/AttackManager';
 import GemManager from '../managers/GemManager';
@@ -77,6 +78,9 @@ export default class GameScene extends Phaser.Scene {
     // Replace monster-related properties with MonsterManager
     private monsterManager: MonsterManager | null = null;
     
+    // Add monster spawner manager for spawn indicators
+    private monsterSpawnerManager: MonsterSpawnerManager | null = null;
+    
     // Add attack manager for player attack visualization
     private attackManager: AttackManager | null = null;
     
@@ -141,6 +145,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('monster_rat', '/assets/monster_rat.png');
         this.load.image('monster_slime', '/assets/monster_slime.png');
         this.load.image('monster_orc', '/assets/monster_orc.png');
+        this.load.image('monster_spawn_indicator', '/assets/monster_spawn_indicator.png');
         
         // Load attack assets
         this.load.image('attack_sword', '/assets/attack_sword.png');
@@ -291,8 +296,10 @@ export default class GameScene extends Phaser.Scene {
         
         // Initialize AttackManager
         this.attackManager = new AttackManager(this, this.spacetimeDBClient);
+        
+        // Initialize MonsterSpawnerManager
+        this.monsterSpawnerManager = new MonsterSpawnerManager(this, this.spacetimeDBClient);
 
-        console.log("\n\n\n\n!!!!!!Updating last login");
         this.spacetimeDBClient.sdkConnection?.reducers.updateLastLogin();
     }
 
@@ -2014,6 +2021,10 @@ export default class GameScene extends Phaser.Scene {
         console.log("GameScene shutting down...");
 
         this.monsterManager?.shutdown();
+        
+        // Clean up MonsterSpawnerManager
+        this.monsterSpawnerManager?.destroy();
+        this.monsterSpawnerManager = null;
         
         // Clean up AttackManager properly
         this.attackManager?.shutdown();
