@@ -93,15 +93,38 @@ export default class BossTimerUI {
     }
 
     private handleBossTimerCreated(ctx: any, timer: any): void {
-        console.log("Boss timer created:", timer);
+        console.log("Boss timer created event received");
+        console.log("Raw timer in event:", timer); 
+        console.log("Timer type:", typeof timer);
+        
+        if (timer?.scheduledAt?.value) {
+            console.log("Timer value direct access:", timer.scheduledAt.value);
+            console.log("Value type:", typeof timer.scheduledAt.value);
+        }
         
         // Extract the timestamp using our helper
         const timestamp = this.extractTimestampFromTimer(timer);
         if (timestamp) {
+            console.log("Successfully extracted timestamp:", timestamp);
+            console.log("Human readable date:", new Date(timestamp).toLocaleString());
             this.bossSpawnTime = timestamp;
             this.startTimer();
             console.log("Started boss timer from timer creation event");
         } else {
+            console.log("Failed to extract timestamp from timer, trying fallbacks...");
+            
+            // Fallback 1: Try direct access to value if it exists
+            if (timer?.scheduledAt?.value) {
+                const directValue = timer.scheduledAt.value;
+                if (typeof directValue === 'bigint' || !isNaN(Number(directValue))) {
+                    const directTimestamp = Number(directValue) / 1000;
+                    console.log("Fallback 1: Direct value conversion:", directTimestamp);
+                    this.bossSpawnTime = directTimestamp;
+                    this.startTimer();
+                    return;
+                }
+            }
+            
             // Hide timer if no valid timestamp was found
             this.stopTimer();
             this.container.setVisible(false);
@@ -256,16 +279,39 @@ export default class BossTimerUI {
                     // Timer exists, get the first one
                     const timer = bossTimers[0];
                     console.log("Found existing boss timer:", timer);
+                    console.log("Timer properties:", Object.keys(timer));
+                    
+                    if (timer?.scheduledAt?.value) {
+                        console.log("Direct value:", timer.scheduledAt.value);
+                        console.log("Value type:", typeof timer.scheduledAt.value);
+                    }
                     
                     // Extract spawn time - we need to safely extract it from the timer object
                     if (timer) {
                         // Extract the timestamp using a more general approach
                         const timestamp = this.extractTimestampFromTimer(timer);
                         if (timestamp) {
+                            console.log("Successfully extracted timestamp:", timestamp);
+                            console.log("Human readable date:", new Date(timestamp).toLocaleString());
                             this.bossSpawnTime = timestamp;
                             this.startTimer();
                             console.log("Started boss timer from existing database entry");
                         } else {
+                            console.log("Failed to extract timestamp using standard method, trying fallbacks...");
+                            
+                            // Fallback 1: Try direct access to value if it exists
+                            if (timer?.scheduledAt?.value) {
+                                const directValue = timer.scheduledAt.value;
+                                if (typeof directValue === 'bigint' || !isNaN(Number(directValue))) {
+                                    const directTimestamp = Number(directValue) / 1000;
+                                    console.log("Fallback 1: Direct value conversion:", directTimestamp);
+                                    console.log("Human readable date:", new Date(directTimestamp).toLocaleString());
+                                    this.bossSpawnTime = directTimestamp;
+                                    this.startTimer();
+                                    return;
+                                }
+                            }
+                            
                             // Hide timer if timestamp can't be extracted
                             this.stopTimer();
                             this.container.setVisible(false);
@@ -290,6 +336,18 @@ export default class BossTimerUI {
     // Helper method to extract timestamp from timer object
     private extractTimestampFromTimer(timer: any): number | null {
         try {
+            // Log the raw timer before JSON stringification
+            console.log("Raw timer before stringification:", timer);
+            console.log("Raw scheduledAt:", timer?.scheduledAt);
+            console.log("Raw value:", timer?.scheduledAt?.value);
+            
+            // Check the actual type of the value
+            if (timer?.scheduledAt?.value) {
+                console.log("Value type:", typeof timer.scheduledAt.value);
+                console.log("Is BigInt:", typeof timer.scheduledAt.value === 'bigint');
+            }
+            
+            // Log stringified version for reference
             console.log("Extracting timestamp from timer:", JSON.stringify(timer, (key, value) => 
                 typeof value === 'bigint' ? value.toString() : value
             ));
@@ -325,11 +383,35 @@ export default class BossTimerUI {
             
             // If it's a structured object with tag and value
             if (typeof scheduledAt === 'object' && scheduledAt.tag && scheduledAt.value) {
-                if (scheduledAt.tag === 'Time' && scheduledAt.value) {
+                if (scheduledAt.tag === 'Time') {
                     const timeValue = scheduledAt.value;
+                    console.log("Processing Time tag with value:", timeValue, "type:", typeof timeValue);
+                    
+                    // Direct BigInt handling
+                    if (typeof timeValue === 'bigint') {
+                        console.log("Converting BigInt value to timestamp");
+                        return Number(timeValue) / 1000;
+                    }
+                    
+                    // Handle case where value is a string (could be with or without 'n')
+                    if (typeof timeValue === 'string') {
+                        console.log("Found string timestamp:", timeValue);
+                        // Check if it's a BigInt string (ends with 'n')
+                        if (timeValue.endsWith('n')) {
+                            // Remove the 'n' suffix and convert to number
+                            const valueWithoutN = timeValue.slice(0, -1);
+                            console.log("Removed 'n' suffix, processing:", valueWithoutN);
+                            // This is microseconds since epoch, convert to ms
+                            return Number(valueWithoutN) / 1000;
+                        } else {
+                            // It's a regular string number, convert directly
+                            console.log("Processing as regular string number");
+                            return Number(timeValue) / 1000;
+                        }
+                    }
                     
                     // Check for microsSinceUnixEpoch in the value
-                    if (timeValue.microsSinceUnixEpoch !== undefined) {
+                    if (timeValue && typeof timeValue === 'object' && timeValue.microsSinceUnixEpoch !== undefined) {
                         const microsValue = timeValue.microsSinceUnixEpoch;
                         if (typeof microsValue === 'bigint') {
                             return Number(microsValue) / 1000;
@@ -339,10 +421,20 @@ export default class BossTimerUI {
                     }
                     
                     // Check for timeMs in the value
-                    if (timeValue.timeMs !== undefined) {
+                    if (timeValue && typeof timeValue === 'object' && timeValue.timeMs !== undefined) {
                         return typeof timeValue.timeMs === 'bigint' 
                             ? Number(timeValue.timeMs) 
                             : timeValue.timeMs;
+                    }
+
+                    // Try direct conversion as a fallback - this is likely the case we're handling
+                    if (timeValue) {
+                        console.log("Attempting direct conversion of value");
+                        const timestamp = Number(timeValue);
+                        if (!isNaN(timestamp) && timestamp > 0) {
+                            console.log("Direct conversion succeeded:", timestamp);
+                            return timestamp / 1000; // Convert microseconds to milliseconds
+                        }
                     }
                 }
             }

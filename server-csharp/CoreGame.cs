@@ -156,23 +156,72 @@ public static partial class Module
             bool isBoss = false;
             var gameStateOpt = ctx.Db.game_state.id.Find(0);
             
+            // Add debug info to verify boss identification
+            if (gameStateOpt != null) {
+                Log.Info($"DamageMonster ID={monsterId}, GameState boss_monster_id={gameStateOpt.Value.boss_monster_id}, boss_active={gameStateOpt.Value.boss_active}, boss_phase={gameStateOpt.Value.boss_phase}");
+            }
+            
             if (gameStateOpt != null && gameStateOpt.Value.boss_active && gameStateOpt.Value.boss_monster_id == monsterId)
             {
                 isBoss = true;
+                Log.Info($"BOSS MONSTER CONFIRMED: ID={monsterId}, Phase={gameStateOpt.Value.boss_phase}, Monster Type: {monster.bestiary_id}");
                 
                 // Handle based on boss phase
                 if (gameStateOpt.Value.boss_phase == 1)
                 {
                     // Phase 1 boss defeated, transition to phase 2
                     Log.Info("BOSS PHASE 1 DEFEATED! TRANSITIONING TO PHASE 2...");
+                    Log.Info($"Phase 1 details - Entity ID: {monster.entity_id}, Position: ({position.x}, {position.y})");
                     
-                    // Delete the monster and entity
-                    ctx.Db.monsters.monster_id.Delete(monsterId);
+                    // Store the entity ID and position before deletion
                     uint entityId = monster.entity_id;
-                    ctx.Db.entity.entity_id.Delete(entityId);
+                    DbVector2 bossPosition = position;
                     
-                    // Spawn phase 2
-                    SpawnBossPhaseTwo(ctx, entityId, position);
+                    // Spawn phase 2 first, before deleting phase 1 monster
+                    Log.Info("Calling SpawnBossPhaseTwo now...");
+                    try 
+                    {
+                        SpawnBossPhaseTwo(ctx, entityId, bossPosition);
+                        Log.Info("SpawnBossPhaseTwo completed successfully");
+                        
+                        // Only after successful spawn of phase 2, delete phase 1
+                        ctx.Db.monsters.monster_id.Delete(monsterId);
+                        ctx.Db.entity.entity_id.Delete(entityId);
+                        Log.Info("Phase 1 boss monster and entity deleted after phase 2 spawned");
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Info($"ERROR spawning boss phase 2: {ex.Message}");
+                        // Don't rethrow - we still want to delete the phase 1 boss
+                        ctx.Db.monsters.monster_id.Delete(monsterId);
+                        ctx.Db.entity.entity_id.Delete(entityId);
+                        Log.Info("Phase 1 boss monster and entity deleted after spawn failure");
+                    }
+                    
+                    // Add a verification check to confirm phase 2 exists
+                    Log.Info("Verifying phase 2 boss was created:");
+                    var gameStateAfter = ctx.Db.game_state.id.Find(0);
+                    if (gameStateAfter != null)
+                    {
+                        Log.Info($"Game state after transition - Phase: {gameStateAfter.Value.boss_phase}, BossActive: {gameStateAfter.Value.boss_active}, BossMonsterID: {gameStateAfter.Value.boss_monster_id}");
+                        
+                        if (gameStateAfter.Value.boss_phase == 2)
+                        {
+                            var phase2BossOpt = ctx.Db.monsters.monster_id.Find(gameStateAfter.Value.boss_monster_id);
+                            if (phase2BossOpt != null)
+                            {
+                                Log.Info($"Phase 2 boss verified: Monster ID={phase2BossOpt.Value.monster_id}, HP={phase2BossOpt.Value.hp}, Entity ID={phase2BossOpt.Value.entity_id}");
+                            }
+                            else
+                            {
+                                Log.Info($"ERROR: Phase 2 boss with ID {gameStateAfter.Value.boss_monster_id} not found in monsters table!");
+                            }
+                        }
+                        else
+                        {
+                            Log.Info("ERROR: Game state still shows phase 1 after transition!");
+                        }
+                    }
                     
                     return true;
                 }
@@ -189,6 +238,10 @@ public static partial class Module
                     HandleBossDefeated(ctx);
                     
                     return true;
+                }
+                else
+                {
+                    Log.Info($"WARNING: Boss killed but phase is unexpected: {gameStateOpt.Value.boss_phase}");
                 }
             }
             

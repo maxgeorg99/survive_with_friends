@@ -81,7 +81,7 @@ public static partial class Module
         {
             bestiary_id = (uint)MonsterType.FinalBossPhase1,
             monster_type = MonsterType.FinalBossPhase1,
-            max_hp = 5000,
+            max_hp = 500,
             speed = 120.0f,
             exp = 100,
             atk = 25.0f,
@@ -93,7 +93,7 @@ public static partial class Module
         {
             bestiary_id = (uint)MonsterType.FinalBossPhase2,
             monster_type = MonsterType.FinalBossPhase2,
-            max_hp = 10000,
+            max_hp = 500,
             speed = 150.0f,
             exp = 500,
             atk = 40.0f,

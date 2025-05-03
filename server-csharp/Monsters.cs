@@ -245,6 +245,13 @@ public static partial class Module
         }
 
         Log.Info($"Spawned {spawner.monster_type} monster (entity: {entityOpt.Value.entity_id}) targeting player: {targetPlayerName} with HP: {bestiaryEntry.Value.max_hp}/{bestiaryEntry.Value.max_hp}");
+        
+        // If this is a boss monster, update the game state with its ID
+        if (spawner.monster_type == MonsterType.FinalBossPhase1 || spawner.monster_type == MonsterType.FinalBossPhase2)
+        {
+            Log.Info($"Boss monster of type {spawner.monster_type} created with ID {monsterOpt.Value.monster_id}");
+            UpdateBossMonsterID(ctx, monsterOpt.Value.monster_id);
+        }
     }
     
     // Method to schedule monster spawning - called from Init in Lib.cs

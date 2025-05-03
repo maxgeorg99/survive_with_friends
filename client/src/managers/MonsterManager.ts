@@ -29,6 +29,11 @@ export default class MonsterManager {
     private pendingMonsters: Map<number, Monsters> = new Map();
     // Add a property for the game events
     private gameEvents: Phaser.Events.EventEmitter;
+    // Add a property to track boss state
+    private bossPhase1Killed: boolean = false;
+    private timeOfBossPhase1Death: number = 0;
+    private bossMonsterId: number = 0;
+    private bossPosition: { x: number, y: number } | null = null;
 
     constructor(scene: Phaser.Scene, client: SpacetimeDBClient) {
         this.scene = scene;
@@ -418,11 +423,15 @@ export default class MonsterManager {
                     
                     // For bosses, make them larger and ensure visibility
                     if (monsterType === "FinalBossPhase1" || monsterType === "FinalBossPhase2") {
-                        console.log(`Setting up boss sprite: ${monsterType}`);
-                        sprite.setScale(1.5); // Make boss larger
+                        console.log(`Setting up boss sprite: ${monsterType} (ID: ${monsterData.monsterId})`);
+                        console.log(`Boss data: HP=${monsterData.hp}/${monsterData.maxHp}, Entity ID=${monsterData.entityId}`);
+                        sprite.setScale(1.0);
                         sprite.setAlpha(1); // Ensure full opacity
                         sprite.setVisible(true); // Explicitly set visibility
-                        console.log(`Boss sprite properties: visible=${sprite.visible}, alpha=${sprite.alpha}, scale=${sprite.scale}`);
+                        
+                        // Debug check for texture
+                        console.log(`Boss sprite properties: visible=${sprite.visible}, alpha=${sprite.alpha}, scale=${sprite.scaleX}, texture=${sprite.texture.key}`);
+                        console.log(`Is boss sprite texture missing: ${sprite.texture.key === '__MISSING'}`);
                     }
                     
                     console.log(`Added sprite for ${monsterType}: visible=${sprite.visible}, alpha=${sprite.alpha}`);
@@ -565,11 +574,35 @@ export default class MonsterManager {
     
     // Helper function to remove monster sprites
     removeMonster(monsterId: number) {
+        console.log(`Removing monster: ${monsterId}`);
+        
+        // Check if this was a boss monster before removing it
         const monsterContainer = this.monsters.get(monsterId);
         if (monsterContainer) {
-            monsterContainer.destroy();
-            this.monsters.delete(monsterId);
+            const monsterType = monsterContainer.getData('monsterType');
+            if (monsterType === 'FinalBossPhase1') {
+                console.log(`*** BOSS PHASE 1 DEFEATED (ID: ${monsterId})! Waiting for phase 2 to spawn... ***`);
+                
+                // Set tracking variables to monitor phase transition
+                this.bossPhase1Killed = true;
+                this.timeOfBossPhase1Death = Date.now();
+                this.bossMonsterId = monsterId;
+                this.bossPosition = { x: monsterContainer.x, y: monsterContainer.y };
+                console.log(`Boss position stored: (${this.bossPosition.x}, ${this.bossPosition.y})`);
+                
+                // Add a visual indicator for phase transition
+                this.createBossTransformationEffect(monsterContainer.x, monsterContainer.y);
+            } else if (monsterType === 'FinalBossPhase2') {
+                console.log(`*** FINAL BOSS DEFEATED (ID: ${monsterId})! GAME COMPLETE! ***`);
+            }
         }
+        
+        // Get and destroy the container
+        const container = this.monsters.get(monsterId);
+        if (container) {
+            container.destroy();
+        }
+        this.monsters.delete(monsterId);
     }
 
     // Get monster by ID
@@ -594,11 +627,14 @@ export default class MonsterManager {
 
     // Update method to be called from scene's update method
     update(time: number, delta: number) {
-        // Process active monsters for smooth interpolation between server updates
-        const lerp = (a: number, b: number, t: number) => a + (b - a) * Math.min(t, 1.0);
-        const now = Date.now();
+        // Perform the boss transition check
+        this.checkForBossPhaseTransition();
         
-        this.monsters.forEach((container, monsterId) => {
+        // Existing update logic
+        const lerp = (a: number, b: number, t: number) => a + (b - a) * Math.min(t, 1.0);
+        
+        // Update monster positions via lerping
+        this.monsters.forEach((container, id) => {
             const targetX = container.getData('targetX');
             const targetY = container.getData('targetY');
             const lastUpdate = container.getData('lastUpdateTime');
@@ -643,17 +679,39 @@ export default class MonsterManager {
         
         console.log(`Monster created: ${monster.monsterId}, type: ${monsterTypeName}, entity: ${monster.entityId}`);
         
-        // Debug boss visibility issue
+        // Special handling for boss monsters
         if (monsterTypeName === "FinalBossPhase1" || monsterTypeName === "FinalBossPhase2") {
             console.log(`BOSS SPAWNED: ${monsterTypeName}`);
-            console.log(`- Boss entity ID: ${monster.entityId}`);
-            console.log(`- Boss monster ID: ${monster.monsterId}`);
+            console.log(`- Monster ID: ${monster.monsterId}`);
+            console.log(`- Entity ID: ${monster.entityId}`);
+            console.log(`- HP: ${monster.hp}/${monster.maxHp}`);
             console.log(`- Asset key: ${MONSTER_ASSET_KEYS[monsterTypeName]}`);
             console.log(`- Texture exists: ${this.scene.textures.exists(MONSTER_ASSET_KEYS[monsterTypeName])}`);
+            
             if (entityData) {
                 console.log(`- Position: (${entityData.position.x}, ${entityData.position.y})`);
             } else {
                 console.log(`- WARNING: No entity data found for boss!`);
+            }
+            
+            // Log information about all entities to help with debugging
+            console.log("All entities in database:");
+            for (const entity of ctx.db?.entity.iter() || []) {
+                console.log(`- Entity ID: ${entity.entityId}, Position: (${entity.position.x}, ${entity.position.y})`);
+            }
+            
+            // If this is phase 2, it means phase 1 was defeated
+            if (monsterTypeName === "FinalBossPhase2") {
+                console.log("*** PHASE 2 OF THE BOSS HAS BEGUN! ***");
+                
+                // Reset phase 1 tracking variables since phase 2 has spawned
+                if (this.bossPhase1Killed) {
+                    const transitionTime = Date.now() - this.timeOfBossPhase1Death;
+                    console.log(`Phase transition took ${transitionTime}ms from phase 1 death to phase 2 spawn`);
+                    this.bossPhase1Killed = false;
+                }
+                
+                // Play a dramatic sound effect or add special visual effects here
             }
             
             // Log all sprites to debug visibility issues
@@ -709,66 +767,76 @@ export default class MonsterManager {
         }
     }
     
-    // Create dark transformation effect for boss phase transition
-    createBossTransformationEffect(x: number, y: number) {
-        console.log("Creating boss transformation effect at", x, y);
+    // Helper method to create a visual effect when boss transforms from phase 1 to phase 2
+    private createBossTransformationEffect(x: number, y: number) {
+        // Create an explosion effect at the boss's position
+        console.log(`Creating boss transformation effect at (${x}, ${y})`);
         
-        // Create dark energy explosion
-        const darkParticles = this.scene.add.particles(x, y, 'white_pixel', {
-            speed: { min: 100, max: 400 },
-            scale: { start: 0.5, end: 0 },
-            lifespan: 1500,
-            blendMode: 'ADD',
-            tint: [0x330066, 0x660099, 0x990099], // Dark purple colors
-            emitting: false,
-            quantity: 100
-        });
+        // Create a light flash
+        const flash = this.scene.add.circle(x, y, 150, 0xff0000, 0.7);
+        flash.setDepth(10); // Above everything
         
-        // Large dark explosion
-        darkParticles.explode(60, x, y);
-        
-        // Add a dark shockwave circle
-        const shockwave = this.scene.add.circle(x, y, 10, 0x660099, 0.7);
-        shockwave.setDepth(BASE_DEPTH + y + 100); // Above everything else temporarily
-        
-        // Animate the shockwave growing outward
-        this.scene.tweens.add({
-            targets: shockwave,
-            radius: 300,
-            alpha: 0,
-            duration: 1200,
-            ease: 'Sine.Out',
-            onComplete: () => {
-                shockwave.destroy();
-            }
-        });
-        
-        // Create a bright flash at the center
-        const flash = this.scene.add.circle(x, y, 50, 0xffffff, 0.8);
-        flash.setDepth(BASE_DEPTH + y + 101); // Above the shockwave
-        
-        // Flash animation
+        // Animate the flash - expand and fade out
         this.scene.tweens.add({
             targets: flash,
-            radius: 10,
             alpha: 0,
-            duration: 600,
-            ease: 'Expo.Out',
+            radius: 300,
+            duration: 1000,
+            ease: 'Power2',
             onComplete: () => {
                 flash.destroy();
             }
         });
         
-        // Add screen shake effect
-        this.scene.cameras.main.shake(1000, 0.01);
-        
-        // Play a transformation sound if available
-        // this.scene.sound.play('boss_transform');
-        
-        // Clean up particles after animation completes
-        this.scene.time.delayedCall(1600, () => {
-            darkParticles.destroy();
+        // Add particle explosion
+        const particles = this.scene.add.particles(x, y, 'white_pixel', {
+            speed: { min: 100, max: 300 },
+            angle: { min: 0, max: 360 },
+            scale: { start: 2, end: 0 },
+            blendMode: 'ADD',
+            lifespan: 1000,
+            quantity: 1,
+            frequency: 20,
+            emitting: false,
+            tint: 0xff0000 // Set the red tint directly in the configuration
         });
+        
+        particles.setDepth(9); // Just below the flash
+        
+        // Emit a burst of particles
+        particles.explode(100, x, y);
+        
+        // Destroy the emitter after animation completes
+        this.scene.time.delayedCall(1200, () => {
+            particles.destroy();
+        });
+        
+        // Add text announcing phase 2
+        const text = this.scene.add.text(x, y - 100, 'BOSS PHASE 2 INCOMING!', {
+            fontSize: '32px',
+            color: '#ff0000',
+            stroke: '#000000',
+            strokeThickness: 4,
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+        text.setDepth(10);
+        
+        // Animate the text
+        this.scene.tweens.add({
+            targets: text,
+            y: y - 200,
+            alpha: 0,
+            duration: 2000,
+            ease: 'Power2',
+            onComplete: () => {
+                text.destroy();
+            }
+        });
+        
+        // Play a sound effect if available
+        // If you have a sound asset for boss transition:
+        // const sound = this.scene.sound.add('boss_transform_sound');
+        // if (sound) sound.play({ volume: 0.5 });
     }
 
     // Add debug method to log all sprites on the scene
@@ -791,5 +859,29 @@ export default class MonsterManager {
                 console.log(`Sprite #${index}: name=${gameObj.name}, texture=${gameObj.texture.key}, x=${gameObj.x}, y=${gameObj.y}, visible=${gameObj.visible}, alpha=${gameObj.alpha}`);
             }
         });
+    }
+
+    // Implement a method to check for boss state transitions
+    private checkForBossPhaseTransition() {
+        const now = Date.now();
+        
+        // If we've killed the phase 1 boss but haven't seen phase 2 after 5 seconds, log an error
+        if (this.bossPhase1Killed && (now - this.timeOfBossPhase1Death > 5000)) {
+            console.error(`ERROR: Boss phase 1 was killed ${(now - this.timeOfBossPhase1Death) / 1000} seconds ago, but phase 2 has not spawned!`);
+            console.log(`Boss phase 1 details - ID: ${this.bossMonsterId}, Position: (${this.bossPosition?.x}, ${this.bossPosition?.y})`);
+            
+            // Reset the flag to prevent continuous logging
+            this.bossPhase1Killed = false;
+            
+            // Dump all current monsters for debugging
+            console.log("Current active monsters:");
+            this.monsters.forEach((container, id) => {
+                const monsterType = container.getData('monsterType');
+                console.log(`- Monster ID: ${id}, Type: ${monsterType}, Position: (${container.x}, ${container.y})`);
+            });
+            
+            // Display an alert in-game that the boss is missing - development only!
+            console.log("BOSS PHASE 2 SPAWN FAILED - Please report this bug!");
+        }
     }
 } 

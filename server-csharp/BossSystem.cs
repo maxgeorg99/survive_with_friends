@@ -160,7 +160,7 @@ public static partial class Module
         const int BOSS_SPAWN_VISUALIZATION_DELAY_MS = 3000; // 3 seconds for pre-spawn animation
         
         // Insert a monster spawner with FinalBossPhase1 type
-        ctx.Db.monster_spawners.Insert(new MonsterSpawners
+        MonsterSpawners? spawnerOpt = ctx.Db.monster_spawners.Insert(new MonsterSpawners
         {
             position = position,
             monster_type = MonsterType.FinalBossPhase1,
@@ -169,12 +169,19 @@ public static partial class Module
         });
         
         Log.Info($"Boss phase 1 scheduled to spawn in {BOSS_SPAWN_VISUALIZATION_DELAY_MS}ms at center of map");
+        
+        // Register a callback to update the game state when the monster is spawned
+        if (spawnerOpt != null)
+        {
+            Log.Info($"Created spawner for Phase 1 boss: ID in spawners table");
+            // We'll update the game state when the monster is created in UpdateBossCreated reducer
+        }
     }
     
     // Called when phase 1 boss is defeated
     public static void SpawnBossPhaseTwo(ReducerContext ctx, uint oldBossEntityId, DbVector2 position)
     {
-        Log.Info("Boss phase 1 defeated! Spawning phase 2...");
+        Log.Info($"Boss phase 1 defeated! Spawning phase 2 at position ({position.x}, {position.y})...");
         
         // Get game state
         var gameStateOpt = ctx.Db.game_state.id.Find(0);
@@ -183,10 +190,14 @@ public static partial class Module
             throw new Exception("SpawnBossPhaseTwo: Could not find game state!");
         }
         
+        Log.Info($"Game state before update - Phase: {gameStateOpt.Value.boss_phase}, BossActive: {gameStateOpt.Value.boss_active}, BossMonsterID: {gameStateOpt.Value.boss_monster_id}");
+        
         // Update game state to indicate phase 2
         var gameState = gameStateOpt.Value;
         gameState.boss_phase = 2;
         ctx.Db.game_state.id.Update(gameState);
+        
+        Log.Info($"Game state updated to phase 2");
         
         // Get boss stats from bestiary
         var bestiaryEntry = ctx.Db.bestiary.bestiary_id.Find((uint)MonsterType.FinalBossPhase2);
@@ -194,6 +205,8 @@ public static partial class Module
         {
             throw new Exception($"SpawnBossPhaseTwo: Could not find bestiary entry for boss phase 2!");
         }
+        
+        Log.Info($"Retrieved bestiary entry for FinalBossPhase2: HP={bestiaryEntry.Value.max_hp}, Speed={bestiaryEntry.Value.speed}, Radius={bestiaryEntry.Value.radius}");
         
         // Find the closest player to target
         uint closestPlayerId = 0;
@@ -221,41 +234,65 @@ public static partial class Module
             }
         }
         
-        // Create boss entity at the same position as phase 1
-        Entity? entityOpt = ctx.Db.entity.Insert(new Entity
-        {
-            position = position,
-            direction = new DbVector2(0, 0), // Initial direction
-            is_moving = false,  // Not moving initially
-            radius = bestiaryEntry.Value.radius // Set radius from bestiary entry
-        });
+        Log.Info($"Selected target player: {targetPlayerName} (ID: {closestPlayerId}, Distance: {Math.Sqrt(closestDistance)})");
         
-        if (entityOpt == null)
+        try
         {
-            throw new Exception("SpawnBossPhaseTwo: Failed to create entity for boss!");
+            // Create boss entity at the same position as phase 1
+            Log.Info($"Creating entity for phase 2 boss at position ({position.x}, {position.y})");
+            Entity? entityOpt = ctx.Db.entity.Insert(new Entity
+            {
+                position = position,
+                direction = new DbVector2(0, 0), // Initial direction
+                is_moving = false,  // Not moving initially
+                radius = bestiaryEntry.Value.radius // Set radius from bestiary entry
+            });
+            
+            if (entityOpt == null)
+            {
+                throw new Exception("SpawnBossPhaseTwo: Failed to create entity for boss!");
+            }
+            
+            Log.Info($"Created phase 2 boss entity with ID: {entityOpt.Value.entity_id}");
+            
+            // Create the boss monster
+            Log.Info($"Creating phase 2 boss monster with entityId: {entityOpt.Value.entity_id}");
+            Monsters? monsterOpt = ctx.Db.monsters.Insert(new Monsters
+            {
+                entity_id = entityOpt.Value.entity_id,
+                bestiary_id = MonsterType.FinalBossPhase2,
+                hp = bestiaryEntry.Value.max_hp,
+                max_hp = bestiaryEntry.Value.max_hp,
+                target_entity_id = closestPlayerId
+            });
+            
+            if (monsterOpt == null)
+            {
+                throw new Exception("SpawnBossPhaseTwo: Failed to create boss monster!");
+            }
+            
+            Log.Info($"Created phase 2 boss monster with ID: {monsterOpt.Value.monster_id}");
+            
+            // Update game state with new boss monster ID
+            gameState.boss_monster_id = monsterOpt.Value.monster_id;
+            
+            // Explicitly set boss_active flag to true just to be absolutely sure
+            gameState.boss_active = true;
+            
+            // Log all game state details before final update
+            Log.Info($"FINAL Game state update - Phase: {gameState.boss_phase}, BossActive: {gameState.boss_active}, BossMonsterID: {gameState.boss_monster_id}");
+            
+            // Update the game state with all the correct values
+            ctx.Db.game_state.id.Update(gameState);
+            
+            // Announce boss phase 2 spawn to players
+            Log.Info($"FINAL BOSS PHASE 2 SPAWNED! (entity: {entityOpt.Value.entity_id}, monster: {monsterOpt.Value.monster_id}) targeting player: {targetPlayerName}");
         }
-        
-        // Create the boss monster
-        Monsters? monsterOpt = ctx.Db.monsters.Insert(new Monsters
+        catch (Exception ex)
         {
-            entity_id = entityOpt.Value.entity_id,
-            bestiary_id = MonsterType.FinalBossPhase2,
-            hp = bestiaryEntry.Value.max_hp,
-            max_hp = bestiaryEntry.Value.max_hp,
-            target_entity_id = closestPlayerId
-        });
-        
-        if (monsterOpt == null)
-        {
-            throw new Exception("SpawnBossPhaseTwo: Failed to create boss monster!");
+            Log.Info($"ERROR in SpawnBossPhaseTwo: {ex.Message}\n{ex.StackTrace}");
+            throw; // Rethrow to ensure original error handling still works
         }
-        
-        // Update game state with new boss monster ID
-        gameState.boss_monster_id = monsterOpt.Value.monster_id;
-        ctx.Db.game_state.id.Update(gameState);
-        
-        // Announce boss phase 2 spawn to players
-        Log.Info($"FINAL BOSS PHASE 2 SPAWNED! (entity: {entityOpt.Value.entity_id}, monster: {monsterOpt.Value.monster_id}) targeting player: {targetPlayerName}");
     }
     
     // Called when phase 2 boss is defeated - all players defeat the game!
@@ -334,5 +371,44 @@ public static partial class Module
         SpawnBossPhaseOne(ctx, new BossSpawnTimer { scheduled_id = 0 });
         
         Log.Info("DEVELOPER TEST: Boss spawn triggered manually");
+    }
+
+    // This new reducer will be called when any monster is created
+    [Reducer]
+    public static void UpdateBossMonsterID(ReducerContext ctx, uint monster_id)
+    {
+        if (ctx.Sender != ctx.Identity)
+        {
+            throw new Exception("Reducer UpdateBossMonsterID may not be invoked by clients.");
+        }
+
+        var monsterOpt = ctx.Db.monsters.monster_id.Find(monster_id);
+        if (monsterOpt == null)
+        {
+            Log.Info($"UpdateBossMonsterID: Monster with ID {monster_id} not found!");
+            return;
+        }
+
+        var monster = monsterOpt.Value;
+        // Check if this is a boss monster (FinalBossPhase1)
+        if (monster.bestiary_id == MonsterType.FinalBossPhase1)
+        {
+            Log.Info($"BOSS PHASE 1 CREATED: Updating game state with boss_monster_id={monster_id}");
+            
+            // Get game state
+            var gameStateOpt = ctx.Db.game_state.id.Find(0);
+            if (gameStateOpt == null)
+            {
+                Log.Info("UpdateBossMonsterID: Could not find game state!");
+                return;
+            }
+            
+            // Update the boss_monster_id in the game state
+            var gameState = gameStateOpt.Value;
+            gameState.boss_monster_id = monster_id;
+            ctx.Db.game_state.id.Update(gameState);
+            
+            Log.Info($"Game state updated with boss_monster_id={monster_id}, boss_active={gameState.boss_active}, boss_phase={gameState.boss_phase}");
+        }
     }
 } 
