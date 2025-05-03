@@ -1986,8 +1986,8 @@ export default class GameScene extends Phaser.Scene {
             emitting: false
         });
         
-        // Set depth to ensure it's visible
-        particles.setDepth(5000);
+        // Set depth to ensure it's visible above all game elements
+        particles.setDepth(50000);
         
         // Emit once
         particles.explode(30, x, y);
@@ -2007,7 +2007,7 @@ export default class GameScene extends Phaser.Scene {
         const overlay = this.add.rectangle(0, 0, width, height, 0x000000, 0.7)
             .setOrigin(0, 0)
             .setScrollFactor(0)  // Fix to camera
-            .setDepth(10000);    // Ensure it's on top
+            .setDepth(100000);    // Increased depth - extremely high to ensure it's on top
             
         // Add "You are no Survivor" text
         const titleText = this.add.text(
@@ -2025,7 +2025,7 @@ export default class GameScene extends Phaser.Scene {
         )
         .setOrigin(0.5)
         .setScrollFactor(0)
-        .setDepth(10001);
+        .setDepth(100001);
         
         // Add "Choose a new character" text (updated from "refresh to play again")
         const subtitleText = this.add.text(
@@ -2043,7 +2043,7 @@ export default class GameScene extends Phaser.Scene {
         )
         .setOrigin(0.5)
         .setScrollFactor(0)
-        .setDepth(10001);
+        .setDepth(100001);
         
         // Fade in effect
         overlay.alpha = 0;
@@ -2648,7 +2648,7 @@ export default class GameScene extends Phaser.Scene {
         const overlay = this.add.rectangle(0, 0, width, height, 0xFFFFFF, 0.7)
             .setOrigin(0, 0)
             .setScrollFactor(0)  // Fix to camera
-            .setDepth(10000);    // Ensure it's on top
+            .setDepth(100000);    // Increased depth - extremely high to ensure it's on top
             
         // Add "You are a True Survivor" text
         const titleText = this.add.text(
@@ -2666,7 +2666,7 @@ export default class GameScene extends Phaser.Scene {
         )
         .setOrigin(0.5)
         .setScrollFactor(0)
-        .setDepth(10001);
+        .setDepth(100001);
         
         // Add victory subtitle text
         const subtitleText = this.add.text(
@@ -2684,7 +2684,7 @@ export default class GameScene extends Phaser.Scene {
         )
         .setOrigin(0.5)
         .setScrollFactor(0)
-        .setDepth(10001);
+        .setDepth(100001);
         
         // Fade in effect
         overlay.alpha = 0;
@@ -2729,7 +2729,7 @@ export default class GameScene extends Phaser.Scene {
             tint: [0xFFD700, 0xFFA500, 0xFFFFFF, 0xDAA520], // Gold colors
             frequency: 50,
             emitting: true
-        }).setDepth(10002);
+        }).setDepth(100002);
         
         // Star burst in the center
         const stars = this.add.particles(width/2, height/2, 'white_pixel', {
@@ -2742,7 +2742,7 @@ export default class GameScene extends Phaser.Scene {
             quantity: 2,
             frequency: 200,
             emitting: true
-        }).setDepth(10002);
+        }).setDepth(100002);
         
         // Stop particles after 5 seconds
         this.time.delayedCall(5000, () => {
