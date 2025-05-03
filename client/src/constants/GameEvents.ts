@@ -44,5 +44,11 @@ export enum GameEvents {
     // Game state events
     GAME_STARTED = 'game_started',
     GAME_ENDED = 'game_ended',
-    SUBSCRIPTION_APPLIED = 'subscription:applied'
+    SUBSCRIPTION_APPLIED = 'subscription:applied',
+    
+    // Boss-related events
+    GAME_STATE_UPDATED = 'game_state:updated',
+    BOSS_SPAWN_TIMER_CREATED = 'boss_spawn_timer:created',
+    BOSS_SPAWN_TIMER_DELETED = 'boss_spawn_timer:deleted',
+    BOSS_PHASE_CHANGED = 'boss_phase_changed'
 } 

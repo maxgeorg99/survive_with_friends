@@ -336,9 +336,16 @@ export default class MonsterManager {
         const monsterType = monsterData.bestiaryId.tag;
         const spriteKey = MONSTER_ASSET_KEYS[monsterType];
         
+        console.log(`Creating monster sprite: type=${monsterType}, spriteKey=${spriteKey}, position=(${position.x}, ${position.y})`);
         
-        if (!spriteKey || !this.scene.textures.exists(spriteKey)) {
-            console.error(`Missing texture for monster type: ${monsterType}`);
+        if (!spriteKey) {
+            console.error(`No sprite key defined for monster type: ${monsterType}`);
+            return;
+        }
+        
+        if (!this.scene.textures.exists(spriteKey)) {
+            console.error(`Missing texture for monster type: ${monsterType}, key: ${spriteKey}`);
+            console.log('Available textures:', this.scene.textures.list);
             return;
         }
         
@@ -382,74 +389,105 @@ export default class MonsterManager {
             }
         } else {
             // Create new monster sprite
-            
-            // Calculate depth based on Y position
-            const initialDepth = BASE_DEPTH + position.y;
-            
-            // Create container for monster and its components
-            const container = this.scene.add.container(position.x, position.y);
-            
-            // Get monster-specific shadow offset from lookup table
-            const shadowOffset = MONSTER_SHADOW_OFFSETS[monsterType] || 8; // Use default if not found
-            
-            // Add shadow with monster-specific offset
-            const shadow = this.scene.add.image(0, shadowOffset, SHADOW_ASSET_KEY)
-                .setAlpha(SHADOW_ALPHA)
-                .setDepth(SHADOW_DEPTH_OFFSET); // Relative depth within container
-            shadow.setScale(0.7); // Make monster shadows slightly smaller
-            
-            // Add sprite
-            const sprite = this.scene.add.sprite(0, 0, spriteKey);
-            sprite.setDepth(0); // Base sprite at 0 relative to container
-            sprite.name = 'sprite'; // Name the sprite for easier identification later
-            
-            // Use the server-provided max_hp instead of hardcoded values
-            const maxHP = monsterData.maxHp;
-            
-            // Store health data in container
-            container.setData('maxHP', maxHP);
-            container.setData('currentHP', monsterData.hp);
-            container.setData('entityId', monsterData.entityId);
-            container.setData('monsterId', monsterData.monsterId);
-            container.setData('monsterType', monsterType);
-            
-            // Health bar background
-            const healthBarBg = this.scene.add.rectangle(
-                0,
-                -sprite.height/2 - MONSTER_HEALTH_BAR_OFFSET_Y,
-                MONSTER_HEALTH_BAR_WIDTH,
-                MONSTER_HEALTH_BAR_HEIGHT,
-                0x000000,
-                0.7
-            );
-            healthBarBg.setDepth(HEALTH_BG_DEPTH_OFFSET); // Relative depth
-            
-            // Health bar
-            const healthPercent = monsterData.hp / maxHP;
-            const healthBar = this.scene.add.rectangle(
-                -MONSTER_HEALTH_BAR_WIDTH/2,
-                -sprite.height/2 - MONSTER_HEALTH_BAR_OFFSET_Y,
-                MONSTER_HEALTH_BAR_WIDTH * healthPercent,
-                MONSTER_HEALTH_BAR_HEIGHT,
-                this.getHealthBarColor(healthPercent), // Use color based on health percentage
-                1
-            );
-            healthBar.setOrigin(0, 0.5);
-            healthBar.setDepth(HEALTH_BAR_DEPTH_OFFSET); // Relative depth
-            healthBar.name = 'healthBar';
-            
-            // Add all components to container
-            container.add([shadow, sprite, healthBarBg, healthBar]);
-            
-            // Set container properties
-            container.setDepth(initialDepth);
-            container.setSize(sprite.width, sprite.height);
-            
-            // Create collision circle visualization (will only be visible in debug mode)
-            this.createCollisionCircle(container, monsterData.entityId);
-            
-            // Store in monsters map
-            this.monsters.set(monsterData.monsterId, container);
+            try {
+                console.log(`Creating new monster container for ${monsterType} at (${position.x}, ${position.y})`);
+                
+                // Calculate depth based on Y position
+                const initialDepth = BASE_DEPTH + position.y;
+                
+                // Create container for monster and its components
+                const container = this.scene.add.container(position.x, position.y);
+                
+                // Get monster-specific shadow offset from lookup table
+                const shadowOffset = MONSTER_SHADOW_OFFSETS[monsterType] || 8; // Use default if not found
+                
+                // Add shadow with monster-specific offset
+                const shadow = this.scene.add.image(0, shadowOffset, SHADOW_ASSET_KEY)
+                    .setAlpha(SHADOW_ALPHA)
+                    .setDepth(SHADOW_DEPTH_OFFSET); // Relative depth within container
+                shadow.setScale(0.7); // Make monster shadows slightly smaller
+                
+                console.log(`Added shadow for ${monsterType}`);
+                
+                // Add sprite with error handling
+                let sprite;
+                try {
+                    sprite = this.scene.add.sprite(0, 0, spriteKey);
+                    sprite.setDepth(0); // Base sprite at 0 relative to container
+                    sprite.name = 'sprite'; // Name the sprite for easier identification later
+                    
+                    // For bosses, make sure they're visible and correctly sized
+                    if (monsterType === "FinalBossPhase1" || monsterType === "FinalBossPhase2") {
+                        console.log(`Setting up boss sprite: ${monsterType}`);
+                        sprite.setAlpha(1); // Ensure full opacity
+                    }
+                    
+                    console.log(`Added sprite for ${monsterType}: visible=${sprite.visible}, alpha=${sprite.alpha}`);
+                } catch (e) {
+                    console.error(`Failed to create sprite for ${monsterType}:`, e);
+                    return;
+                }
+                
+                // Use the server-provided max_hp instead of hardcoded values
+                const maxHP = monsterData.maxHp;
+                
+                // Store health data in container
+                container.setData('maxHP', maxHP);
+                container.setData('currentHP', monsterData.hp);
+                container.setData('entityId', monsterData.entityId);
+                container.setData('monsterId', monsterData.monsterId);
+                container.setData('monsterType', monsterType);
+                
+                // Health bar background
+                const healthBarBg = this.scene.add.rectangle(
+                    0,
+                    -sprite.height/2 - MONSTER_HEALTH_BAR_OFFSET_Y,
+                    MONSTER_HEALTH_BAR_WIDTH,
+                    MONSTER_HEALTH_BAR_HEIGHT,
+                    0x000000,
+                    0.7
+                );
+                healthBarBg.setDepth(HEALTH_BG_DEPTH_OFFSET); // Relative depth
+                
+                // Health bar
+                const healthPercent = monsterData.hp / maxHP;
+                const healthBar = this.scene.add.rectangle(
+                    -MONSTER_HEALTH_BAR_WIDTH/2,
+                    -sprite.height/2 - MONSTER_HEALTH_BAR_OFFSET_Y,
+                    MONSTER_HEALTH_BAR_WIDTH * healthPercent,
+                    MONSTER_HEALTH_BAR_HEIGHT,
+                    this.getHealthBarColor(healthPercent), // Use color based on health percentage
+                    1
+                );
+                healthBar.setOrigin(0, 0.5);
+                healthBar.setDepth(HEALTH_BAR_DEPTH_OFFSET); // Relative depth
+                healthBar.name = 'healthBar';
+                
+                // Add all components to container
+                container.add([shadow, sprite, healthBarBg, healthBar]);
+                
+                // Set container properties
+                container.setDepth(initialDepth);
+                container.setSize(sprite.width, sprite.height);
+                container.setAlpha(1); // Ensure fully visible
+                container.setVisible(true); // Ensure visible
+                
+                // Create collision circle visualization (will only be visible in debug mode)
+                this.createCollisionCircle(container, monsterData.entityId);
+                
+                // Store in monsters map
+                this.monsters.set(monsterData.monsterId, container);
+                
+                console.log(`Successfully created monster: ${monsterType} (ID: ${monsterData.monsterId})`);
+                
+                // If this is a boss, do additional logging
+                if (monsterType === "FinalBossPhase1" || monsterType === "FinalBossPhase2") {
+                    console.log(`BOSS CONTAINER: visible=${container.visible}, alpha=${container.alpha}, x=${container.x}, y=${container.y}, depth=${container.depth}`);
+                    console.log(`BOSS SPRITE: visible=${sprite.visible}, alpha=${sprite.alpha}`);
+                }
+            } catch (error) {
+                console.error(`Failed to create monster sprite for ${monsterType}:`, error);
+            }
         }
     }
     
@@ -598,13 +636,33 @@ export default class MonsterManager {
     handleMonsterCreated(ctx: EventContext, monster: Monsters) {
         // Get the entity for this monster
         const entityData = ctx.db?.entity.entityId.find(monster.entityId);
+        const monsterTypeName = this.getMonsterTypeName(monster.bestiaryId);
+        
+        console.log(`Monster created: ${monster.monsterId}, type: ${monsterTypeName}, entity: ${monster.entityId}`);
+        
+        // Debug boss visibility issue
+        if (monsterTypeName === "FinalBossPhase1" || monsterTypeName === "FinalBossPhase2") {
+            console.log(`BOSS SPAWNED: ${monsterTypeName}`);
+            console.log(`- Boss entity ID: ${monster.entityId}`);
+            console.log(`- Boss monster ID: ${monster.monsterId}`);
+            console.log(`- Asset key: ${MONSTER_ASSET_KEYS[monsterTypeName]}`);
+            console.log(`- Texture exists: ${this.scene.textures.exists(MONSTER_ASSET_KEYS[monsterTypeName])}`);
+            if (entityData) {
+                console.log(`- Position: (${entityData.position.x}, ${entityData.position.y})`);
+            } else {
+                console.log(`- WARNING: No entity data found for boss!`);
+            }
+            
+            // Log all sprites to debug visibility issues
+            this.debugLogAllSprites();
+        }
+        
         if (!entityData) {
-            console.warn(`Monster created but no entity found: ${monster.monsterId}`);
+            console.warn(`Monster created but no entity found: ${monster.monsterId} (type: ${monsterTypeName})`);
             return;
         }
 
         // If this is final boss phase 2 and it just spawned, play the dark transformation effect
-        const monsterTypeName = this.getMonsterTypeName(monster.bestiaryId);
         if (monsterTypeName === "FinalBossPhase2") {
             console.log("Final Boss Phase 2 spawned - playing transformation effect");
             this.createBossTransformationEffect(entityData.position.x, entityData.position.y);
@@ -612,12 +670,26 @@ export default class MonsterManager {
         
         // Create the monster sprite
         this.createMonsterSprite(monster, entityData.position);
+        
+        // For boss monsters, do an additional check after creation
+        if (monsterTypeName === "FinalBossPhase1" || monsterTypeName === "FinalBossPhase2") {
+            const bossContainer = this.monsters.get(monster.monsterId);
+            if (bossContainer) {
+                console.log(`Boss container after creation: visible=${bossContainer.visible}, alpha=${bossContainer.alpha}`);
+            } else {
+                console.error(`Failed to find boss container after creation!`);
+            }
+            
+            // Log all sprites again after creation
+            this.debugLogAllSprites();
+        }
     }
     
     // Helper to get monster type name from bestiary ID
     private getMonsterTypeName(bestiaryId: any): string {
         // Check if bestiaryId is an object with a tag property (from autobindings)
         if (bestiaryId && typeof bestiaryId === 'object' && 'tag' in bestiaryId) {
+            console.log(`Getting monster type from tag: ${bestiaryId.tag}`);
             return bestiaryId.tag;
         }
         
@@ -628,7 +700,9 @@ export default class MonsterManager {
             case 2: return "Orc";
             case 3: return "FinalBossPhase1";
             case 4: return "FinalBossPhase2";
-            default: return "Unknown";
+            default: 
+                console.warn(`Unknown monster type: ${bestiaryId}`);
+                return "Unknown";
         }
     }
     
@@ -691,6 +765,28 @@ export default class MonsterManager {
         // Clean up particles after animation completes
         this.scene.time.delayedCall(1600, () => {
             darkParticles.destroy();
+        });
+    }
+
+    // Add debug method to log all sprites on the scene
+    debugLogAllSprites() {
+        console.log("=== ALL SPRITES IN SCENE ===");
+        const allSprites = this.scene.children.list.filter(obj => 
+            obj instanceof Phaser.GameObjects.Sprite || 
+            obj instanceof Phaser.GameObjects.Container
+        );
+        
+        console.log(`Found ${allSprites.length} sprites/containers`);
+        allSprites.forEach((sprite, index) => {
+            if (sprite instanceof Phaser.GameObjects.Container) {
+                const container = sprite as Phaser.GameObjects.Container;
+                console.log(`Container #${index}: x=${container.x}, y=${container.y}, visible=${container.visible}, alpha=${container.alpha}, depth=${container.depth}`);
+                console.log(`  - Children: ${container.length}`);
+                console.log(`  - Data: ${JSON.stringify(container.data?.getAll())}`);
+            } else {
+                const gameObj = sprite as Phaser.GameObjects.Sprite;
+                console.log(`Sprite #${index}: name=${gameObj.name}, texture=${gameObj.texture.key}, x=${gameObj.x}, y=${gameObj.y}, visible=${gameObj.visible}, alpha=${gameObj.alpha}`);
+            }
         });
     }
 } 

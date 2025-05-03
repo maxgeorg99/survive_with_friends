@@ -85,7 +85,9 @@ class SpacetimeDBClient {
                 "SELECT * FROM gems",
                 "SELECT * FROM upgrade_options",
                 "SELECT * FROM chosen_upgrades",
-                "SELECT * FROM monster_spawners"
+                "SELECT * FROM monster_spawners",
+                "SELECT * FROM game_state",
+                "SELECT * FROM boss_spawn_timer"
             ]);
 
         // Register table event callbacks
@@ -135,6 +137,23 @@ class SpacetimeDBClient {
             });
             connection.db.monsters.onDelete((ctx, monster) => {
                 this.gameEvents.emit(GameEvents.MONSTER_DELETED, ctx, monster);
+            });
+        }
+
+        // Game State Events
+        if (connection.db.gameState) {
+            connection.db.gameState.onUpdate((ctx, oldState, newState) => {
+                this.gameEvents.emit(GameEvents.GAME_STATE_UPDATED, ctx, oldState, newState);
+            });
+        }
+
+        // Boss Spawn Timer Events
+        if (connection.db.bossSpawnTimer) {
+            connection.db.bossSpawnTimer.onInsert((ctx, timer) => {
+                this.gameEvents.emit(GameEvents.BOSS_SPAWN_TIMER_CREATED, ctx, timer);
+            });
+            connection.db.bossSpawnTimer.onDelete((ctx, timer) => {
+                this.gameEvents.emit(GameEvents.BOSS_SPAWN_TIMER_DELETED, ctx, timer);
             });
         }
 

@@ -112,17 +112,13 @@ public static partial class Module
         gameState.normal_spawning_paused = true;
         ctx.Db.game_state.id.Update(gameState);
         
-        // Get boss stats from bestiary 
-        var bestiaryEntry = ctx.Db.bestiary.bestiary_id.Find((uint)MonsterType.FinalBossPhase1);
-        if (bestiaryEntry == null)
-        {
-            throw new Exception($"SpawnBossPhaseOne: Could not find bestiary entry for boss!");
-        }
-        
         // Calculate position at center of map
         float centerX = config.world_size / 2;
         float centerY = config.world_size / 2;
         DbVector2 centerPosition = new DbVector2(centerX, centerY);
+        
+        // Create a pre-spawner for the boss at the center of map
+        Log.Info($"Creating boss phase 1 pre-spawner at center of map ({centerX}, {centerY})");
         
         // Find the closest player to target
         uint closestPlayerId = 0;
@@ -150,41 +146,28 @@ public static partial class Module
             }
         }
         
-        // Create boss entity at the center of the map
-        Entity? entityOpt = ctx.Db.entity.Insert(new Entity
+        // Schedule the boss to spawn using the existing monster spawning system
+        ScheduleBossSpawning(ctx, centerPosition, closestPlayerId, targetPlayerName);
+    }
+    
+    // Schedule boss spawning using the existing monster spawning system
+    private static void ScheduleBossSpawning(ReducerContext ctx, DbVector2 position, uint targetEntityId, string targetPlayerName)
+    {
+        Log.Info($"Scheduling boss phase 1 spawn at position ({position.x}, {position.y}) targeting player: {targetPlayerName}");
+        
+        // Use the existing monster spawner system, but for the boss
+        const int BOSS_SPAWN_VISUALIZATION_DELAY_MS = 3000; // 3 seconds for pre-spawn animation
+        
+        // Insert a monster spawner with FinalBossPhase1 type
+        ctx.Db.monster_spawners.Insert(new MonsterSpawners
         {
-            position = centerPosition,
-            direction = new DbVector2(0, 0), // Initial direction
-            is_moving = false,  // Not moving initially
-            radius = bestiaryEntry.Value.radius // Set radius from bestiary entry
+            position = position,
+            monster_type = MonsterType.FinalBossPhase1,
+            target_entity_id = targetEntityId,
+            scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(BOSS_SPAWN_VISUALIZATION_DELAY_MS))
         });
         
-        if (entityOpt == null)
-        {
-            throw new Exception("SpawnBossPhaseOne: Failed to create entity for boss!");
-        }
-        
-        // Create the boss monster
-        Monsters? monsterOpt = ctx.Db.monsters.Insert(new Monsters
-        {
-            entity_id = entityOpt.Value.entity_id,
-            bestiary_id = MonsterType.FinalBossPhase1,
-            hp = bestiaryEntry.Value.max_hp,
-            max_hp = bestiaryEntry.Value.max_hp,
-            target_entity_id = closestPlayerId
-        });
-        
-        if (monsterOpt == null)
-        {
-            throw new Exception("SpawnBossPhaseOne: Failed to create boss monster!");
-        }
-        
-        // Update game state with boss monster ID
-        gameState.boss_monster_id = monsterOpt.Value.monster_id;
-        ctx.Db.game_state.id.Update(gameState);
-        
-        // Announce boss spawn to players
-        Log.Info($"FINAL BOSS PHASE 1 SPAWNED! (entity: {entityOpt.Value.entity_id}, monster: {monsterOpt.Value.monster_id}) targeting player: {targetPlayerName}");
+        Log.Info($"Boss phase 1 scheduled to spawn in {BOSS_SPAWN_VISUALIZATION_DELAY_MS}ms at center of map");
     }
     
     // Called when phase 1 boss is defeated
@@ -337,5 +320,18 @@ public static partial class Module
             // Schedule monster spawning
             ScheduleMonsterSpawning(ctx);
         }
+    }
+    
+    // Test/debug utility to manually spawn the boss for testing
+    [Reducer]
+    public static void SpawnBossForTesting(ReducerContext ctx)
+    {
+        Log.Info("DEVELOPER TEST: Manually triggering boss spawn...");
+        
+        // Call the boss spawn method directly
+        // This bypasses the scheduling system for testing purposes
+        SpawnBossPhaseOne(ctx, new BossSpawnTimer { scheduled_id = 0 });
+        
+        Log.Info("DEVELOPER TEST: Boss spawn triggered manually");
     }
 } 

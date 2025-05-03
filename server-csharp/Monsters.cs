@@ -2,6 +2,16 @@ using SpacetimeDB;
 
 public static partial class Module
 {
+    // Define which monster types can spawn during normal gameplay (excludes bosses)
+    private static readonly MonsterType[] SpawnableMonsterTypes = new MonsterType[]
+    {
+        MonsterType.Rat,
+        MonsterType.Slime,
+        MonsterType.Orc
+        // Add new normal monster types here as they are created
+        // Bosses are excluded from this list to prevent them from spawning randomly
+    };
+    
     [SpacetimeDB.Table(Name = "monsters", Public = true)]
     public partial struct Monsters
     {
@@ -83,11 +93,12 @@ public static partial class Module
             return;
         }
         
-        // Get a random monster type
+        // Get a random monster type FROM THE SPAWNABLE LIST (not from all monster types)
         var rng = ctx.Rng;
-        var monsterTypes = Enum.GetValues(typeof(MonsterType));
-        var randomTypeIndex = rng.Next(0, monsterTypes.Length);
-        var monsterType = (MonsterType)randomTypeIndex;
+        var randomTypeIndex = rng.Next(0, SpawnableMonsterTypes.Length);
+        var monsterType = SpawnableMonsterTypes[randomTypeIndex];
+        
+        Log.Info($"Selected monster type {monsterType} from spawnable list (index {randomTypeIndex} of {SpawnableMonsterTypes.Length} types)");
         
         // Get monster stats from bestiary using the monster type as numerical ID
         var bestiaryEntry = ctx.Db.bestiary.bestiary_id.Find((uint)monsterType);

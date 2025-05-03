@@ -11,6 +11,7 @@ import GemManager from '../managers/GemManager';
 import { createPlayerDamageEffect, createMonsterDamageEffect } from '../utils/DamageEffects';
 import UpgradeUI from '../ui/UpgradeUI';
 import PlayerHUD from '../ui/PlayerHUD';
+import BossTimerUI from '../ui/BossTimerUI';
 
 // Constants
 const PLAYER_SPEED = 200;
@@ -92,6 +93,9 @@ export default class GameScene extends Phaser.Scene {
     
     // Add player HUD
     private playerHUD: PlayerHUD | null = null;
+    
+    // Add boss timer UI
+    private bossTimerUI: BossTimerUI | null = null;
     
     // Add minimap
     private minimap: {
@@ -243,6 +247,10 @@ export default class GameScene extends Phaser.Scene {
         }
         console.log("Keyboard input set up.");
 
+        // Initialize the boss timer UI
+        this.bossTimerUI = new BossTimerUI(this, this.spacetimeDBClient);
+        console.log("Boss timer UI initialized.");
+        
         // Setup touch input
         this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
             if (pointer.isDown && this.localPlayerSprite) {
@@ -1856,6 +1864,11 @@ export default class GameScene extends Phaser.Scene {
             this.playerHUD.update(time, delta);
         }
         
+        // Update the boss timer UI if it exists
+        if (this.bossTimerUI) {
+            this.bossTimerUI.update(time, delta);
+        }
+        
         // Update minimap
         this.updateMinimap();
     }
@@ -2084,6 +2097,18 @@ export default class GameScene extends Phaser.Scene {
             this.upgradeUI = null;
         }
         
+        // Clean up PlayerHUD
+        if (this.playerHUD) {
+            this.playerHUD.destroy();
+            this.playerHUD = null;
+        }
+        
+        // Clean up BossTimerUI
+        if (this.bossTimerUI) {
+            this.bossTimerUI.destroy();
+            this.bossTimerUI = null;
+        }
+        
         // Note: SpacetimeDB event handlers are managed by the SDK
         // The connection to the database will be cleaned up when the game is closed
         // or when we move to a different scene
@@ -2149,12 +2174,6 @@ export default class GameScene extends Phaser.Scene {
             } catch (e) {
                 console.warn("Could not clean up debug key binding:", e);
             }
-        }
-        
-        // Clean up PlayerHUD
-        if (this.playerHUD) {
-            this.playerHUD.destroy();
-            this.playerHUD = null;
         }
         
         // Clean up minimap
