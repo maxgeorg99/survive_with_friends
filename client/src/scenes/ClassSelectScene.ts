@@ -44,7 +44,7 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.load.image('rogue_icon', '/assets/rogue_icon.png');
         this.load.image('mage_icon', '/assets/mage_icon.png');
         this.load.image('paladin_icon', '/assets/paladin_icon.png');
-        this.load.image('select_background', '/assets/select_background.png');
+        this.load.image('title_bg', '/assets/title_bg.png');
     }
 
     create() {
@@ -55,8 +55,8 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.cameras.main.setBackgroundColor('#042E64');
         
         try {
-            if (this.textures.exists('select_background')) {
-                this.add.image(width/2, height/2, 'select_background')
+            if (this.textures.exists('title_bg')) {
+                this.add.image(width/2, height/2, 'title_bg')
                     .setDisplaySize(width, height)
                     .setDepth(0);
             }

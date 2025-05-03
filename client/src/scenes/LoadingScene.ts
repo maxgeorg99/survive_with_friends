@@ -27,6 +27,11 @@ export default class LoadingScene extends Phaser.Scene {
         console.log(`LoadingScene initialized with message: ${this.message}, next scene: ${this.nextScene}, waiting for: ${this.waitingFor}`);
     }
 
+    preload() {
+        // Load title background
+        this.load.image('title_bg', '/assets/title_bg.png');
+    }
+
     create() {
         // Global cleanup - remove any lingering UI elements from previous scenes
         this.cleanupLingeringUIElements();
@@ -35,6 +40,17 @@ export default class LoadingScene extends Phaser.Scene {
         
         // Set background color
         this.cameras.main.setBackgroundColor('#042E64');
+        
+        // Add title background
+        try {
+            if (this.textures.exists('title_bg')) {
+                this.add.image(width/2, height/2, 'title_bg')
+                    .setDisplaySize(width, height)
+                    .setDepth(0);
+            }
+        } catch (error) {
+            console.error("Error loading background:", error);
+        }
         
         // Create loading text
         this.loadingText = this.add.text(width / 2, height / 2 - 50, this.message, {

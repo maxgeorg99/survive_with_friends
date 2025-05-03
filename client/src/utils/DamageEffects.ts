@@ -10,8 +10,8 @@ export const PLAYER_DAMAGE_FLASH_COLOR = 0xFF0000; // bright red
 export const PLAYER_DAMAGE_ALPHA = 0.7; // alpha value during flash (slightly transparent)
 
 // Constants for monster damage effects
-export const MONSTER_DAMAGE_FLASH_DURATION = 200; // milliseconds (reduced from 300ms)
-export const MONSTER_DAMAGE_ALPHA = 0.5; // alpha value during flash
+export const MONSTER_DAMAGE_FLASH_DURATION = 150; // milliseconds (reduced from 300ms)
+export const MONSTER_DAMAGE_ALPHA = 0.8; // alpha value during flash
 
 // Cooldown to prevent visual spam with rapid damage
 export const COOLDOWN_BETWEEN_FLASHES = 100; // milliseconds

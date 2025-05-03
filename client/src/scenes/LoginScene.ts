@@ -22,7 +22,7 @@ export default class LoginScene extends Phaser.Scene {
 
     preload() {
         // Load assets needed for the login screen
-        this.load.image('login_background', '/assets/login_background.png');
+        this.load.image('title_bg', '/assets/title_bg.png');
         this.load.image('button', '/assets/button.png');
     }
 
@@ -37,8 +37,8 @@ export default class LoginScene extends Phaser.Scene {
         this.cameras.main.setBackgroundColor('#042E64');
         
         try {
-            if (this.textures.exists('login_background')) {
-                this.add.image(width/2, height/2, 'login_background')
+            if (this.textures.exists('title_bg')) {
+                this.add.image(width/2, height/2, 'title_bg')
                     .setDisplaySize(width, height)
                     .setDepth(0);
             }
@@ -50,7 +50,7 @@ export default class LoginScene extends Phaser.Scene {
         this.loginContainer = this.add.container(width/2, height/2);
         
         // Add game title
-        const titleText = this.add.text(0, -200, 'VIBE SURVIVORS', {
+        const titleText = this.add.text(0, -150, 'VIBE SURVIVORS', {
             fontFamily: 'Arial Black',
             fontSize: '64px',
             color: '#ffffff',
@@ -60,8 +60,8 @@ export default class LoginScene extends Phaser.Scene {
         }).setOrigin(0.5);
         this.loginContainer.add(titleText);
         
-        // Add status text
-        this.statusText = this.add.text(0, -120, 'Connecting to server...', {
+        // Add status text (only for connection status, not for name prompt)
+        this.statusText = this.add.text(0, -80, 'Connecting to server...', {
             fontFamily: 'Arial',
             fontSize: '24px',
             color: '#ffffff',
@@ -115,6 +115,9 @@ export default class LoginScene extends Phaser.Scene {
         this.nameInput.style.textAlign = 'center';
         this.nameInput.style.borderRadius = '4px';
         this.nameInput.style.display = 'none';
+        // Use transform for perfect centering
+        this.nameInput.style.left = '50%';
+        this.nameInput.style.transform = 'translateX(-50%)';
         document.body.appendChild(this.nameInput);
         
         // Create Set Name button
@@ -125,12 +128,17 @@ export default class LoginScene extends Phaser.Scene {
         this.nameButton.style.fontFamily = 'Arial';
         this.nameButton.style.fontSize = '20px';
         this.nameButton.style.padding = '10px 20px';
+        this.nameButton.style.width = '150px'; // Fixed width for better centering
         this.nameButton.style.borderRadius = '4px';
         this.nameButton.style.backgroundColor = '#4CAF50';
         this.nameButton.style.color = 'white';
         this.nameButton.style.border = 'none';
         this.nameButton.style.cursor = 'pointer';
         this.nameButton.style.display = 'none';
+        this.nameButton.style.textAlign = 'center'; // Ensure text is centered in button
+        // Use transform for perfect centering
+        this.nameButton.style.left = '50%';
+        this.nameButton.style.transform = 'translateX(-50%)';
         document.body.appendChild(this.nameButton);
         
         // Add event listeners
@@ -146,18 +154,22 @@ export default class LoginScene extends Phaser.Scene {
     }
     
     private positionHTMLElements() {
-        const { width, height } = this.scale;
+        const { height } = this.scale;
         
-        // Position the name input
-        this.nameInput.style.left = `${width/2 - 150}px`;
-        this.nameInput.style.top = `${height/2 - 50}px`;
-        
-        // Position the name button
-        this.nameButton.style.left = `${width/2 - 75}px`;
-        this.nameButton.style.top = `${height/2 + 20}px`;
+        // Only need to set vertical position, horizontal is handled by transform
+        this.nameInput.style.top = `${height/2 - 25}px`;
+        this.nameButton.style.top = `${height/2 + 40}px`;
     }
     
     private handleResize() {
+        const { width, height } = this.scale;
+        
+        // Update container position to new center
+        if (this.loginContainer) {
+            this.loginContainer.setPosition(width/2, height/2);
+        }
+        
+        // Position HTML elements
         this.positionHTMLElements();
     }
     
@@ -207,7 +219,7 @@ export default class LoginScene extends Phaser.Scene {
     private updateConnectionStatus() {
         if (this.spacetimeDBClient.isConnected) {
             console.log("Connected to server");
-            this.statusText.setText('Please enter your name:');
+            this.statusText.setText(''); // Remove any status text after connection
             this.showNameInput();
         } else {
             this.statusText.setText('Connecting to server...');
