@@ -169,9 +169,6 @@ public static partial class Module
             monster.hp -= damageAmount;
             ctx.Db.monsters.monster_id.Update(monster);
             
-            // Log the damage
-            Log.Info($"Monster {monster.monster_id} (type: {monster.bestiary_id}) took {damageAmount} damage. HP: {monster.hp}/{monster.max_hp}");
-            
             return false;
         }
     }
