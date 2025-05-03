@@ -447,7 +447,42 @@ export default class GameScene extends Phaser.Scene {
         
         // Get the dead player record to check if this is a true survivor victory
         const deadPlayerOpt = ctx.db?.deadPlayers.playerId.find(player.playerId);
-        const isTrueSurvivor = deadPlayerOpt && 'is_true_survivor' in deadPlayerOpt ? deadPlayerOpt.is_true_survivor : false;
+        console.log("Dead player record:", deadPlayerOpt);
+        
+        // Check specifically for the isTrueSurvivor property with detailed logging
+        let isTrueSurvivor = false;
+        
+        if (deadPlayerOpt) {
+            // Cast to any type to avoid TypeScript errors with dynamic property access
+            const deadPlayer = deadPlayerOpt as any;
+            console.log("Dead player properties:", Object.keys(deadPlayer));
+            
+            // Try multiple property name formats that could be used in the binding
+            if ('isTrueSurvivor' in deadPlayer) {
+                isTrueSurvivor = deadPlayer.isTrueSurvivor;
+                console.log("Found isTrueSurvivor property:", isTrueSurvivor);
+            } else if ('is_true_survivor' in deadPlayer) {
+                isTrueSurvivor = deadPlayer.is_true_survivor;
+                console.log("Found is_true_survivor property:", isTrueSurvivor);
+            } else if ('istrue_survivor' in deadPlayer) {
+                isTrueSurvivor = deadPlayer.istrue_survivor;
+                console.log("Found istrue_survivor property:", isTrueSurvivor);
+            } else {
+                // Try looping through all properties to find any that might be the true survivor flag
+                for (const key in deadPlayer) {
+                    if (key.toLowerCase().includes('true') || key.toLowerCase().includes('survivor')) {
+                        console.log(`Found potential match: ${key} = ${deadPlayer[key]}`);
+                        if (typeof deadPlayer[key] === 'boolean' && deadPlayer[key] === true) {
+                            isTrueSurvivor = true;
+                            console.log("Setting isTrueSurvivor to true based on property:", key);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        console.log("Final isTrueSurvivor value:", isTrueSurvivor);
         
         //play death animation
         var center = this.localPlayerSprite?.getCenter();
@@ -457,8 +492,10 @@ export default class GameScene extends Phaser.Scene {
         
         // Show appropriate death screen
         if (isTrueSurvivor) {
+            console.log("Showing TRUE SURVIVOR victory screen!");
             this.showVictoryScreen();
         } else {
+            console.log("Showing regular death screen");
             this.showDeathScreen();
         }
     }
