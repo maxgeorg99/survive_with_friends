@@ -88,35 +88,33 @@ public static partial class Module
             throw new Exception($"PreSpawnMonster: Could not find bestiary entry for monster type: {monsterType}");
         }
         
-        // Calculate spawn position on the edge of the game world
-        DbVector2 position;
-        float edgeOffset = bestiaryEntry.Value.radius; // Keep monsters from spawning partially off-screen
-        var worldSize = config.world_size;
-        
-        // Choose a random edge (0=top, 1=right, 2=bottom, 3=left)
-        int edge = rng.Next(0, 4);
-        switch (edge)
-        {
-            case 0: // Top edge
-                position = new DbVector2(rng.Next((int)edgeOffset, (int)(worldSize - edgeOffset)), edgeOffset);
-                break;
-            case 1: // Right edge
-                position = new DbVector2(worldSize - edgeOffset, rng.Next((int)edgeOffset, (int)(worldSize - edgeOffset)));
-                break;
-            case 2: // Bottom edge
-                position = new DbVector2(rng.Next((int)edgeOffset, (int)(worldSize - edgeOffset)), worldSize - edgeOffset);
-                break;
-            case 3: // Left edge
-                position = new DbVector2(edgeOffset, rng.Next((int)edgeOffset, (int)(worldSize - edgeOffset)));
-                break;
-            default: // Fallback (shouldn't happen)
-                position = new DbVector2(edgeOffset, edgeOffset);
-                break;
-        }
-        
-        // Choose a random player to target without loading all players into memory
-        var randomSkip = rng.Next(0, (int)playerCount); // Convert playerCount to int
+        // Choose a random player to spawn near
+        var randomSkip = rng.Next(0, (int)playerCount);
         var targetPlayer = ctx.Db.player.Iter().Skip(randomSkip).First();
+        
+        // Get the player's entity for position
+        var playerEntityOpt = ctx.Db.entity.entity_id.Find(targetPlayer.entity_id);
+        if (playerEntityOpt == null)
+        {
+            Log.Info($"PreSpawnMonster: Could not find entity for player {targetPlayer.name}");
+            return;
+        }
+        var playerEntity = playerEntityOpt.Value;
+        
+        // Calculate spawn position near the player (random direction, within 300-800 pixel radius)
+        float spawnRadius = rng.Next(300, 801); // Distance from player
+        float spawnAngle = (float)(rng.NextDouble() * Math.PI * 2); // Random angle in radians
+        
+        // Calculate spawn position
+        DbVector2 position = new DbVector2(
+            playerEntity.position.x + spawnRadius * (float)Math.Cos(spawnAngle),
+            playerEntity.position.y + spawnRadius * (float)Math.Sin(spawnAngle)
+        );
+        
+        // Clamp to world boundaries using monster radius
+        float monsterRadius = bestiaryEntry.Value.radius;
+        position.x = Math.Clamp(position.x, monsterRadius, config.world_size - monsterRadius);
+        position.y = Math.Clamp(position.y, monsterRadius, config.world_size - monsterRadius);
         
         // Instead of immediately spawning the monster, schedule it for actual spawning
         // with a delay to give the player time to respond
@@ -186,16 +184,30 @@ public static partial class Module
             throw new Exception("SpawnMonster: Failed to create entity for monster!");
         }
         
-        // Check if the target player still exists
-        var targetEntityOpt = ctx.Db.entity.entity_id.Find(spawner.target_entity_id);
-        uint targetEntityId = spawner.target_entity_id;
+        // Find the closest player to target
+        uint closestPlayerId = 0;
+        float closestDistance = float.MaxValue;
+        string targetPlayerName = "unknown";
         
-        // If the target player is no longer available, pick a new random player
-        if (targetEntityOpt == null)
+        foreach (var player in ctx.Db.player.Iter())
         {
-            var randomSkip = ctx.Rng.Next(0, (int)playerCount); // Convert playerCount to int
-            var targetPlayer = ctx.Db.player.Iter().Skip(randomSkip).First();
-            targetEntityId = targetPlayer.entity_id;
+            var playerEntityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
+            if (playerEntityOpt != null)
+            {
+                // Calculate distance to this player
+                var playerEntity = playerEntityOpt.Value;
+                float dx = playerEntity.position.x - spawner.position.x;
+                float dy = playerEntity.position.y - spawner.position.y;
+                float distanceSquared = dx * dx + dy * dy;
+                
+                // Update closest player if this one is closer
+                if (distanceSquared < closestDistance)
+                {
+                    closestDistance = distanceSquared;
+                    closestPlayerId = player.entity_id;
+                    targetPlayerName = player.name;
+                }
+            }
         }
         
         // Create the monster
@@ -205,23 +217,12 @@ public static partial class Module
             bestiary_id = spawner.monster_type,
             hp = bestiaryEntry.Value.max_hp,
             max_hp = bestiaryEntry.Value.max_hp, // Store max_hp from bestiary
-            target_entity_id = targetEntityId
+            target_entity_id = closestPlayerId
         });
         
         if (monsterOpt is null)
         {
             throw new Exception("SpawnMonster: Failed to create monster!");
-        }
-
-        // Get player name for logging
-        string targetPlayerName = "unknown";
-        foreach (var player in ctx.Db.player.Iter())
-        {
-            if (player.entity_id == targetEntityId)
-            {
-                targetPlayerName = player.name;
-                break;
-            }
         }
 
         Log.Info($"Spawned {spawner.monster_type} monster (entity: {entityOpt.Value.entity_id}) targeting player: {targetPlayerName} with HP: {bestiaryEntry.Value.max_hp}/{bestiaryEntry.Value.max_hp}");
@@ -373,7 +374,7 @@ public static partial class Module
                 updatedEntity.position = monsterEntity.position + moveOffset;
                 
                 // Get world size from config
-                uint worldSize = 2000; // Default fallback
+                uint worldSize = 20000; // Default fallback (10x larger)
                 var configOpt = ctx.Db.config.id.Find(0);
                 if (configOpt != null)
                 {

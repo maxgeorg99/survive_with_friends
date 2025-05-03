@@ -36,7 +36,7 @@ public static partial class Module
         ctx.Db.config.Insert(new Config
         {
             id = 0,
-            world_size = 2000, // Default world size in pixels
+            world_size = 20000, // Default world size in pixels (10x larger)
             game_tick_rate = 50, // Default game tick rate in milliseconds
             max_monsters = 20,  // Default maximum monsters
             player_spawn_grace_period = 5000, // Default player spawn grace period in milliseconds

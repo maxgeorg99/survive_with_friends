@@ -436,7 +436,7 @@ public static partial class Module
         }
 
         // Get world size from config
-        uint worldSize = 2000; // Default fallback
+        uint worldSize = 20000; // Default fallback (10x larger)
         uint tick_rate = 50;
         var configOpt = ctx.Db.config.id.Find(0);
         if (configOpt != null)
