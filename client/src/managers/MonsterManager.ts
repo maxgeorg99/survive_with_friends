@@ -416,10 +416,13 @@ export default class MonsterManager {
                     sprite.setDepth(0); // Base sprite at 0 relative to container
                     sprite.name = 'sprite'; // Name the sprite for easier identification later
                     
-                    // For bosses, make sure they're visible and correctly sized
+                    // For bosses, make them larger and ensure visibility
                     if (monsterType === "FinalBossPhase1" || monsterType === "FinalBossPhase2") {
                         console.log(`Setting up boss sprite: ${monsterType}`);
+                        sprite.setScale(1.0);
                         sprite.setAlpha(1); // Ensure full opacity
+                        sprite.setVisible(true); // Explicitly set visibility
+                        console.log(`Boss sprite properties: visible=${sprite.visible}, alpha=${sprite.alpha}, scale=${sprite.scale}`);
                     }
                     
                     console.log(`Added sprite for ${monsterType}: visible=${sprite.visible}, alpha=${sprite.alpha}`);

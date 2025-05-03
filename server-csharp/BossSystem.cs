@@ -18,7 +18,8 @@ public static partial class Module
     // Timer for boss spawn (scheduled every 5 minutes)
     [SpacetimeDB.Table(Name = "boss_spawn_timer", 
                         Scheduled = nameof(SpawnBossPhaseOne), 
-                        ScheduledAt = nameof(scheduled_at))]
+                        ScheduledAt = nameof(scheduled_at),
+                        Public = true)]
     public partial struct BossSpawnTimer
     {
         [PrimaryKey, AutoInc]

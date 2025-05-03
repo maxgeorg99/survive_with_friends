@@ -160,8 +160,8 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('monster_spawn_indicator', '/assets/monster_spawn_indicator.png');
         
         // Load boss monster assets
-        this.load.image('final_boss_phase1', '/assets/final_boss_phase1.png');
-        this.load.image('final_boss_phase2', '/assets/final_boss_phase2.png');
+        this.load.image('final_boss_phase1', '/assets/final_boss_phase_1.png');
+        this.load.image('final_boss_phase2', '/assets/final_boss_phase_2.png');
         
         // Load attack assets
         this.load.image('attack_sword', '/assets/attack_sword.png');
@@ -758,6 +758,12 @@ export default class GameScene extends Phaser.Scene {
         // Mark as initialized
         this.playerInitialized = true;
         this.isPlayerDataReady = true;
+
+        // Start the boss timer UI for testing if it exists
+        if (this.bossTimerUI) {
+            this.bossTimerUI.startTimer();
+            console.log("Boss timer started for testing after player initialization");
+        }
 
         // Check if player has pending upgrades and initialize the upgrade UI if needed
         if (player.unspentUpgrades > 0) {

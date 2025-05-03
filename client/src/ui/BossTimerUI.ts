@@ -30,6 +30,13 @@ export default class BossTimerUI {
         this.container = this.scene.add.container(0, 0);
         this.container.setDepth(UI_DEPTH);
         
+        // Set initial position at top center of camera view
+        const camera = this.scene.cameras.main;
+        if (camera) {
+            this.container.x = camera.scrollX + camera.width / 2;
+            this.container.y = camera.scrollY + 40; // Position at the top
+        }
+        
         // Create background for timer
         this.timerBackground = this.scene.add.rectangle(0, 0, 180, 40, 0x000000, 0.7);
         this.timerBackground.setStrokeStyle(2, 0x444444);
@@ -121,7 +128,15 @@ export default class BossTimerUI {
         this.isTimerActive = true;
         this.container.setVisible(true);
         
+        // Ensure UI is properly visible
+        if (!this.container.visible) {
+            console.warn("Boss timer container not visible after setVisible(true), forcing visibility");
+            this.container.visible = true;
+            this.container.alpha = 1;
+        }
+        
         console.log(`Boss timer started. Boss will spawn at: ${new Date(this.bossSpawnTime).toLocaleTimeString()}`);
+        console.log(`Timer container properties: visible=${this.container.visible}, alpha=${this.container.alpha}, x=${this.container.x}, y=${this.container.y}`);
     }
 
     public stopTimer(): void {
