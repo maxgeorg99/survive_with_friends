@@ -7,7 +7,9 @@ public static partial class Module
     {
         Rat,
         Slime,
-        Orc
+        Orc,
+        FinalBossPhase1,
+        FinalBossPhase2
     }
 
     [SpacetimeDB.Table(Name = "bestiary")]
@@ -72,6 +74,30 @@ public static partial class Module
             exp = 5,
             atk = 2.0f,
             radius = 40.0f
+        });
+        
+        // Insert Final Boss Phase 1 stats
+        ctx.Db.bestiary.Insert(new Bestiary
+        {
+            bestiary_id = (uint)MonsterType.FinalBossPhase1,
+            monster_type = MonsterType.FinalBossPhase1,
+            max_hp = 5000,
+            speed = 120.0f,
+            exp = 100,
+            atk = 25.0f,
+            radius = 92.0f
+        });
+        
+        // Insert Final Boss Phase 2 stats
+        ctx.Db.bestiary.Insert(new Bestiary
+        {
+            bestiary_id = (uint)MonsterType.FinalBossPhase2,
+            monster_type = MonsterType.FinalBossPhase2,
+            max_hp = 10000,
+            speed = 150.0f,
+            exp = 500,
+            atk = 40.0f,
+            radius = 245.0f
         });
 
         Log.Info("Bestiary initialization complete");

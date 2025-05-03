@@ -151,15 +151,59 @@ public static partial class Module
             
             // Clean up any monster damage records for this monster
             CleanupMonsterDamageRecords(ctx, monsterId);
-
-            // Spawn a gem at the monster's position
-            SpawnGemOnMonsterDeath(ctx, monsterId, position);
             
-            // Delete the monster
-            ctx.Db.monsters.monster_id.Delete(monsterId);
+            // Check if this is a boss monster
+            bool isBoss = false;
+            var gameStateOpt = ctx.Db.game_state.id.Find(0);
             
-            // Delete the entity
-            ctx.Db.entity.entity_id.Delete(monster.entity_id);
+            if (gameStateOpt != null && gameStateOpt.Value.boss_active && gameStateOpt.Value.boss_monster_id == monsterId)
+            {
+                isBoss = true;
+                
+                // Handle based on boss phase
+                if (gameStateOpt.Value.boss_phase == 1)
+                {
+                    // Phase 1 boss defeated, transition to phase 2
+                    Log.Info("BOSS PHASE 1 DEFEATED! TRANSITIONING TO PHASE 2...");
+                    
+                    // Delete the monster and entity
+                    ctx.Db.monsters.monster_id.Delete(monsterId);
+                    uint entityId = monster.entity_id;
+                    ctx.Db.entity.entity_id.Delete(entityId);
+                    
+                    // Spawn phase 2
+                    SpawnBossPhaseTwo(ctx, entityId, position);
+                    
+                    return true;
+                }
+                else if (gameStateOpt.Value.boss_phase == 2)
+                {
+                    // Phase 2 boss defeated - VICTORY!
+                    Log.Info("BOSS PHASE 2 DEFEATED! GAME COMPLETE!");
+                    
+                    // Delete the monster and entity
+                    ctx.Db.monsters.monster_id.Delete(monsterId);
+                    ctx.Db.entity.entity_id.Delete(monster.entity_id);
+                    
+                    // Handle boss defeated (true victory!)
+                    HandleBossDefeated(ctx);
+                    
+                    return true;
+                }
+            }
+            
+            // For non-boss monsters or if game state not found, spawn a gem
+            if (!isBoss)
+            {
+                // Spawn a gem at the monster's position
+                SpawnGemOnMonsterDeath(ctx, monsterId, position);
+                
+                // Delete the monster
+                ctx.Db.monsters.monster_id.Delete(monsterId);
+                
+                // Delete the entity
+                ctx.Db.entity.entity_id.Delete(monster.entity_id);
+            }
             
             return true;
         }
@@ -168,6 +212,9 @@ public static partial class Module
             // Monster is still alive, update with reduced HP
             monster.hp -= damageAmount;
             ctx.Db.monsters.monster_id.Update(monster);
+            
+            // Log the damage
+            Log.Info($"Monster {monster.monster_id} (type: {monster.bestiary_id}) took {damageAmount} damage. HP: {monster.hp}/{monster.max_hp}");
             
             return false;
         }

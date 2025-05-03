@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { Monsters, Entity, EventContext } from "../autobindings";
+import { Monsters, Entity, EventContext, MonsterType } from "../autobindings";
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { MONSTER_ASSET_KEYS, MONSTER_SHADOW_OFFSETS, MONSTER_MAX_HP } from '../constants/MonsterConfig';
 import { GameEvents } from '../constants/GameEvents';
@@ -71,9 +71,7 @@ export default class MonsterManager {
     registerMonsterListeners() {
         console.log("Registering monster listeners for MonsterManager");
 
-        this.gameEvents.on(GameEvents.MONSTER_CREATED, (ctx: EventContext, monster: Monsters) => {
-            this.createOrUpdateMonster(monster);
-        });
+        this.gameEvents.on(GameEvents.MONSTER_CREATED, this.handleMonsterCreated, this);
 
         this.gameEvents.on(GameEvents.MONSTER_UPDATED, (ctx: EventContext, oldMonster: Monsters, newMonster: Monsters) => {
             this.createOrUpdateMonster(newMonster);
@@ -587,12 +585,112 @@ export default class MonsterManager {
         this.gameEvents.off(GameEvents.ENTITY_CREATED, this.handleEntityEvent, this);
 
         // Remove monster event listeners
-        this.gameEvents.off(GameEvents.MONSTER_CREATED);
+        this.gameEvents.off(GameEvents.MONSTER_CREATED, this.handleMonsterCreated, this);
         this.gameEvents.off(GameEvents.MONSTER_UPDATED);
         this.gameEvents.off(GameEvents.MONSTER_DELETED);
     }
 
     shutdown() {
         this.unregisterListeners();
+    }
+
+    // Handles when a monster is created
+    handleMonsterCreated(ctx: EventContext, monster: Monsters) {
+        // Get the entity for this monster
+        const entityData = ctx.db?.entity.entityId.find(monster.entityId);
+        if (!entityData) {
+            console.warn(`Monster created but no entity found: ${monster.monsterId}`);
+            return;
+        }
+
+        // If this is final boss phase 2 and it just spawned, play the dark transformation effect
+        const monsterTypeName = this.getMonsterTypeName(monster.bestiaryId);
+        if (monsterTypeName === "FinalBossPhase2") {
+            console.log("Final Boss Phase 2 spawned - playing transformation effect");
+            this.createBossTransformationEffect(entityData.position.x, entityData.position.y);
+        }
+        
+        // Create the monster sprite
+        this.createMonsterSprite(monster, entityData.position);
+    }
+    
+    // Helper to get monster type name from bestiary ID
+    private getMonsterTypeName(bestiaryId: any): string {
+        // Check if bestiaryId is an object with a tag property (from autobindings)
+        if (bestiaryId && typeof bestiaryId === 'object' && 'tag' in bestiaryId) {
+            return bestiaryId.tag;
+        }
+        
+        // Fall back to numeric mapping for backward compatibility
+        switch(bestiaryId) {
+            case 0: return "Rat";
+            case 1: return "Slime";
+            case 2: return "Orc";
+            case 3: return "FinalBossPhase1";
+            case 4: return "FinalBossPhase2";
+            default: return "Unknown";
+        }
+    }
+    
+    // Create dark transformation effect for boss phase transition
+    createBossTransformationEffect(x: number, y: number) {
+        console.log("Creating boss transformation effect at", x, y);
+        
+        // Create dark energy explosion
+        const darkParticles = this.scene.add.particles(x, y, 'white_pixel', {
+            speed: { min: 100, max: 400 },
+            scale: { start: 0.5, end: 0 },
+            lifespan: 1500,
+            blendMode: 'ADD',
+            tint: [0x330066, 0x660099, 0x990099], // Dark purple colors
+            emitting: false,
+            quantity: 100
+        });
+        
+        // Large dark explosion
+        darkParticles.explode(60, x, y);
+        
+        // Add a dark shockwave circle
+        const shockwave = this.scene.add.circle(x, y, 10, 0x660099, 0.7);
+        shockwave.setDepth(BASE_DEPTH + y + 100); // Above everything else temporarily
+        
+        // Animate the shockwave growing outward
+        this.scene.tweens.add({
+            targets: shockwave,
+            radius: 300,
+            alpha: 0,
+            duration: 1200,
+            ease: 'Sine.Out',
+            onComplete: () => {
+                shockwave.destroy();
+            }
+        });
+        
+        // Create a bright flash at the center
+        const flash = this.scene.add.circle(x, y, 50, 0xffffff, 0.8);
+        flash.setDepth(BASE_DEPTH + y + 101); // Above the shockwave
+        
+        // Flash animation
+        this.scene.tweens.add({
+            targets: flash,
+            radius: 10,
+            alpha: 0,
+            duration: 600,
+            ease: 'Expo.Out',
+            onComplete: () => {
+                flash.destroy();
+            }
+        });
+        
+        // Add screen shake effect
+        this.scene.cameras.main.shake(1000, 0.01);
+        
+        // Play a transformation sound if available
+        // this.scene.sound.play('boss_transform');
+        
+        // Clean up particles after animation completes
+        this.scene.time.delayedCall(1600, () => {
+            darkParticles.destroy();
+        });
     }
 } 

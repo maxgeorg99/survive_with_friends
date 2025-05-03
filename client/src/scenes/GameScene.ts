@@ -155,6 +155,10 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('monster_orc', '/assets/monster_orc.png');
         this.load.image('monster_spawn_indicator', '/assets/monster_spawn_indicator.png');
         
+        // Load boss monster assets
+        this.load.image('final_boss_phase1', '/assets/final_boss_phase1.png');
+        this.load.image('final_boss_phase2', '/assets/final_boss_phase2.png');
+        
         // Load attack assets
         this.load.image('attack_sword', '/assets/attack_sword.png');
         this.load.image('attack_wand', '/assets/attack_wand.png');
@@ -433,12 +437,22 @@ export default class GameScene extends Phaser.Scene {
             this.upgradeUI.hide();
         }
         
+        // Get the dead player record to check if this is a true survivor victory
+        const deadPlayerOpt = ctx.db?.deadPlayers.playerId.find(player.playerId);
+        const isTrueSurvivor = deadPlayerOpt && 'is_true_survivor' in deadPlayerOpt ? deadPlayerOpt.is_true_survivor : false;
+        
         //play death animation
         var center = this.localPlayerSprite?.getCenter();
         if (center) {
             this.createDeathEffects(center.x, center.y);
         }
-        this.showDeathScreen();
+        
+        // Show appropriate death screen
+        if (isTrueSurvivor) {
+            this.showVictoryScreen();
+        } else {
+            this.showDeathScreen();
+        }
     }
 
     private handleConnectionLost(_ctx:ErrorContext) {
@@ -2587,5 +2601,117 @@ export default class GameScene extends Phaser.Scene {
         };
         
         console.log("Minimap created");
+    }
+
+    // Show victory screen for True Survivors
+    private showVictoryScreen() {
+        console.log("Showing True Survivor victory screen");
+        
+        // Create bright overlay covering the entire screen
+        const { width, height } = this.scale;
+        const overlay = this.add.rectangle(0, 0, width, height, 0xFFFFFF, 0.7)
+            .setOrigin(0, 0)
+            .setScrollFactor(0)  // Fix to camera
+            .setDepth(10000);    // Ensure it's on top
+            
+        // Add "You are a True Survivor" text
+        const titleText = this.add.text(
+            width / 2, 
+            height / 2 - 50, 
+            "YOU ARE A TRUE SURVIVOR", 
+            {
+                fontFamily: 'Arial',
+                fontSize: '48px',
+                color: '#FFD700', // Gold
+                stroke: '#000000',
+                strokeThickness: 6,
+                align: 'center'
+            }
+        )
+        .setOrigin(0.5)
+        .setScrollFactor(0)
+        .setDepth(10001);
+        
+        // Add victory subtitle text
+        const subtitleText = this.add.text(
+            width / 2, 
+            height / 2 + 50, 
+            "The Final Boss has been defeated!", 
+            {
+                fontFamily: 'Arial',
+                fontSize: '24px',
+                color: '#FFFFFF',
+                stroke: '#000000',
+                strokeThickness: 4,
+                align: 'center'
+            }
+        )
+        .setOrigin(0.5)
+        .setScrollFactor(0)
+        .setDepth(10001);
+        
+        // Fade in effect
+        overlay.alpha = 0;
+        titleText.alpha = 0;
+        subtitleText.alpha = 0;
+        
+        this.tweens.add({
+            targets: [overlay, titleText, subtitleText],
+            alpha: 1,
+            duration: 1000,
+            ease: 'Power2',
+            onComplete: () => {
+                // Wait 5 seconds before transitioning to ClassSelectScene
+                this.time.delayedCall(5000, () => {
+                    console.log("Victory screen timer complete, transitioning to ClassSelectScene");
+                    this.scene.start('ClassSelectScene');
+                });
+            }
+        });
+        
+        // Create victory particles effect
+        this.createVictoryParticles();
+        
+        // Disable input and controls for local player
+        this.disablePlayerControls();
+    }
+    
+    // Create special particle effects for the victory screen
+    private createVictoryParticles() {
+        const { width, height } = this.scale;
+        
+        // Golden confetti particles
+        const confetti = this.add.particles(0, 0, 'white_pixel', {
+            x: { min: 0, max: width },
+            y: -50,
+            quantity: 2,
+            lifespan: 6000,
+            speedY: { min: 100, max: 300 },
+            speedX: { min: -100, max: 100 },
+            scale: { start: 0.5, end: 1 },
+            rotate: { start: 0, end: 360 },
+            tint: [0xFFD700, 0xFFA500, 0xFFFFFF, 0xDAA520], // Gold colors
+            frequency: 50,
+            emitting: true
+        }).setDepth(10002);
+        
+        // Star burst in the center
+        const stars = this.add.particles(width/2, height/2, 'white_pixel', {
+            speed: { min: 100, max: 500 },
+            angle: { min: 0, max: 360 },
+            scale: { start: 1, end: 0 },
+            lifespan: 2000,
+            blendMode: 'ADD',
+            tint: 0xFFD700, // Gold
+            quantity: 2,
+            frequency: 200,
+            emitting: true
+        }).setDepth(10002);
+        
+        // Stop particles after 5 seconds
+        this.time.delayedCall(5000, () => {
+            confetti.destroy();
+            stars.destroy();
+        });
     }
 }

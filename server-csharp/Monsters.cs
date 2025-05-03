@@ -67,6 +67,14 @@ public static partial class Module
         }
         var config = configOpt.Value;
         
+        // Check if boss fight is active - skip normal spawning during boss fights
+        var gameStateOpt = ctx.Db.game_state.id.Find(0);
+        if (gameStateOpt != null && (gameStateOpt.Value.boss_active || gameStateOpt.Value.normal_spawning_paused))
+        {
+            //Log.Info("PreSpawnMonster: Boss fight active, skipping normal monster spawn.");
+            return;
+        }
+        
         // Check if we're at monster capacity
         var monsterCount = ctx.Db.monsters.Count;
         if (monsterCount >= config.max_monsters)

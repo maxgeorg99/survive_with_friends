@@ -132,6 +132,8 @@ public static partial class Module
         public uint player_id;
 
         public string name;
+        
+        public bool is_true_survivor; // Flag to indicate the player defeated the final boss
     }
 
     // --- Lifecyle Hooks ---
@@ -142,6 +144,9 @@ public static partial class Module
         
         // Initialize game configuration first
         InitGameConfig(ctx);
+        
+        // Initialize game state
+        InitGameState(ctx);
         
         // Initialize class data
         InitializeClassData(ctx);
@@ -434,21 +439,19 @@ public static partial class Module
     public static void UpdateLastLogin(ReducerContext ctx)
     {
         var identity = ctx.Sender;
-        Log.Info($"UpdateLastLogin called by identity: {identity}");
-
+        
+        // Get account for the caller
         var accountOpt = ctx.Db.account.identity.Find(identity);
         if (accountOpt == null)
         {
-            throw new Exception($"UpdateLastLogin: Attempted to update last login for non-existent account {identity}.");
+            throw new Exception($"UpdateLastLogin: Account not found for identity {identity}");
         }
         
+        // Update the last login time
         var account = accountOpt.Value;
-
-        var now = ctx.Timestamp;
-        account.last_login = now;
-
+        account.last_login = ctx.Timestamp;
         ctx.Db.account.identity.Update(account);
-        Log.Info($"Updated last login for account {identity} to {now}.");
+        
+        Log.Info($"Updated last login time for account {identity}");
     }
-
 }
