@@ -93,6 +93,14 @@ export default class GameScene extends Phaser.Scene {
     // Add player HUD
     private playerHUD: PlayerHUD | null = null;
     
+    // Add minimap
+    private minimap: {
+        container: Phaser.GameObjects.Container;
+        background: Phaser.GameObjects.Rectangle;
+        playerDot: Phaser.GameObjects.Arc;
+        border: Phaser.GameObjects.Rectangle;
+    } | null = null;
+    
     private localPlayerId: number = 0;
     
     private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null;
@@ -299,6 +307,9 @@ export default class GameScene extends Phaser.Scene {
         
         // Initialize MonsterSpawnerManager
         this.monsterSpawnerManager = new MonsterSpawnerManager(this, this.spacetimeDBClient);
+
+        // Create minimap
+        this.createMinimap();
 
         this.spacetimeDBClient.sdkConnection?.reducers.updateLastLogin();
     }
@@ -1830,6 +1841,26 @@ export default class GameScene extends Phaser.Scene {
         if (this.playerHUD) {
             this.playerHUD.update(time, delta);
         }
+        
+        // Update minimap
+        this.updateMinimap();
+    }
+    
+    // Update the minimap with player's position
+    private updateMinimap() {
+        if (!this.minimap || !this.localPlayerSprite) return;
+        
+        // Get world bounds and minimap size
+        const worldBounds = this.physics.world.bounds;
+        const minimapSize = this.minimap.background.width;
+        
+        // Calculate position ratio (player position relative to world size)
+        const ratioX = this.localPlayerSprite.x / worldBounds.width;
+        const ratioY = this.localPlayerSprite.y / worldBounds.height;
+        
+        // Position player dot on minimap based on world position
+        this.minimap.playerDot.x = ratioX * minimapSize;
+        this.minimap.playerDot.y = ratioY * minimapSize;
     }
 
     // Force a synchronization of player entities
@@ -2110,6 +2141,12 @@ export default class GameScene extends Phaser.Scene {
         if (this.playerHUD) {
             this.playerHUD.destroy();
             this.playerHUD = null;
+        }
+        
+        // Clean up minimap
+        if (this.minimap) {
+            this.minimap.container.destroy();
+            this.minimap = null;
         }
         
         console.log("GameScene shutdown complete.");
@@ -2483,5 +2520,72 @@ export default class GameScene extends Phaser.Scene {
         this.time.delayedCall(800, () => {
             particles.destroy();
         });
+    }
+
+    // Create a semi-transparent minimap in the bottom-left corner
+    private createMinimap() {
+        const { width, height } = this.scale;
+        
+        // Constants for minimap sizing and positioning
+        const MINIMAP_SIZE = 150; // Size of the minimap (square)
+        const MINIMAP_MARGIN = 20; // Margin from screen edges
+        const MINIMAP_ALPHA = 0.7; // Semi-transparency
+        const PLAYER_DOT_SIZE = 5; // Size of player dot on minimap
+        const BORDER_SIZE = 2; // Width of minimap border
+        
+        // Create minimap container at the bottom-left corner
+        const container = this.add.container(
+            MINIMAP_MARGIN,
+            height - MINIMAP_MARGIN - MINIMAP_SIZE
+        );
+        
+        // Create semi-transparent dark background
+        const background = this.add.rectangle(
+            0, 
+            0, 
+            MINIMAP_SIZE, 
+            MINIMAP_SIZE, 
+            0x000000, 
+            0.5
+        ).setOrigin(0);
+        
+        // Create border
+        const border = this.add.rectangle(
+            0,
+            0,
+            MINIMAP_SIZE,
+            MINIMAP_SIZE,
+            0xFFFFFF,
+            0.3
+        ).setOrigin(0);
+        border.setStrokeStyle(BORDER_SIZE, 0xFFFFFF, 0.5);
+        
+        // Create player dot (will be positioned in update)
+        const playerDot = this.add.circle(
+            0,
+            0,
+            PLAYER_DOT_SIZE,
+            0xFFFFFF,
+            1
+        );
+        
+        // Add all elements to container
+        container.add([background, border, playerDot]);
+        
+        // Fix to camera so it doesn't move with world
+        container.setScrollFactor(0);
+        
+        // Set initial alpha
+        container.setAlpha(MINIMAP_ALPHA);
+        
+        // Store reference to minimap elements
+        this.minimap = {
+            container,
+            background,
+            playerDot,
+            border
+        };
+        
+        console.log("Minimap created");
     }
 }
