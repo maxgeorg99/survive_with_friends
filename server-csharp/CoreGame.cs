@@ -391,6 +391,13 @@ public static partial class Module
             //Delete the entity from the entity table
             var entity_id = player.entity_id;
             ctx.Db.entity.entity_id.Delete(entity_id);
+            
+            // Check if all players are now dead
+            if (ctx.Db.player.Count == 0)
+            {
+                Log.Info("Last player has died! Resetting the game world...");
+                ResetWorld(ctx);
+            }
 
             return true;
         }

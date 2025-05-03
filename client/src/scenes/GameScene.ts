@@ -453,33 +453,7 @@ export default class GameScene extends Phaser.Scene {
         let isTrueSurvivor = false;
         
         if (deadPlayerOpt) {
-            // Cast to any type to avoid TypeScript errors with dynamic property access
-            const deadPlayer = deadPlayerOpt as any;
-            console.log("Dead player properties:", Object.keys(deadPlayer));
-            
-            // Try multiple property name formats that could be used in the binding
-            if ('isTrueSurvivor' in deadPlayer) {
-                isTrueSurvivor = deadPlayer.isTrueSurvivor;
-                console.log("Found isTrueSurvivor property:", isTrueSurvivor);
-            } else if ('is_true_survivor' in deadPlayer) {
-                isTrueSurvivor = deadPlayer.is_true_survivor;
-                console.log("Found is_true_survivor property:", isTrueSurvivor);
-            } else if ('istrue_survivor' in deadPlayer) {
-                isTrueSurvivor = deadPlayer.istrue_survivor;
-                console.log("Found istrue_survivor property:", isTrueSurvivor);
-            } else {
-                // Try looping through all properties to find any that might be the true survivor flag
-                for (const key in deadPlayer) {
-                    if (key.toLowerCase().includes('true') || key.toLowerCase().includes('survivor')) {
-                        console.log(`Found potential match: ${key} = ${deadPlayer[key]}`);
-                        if (typeof deadPlayer[key] === 'boolean' && deadPlayer[key] === true) {
-                            isTrueSurvivor = true;
-                            console.log("Setting isTrueSurvivor to true based on property:", key);
-                            break;
-                        }
-                    }
-                }
-            }
+            isTrueSurvivor = deadPlayerOpt.isTrueSurvivor;
         }
         
         console.log("Final isTrueSurvivor value:", isTrueSurvivor);

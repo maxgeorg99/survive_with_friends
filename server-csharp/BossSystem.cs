@@ -320,6 +320,12 @@ public static partial class Module
         
         foreach (var player in ctx.Db.player.Iter())
         {
+            // Clean up all attack-related data for this player
+            CleanupPlayerAttacks(ctx, player.player_id);
+            
+            // Clean up all pending upgrade options for this player
+            CleanupPlayerUpgradeOptions(ctx, player.player_id);
+            
             // Store the player in the dead_players table with special flag
             DeadPlayer? deadPlayerOpt = ctx.Db.dead_players.Insert(new DeadPlayer
             {
@@ -372,9 +378,6 @@ public static partial class Module
         
         Log.Info("DEVELOPER TEST: Boss spawn triggered manually");
     }
-
-    // This new reducer will be called when any monster is created
-    [Reducer]
     public static void UpdateBossMonsterID(ReducerContext ctx, uint monster_id)
     {
         if (ctx.Sender != ctx.Identity)

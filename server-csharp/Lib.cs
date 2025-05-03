@@ -292,6 +292,19 @@ public static partial class Module
         ctx.Db.account.identity.Update(account);
 
         Log.Info($"Created new player record for {identity} with class {playerClass} linked to entity {newPlayer.entity_id}.");
+        
+        // Check if this is the first player - if so, schedule boss spawn
+        if (ctx.Db.player.Count == 1)
+        {
+            Log.Info("First player spawned - scheduling boss timer for new world");
+            // Clear any existing boss spawn timers first
+            foreach (var timer in ctx.Db.boss_spawn_timer.Iter())
+            {
+                ctx.Db.boss_spawn_timer.scheduled_id.Delete(timer.scheduled_id);
+            }
+            // Schedule a new boss spawn
+            ScheduleBossSpawn(ctx);
+        }
     }
     
     // Helper function to create a new player with an associated entity
