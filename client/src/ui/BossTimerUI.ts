@@ -13,7 +13,6 @@ export default class BossTimerUI {
     private container: Phaser.GameObjects.Container;
     private timerText: Phaser.GameObjects.Text;
     private timerBackground: Phaser.GameObjects.Rectangle;
-    private timerIcon: Phaser.GameObjects.Image;
     private gameEvents: Phaser.Events.EventEmitter;
     
     // Timer tracking
@@ -37,14 +36,14 @@ export default class BossTimerUI {
             this.container.y = camera.scrollY + 40; // Position at the top
         }
         
-        // Create background for timer
-        this.timerBackground = this.scene.add.rectangle(0, 0, 180, 40, 0x000000, 0.7);
+        // Create background for timer - wider to fit longer text
+        this.timerBackground = this.scene.add.rectangle(0, 0, 300, 40, 0x000000, 0.7);
         this.timerBackground.setStrokeStyle(2, 0x444444);
         this.timerBackground.setOrigin(0.5, 0.5);
         
-        // Create timer text
-        this.timerText = this.scene.add.text(0, 0, "BOSS: --:--", {
-            fontSize: '20px',
+        // Create timer text with new message
+        this.timerText = this.scene.add.text(0, 0, "End of the world in: --:--", {
+            fontSize: '18px',
             fontFamily: 'Arial',
             color: '#ffffff',
             stroke: '#000000',
@@ -53,13 +52,8 @@ export default class BossTimerUI {
         });
         this.timerText.setOrigin(0.5, 0.5);
         
-        // Add skull icon for boss timer
-        this.timerIcon = this.scene.add.image(-70, 0, 'final_boss_phase1');
-        this.timerIcon.setScale(0.4);
-        this.timerIcon.setOrigin(0.5, 0.5);
-        
-        // Add elements to container
-        this.container.add([this.timerBackground, this.timerText, this.timerIcon]);
+        // Add elements to container (removed icon)
+        this.container.add([this.timerBackground, this.timerText]);
         
         // Hide initially until we know a boss is coming
         this.container.setVisible(false);
@@ -67,10 +61,10 @@ export default class BossTimerUI {
         // Register event listeners
         this.registerEventListeners();
         
-        console.log('BossTimerUI initialized');
+        // Check for existing boss spawn timer in the database
+        this.checkForExistingBossTimer();
         
-        // For testing - start timer on init
-        // this.startTimer();
+        console.log('BossTimerUI initialized');
     }
 
     private registerEventListeners(): void {
@@ -101,10 +95,17 @@ export default class BossTimerUI {
     private handleBossTimerCreated(ctx: any, timer: any): void {
         console.log("Boss timer created:", timer);
         
-        // Calculate when the boss will spawn
-        if (timer && timer.scheduledAt && timer.scheduledAt.timeMs) {
-            this.bossSpawnTime = timer.scheduledAt.timeMs;
+        // Extract the timestamp using our helper
+        const timestamp = this.extractTimestampFromTimer(timer);
+        if (timestamp) {
+            this.bossSpawnTime = timestamp;
             this.startTimer();
+            console.log("Started boss timer from timer creation event");
+        } else {
+            // Hide timer if no valid timestamp was found
+            this.stopTimer();
+            this.container.setVisible(false);
+            console.log("Could not extract valid timestamp from created timer, hiding boss timer UI");
         }
     }
 
@@ -115,14 +116,18 @@ export default class BossTimerUI {
             if (monsterType === 'FinalBossPhase1' || monsterType === 'FinalBossPhase2') {
                 this.stopTimer();
                 this.container.setVisible(false);
+            } else {
+                // For regular monsters, recheck the boss timer to keep it in sync
+                this.checkForExistingBossTimer();
             }
         }
     }
 
     public startTimer(): void {
         if (!this.bossSpawnTime) {
-            // If no explicit time was set, use the default 5 minute timer
-            this.bossSpawnTime = Date.now() + BOSS_SPAWN_DELAY_MS;
+            console.log("Cannot start timer - no valid boss spawn time");
+            this.container.setVisible(false);
+            return;
         }
         
         this.isTimerActive = true;
@@ -133,6 +138,13 @@ export default class BossTimerUI {
             console.warn("Boss timer container not visible after setVisible(true), forcing visibility");
             this.container.visible = true;
             this.container.alpha = 1;
+        }
+        
+        // Check if the spawn time is in the past
+        if (this.bossSpawnTime <= Date.now()) {
+            console.log("Boss spawn time is in the past, showing IMMINENT message");
+            this.timerText.setText("End of the world: IMMINENT!");
+            this.startWarningFlash(true);
         }
         
         console.log(`Boss timer started. Boss will spawn at: ${new Date(this.bossSpawnTime).toLocaleTimeString()}`);
@@ -166,7 +178,7 @@ export default class BossTimerUI {
             
             if (timeRemaining <= 0) {
                 // Timer expired but boss hasn't spawned yet
-                this.timerText.setText("BOSS INCOMING!");
+                this.timerText.setText("End of the world: IMMINENT!");
                 
                 // Start flashing if not already
                 if (!this.flashAnimation) {
@@ -176,7 +188,7 @@ export default class BossTimerUI {
                 // Format remaining time as MM:SS
                 const minutes = Math.floor(timeRemaining / 60000);
                 const seconds = Math.floor((timeRemaining % 60000) / 1000);
-                const timeString = `BOSS: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+                const timeString = `End of the world in: ${minutes}:${seconds.toString().padStart(2, '0')}`;
                 this.timerText.setText(timeString);
                 
                 // Start warning animation when approaching boss time
@@ -222,5 +234,126 @@ export default class BossTimerUI {
         
         // Destroy container and all children
         this.container.destroy();
+    }
+
+    private checkForExistingBossTimer(): void {
+        // Only if we have a connection
+        if (this.spacetimeClient?.sdkConnection?.db) {
+            console.log("Checking for existing boss spawn timer...");
+            
+            try {
+                // Try to find a boss timer in the database
+                const bossTimers = Array.from(this.spacetimeClient.sdkConnection.db.bossSpawnTimer.iter());
+                
+                console.log("Boss timers found:", bossTimers.length);
+                console.log("Raw timer data:", 
+                    JSON.stringify(bossTimers, (key, value) => 
+                        typeof value === 'bigint' ? value.toString() + 'n' : value
+                    )
+                );
+                
+                if (bossTimers.length > 0) {
+                    // Timer exists, get the first one
+                    const timer = bossTimers[0];
+                    console.log("Found existing boss timer:", timer);
+                    
+                    // Extract spawn time - we need to safely extract it from the timer object
+                    if (timer) {
+                        // Extract the timestamp using a more general approach
+                        const timestamp = this.extractTimestampFromTimer(timer);
+                        if (timestamp) {
+                            this.bossSpawnTime = timestamp;
+                            this.startTimer();
+                            console.log("Started boss timer from existing database entry");
+                        } else {
+                            // Hide timer if timestamp can't be extracted
+                            this.stopTimer();
+                            this.container.setVisible(false);
+                            console.log("Could not extract valid timestamp from timer, hiding boss timer UI");
+                        }
+                    }
+                } else {
+                    console.log("No existing boss spawn timer found, hiding timer UI");
+                    // Ensure timer is hidden when no timer exists
+                    this.stopTimer();
+                    this.container.setVisible(false);
+                }
+            } catch (error) {
+                console.error("Error checking for existing boss timer:", error);
+                // Hide timer on error
+                this.stopTimer();
+                this.container.setVisible(false);
+            }
+        }
+    }
+    
+    // Helper method to extract timestamp from timer object
+    private extractTimestampFromTimer(timer: any): number | null {
+        try {
+            console.log("Extracting timestamp from timer:", JSON.stringify(timer, (key, value) => 
+                typeof value === 'bigint' ? value.toString() : value
+            ));
+            
+            // First check if we have a scheduledAt property
+            if (!timer || !timer.scheduledAt) {
+                console.log("Timer or scheduledAt property is missing");
+                return null;
+            }
+            
+            // Handle scheduledAt property based on its type
+            const scheduledAt = timer.scheduledAt;
+            
+            // If scheduled_at has a microsSinceUnixEpoch property (common timestamp format)
+            if (scheduledAt.microsSinceUnixEpoch !== undefined) {
+                // Convert microseconds to milliseconds for JS Date
+                // Handle both number and bigint cases
+                const microsValue = scheduledAt.microsSinceUnixEpoch;
+                if (typeof microsValue === 'bigint') {
+                    // Convert bigint to number safely
+                    return Number(microsValue) / 1000;
+                } else if (typeof microsValue === 'number') {
+                    return microsValue / 1000;
+                }
+            }
+            
+            // If it has a time_ms field
+            if (scheduledAt.timeMs !== undefined) {
+                return typeof scheduledAt.timeMs === 'bigint' 
+                    ? Number(scheduledAt.timeMs) 
+                    : scheduledAt.timeMs;
+            }
+            
+            // If it's a structured object with tag and value
+            if (typeof scheduledAt === 'object' && scheduledAt.tag && scheduledAt.value) {
+                if (scheduledAt.tag === 'Time' && scheduledAt.value) {
+                    const timeValue = scheduledAt.value;
+                    
+                    // Check for microsSinceUnixEpoch in the value
+                    if (timeValue.microsSinceUnixEpoch !== undefined) {
+                        const microsValue = timeValue.microsSinceUnixEpoch;
+                        if (typeof microsValue === 'bigint') {
+                            return Number(microsValue) / 1000;
+                        } else if (typeof microsValue === 'number') {
+                            return microsValue / 1000;
+                        }
+                    }
+                    
+                    // Check for timeMs in the value
+                    if (timeValue.timeMs !== undefined) {
+                        return typeof timeValue.timeMs === 'bigint' 
+                            ? Number(timeValue.timeMs) 
+                            : timeValue.timeMs;
+                    }
+                }
+            }
+            
+            // Log the structure for debugging
+            console.log("Could not extract timestamp - unknown timer structure");
+            
+            return null;
+        } catch (error) {
+            console.error("Error extracting timestamp:", error);
+            return null;
+        }
     }
 } 

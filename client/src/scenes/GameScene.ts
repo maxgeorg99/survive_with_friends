@@ -759,11 +759,11 @@ export default class GameScene extends Phaser.Scene {
         this.playerInitialized = true;
         this.isPlayerDataReady = true;
 
-        // Start the boss timer UI for testing if it exists
-        if (this.bossTimerUI) {
-            this.bossTimerUI.startTimer();
-            console.log("Boss timer started for testing after player initialization");
-        }
+        // Remove timer auto-start - it's now checked from database
+        // if (this.bossTimerUI) {
+        //    this.bossTimerUI.startTimer();
+        //    console.log("Boss timer started for testing after player initialization");
+        // }
 
         // Check if player has pending upgrades and initialize the upgrade UI if needed
         if (player.unspentUpgrades > 0) {
