@@ -549,6 +549,17 @@ public static partial class Module
             tick_rate = configOpt.Value.game_tick_rate;
         }
 
+        ProcessPlayerMovement(ctx, tick_rate, worldSize);
+        ProcessMonsterMovements(ctx);
+        ProcessAttackMovements(ctx, worldSize);
+
+        ProcessPlayerMonsterCollisions(ctx);
+        ProcessMonsterAttackCollisions(ctx);
+        ProcessGemCollisions(ctx);
+    }
+
+    private static void ProcessPlayerMovement(ReducerContext ctx, uint tick_rate, uint worldSize)
+    {
         // Process all movable players
         foreach (var player in ctx.Db.player.Iter())
         {
@@ -611,21 +622,6 @@ public static partial class Module
             // Update entity in database
             ctx.Db.entity.entity_id.Update(updatedEntity);
         }
-        
-        // Process monster movements
-        ProcessMonsterMovements(ctx);
-        
-        // Process attack movements (moved to Attacks.cs)
-        ProcessAttackMovements(ctx, worldSize);
-
-        // Check for collisions between players and monsters
-        ProcessPlayerMonsterCollisions(ctx);
-        
-        // Check for collisions between attacks and monsters
-        ProcessMonsterAttackCollisions(ctx);
-        
-        // Check for collisions between players and gems
-        ProcessGemCollisions(ctx);
     }
     
     // Helper method to process collisions between attacks and monsters
