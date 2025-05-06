@@ -6,6 +6,9 @@ import { GameEvents } from './constants/GameEvents';
 // Define your SpacetimeDB connection details
 const SPACETIMEDB_DB_NAME = "vibesurvivors";
 const SPACETIMEDB_URI = "ws://localhost:3000"; // Use wss for cloud, corrected order
+const REMOTE_SPACETIMEDB_URI = "wss://maincloud.spacetimedb.com";
+
+const URI_TO_USE = REMOTE_SPACETIMEDB_URI;
 
 class SpacetimeDBClient {
     // Initialize sdkClient to null, it will be set in handleConnect
@@ -34,7 +37,7 @@ class SpacetimeDBClient {
         // Configure and initiate connection attempt.
         // The actual DbConnection instance is received in onConnect.
         DbConnection.builder()
-            .withUri(SPACETIMEDB_URI)
+            .withUri(URI_TO_USE)
             .withModuleName(SPACETIMEDB_DB_NAME)
             .withToken(localStorage.getItem('auth_token') || '')
             .onConnect(this.handleConnect.bind(this))

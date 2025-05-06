@@ -89,7 +89,6 @@ public static partial class Module
         [PrimaryKey]
         public SpacetimeDB.Identity identity;
 
-        [Unique]
         public string name;
         
         public uint current_player_id;

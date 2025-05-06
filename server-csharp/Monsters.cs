@@ -1,3 +1,4 @@
+using System.Formats.Tar;
 using SpacetimeDB;
 
 public static partial class Module
@@ -26,6 +27,8 @@ public static partial class Module
         // monster attributes
         public uint hp;
         public uint max_hp; // Maximum HP copied from bestiary
+        public float atk;
+        public float speed;
         
         // target entity id the monster is following
         public uint target_entity_id;
@@ -236,6 +239,8 @@ public static partial class Module
             bestiary_id = spawner.monster_type,
             hp = bestiaryEntry.Value.max_hp,
             max_hp = bestiaryEntry.Value.max_hp, // Store max_hp from bestiary
+            atk = bestiaryEntry.Value.atk,
+            speed = bestiaryEntry.Value.speed,
             target_entity_id = closestPlayerId
         });
         
@@ -262,7 +267,7 @@ public static partial class Module
         // Schedule monster spawning every 5 seconds
         ctx.Db.monster_spawn_timer.Insert(new MonsterSpawnTimer
         {
-            scheduled_at = new ScheduleAt.Interval(TimeSpan.FromSeconds(5))
+            scheduled_at = new ScheduleAt.Interval(TimeSpan.FromSeconds(1))
         });
         
         Log.Info("Monster spawning scheduled successfully");
@@ -275,29 +280,17 @@ public static partial class Module
         const float MIN_DISTANCE_TO_MOVE = 20.0f;  // Minimum distance before monster starts moving
         const float MIN_DISTANCE_TO_REACH = 5.0f;  // Distance considered "reached" the target
         
-        // First, get all monster entities for collision detection
-        var monsterEntities = new Dictionary<uint, Entity>();
-        var monsterTypes = new Dictionary<uint, MonsterType>();
-        
-        foreach (var monster in ctx.Db.monsters.Iter())
-        {
-            var entityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
-            if (entityOpt != null)
-            {
-                monsterEntities[monster.entity_id] = entityOpt.Value;
-                monsterTypes[monster.entity_id] = monster.bestiary_id;
-            }
-        }
-        
         // Now process each monster's movement with collision avoidance
         foreach (var monster in ctx.Db.monsters.Iter())
         {
-            // Get the monster's entity
-            if (!monsterEntities.TryGetValue(monster.entity_id, out Entity monsterEntity))
+            var monsterEntityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
+            if(monsterEntityOpt == null)
             {
                 continue;
             }
-            
+            var monsterEntity = monsterEntityOpt.Value;
+
+
             // Get the target entity
             var targetEntityOpt = ctx.Db.entity.entity_id.Find(monster.target_entity_id);
             if (targetEntityOpt == null)
@@ -338,30 +331,25 @@ public static partial class Module
                 var normalizedDirection = directionVector.Normalize();
                 
                 // Get monster speed from bestiary
-                float monsterSpeed = 20.0f; // Lower default fallback speed
-                
-                // Get the monster type
-                MonsterType monsterType = monster.bestiary_id;
-                
-                // Get bestiary entry using correct ID
-                var bestiaryEntryOpt = ctx.Db.bestiary.bestiary_id.Find((uint)monsterType);
-                
-                if (bestiaryEntryOpt != null)
-                {
-                    monsterSpeed = bestiaryEntryOpt.Value.speed;
-                }
+                float monsterSpeed = monster.speed;
                 
                 // Check for collisions with other monsters and calculate avoidance vectors
                 var avoidanceVector = new DbVector2(0, 0);
                 
-                foreach (var otherEntityPair in monsterEntities)
+                foreach (var otherMonsterEntry in ctx.Db.monsters.Iter())
                 {
-                    uint otherEntityId = otherEntityPair.Key;
-                    Entity otherEntity = otherEntityPair.Value;
-                    
-                    // Skip self
-                    if (otherEntityId == monster.entity_id)
+                    if(otherMonsterEntry.monster_id == monster.monster_id)
+                    {
                         continue;
+                    }
+
+                    var otherEntityOpt = ctx.Db.entity.entity_id.Find(otherMonsterEntry.entity_id);
+                    if(otherEntityOpt == null)
+                    {
+                        continue;
+                    }
+
+                    Entity otherEntity = otherEntityOpt.Value;
                     
                     // Check if we're colliding with this entity
                     float overlap = GetEntitiesOverlap(monsterEntity, otherEntity);
@@ -421,9 +409,6 @@ public static partial class Module
                 
                 // Update entity in database
                 ctx.Db.entity.entity_id.Update(updatedEntity);
-                
-                // Update our local cache for subsequent collision checks
-                monsterEntities[monster.entity_id] = updatedEntity;
             }
         }
     }
