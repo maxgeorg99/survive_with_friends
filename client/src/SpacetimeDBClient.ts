@@ -8,7 +8,7 @@ const SPACETIMEDB_DB_NAME = "vibesurvivors";
 const SPACETIMEDB_URI = "ws://localhost:3000"; // Use wss for cloud, corrected order
 const REMOTE_SPACETIMEDB_URI = "wss://maincloud.spacetimedb.com";
 
-const URI_TO_USE = REMOTE_SPACETIMEDB_URI;
+const URI_TO_USE = SPACETIMEDB_URI;
 
 class SpacetimeDBClient {
     // Initialize sdkClient to null, it will be set in handleConnect
@@ -79,6 +79,7 @@ class SpacetimeDBClient {
             .onError(this.handleSubscriptionError.bind(this))
             .subscribe([
                 "SELECT * FROM account",
+                "SELECT * FROM world",
                 "SELECT * FROM player",
                 "SELECT * FROM dead_players",
                 "SELECT * FROM entity",
@@ -193,6 +194,14 @@ class SpacetimeDBClient {
             }
         } catch (e) {
             console.warn("Could not register gem event handlers - the gems table might not be in current bindings yet:", e);
+        }
+
+        if(connection.db.world) {
+            connection.db.world.onUpdate((ctx, oldWorld, newWorld) => {
+                if(newWorld.tickCount % 50 == 0) {
+                    console.log("Game tick:", newWorld.tickCount);
+                }
+            });
         }
     }
 

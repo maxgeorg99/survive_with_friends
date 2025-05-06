@@ -83,6 +83,15 @@ public static partial class Module
         public float radius;          // Collision radius for this entity
     }
 
+    [SpacetimeDB.Table(Name = "world", Public = true)]
+    public partial struct World
+    {
+        [PrimaryKey]
+        public uint world_id;
+
+        public uint tick_count;
+    }
+
     [SpacetimeDB.Table(Name = "account", Public = true)]
     public partial struct Account
     {
@@ -140,6 +149,17 @@ public static partial class Module
     public static void Init(ReducerContext ctx)
     {
         Log.Info("Initializing game and scheduling game tick...");
+
+        //Initialize world        
+        if (ctx.Db.world.Count == 0)
+        {
+            // Insert default configuration
+            ctx.Db.world.Insert(new World
+            {
+                world_id = 0,
+                tick_count = 0
+            });
+        }
         
         // Initialize game configuration first
         InitGameConfig(ctx);

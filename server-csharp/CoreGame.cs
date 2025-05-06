@@ -539,6 +539,18 @@ public static partial class Module
             return;
         }
 
+        var worldOpt = ctx.Db.world.world_id.Find(0);
+        if (worldOpt != null)
+        {
+            var world = worldOpt.Value;
+            world.tick_count += 1;
+            if(world.tick_count % 50 == 0)
+            {
+                Log.Info($"Game tick: {world.tick_count}");
+            }
+            ctx.Db.world.world_id.Update(world);
+        }
+
         // Get world size from config
         uint worldSize = 20000; // Default fallback (10x larger)
         uint tick_rate = 50;
