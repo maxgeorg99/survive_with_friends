@@ -539,6 +539,18 @@ public static partial class Module
             return;
         }
 
+        var worldOpt = ctx.Db.world.world_id.Find(0);
+        if (worldOpt != null)
+        {
+            var world = worldOpt.Value;
+            world.tick_count += 1;
+            if(world.tick_count % 50 == 0)
+            {
+                Log.Info($"Game tick: {world.tick_count}");
+            }
+            ctx.Db.world.world_id.Update(world);
+        }
+
         // Get world size from config
         uint worldSize = 20000; // Default fallback (10x larger)
         uint tick_rate = 50;
@@ -626,19 +638,7 @@ public static partial class Module
     
     // Helper method to process collisions between attacks and monsters
     private static void ProcessMonsterAttackCollisions(ReducerContext ctx)
-    {
-        // Load all monsters with entities
-        var monsterEntities = new Dictionary<uint, (Entity entity, Monsters monster)>();
-        
-        foreach (var monster in ctx.Db.monsters.Iter())
-        {
-            var entityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
-            if (entityOpt != null)
-            {
-                monsterEntities[monster.entity_id] = (entityOpt.Value, monster);
-            }
-        }
-        
+    {        
         // Check each active attack for collisions with monsters
         foreach (var activeAttack in ctx.Db.active_attacks.Iter())
         {
@@ -654,22 +654,26 @@ public static partial class Module
             bool attackHitMonster = false;
             
             // Check for collisions with monsters
-            foreach (var monsterEntry in monsterEntities)
+            foreach (var monsterEntry in ctx.Db.monsters.Iter())
             {
-                uint monsterEntityId = monsterEntry.Key;
-                var (monsterEntity, monster) = monsterEntry.Value;
+                var monsterEntityOpt = ctx.Db.entity.entity_id.Find(monsterEntry.entity_id);
+                if(monsterEntityOpt == null)
+                {
+                    continue;
+                }
+                Entity monsterEntity = monsterEntityOpt.Value;
                 
                 // Check if the attack is colliding with this monster
                 if (AreEntitiesColliding(attackEntity, monsterEntity))
                 {
                     // Check if this monster has already been hit by this attack
-                    if (HasMonsterBeenHitByAttack(ctx, monster.monster_id, attackEntity.entity_id))
+                    if (HasMonsterBeenHitByAttack(ctx, monsterEntry.monster_id, attackEntity.entity_id))
                     {
                         continue; // Skip if monster already hit by this attack
                     }
                     
                     // Record the hit
-                    RecordMonsterHitByAttack(ctx, monster.monster_id, attackEntity.entity_id);
+                    RecordMonsterHitByAttack(ctx, monsterEntry.monster_id, attackEntity.entity_id);
                     
                     // Apply damage to monster using the active attack's damage value
                     uint damage = activeAttack.damage;
@@ -677,7 +681,7 @@ public static partial class Module
                     // Apply armor piercing if needed
                     // (Not implemented in this version)
                     
-                    bool monsterKilled = DamageMonster(ctx, monster.monster_id, damage);
+                    bool monsterKilled = DamageMonster(ctx, monsterEntry.monster_id, damage);
                     attackHitMonster = true;
                     
                     // For non-piercing attacks, stop checking other monsters and destroy the attack
@@ -706,32 +710,6 @@ public static partial class Module
     // Helper method to process collisions between players and monsters and apply damage
     private static void ProcessPlayerMonsterCollisions(ReducerContext ctx)
     {        
-        // Keep track of monster positions and types
-        var monsterEntities = new Dictionary<uint, Entity>();
-        var monsterAtks = new Dictionary<uint, float>();
-        
-        // Load all monsters with entities
-        foreach (var monster in ctx.Db.monsters.Iter())
-        {
-            var entityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
-            if (entityOpt != null)
-            {
-                monsterEntities[monster.entity_id] = entityOpt.Value;
-                
-                // Get monster attack value from bestiary
-                var bestiaryEntryOpt = ctx.Db.bestiary.bestiary_id.Find((uint)monster.bestiary_id);
-                if (bestiaryEntryOpt != null)
-                {
-                    monsterAtks[monster.entity_id] = bestiaryEntryOpt.Value.atk;
-                }
-                else
-                {
-                    // Default attack if bestiary entry not found
-                    monsterAtks[monster.entity_id] = 1.0f;
-                }
-            }
-        }
-        
         // Check each player for collisions with monsters
         foreach (var player in ctx.Db.player.Iter())
         {
@@ -746,19 +724,23 @@ public static partial class Module
             bool playerIsDead = false;
             
             // Check against each monster
-            foreach (var monsterEntry in monsterEntities)
+            foreach (var monsterEntry in ctx.Db.monsters.Iter())
             {
-                uint monsterId = monsterEntry.Key;
-                Entity monsterEntity = monsterEntry.Value;
+                uint monsterId = monsterEntry.monster_id;
+
+                Entity? monsterEntityOpt = ctx.Db.entity.entity_id.Find(monsterEntry.entity_id);
+                if(monsterEntityOpt == null)
+                {
+                    continue;
+                }
+
+                Entity monsterEntity = monsterEntityOpt.Value;
                 
                 // Check if player is colliding with this monster
                 if (AreEntitiesColliding(playerEntity, monsterEntity))
-                {
-                    // Get monster attack value
-                    float monsterAtk = monsterAtks.GetValueOrDefault(monsterId, 1.0f);
-                    
+                {                    
                     // Apply damage to player
-                    playerIsDead = DamagePlayer(ctx, player.player_id, monsterAtk);
+                    playerIsDead = DamagePlayer(ctx, player.player_id, monsterEntry.atk);
 
                     if(playerIsDead)
                     {

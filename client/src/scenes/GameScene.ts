@@ -136,6 +136,8 @@ export default class GameScene extends Phaser.Scene {
         left: false
     };
 
+    private gameOver: boolean = false;
+
     constructor() {
         super('GameScene');
         this.spacetimeDBClient = (window as any).spacetimeDBClient;
@@ -477,6 +479,8 @@ export default class GameScene extends Phaser.Scene {
             console.log("Showing regular death screen");
             this.showDeathScreen();
         }
+
+        this.gameOver = true;
     }
 
     private handleConnectionLost(_ctx:ErrorContext) {
@@ -1715,13 +1719,11 @@ export default class GameScene extends Phaser.Scene {
             // Update current direction
             this.currentDirection.set(dirX, dirY);
             this.isMoving = hasDirection;
-            
-            // Send movement direction to server
-            try {
+
+            if(!this.gameOver) 
+            {
                 this.spacetimeDBClient.sdkConnection?.reducers.updatePlayerDirection(dirX, dirY);
                 this.lastDirectionUpdateTime = time;
-            } catch (error) {
-                console.error("Error sending direction to server:", error);
             }
         }
         
