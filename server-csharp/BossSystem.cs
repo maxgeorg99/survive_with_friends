@@ -263,6 +263,8 @@ public static partial class Module
                 bestiary_id = MonsterType.FinalBossPhase2,
                 hp = bestiaryEntry.Value.max_hp,
                 max_hp = bestiaryEntry.Value.max_hp,
+                atk = bestiaryEntry.Value.atk,
+                speed = bestiaryEntry.Value.speed,
                 target_entity_id = closestPlayerId
             });
             
