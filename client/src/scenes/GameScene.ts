@@ -138,6 +138,9 @@ export default class GameScene extends Phaser.Scene {
 
     private gameOver: boolean = false;
 
+    // Add predicted position for client-side prediction
+    private predictedPosition: Phaser.Math.Vector2 | null = null;
+
     constructor() {
         super('GameScene');
         this.spacetimeDBClient = (window as any).spacetimeDBClient;
@@ -1653,106 +1656,126 @@ export default class GameScene extends Phaser.Scene {
     // Add the update method to handle player movement
     update(time: number, delta: number) {
         // Skip if local player sprite isn't initialized yet
-        if (!this.localPlayerSprite || !this.spacetimeDBClient?.sdkConnection?.db) {
-            return;
-        }
+        if (!this.localPlayerSprite || !this.isPlayerDataReady) return;
+
+        // Get entity radius using helper function
+        const entityRadius = this.getPlayerEntityRadius();
         
-        // Handle tap target if it exists
-        if (this.tapTarget) {
-            // Get entity radius
-            const entityRadius = this.getPlayerEntityRadius();
-            
-            // Clamp the tap target to valid world bounds
-            const clampedTarget = this.clampToWorldBounds(this.tapTarget, entityRadius);
-            
-            // Update tap target if it was clamped
-            if (clampedTarget.x !== this.tapTarget.x || clampedTarget.y !== this.tapTarget.y) {
-                this.tapTarget.set(clampedTarget.x, clampedTarget.y);
-                this.updateTapMarker();
+        // Calculate delta time in seconds
+        const deltaTime = delta / 1000;
+        
+        // Get current entity data from server
+        const entityData = this.spacetimeDBClient?.sdkConnection?.db?.entity.entityId.find(
+            this.localPlayerSprite.getData('entityId')
+        );
+        
+        if (!entityData) return;
+
+        // Get player data for accurate speed
+        const playerData = this.spacetimeDBClient?.sdkConnection?.db?.player.entityId.find(
+            entityData.entityId
+        );
+        
+        if (!playerData) return;
+
+        // Always update server position if available
+        if (this.serverPosition) {
+            const distX = this.serverPosition.x - this.localPlayerSprite.x;
+            const distY = this.serverPosition.y - this.localPlayerSprite.y;
+            const distSquared = distX * distX + distY * distY;
+
+            // If we're too far from server position, snap immediately
+            if (distSquared > POSITION_CORRECTION_THRESHOLD * 4) {
+                console.log(`Large position correction: ${Math.sqrt(distSquared).toFixed(2)} units`);
+                this.localPlayerSprite.x = this.serverPosition.x;
+                this.localPlayerSprite.y = this.serverPosition.y;
+                if (this.predictedPosition) {
+                    this.predictedPosition.set(this.serverPosition.x, this.serverPosition.y);
+                }
+            }
+            // Otherwise interpolate towards server position
+            else if (distSquared > POSITION_CORRECTION_THRESHOLD) {
+                // Use faster interpolation when correction needed
+                const correctionSpeed = INTERPOLATION_SPEED * 2;
+                this.localPlayerSprite.x += distX * correctionSpeed;
+                this.localPlayerSprite.y += distY * correctionSpeed;
+                if (this.predictedPosition) {
+                    this.predictedPosition.set(this.localPlayerSprite.x, this.localPlayerSprite.y);
+                }
             }
         }
+        
+        // If we have a waypoint and are moving, update predicted position
+        if (entityData.hasWaypoint && entityData.isMoving) {
+            // Initialize predicted position if needed
+            if (!this.predictedPosition) {
+                this.predictedPosition = new Phaser.Math.Vector2(
+                    this.localPlayerSprite.x,
+                    this.localPlayerSprite.y
+                );
+            }
+            
+            // Calculate direction to waypoint
+            const directionVector = new Phaser.Math.Vector2(
+                entityData.waypoint.x - this.predictedPosition.x,
+                entityData.waypoint.y - this.predictedPosition.y
+            );
+            
+            // Calculate distance to waypoint
+            const distanceToWaypoint = directionVector.length();
+            
+            // If we're close enough to the waypoint, stop moving
+            const WAYPOINT_REACHED_DISTANCE = 5.0;
+            if (distanceToWaypoint < WAYPOINT_REACHED_DISTANCE) {
+                // Reached waypoint, stop moving
+                this.isMoving = false;
+                this.currentDirection.set(0, 0);
+                this.predictedPosition.set(entityData.waypoint.x, entityData.waypoint.y);
+                
+                // Clear tap target and marker
+                this.tapTarget = null;
+                if (this.tapMarker) {
+                    this.tapMarker.setVisible(false);
+                }
+            } else {
+                // Continue moving towards waypoint
+                this.isMoving = true;
+                
+                // Use exact player speed from server
+                const playerSpeed = playerData.speed;
+                
+                // Calculate movement (slightly slower than server to avoid overshooting)
+                const moveDistance = playerSpeed * deltaTime * 0.9; // 90% of actual speed to stay behind server
+                const normalizedDirection = directionVector.normalize();
+                
+                // Update predicted position
+                this.predictedPosition.x += normalizedDirection.x * moveDistance;
+                this.predictedPosition.y += normalizedDirection.y * moveDistance;
+                
+                // Clamp predicted position to world bounds
+                const clampedPosition = this.clampToWorldBounds(this.predictedPosition, entityRadius);
+                this.predictedPosition.set(clampedPosition.x, clampedPosition.y);
+                
+                // Update sprite position with prediction
+                this.localPlayerSprite.x = this.predictedPosition.x;
+                this.localPlayerSprite.y = this.predictedPosition.y;
+            }
+        } else {
+            // Not moving or no waypoint
+            this.isMoving = false;
+            this.currentDirection.set(0, 0);
+            this.predictedPosition = null; // Clear prediction when not moving
+        }
+
+        // Always update depth and UI after any position change
+        this.localPlayerSprite.setDepth(BASE_DEPTH + this.localPlayerSprite.y);
+        this.updatePlayerUI();
 
         // Update upgrade UI if it exists
         if (this.upgradeUI) {
             this.upgradeUI.update(time, delta);
         }
 
-        // If server has sent an updated position that's far from our prediction, correct it
-        if (this.serverPosition && this.localPlayerSprite) {
-            // Get entity radius using helper function
-            const entityRadius = this.getPlayerEntityRadius();
-            
-            // Clamp server position to world bounds
-            const clampedServerPosition = this.clampToWorldBounds(this.serverPosition, entityRadius);
-            
-            // Calculate distance to clamped server position
-            const distX = clampedServerPosition.x - this.localPlayerSprite.x;
-            const distY = clampedServerPosition.y - this.localPlayerSprite.y;
-            const distSquared = distX * distX + distY * distY;
-
-            // If we have a tap target, check if we've reached it
-            if (this.tapTarget) {
-                const distToTargetX = this.tapTarget.x - this.localPlayerSprite.x;
-                const distToTargetY = this.tapTarget.y - this.localPlayerSprite.y;
-                const distToTargetSquared = distToTargetX * distToTargetX + distToTargetY * distToTargetY;
-                
-                // If we're close enough to the target (within 5 pixels), clear the tap target
-                if (distToTargetSquared < 25) { // 5 squared
-                    this.tapTarget = null;
-                    this.tapMarker?.setVisible(false);
-                }
-            }
-            
-            // If difference is significant, update to match server position
-            if (distSquared > POSITION_CORRECTION_THRESHOLD) {
-                // Interpolate position
-                this.localPlayerSprite.x += distX * INTERPOLATION_SPEED;
-                this.localPlayerSprite.y += distY * INTERPOLATION_SPEED;
-                
-                // Update the depth based on new Y position
-                this.localPlayerSprite.setDepth(BASE_DEPTH + this.localPlayerSprite.y);
-                
-                // Update UI elements with interpolated position and depth
-                if (this.localPlayerNameText) {
-                    this.localPlayerNameText.x = this.localPlayerSprite.x;
-                    this.localPlayerNameText.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - NAME_OFFSET_Y;
-                    this.localPlayerNameText.setDepth(BASE_DEPTH + this.localPlayerSprite.y + NAME_DEPTH_OFFSET);
-                }
-                
-                if (this.localPlayerShadow) {
-                    this.localPlayerShadow.x = this.localPlayerSprite.x;
-                    this.localPlayerShadow.y = this.localPlayerSprite.y + SHADOW_OFFSET_Y;
-                    this.localPlayerShadow.setDepth(BASE_DEPTH + this.localPlayerSprite.y + SHADOW_DEPTH_OFFSET);
-                }
-                
-                // Update health bar with interpolated position and depth
-                const healthBarBackground = this.localPlayerSprite.getData('healthBarBackground');
-                const healthBar = this.localPlayerSprite.getData('healthBar');
-                if (healthBarBackground && healthBar) {
-                    healthBarBackground.x = this.localPlayerSprite.x;
-                    healthBarBackground.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
-                    healthBarBackground.setDepth(BASE_DEPTH + this.localPlayerSprite.y + HEALTH_BAR_DEPTH_OFFSET);
-                    
-                    healthBar.x = this.localPlayerSprite.x - (HEALTH_BAR_WIDTH / 2);
-                    healthBar.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
-                    healthBar.setDepth(BASE_DEPTH + this.localPlayerSprite.y + HEALTH_BAR_DEPTH_OFFSET);
-                }
-
-                // Update exp bar with interpolated position and depth
-                const expBarBackground = this.localPlayerSprite.getData('expBarBackground');
-                const expBar = this.localPlayerSprite.getData('expBar');
-                if (expBarBackground && expBar) {
-                    expBarBackground.x = this.localPlayerSprite.x;
-                    expBarBackground.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
-                    expBarBackground.setDepth(BASE_DEPTH + this.localPlayerSprite.y + EXP_BG_DEPTH_OFFSET);
-                    
-                    expBar.x = this.localPlayerSprite.x - (EXP_BAR_WIDTH / 2);
-                    expBar.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
-                    expBar.setDepth(BASE_DEPTH + this.localPlayerSprite.y + EXP_BAR_DEPTH_OFFSET);
-                }
-            }
-        }
-        
         // Update minimap
         this.updateMinimap();
     }
@@ -2667,5 +2690,50 @@ export default class GameScene extends Phaser.Scene {
                 }
             }
         });
+    }
+
+    // Add updatePlayerUI method
+    private updatePlayerUI() {
+        if (!this.localPlayerSprite) return;
+
+        // Update name text
+        if (this.localPlayerNameText) {
+            this.localPlayerNameText.x = this.localPlayerSprite.x;
+            this.localPlayerNameText.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - NAME_OFFSET_Y;
+            this.localPlayerNameText.setDepth(BASE_DEPTH + this.localPlayerSprite.y + NAME_DEPTH_OFFSET);
+        }
+
+        // Update shadow
+        if (this.localPlayerShadow) {
+            this.localPlayerShadow.x = this.localPlayerSprite.x;
+            this.localPlayerShadow.y = this.localPlayerSprite.y + SHADOW_OFFSET_Y;
+            this.localPlayerShadow.setDepth(BASE_DEPTH + this.localPlayerSprite.y + SHADOW_DEPTH_OFFSET);
+        }
+
+        // Update health bar
+        const healthBarBackground = this.localPlayerSprite.getData('healthBarBackground');
+        const healthBar = this.localPlayerSprite.getData('healthBar');
+        if (healthBarBackground && healthBar) {
+            healthBarBackground.x = this.localPlayerSprite.x;
+            healthBarBackground.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
+            healthBarBackground.setDepth(BASE_DEPTH + this.localPlayerSprite.y + HEALTH_BAR_DEPTH_OFFSET);
+            
+            healthBar.x = this.localPlayerSprite.x - (HEALTH_BAR_WIDTH / 2);
+            healthBar.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
+            healthBar.setDepth(BASE_DEPTH + this.localPlayerSprite.y + HEALTH_BAR_DEPTH_OFFSET);
+        }
+
+        // Update exp bar
+        const expBarBackground = this.localPlayerSprite.getData('expBarBackground');
+        const expBar = this.localPlayerSprite.getData('expBar');
+        if (expBarBackground && expBar) {
+            expBarBackground.x = this.localPlayerSprite.x;
+            expBarBackground.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
+            expBarBackground.setDepth(BASE_DEPTH + this.localPlayerSprite.y + EXP_BG_DEPTH_OFFSET);
+            
+            expBar.x = this.localPlayerSprite.x - (EXP_BAR_WIDTH / 2);
+            expBar.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
+            expBar.setDepth(BASE_DEPTH + this.localPlayerSprite.y + EXP_BAR_DEPTH_OFFSET);
+        }
     }
 }
