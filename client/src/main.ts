@@ -3,6 +3,7 @@ import GameScene from './scenes/GameScene';
 import LoginScene from './scenes/LoginScene';
 import ClassSelectScene from './scenes/ClassSelectScene';
 import LoadingScene from './scenes/LoadingScene';
+import QuestScene from './scenes/QuestScene';
 import { Identity } from '@clockworklabs/spacetimedb-sdk';
 import SpacetimeDBClient from './SpacetimeDBClient';
 import { DbConnection, ErrorContext, Player, SubscriptionEventContext } from './autobindings';
@@ -33,7 +34,7 @@ const config: Phaser.Types.Core.GameConfig = {
             // debug: true // Set to true for physics debugging
         }
     },
-    scene: [LoginScene, ClassSelectScene, GameScene, LoadingScene],
+    scene: [LoginScene, ClassSelectScene, GameScene, LoadingScene, QuestScene],
     scale: {
         mode: Phaser.Scale.RESIZE,
         autoCenter: Phaser.Scale.CENTER_BOTH
@@ -413,4 +414,4 @@ const spacetimeDBClient = new SpacetimeDBClient(onSubscriptionApplied, onConnect
 // Ensure the client instance is accessible globally or passed to scenes as needed
 (window as any).spacetimeDBClient = spacetimeDBClient;
 
-console.log("Main script finished loading."); 
+console.log("Main script finished loading.");

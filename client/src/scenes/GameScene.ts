@@ -59,7 +59,7 @@ const POSITION_CORRECTION_THRESHOLD = 49; // Distance squared threshold for posi
 
 // Asset keys for different player classes
 const CLASS_ASSET_KEYS: Record<string, string> = {
-    "Fighter": 'player_fighter',
+    "Fighter": 'player_fighter',  // These should match the keys used in preload()
     "Rogue": 'player_rogue',
     "Mage": 'player_mage',
     "Paladin": 'player_paladin'
@@ -160,7 +160,9 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('monster_spawn_indicator', '/assets/monster_spawn_indicator.png');
         
         // Load boss monster assets
-        this.load.image('final_boss_phase1', '/assets/final_boss_phase_1.png');
+
+        //Add assets for Jorge & Simon
+        this.load.image('final_boss_phase1', '/assets/final_boss_simon_phase_1.png');
         this.load.image('final_boss_phase2', '/assets/final_boss_phase_2.png');
         
         // Load attack assets
@@ -214,6 +216,9 @@ export default class GameScene extends Phaser.Scene {
 
     create() {
         console.log("GameScene create started.");
+
+        // Debug: Log all available textures
+        console.log("Available textures:", Object.keys(this.textures.list));
 
         // Clean up any lingering UI elements from other scenes
         this.cleanupLingeringUIElements();

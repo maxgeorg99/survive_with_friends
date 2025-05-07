@@ -23,7 +23,6 @@ export default class LoginScene extends Phaser.Scene {
     preload() {
         // Load assets needed for the login screen
         this.load.image('title_bg', '/assets/title_bg.png');
-        this.load.image('button', '/assets/button.png');
     }
 
     create() {
@@ -398,4 +397,4 @@ export default class LoginScene extends Phaser.Scene {
             console.error("Error in forceCleanupDOMElements:", e);
         }
     }
-} 
+}
