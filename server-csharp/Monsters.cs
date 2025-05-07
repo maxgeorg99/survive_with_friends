@@ -290,7 +290,6 @@ public static partial class Module
             }
             var monsterEntity = monsterEntityOpt.Value;
 
-
             // Get the target entity
             var targetEntityOpt = ctx.Db.entity.entity_id.Find(monster.target_entity_id);
             if (targetEntityOpt == null)
@@ -336,6 +335,8 @@ public static partial class Module
                 // Check for collisions with other monsters and calculate avoidance vectors
                 var avoidanceVector = new DbVector2(0, 0);
                 
+                //TODO: bring back repulsion!
+                /*
                 foreach (var otherMonsterEntry in ctx.Db.monsters.Iter())
                 {
                     if(otherMonsterEntry.monster_id == monster.monster_id)
@@ -363,7 +364,9 @@ public static partial class Module
                         avoidanceVector.x += repulsion.x;
                         avoidanceVector.y += repulsion.y;
                     }
+                    
                 }
+                */
                 
                 // Combine the target direction with the avoidance vector
                 // We give more weight to avoidance to ensure monsters don't stack

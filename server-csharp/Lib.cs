@@ -81,6 +81,10 @@ public static partial class Module
         public DbVector2 direction;   // Direction vector (normalized)
         public bool is_moving;        // Whether entity is actively moving
         public float radius;          // Collision radius for this entity
+        
+        // Added waypoint for tap-to-move
+        public DbVector2 waypoint;    // Target position for movement
+        public bool has_waypoint;     // Whether entity has an active waypoint
     }
 
     [SpacetimeDB.Table(Name = "world", Public = true)]
@@ -389,7 +393,9 @@ public static partial class Module
             position = position,
             direction = new DbVector2(0, 0), // Default direction
             is_moving = false, // Not moving by default
-            radius = 48.0f // Player collision radius
+            radius = 48.0f, // Player collision radius
+            waypoint = new DbVector2(0, 0), // Default waypoint
+            has_waypoint = false // Default waypoint status
         });
 
         // Check if entity insertion failed

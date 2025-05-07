@@ -29,13 +29,6 @@ export default class BossTimerUI {
         this.container = this.scene.add.container(0, 0);
         this.container.setDepth(UI_DEPTH);
         
-        // Set initial position at top center of camera view
-        const camera = this.scene.cameras.main;
-        if (camera) {
-            this.container.x = camera.scrollX + camera.width / 2;
-            this.container.y = camera.scrollY + 40; // Position at the top
-        }
-        
         // Create background for timer - wider to fit longer text
         this.timerBackground = this.scene.add.rectangle(0, 0, 300, 40, 0x000000, 0.7);
         this.timerBackground.setStrokeStyle(2, 0x444444);
@@ -52,19 +45,33 @@ export default class BossTimerUI {
         });
         this.timerText.setOrigin(0.5, 0.5);
         
-        // Add elements to container (removed icon)
+        // Add elements to container
         this.container.add([this.timerBackground, this.timerText]);
         
-        // Hide initially until we know a boss is coming
-        this.container.setVisible(false);
+        // Set initial position at top center of camera view
+        const camera = this.scene.cameras.main;
+        if (camera) {
+            this.container.setPosition(
+                camera.scrollX + camera.width / 2,
+                camera.scrollY + 40
+            );
+        }
+        
+        // Add update callback to scene
+        this.scene.events.on('update', this.update, this);
         
         // Register event listeners
         this.registerEventListeners();
         
-        // Check for existing boss spawn timer in the database
+        // Check for existing boss timer in the database
         this.checkForExistingBossTimer();
         
-        console.log('BossTimerUI initialized');
+        console.log('BossTimerUI initialized', {
+            containerVisible: this.container.visible,
+            containerPosition: { x: this.container.x, y: this.container.y },
+            containerDepth: this.container.depth,
+            containerAlpha: this.container.alpha
+        });
     }
 
     private registerEventListeners(): void {
@@ -187,36 +194,65 @@ export default class BossTimerUI {
     }
 
     public update(time: number, delta: number): void {
-        // Update position based on camera view
+        // Update position to follow camera
         const camera = this.scene.cameras.main;
         if (camera) {
-            this.container.x = camera.scrollX + camera.width / 2;
-            this.container.y = camera.scrollY + 40; // Position at the top
+            this.container.setPosition(
+                camera.scrollX + camera.width / 2,
+                camera.scrollY + 40 // Fixed distance from top of screen
+            );
         }
         
-        // Update timer if active
-        if (this.isTimerActive && this.bossSpawnTime) {
-            const now = Date.now();
-            const timeRemaining = Math.max(0, this.bossSpawnTime - now);
-            
-            if (timeRemaining <= 0) {
-                // Timer expired but boss hasn't spawned yet
-                this.timerText.setText("End of the world: IMMINENT!");
-                
-                // Start flashing if not already
-                if (!this.flashAnimation) {
-                    this.startWarningFlash(true);
-                }
-            } else {
-                // Format remaining time as MM:SS
-                const minutes = Math.floor(timeRemaining / 60000);
-                const seconds = Math.floor((timeRemaining % 60000) / 1000);
-                const timeString = `End of the world in: ${minutes}:${seconds.toString().padStart(2, '0')}`;
-                this.timerText.setText(timeString);
-                
-                // Start warning animation when approaching boss time
-                if (timeRemaining <= WARNING_THRESHOLD && !this.flashAnimation) {
-                    this.startWarningFlash(false);
+        // Update timer text if game state exists
+        if (this.spacetimeClient.sdkConnection?.db) {
+            const gameState = this.spacetimeClient.sdkConnection.db.gameState.id.find(0);
+            if (gameState) {
+                // Show timer if we have a boss spawn timer
+                const bossTimers = Array.from(this.spacetimeClient.sdkConnection.db.bossSpawnTimer.iter());
+                if (bossTimers.length > 0 && !gameState.bossActive) {
+                    // Force visibility and check container properties
+                    this.container.setVisible(true);
+                    this.container.setAlpha(1);
+                    
+                    // Get current time and calculate remaining time
+                    const now = Date.now();
+                    const timestamp = this.extractTimestampFromTimer(bossTimers[0]);
+                    if (timestamp) {
+                        const timeRemaining = Math.max(0, (timestamp - now) / 1000); // Convert to seconds
+                        const minutes = Math.floor(timeRemaining / 60);
+                        const seconds = Math.floor(timeRemaining % 60);
+                        
+                        if (timeRemaining > 0) {
+                            this.timerText.setText(`End of the world in: ${minutes}:${seconds.toString().padStart(2, '0')}`);
+                            
+                            // Start warning flash if time is running low
+                            if (timeRemaining <= 60 && !this.flashAnimation) {
+                                this.startWarningFlash(timeRemaining <= 10);
+                            }
+                        } else {
+                            this.timerText.setText("End of the world: IMMINENT!");
+                            if (!this.flashAnimation) {
+                                this.startWarningFlash(true);
+                            }
+                        }
+                        
+                        // Log container state periodically
+                        if (time % 1000 < 16) { // Log roughly every second
+                            console.log('BossTimerUI state:', {
+                                containerVisible: this.container.visible,
+                                containerPosition: { x: this.container.x, y: this.container.y },
+                                containerDepth: this.container.depth,
+                                containerAlpha: this.container.alpha,
+                                timeRemaining: timeRemaining
+                            });
+                        }
+                    }
+                } else {
+                    this.container.setVisible(false);
+                    if (this.flashAnimation) {
+                        this.flashAnimation.stop();
+                        this.flashAnimation = null;
+                    }
                 }
             }
         }
@@ -245,6 +281,9 @@ export default class BossTimerUI {
     }
 
     public destroy(): void {
+        // Remove update callback
+        this.scene.events.off('update', this.update, this);
+        
         // Clean up event listeners
         this.gameEvents.off(GameEvents.GAME_STATE_UPDATED, this.handleGameStateUpdated, this);
         this.gameEvents.off(GameEvents.BOSS_SPAWN_TIMER_CREATED, this.handleBossTimerCreated, this);

@@ -61,8 +61,7 @@ export default class UpgradeUI {
         // Create container for all upgrade UI elements
         this.container = this.scene.add.container(0, 0);
         this.container.setDepth(UI_DEPTH);
-        this.container.setVisible(false);
-
+        
         // Create keyboard input for number keys 1-3
         this.keyListeners = [
             this.scene.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.ONE),
@@ -70,9 +69,8 @@ export default class UpgradeUI {
             this.scene.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.THREE)
         ].filter((key): key is Phaser.Input.Keyboard.Key => key !== undefined);
 
-        // Create reroll text with instruction 
-        /*
-        this.rerollText = this.scene.add.text(0, -CARD_HEIGHT, "Press R to reroll (Available: 0)", {
+        // Create reroll text with instruction
+        this.rerollText = this.scene.add.text(0, -CARD_HEIGHT / 2 - 40, "Press R to reroll (Available: 0)", {
             fontSize: '18px',
             fontFamily: 'Arial',
             color: '#ffffff',
@@ -81,7 +79,6 @@ export default class UpgradeUI {
         });
         this.rerollText.setOrigin(0.5);
         this.container.add(this.rerollText);
-        */
 
         console.log('UpgradeUI initialized');
     }
@@ -92,8 +89,19 @@ export default class UpgradeUI {
         // Position the container at the bottom of the camera
         const camera = this.scene.cameras.main;
         if (camera) {
-            this.container.x = camera.scrollX + camera.width / 2;
-            this.container.y = camera.scrollY + camera.height - CARD_HEIGHT / 2 - 20;
+            this.container.setPosition(
+                camera.scrollX + camera.width / 2,
+                camera.scrollY + camera.height - CARD_HEIGHT / 2 - 20
+            );
+        }
+
+        // Update reroll text if player data is available
+        if (this.rerollText && this.spacetimeClient.sdkConnection?.db) {
+            const player = this.spacetimeClient.sdkConnection.db.player.playerId.find(this.localPlayerId);
+            if (player && player.rerolls !== undefined) {
+                this.rerollText.setText(`Press R to reroll (Available: ${player.rerolls})`);
+                this.rerollText.setVisible(this.isVisible);
+            }
         }
 
         // Check for number key presses
@@ -109,19 +117,13 @@ export default class UpgradeUI {
         console.log('Setting upgrade options:', options);
         this.upgradeOptions = options;
         
-        // Update reroll text with current count if player data is available
-        if (this.rerollText && this.spacetimeClient.sdkConnection?.db) {
-            const player = this.spacetimeClient.sdkConnection.db.player.playerId.find(this.localPlayerId);
-            if (player && player.rerolls !== undefined) {
-                this.rerollText.setText(`Press R to reroll (Available: ${player.rerolls})`);
-            }
-        }
-        
         if (options.length > 0) {
             this.createUpgradeCards();
             this.show();
+            console.log("UpgradeUI shown with options");
         } else {
             this.hide();
+            console.log("UpgradeUI hidden - no options");
         }
     }
 
@@ -321,11 +323,13 @@ export default class UpgradeUI {
     }
 
     public show(): void {
+        console.log("Showing UpgradeUI");
         this.isVisible = true;
         this.container.setVisible(true);
     }
 
     public hide(): void {
+        console.log("Hiding UpgradeUI");
         this.isVisible = false;
         this.container.setVisible(false);
     }

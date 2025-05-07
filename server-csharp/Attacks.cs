@@ -503,18 +503,12 @@ public static partial class Module
     }
     
     // Helper method to process attack movements - moved from CoreGame.cs
-    public static void ProcessAttackMovements(ReducerContext ctx, uint worldSize)
+    public static void ProcessAttackMovements(ReducerContext ctx)
     {
         // Process each active attack
         foreach (var rawActiveAttack in ctx.Db.active_attacks.Iter())
         {
-            var activeAttackOpt = ctx.Db.active_attacks.active_attack_id.Find(rawActiveAttack.active_attack_id);
-            if (activeAttackOpt == null)
-            {
-                continue; // Skip if active attack not found
-            }
-
-            var activeAttack = activeAttackOpt.Value;
+            var activeAttack = rawActiveAttack;
 
             activeAttack.ticks_elapsed += 1; 
             ctx.Db.active_attacks.active_attack_id.Update(activeAttack);
@@ -592,18 +586,6 @@ public static partial class Module
                     playerEntity.position.y + offsetY
                 );
                 
-                // Apply world boundary clamping
-                updatedEntity.position.x = Math.Clamp(
-                    updatedEntity.position.x, 
-                    updatedEntity.radius, 
-                    worldSize - updatedEntity.radius
-                );
-                updatedEntity.position.y = Math.Clamp(
-                    updatedEntity.position.y, 
-                    updatedEntity.radius, 
-                    worldSize - updatedEntity.radius
-                );
-                
                 ctx.Db.entity.entity_id.Update(updatedEntity);
             }
             else
@@ -619,39 +601,7 @@ public static partial class Module
                 var updatedEntity = entity;
                 updatedEntity.position = entity.position + moveOffset;
                 
-                // Apply world boundary clamping
-                updatedEntity.position.x = Math.Clamp(
-                    updatedEntity.position.x, 
-                    updatedEntity.radius, 
-                    worldSize - updatedEntity.radius
-                );
-                updatedEntity.position.y = Math.Clamp(
-                    updatedEntity.position.y, 
-                    updatedEntity.radius, 
-                    worldSize - updatedEntity.radius
-                );
-                
-                // Check if entity hit the world boundary, if so mark for deletion
-                bool hitBoundary = 
-                    updatedEntity.position.x <= updatedEntity.radius ||
-                    updatedEntity.position.x >= worldSize - updatedEntity.radius ||
-                    updatedEntity.position.y <= updatedEntity.radius ||
-                    updatedEntity.position.y >= worldSize - updatedEntity.radius;
-                
-                if (hitBoundary)
-                {
-                    // Delete attack entity and active attack record
-                    ctx.Db.entity.entity_id.Delete(entity.entity_id);
-                    ctx.Db.active_attacks.active_attack_id.Delete(activeAttack.active_attack_id);
-                    
-                    // Clean up any damage records associated with this attack
-                    CleanupAttackDamageRecords(ctx, entity.entity_id);
-                }
-                else
-                {
-                    // Update entity position
-                    ctx.Db.entity.entity_id.Update(updatedEntity);
-                }
+                ctx.Db.entity.entity_id.Update(updatedEntity);
             }
         }
     }

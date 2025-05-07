@@ -29,7 +29,7 @@ public enum AttackStat
 
 public static partial class Module
 {
-    [SpacetimeDB.Table(Name = "upgrade_options", Public = true)    ]
+    [SpacetimeDB.Table(Name = "upgrade_options", Public = true)]
     public partial struct UpgradeOptionData
     {
         [PrimaryKey, AutoInc]

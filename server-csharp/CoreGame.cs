@@ -266,9 +266,6 @@ public static partial class Module
             monster.hp -= damageAmount;
             ctx.Db.monsters.monster_id.Update(monster);
             
-            // Log the damage
-            Log.Info($"Monster {monster.monster_id} (type: {monster.bestiary_id}) took {damageAmount} damage. HP: {monster.hp}/{monster.max_hp}");
-            
             return false;
         }
     }
@@ -563,7 +560,7 @@ public static partial class Module
 
         ProcessPlayerMovement(ctx, tick_rate, worldSize);
         ProcessMonsterMovements(ctx);
-        ProcessAttackMovements(ctx, worldSize);
+        ProcessAttackMovements(ctx);
 
         ProcessPlayerMonsterCollisions(ctx);
         ProcessMonsterAttackCollisions(ctx);
@@ -578,20 +575,16 @@ public static partial class Module
             // Update player status
             if(player.spawn_grace_period_remaining > 0)
             {
-                var playerOpt = ctx.Db.player.player_id.Find(player.player_id);
-                if(playerOpt != null)
+                var modifiedPlayer = player;
+                if(modifiedPlayer.spawn_grace_period_remaining >= tick_rate)
                 {
-                    var modifiedPlayer = playerOpt.Value;
-                    if(modifiedPlayer.spawn_grace_period_remaining >= tick_rate)
-                    {
-                        modifiedPlayer.spawn_grace_period_remaining -= tick_rate;
-                    }
-                    else
-                    {   
-                        modifiedPlayer.spawn_grace_period_remaining = 0;
-                    }
-                    ctx.Db.player.player_id.Update(modifiedPlayer);
+                    modifiedPlayer.spawn_grace_period_remaining -= tick_rate;
                 }
+                else
+                {   
+                    modifiedPlayer.spawn_grace_period_remaining = 0;
+                }
+                ctx.Db.player.player_id.Update(modifiedPlayer);
             }
 
             // Process player movement
@@ -606,14 +599,35 @@ public static partial class Module
 
             var entity = entityOpt.Value;
 
-            if (!entity.is_moving)
+            if (!entity.is_moving || !entity.has_waypoint)
             {
+                continue;
+            }
+            
+            // Calculate direction to waypoint
+            var directionVector = new DbVector2(
+                entity.waypoint.x - entity.position.x,
+                entity.waypoint.y - entity.position.y
+            );
+            
+            // Calculate distance to waypoint
+            float distanceToWaypoint = directionVector.Magnitude();
+            
+            // If we're close enough to the waypoint, stop moving
+            const float WAYPOINT_REACHED_DISTANCE = 5.0f;
+            if (distanceToWaypoint < WAYPOINT_REACHED_DISTANCE)
+            {
+                // Reached waypoint, stop moving
+                entity.is_moving = false;
+                entity.has_waypoint = false;
+                entity.direction = new DbVector2(0, 0);
+                ctx.Db.entity.entity_id.Update(entity);
                 continue;
             }
             
             // Calculate new position based on direction, speed and time delta
             float moveDistance = moveSpeed * DELTA_TIME;
-            var moveOffset = entity.direction * moveDistance;
+            var moveOffset = directionVector.Normalize() * moveDistance;
             
             // Update entity with new position
             var updatedEntity = entity;
@@ -825,5 +839,79 @@ public static partial class Module
         
         // Delete the damage record
         ctx.Db.monster_damage.damage_id.Delete(cleanup.damage_id);
+    }
+
+    [Reducer]
+    public static void SetPlayerWaypoint(ReducerContext ctx, float waypointX, float waypointY)
+    {
+        // Get the identity of the caller
+        var identity = ctx.Sender;
+        
+        //Find the account for the caller   
+        var accountOpt = ctx.Db.account.identity.Find(identity);
+        if (accountOpt is null)
+        {
+            throw new Exception($"SetPlayerWaypoint: Account {identity} does not exist.");
+        }
+
+        var account = accountOpt.Value;
+        var player_id = account.current_player_id;
+
+        var playerOpt = ctx.Db.player.player_id.Find(player_id);
+        if (playerOpt is null)
+        {
+            throw new Exception($"SetPlayerWaypoint: Player {player_id} does not exist.");
+        }
+        var player = playerOpt.Value;
+        
+        // Find the entity associated with this player
+        var entityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
+        if (entityOpt is null)
+        {
+            throw new Exception($"SetPlayerWaypoint: Player {player_id} (entity_id: {player.entity_id}) has no matching entity!");
+        }
+        
+        // Get world size from config for boundary checking
+        uint worldSize = 20000; // Default fallback
+        var configOpt = ctx.Db.config.id.Find(0);
+        if (configOpt != null)
+        {
+            worldSize = configOpt.Value.world_size;
+        }
+        
+        // Clamp waypoint to world boundaries using entity radius
+        var entity = entityOpt.Value;
+        var waypoint = new DbVector2(
+            Math.Clamp(waypointX, entity.radius, worldSize - entity.radius),
+            Math.Clamp(waypointY, entity.radius, worldSize - entity.radius)
+        );
+        
+        // Update entity with new waypoint
+        entity.waypoint = waypoint;
+        entity.has_waypoint = true;
+        entity.is_moving = true;
+        
+        // Calculate direction to waypoint
+        var directionVector = new DbVector2(
+            waypoint.x - entity.position.x,
+            waypoint.y - entity.position.y
+        );
+        
+        // Only set direction if we're not at the waypoint
+        if (directionVector.Magnitude() > 0.1f)
+        {
+            entity.direction = directionVector.Normalize();
+        }
+        else
+        {
+            entity.direction = new DbVector2(0, 0);
+            entity.is_moving = false;
+            entity.has_waypoint = false;
+        }
+        
+        // Update the entity in the database
+        ctx.Db.entity.entity_id.Update(entity);
+        
+        Log.Info($"Set waypoint for player {player.name} to ({waypoint.x}, {waypoint.y})");
     }
 }

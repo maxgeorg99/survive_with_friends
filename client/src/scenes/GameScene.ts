@@ -254,33 +254,21 @@ export default class GameScene extends Phaser.Scene {
         console.log("Boss timer UI initialized.");
         
         // Setup touch input
-        this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-            if (pointer.isDown && this.localPlayerSprite) {
-                this.tapTarget = new Phaser.Math.Vector2(pointer.worldX, pointer.worldY);
-                this.updateTapMarker();
-            }
-        });
-        this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-            if (this.localPlayerSprite) {
-                this.tapTarget = new Phaser.Math.Vector2(pointer.worldX, pointer.worldY);
-                this.updateTapMarker();
-            }
-        });
-        this.input.on('pointerup', () => {
-            // Don't clear tap target, we want to continue moving toward the target
-        });
+        this.setupTouchInput();
         console.log("Touch input set up.");
 
-        // Create tap marker using shape graphics instead of texture
-        // This is more reliable than the texture generation approach
-        // Make the outer circle more transparent (0.3 instead of 0.6)
+        // Create tap marker container
+        const tapMarkerContainer = this.add.container(0, 0);
+        
+        // Create outer circle
         const outerCircle = this.add.circle(0, 0, 32, 0xffffff, 0.3);
-        // Make the inner circle more transparent (0.5 instead of 0.8)
+        
+        // Create inner circle
         const innerCircle = this.add.circle(0, 0, 16, 0x00ffff, 0.5);
         
-        // Create an X using line graphics with reduced alpha
+        // Create an X using line graphics
         const crossGraphics = this.add.graphics();
-        crossGraphics.lineStyle(4, 0xffffff, 0.7); // Reduced alpha from 1.0 to 0.7
+        crossGraphics.lineStyle(4, 0xffffff, 0.7);
         crossGraphics.beginPath();
         crossGraphics.moveTo(-8, -8);
         crossGraphics.lineTo(8, 8);
@@ -289,18 +277,16 @@ export default class GameScene extends Phaser.Scene {
         crossGraphics.closePath();
         crossGraphics.strokePath();
         
-        // Group them all together
-        const container = this.add.container(0, 0, [outerCircle, innerCircle, crossGraphics]);
-        this.tapMarker = container;
+        // Add all elements to the container
+        tapMarkerContainer.add([outerCircle, innerCircle, crossGraphics]);
         
-        if (this.tapMarker) {
-            this.tapMarker.setVisible(false);
-            // Set depth to 0.5 - above floor (0) but below players (1)
-            this.tapMarker.setDepth(0.5);
-            // Add a slight overall alpha to the entire container
-            this.tapMarker.setAlpha(0.8);
-        }
-        console.log("Tap marker set up.");
+        // Set initial state
+        tapMarkerContainer.setVisible(false);
+        tapMarkerContainer.setDepth(100); // Just above grass (0) but below everything else
+        
+        // Store the container
+        this.tapMarker = tapMarkerContainer;
+        console.log("Tap marker created", { marker: this.tapMarker });
 
         // Background - Make it large enough to feel like a world
         const worldSize = 20000; // World size - 10x larger
@@ -412,6 +398,22 @@ export default class GameScene extends Phaser.Scene {
             // Play level up effect
             if (this.localPlayerSprite) {
                 this.createLevelUpEffect(this.localPlayerSprite);
+            }
+
+            // Initialize upgrade UI if not already done
+            if (!this.upgradeUI && this.localPlayerId > 0) {
+                this.upgradeUI = new UpgradeUI(this, this.spacetimeDBClient, this.localPlayerId);
+            }
+            
+            // Check for upgrade options
+            if (this.upgradeUI) {
+                const playerUpgrades = Array.from(ctx.db.upgradeOptions.iter())
+                    .filter(option => option.playerId === this.localPlayerId);
+                
+                if (playerUpgrades.length > 0) {
+                    console.log("Setting upgrade options:", playerUpgrades);
+                    this.upgradeUI.setUpgradeOptions(playerUpgrades);
+                }
             }
         }
 
@@ -601,6 +603,9 @@ export default class GameScene extends Phaser.Scene {
             console.log("Creating new player sprite at position:", entityData.position);
             this.localPlayerSprite = this.physics.add.sprite(entityData.position.x, entityData.position.y, spriteKey);
             this.localPlayerSprite.setDepth(BASE_DEPTH + entityData.position.y);
+            
+            // Store the entity ID for later reference
+            this.localPlayerSprite.setData('entityId', entityData.entityId);
             
             // Add shadow
             this.localPlayerShadow = this.add.image(entityData.position.x, entityData.position.y, SHADOW_ASSET_KEY);
@@ -1581,28 +1586,36 @@ export default class GameScene extends Phaser.Scene {
     }
 
     updateTapMarker() {
-        if (!this.tapMarker) {
-            console.warn("Cannot update tap marker - it doesn't exist!");
+        if (!this.tapMarker || !this.tapTarget) {
+            console.log("Cannot update tap marker - marker or target missing", {
+                hasMarker: !!this.tapMarker,
+                hasTarget: !!this.tapTarget
+            });
             return;
         }
         
-        if (this.tapTarget) {
-            // Position marker at tap target and make visible
-            // Add larger vertical offset to align with character feet (SHADOW_OFFSET_Y + 10)
-            this.tapMarker.setPosition(this.tapTarget.x, this.tapTarget.y + SHADOW_OFFSET_Y + 20);
-            this.tapMarker.setVisible(true);
-            
-            // Add a small animation to make it more noticeable
-            this.tweens.add({
-                targets: this.tapMarker,
-                scale: { from: 0.8, to: 1 },
-                duration: 300,
-                ease: 'Bounce.Out'
-            });
-        } else {
-            // Hide marker when no target
-            this.tapMarker.setVisible(false);
-        }
+        console.log("Updating tap marker position", {
+            x: this.tapTarget.x,
+            y: this.tapTarget.y,
+            markerVisible: this.tapMarker.visible
+        });
+        
+        // Position marker at tap target and make visible
+        // Add larger vertical offset to align with character feet (SHADOW_OFFSET_Y + 20)
+        this.tapMarker.setPosition(this.tapTarget.x, this.tapTarget.y + SHADOW_OFFSET_Y + 20);
+        this.tapMarker.setVisible(true);
+        
+        console.log("After setting visible:", {
+            markerVisible: this.tapMarker.visible
+        });
+        
+        // Add a small animation to make it more noticeable
+        this.tweens.add({
+            targets: this.tapMarker,
+            scale: { from: 0.8, to: 1 },
+            duration: 300,
+            ease: 'Bounce.Out'
+        });
     }
 
     updateOtherPlayerPosition(playerId: number, x: number, y: number) {
@@ -1644,37 +1657,8 @@ export default class GameScene extends Phaser.Scene {
             return;
         }
         
-        // Determine movement direction from input
-        let dirX = 0;
-        let dirY = 0;
-        
-        // Track if any keyboard movement key was pressed
-        let keyboardInputDetected = false;
-        
-        // Handle keyboard input
-        if (this.cursors) {
-            if (this.cursors.left?.isDown) { dirX -= 1; keyboardInputDetected = true; }
-            if (this.cursors.right?.isDown) { dirX += 1; keyboardInputDetected = true; }
-            if (this.cursors.up?.isDown) { dirY -= 1; keyboardInputDetected = true; }
-            if (this.cursors.down?.isDown) { dirY += 1; keyboardInputDetected = true; }
-        }
-        
-        // Handle WASD keyboard input
-        if (this.wasdKeys) {
-            if (this.wasdKeys.A.isDown) { dirX -= 1; keyboardInputDetected = true; }
-            if (this.wasdKeys.D.isDown) { dirX += 1; keyboardInputDetected = true; }
-            if (this.wasdKeys.W.isDown) { dirY -= 1; keyboardInputDetected = true; }
-            if (this.wasdKeys.S.isDown) { dirY += 1; keyboardInputDetected = true; }
-        }
-        
-        // Clear tap target if keyboard input is detected
-        if (keyboardInputDetected && this.tapTarget) {
-            this.tapTarget = null;
-            this.tapMarker?.setVisible(false);
-        }
-        
-        // Handle tap target if no keyboard input
-        if (dirX === 0 && dirY === 0 && this.tapTarget) {
+        // Handle tap target if it exists
+        if (this.tapTarget) {
             // Get entity radius
             const entityRadius = this.getPlayerEntityRadius();
             
@@ -1686,114 +1670,13 @@ export default class GameScene extends Phaser.Scene {
                 this.tapTarget.set(clampedTarget.x, clampedTarget.y);
                 this.updateTapMarker();
             }
-            
-            // Calculate direction toward tap target
-            const dx = this.tapTarget.x - this.localPlayerSprite.x;
-            const dy = this.tapTarget.y - this.localPlayerSprite.y;
-            
-            // Check if we're close enough to the target to stop moving
-            const distanceSquared = dx * dx + dy * dy;
-            if (distanceSquared > 100) { // Arbitrary threshold of 10 pixels squared
-                // Normalize direction vector
-                const length = Math.sqrt(distanceSquared);
-                dirX = dx / length;
-                dirY = dy / length;
-            } else {
-                // Clear tap target if we've reached it
-                this.tapTarget = null;
-                this.tapMarker?.setVisible(false);
-            }
         }
-        
-        // Only send updates to server if direction has changed or periodically
-        const hasDirection = (dirX !== 0 || dirY !== 0);
-        const directionChanged = (this.currentDirection.x !== dirX || this.currentDirection.y !== dirY);
-        const timeForUpdate = (time - this.lastDirectionUpdateTime) > DIRECTION_UPDATE_RATE;
-        
-        if (directionChanged || (hasDirection && timeForUpdate)) {
-            // Update current direction
-            this.currentDirection.set(dirX, dirY);
-            this.isMoving = hasDirection;
 
-            if(!this.gameOver) 
-            {
-                this.spacetimeDBClient.sdkConnection?.reducers.updatePlayerDirection(dirX, dirY);
-                this.lastDirectionUpdateTime = time;
-            }
+        // Update upgrade UI if it exists
+        if (this.upgradeUI) {
+            this.upgradeUI.update(time, delta);
         }
-        
-        // Client-side prediction - move sprite immediately, server will correct if needed
-        if (this.isMoving) {
-            // Calculate position delta based on direction, speed and time
-            const speed = PLAYER_SPEED * (delta / 1000); // pixels per millisecond
-            const dx = this.currentDirection.x * speed;
-            const dy = this.currentDirection.y * speed;
-            
-            // Get the entity radius for boundary checking
-            const entityRadius = this.getPlayerEntityRadius();
-            
-            // Calculate new position
-            const predictedPosition = {
-                x: this.localPlayerSprite.x + dx,
-                y: this.localPlayerSprite.y + dy
-            };
-            
-            // Clamp the predicted position to valid world bounds
-            const clampedPosition = this.clampToWorldBounds(predictedPosition, entityRadius);
-            
-            // Log when we hit boundaries for debugging
-            if (clampedPosition.x !== predictedPosition.x || clampedPosition.y !== predictedPosition.y) {
-                console.debug(`Movement clamped to boundary: (${predictedPosition.x.toFixed(1)}, ${predictedPosition.y.toFixed(1)}) → (${clampedPosition.x.toFixed(1)}, ${clampedPosition.y.toFixed(1)})`);
-            }
-            
-            // Move the player sprite to the clamped position
-            this.localPlayerSprite.x = clampedPosition.x;
-            this.localPlayerSprite.y = clampedPosition.y;
-            
-            // Update the depth based on new Y position
-            this.localPlayerSprite.setDepth(BASE_DEPTH + this.localPlayerSprite.y);
-            
-            // Update UI elements position
-            if (this.localPlayerNameText) {
-                this.localPlayerNameText.x = this.localPlayerSprite.x;
-                this.localPlayerNameText.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - NAME_OFFSET_Y;
-                this.localPlayerNameText.setDepth(BASE_DEPTH + this.localPlayerSprite.y + NAME_DEPTH_OFFSET);
-            }
-            
-            // Update shadow position
-            if (this.localPlayerShadow) {
-                this.localPlayerShadow.x = this.localPlayerSprite.x;
-                this.localPlayerShadow.y = this.localPlayerSprite.y + SHADOW_OFFSET_Y;
-                this.localPlayerShadow.setDepth(BASE_DEPTH + this.localPlayerSprite.y + SHADOW_DEPTH_OFFSET);
-            }
-            
-            // Update health bar position and depth
-            const healthBarBackground = this.localPlayerSprite.getData('healthBarBackground');
-            const healthBar = this.localPlayerSprite.getData('healthBar');
-            if (healthBarBackground && healthBar) {
-                healthBarBackground.x = this.localPlayerSprite.x;
-                healthBarBackground.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
-                healthBarBackground.setDepth(BASE_DEPTH + this.localPlayerSprite.y + HEALTH_BG_DEPTH_OFFSET);
-                
-                healthBar.x = this.localPlayerSprite.x - (HEALTH_BAR_WIDTH / 2);
-                healthBar.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
-                healthBar.setDepth(BASE_DEPTH + this.localPlayerSprite.y + HEALTH_BAR_DEPTH_OFFSET);
-            }
-            
-            // Update exp bar position and depth
-            const expBarBackground = this.localPlayerSprite.getData('expBarBackground');
-            const expBar = this.localPlayerSprite.getData('expBar');
-            if (expBarBackground && expBar) {
-                expBarBackground.x = this.localPlayerSprite.x;
-                expBarBackground.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
-                expBarBackground.setDepth(BASE_DEPTH + this.localPlayerSprite.y + EXP_BG_DEPTH_OFFSET);
-                
-                expBar.x = this.localPlayerSprite.x - (EXP_BAR_WIDTH / 2);
-                expBar.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
-                expBar.setDepth(BASE_DEPTH + this.localPlayerSprite.y + EXP_BAR_DEPTH_OFFSET);
-            }
-        }
-        
+
         // If server has sent an updated position that's far from our prediction, correct it
         if (this.serverPosition && this.localPlayerSprite) {
             // Get entity radius using helper function
@@ -1806,6 +1689,19 @@ export default class GameScene extends Phaser.Scene {
             const distX = clampedServerPosition.x - this.localPlayerSprite.x;
             const distY = clampedServerPosition.y - this.localPlayerSprite.y;
             const distSquared = distX * distX + distY * distY;
+
+            // If we have a tap target, check if we've reached it
+            if (this.tapTarget) {
+                const distToTargetX = this.tapTarget.x - this.localPlayerSprite.x;
+                const distToTargetY = this.tapTarget.y - this.localPlayerSprite.y;
+                const distToTargetSquared = distToTargetX * distToTargetX + distToTargetY * distToTargetY;
+                
+                // If we're close enough to the target (within 5 pixels), clear the tap target
+                if (distToTargetSquared < 25) { // 5 squared
+                    this.tapTarget = null;
+                    this.tapMarker?.setVisible(false);
+                }
+            }
             
             // If difference is significant, update to match server position
             if (distSquared > POSITION_CORRECTION_THRESHOLD) {
@@ -1835,13 +1731,13 @@ export default class GameScene extends Phaser.Scene {
                 if (healthBarBackground && healthBar) {
                     healthBarBackground.x = this.localPlayerSprite.x;
                     healthBarBackground.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
-                    healthBarBackground.setDepth(BASE_DEPTH + this.localPlayerSprite.y + HEALTH_BG_DEPTH_OFFSET);
+                    healthBarBackground.setDepth(BASE_DEPTH + this.localPlayerSprite.y + HEALTH_BAR_DEPTH_OFFSET);
                     
                     healthBar.x = this.localPlayerSprite.x - (HEALTH_BAR_WIDTH / 2);
                     healthBar.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
                     healthBar.setDepth(BASE_DEPTH + this.localPlayerSprite.y + HEALTH_BAR_DEPTH_OFFSET);
                 }
-                
+
                 // Update exp bar with interpolated position and depth
                 const expBarBackground = this.localPlayerSprite.getData('expBarBackground');
                 const expBar = this.localPlayerSprite.getData('expBar');
@@ -1855,37 +1751,6 @@ export default class GameScene extends Phaser.Scene {
                     expBar.setDepth(BASE_DEPTH + this.localPlayerSprite.y + EXP_BAR_DEPTH_OFFSET);
                 }
             }
-        }
-        
-        // Update depths for other players as well
-        this.otherPlayers.forEach((container) => {
-            container.setDepth(BASE_DEPTH + container.y);
-        });
-        
-        // Update monster positions with interpolation
-        this.monsterManager?.update(time, delta);
-        
-        // Update attack visuals with time for prediction
-        this.attackManager?.update(time, delta);
-        
-        // Let gem manager update animations
-        if (this.gemManager) {
-            this.gemManager.update(time, delta);
-        }
-        
-        // Update upgrade UI if visible
-        if (this.upgradeUI) {
-            this.upgradeUI.update(time, delta);
-        }
-        
-        // Update the player HUD if it exists
-        if (this.playerHUD) {
-            this.playerHUD.update(time, delta);
-        }
-        
-        // Update the boss timer UI if it exists
-        if (this.bossTimerUI) {
-            this.bossTimerUI.update(time, delta);
         }
         
         // Update minimap
@@ -2210,6 +2075,20 @@ export default class GameScene extends Phaser.Scene {
     }
 
     private handleEntityUpdated(ctx: EventContext, oldEntity: Entity, newEntity: Entity) {
+        // If this is our local player's entity, check if we need to update the tap marker
+        if (this.localPlayerSprite) {
+            const localEntityId = this.localPlayerSprite.getData('entityId');
+            if (localEntityId === newEntity.entityId) {
+                // If we were moving and have now stopped with no waypoint, clear the marker
+                if (oldEntity.isMoving && !newEntity.isMoving && !newEntity.hasWaypoint) {
+                    console.log("Player stopped moving, clearing marker");
+                    this.tapTarget = null;
+                    if (this.tapMarker) {
+                        this.tapMarker.setVisible(false);
+                    }
+                }
+            }
+        }
         this.handleEntityUpdate(ctx, newEntity);
     }
 
@@ -2750,6 +2629,43 @@ export default class GameScene extends Phaser.Scene {
         this.time.delayedCall(5000, () => {
             confetti.destroy();
             stars.destroy();
+        });
+    }
+
+    // Setup touch input
+    private setupTouchInput() {
+        this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+            if (pointer.isDown && this.localPlayerSprite) {
+                console.log("Pointer move - setting tap target");
+                const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+                this.tapTarget = new Phaser.Math.Vector2(worldPoint.x, worldPoint.y);
+                this.updateTapMarker();
+                
+                // Send waypoint to server immediately
+                if(!this.gameOver && this.spacetimeDBClient?.sdkConnection?.db) {
+                    this.spacetimeDBClient.sdkConnection.reducers.setPlayerWaypoint(
+                        this.tapTarget.x,
+                        this.tapTarget.y
+                    );
+                }
+            }
+        });
+        
+        this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+            if (this.localPlayerSprite) {
+                console.log("Pointer down - setting tap target");
+                const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+                this.tapTarget = new Phaser.Math.Vector2(worldPoint.x, worldPoint.y);
+                this.updateTapMarker();
+                
+                // Send waypoint to server immediately
+                if(!this.gameOver && this.spacetimeDBClient?.sdkConnection?.db) {
+                    this.spacetimeDBClient.sdkConnection.reducers.setPlayerWaypoint(
+                        this.tapTarget.x,
+                        this.tapTarget.y
+                    );
+                }
+            }
         });
     }
 }
