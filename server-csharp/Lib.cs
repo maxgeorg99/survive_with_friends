@@ -104,6 +104,7 @@ public static partial class Module
 
         public string name;
         
+        [Unique, AutoInc]
         public uint current_player_id;
 
         public Timestamp last_login;
@@ -181,13 +182,13 @@ public static partial class Module
             game_tick_rate = configOpt.Value.game_tick_rate;
         }
         
-        // Schedule game tick to run at regular intervals (50ms = 20 ticks/second)
+        // Schedule first game tick as a one-off event
         ctx.Db.game_tick_timer.Insert(new GameTickTimer
         {
-            scheduled_at = new ScheduleAt.Interval(TimeSpan.FromMilliseconds(game_tick_rate))
+            scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(game_tick_rate))
         });
         
-        Log.Info("Game tick scheduled successfully");
+        Log.Info("Initial game tick scheduled successfully");
         
         // Initialize bestiary with monster data
         InitBestiary(ctx);

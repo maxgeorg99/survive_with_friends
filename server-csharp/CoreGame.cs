@@ -269,49 +269,6 @@ public static partial class Module
             return false;
         }
     }
-
-    [Reducer]
-    public static void UpdatePlayerDirection(ReducerContext ctx, float dirX, float dirY)
-    {
-        var identity = ctx.Sender;
-        // Find the player record for the caller
-
-        //Find the account for the caller   
-        var accountOpt = ctx.Db.account.identity.Find(identity);
-        if (accountOpt is null)
-        {
-            throw new Exception($"UpdatePlayerDirection: Account {identity} does not exist.");
-        }
-
-        var account = accountOpt.Value;
-        var player_id = account.current_player_id;
-
-        var playerOpt = ctx.Db.player.player_id.Find(player_id);
-        if (playerOpt is null)
-        {
-            throw new Exception($"UpdatePlayerDirection: Player {player_id} does not exist.");
-        }
-        var player = playerOpt.Value;
-        
-        // Get direction vector and determine if player is attempting to move
-        var direction = new DbVector2(dirX, dirY);
-        bool isMoving = dirX != 0 || dirY != 0;
-        
-        // Find the entity associated with this player
-        var entityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
-        if (entityOpt is null)
-        {
-            throw new Exception($"UpdatePlayerDirection: Player {player_id} (entity_id: {player.entity_id}) has no matching entity! Cannot update direction.");
-        }
-        
-        // Update entity with new direction and movement state
-        var entity = entityOpt.Value;
-        entity.direction = isMoving ? direction.Normalize() : direction;
-        entity.is_moving = isMoving;
-        
-        // Update the entity in the database
-        ctx.Db.entity.entity_id.Update(entity);
-    }
     
     //Helper function to damage a player
     //Returns true if the player is dead, false otherwise
@@ -382,7 +339,7 @@ public static partial class Module
             // Delete the player and their entity
             // Note: The client will detect this deletion through the onDelete handler
 
-            //Delete the player from the player tableb
+            //Delete the player from the player table
             ctx.Db.player.player_id.Delete(player_id);
 
             //Delete the entity from the entity table
@@ -557,6 +514,12 @@ public static partial class Module
             worldSize = configOpt.Value.world_size;
             tick_rate = configOpt.Value.game_tick_rate;
         }
+
+        // Schedule the next game tick as a one-off event
+        ctx.Db.game_tick_timer.Insert(new GameTickTimer
+        {
+            scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(tick_rate))
+        });
 
         ProcessPlayerMovement(ctx, tick_rate, worldSize);
         ProcessMonsterMovements(ctx);

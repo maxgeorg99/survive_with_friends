@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import SpacetimeDBClient from '../SpacetimeDBClient';
-import { Player, Entity, PlayerClass, UpdatePlayerDirection, Monsters, MonsterType, Bestiary, Account, DeadPlayer, EventContext, ErrorContext, UpgradeOptionData } from "../autobindings";
+import { Player, Entity, PlayerClass, Monsters, MonsterType, Bestiary, Account, DeadPlayer, EventContext, ErrorContext, UpgradeOptionData } from "../autobindings";
 import { Identity } from '@clockworklabs/spacetimedb-sdk';
 import { MONSTER_ASSET_KEYS, MONSTER_SHADOW_OFFSETS, MONSTER_MAX_HP } from '../constants/MonsterConfig';
 import MonsterManager from '../managers/MonsterManager';
@@ -231,6 +231,8 @@ export default class GameScene extends Phaser.Scene {
         console.log("Game event listeners registered.");
 
         this.playerInitialized = false;
+
+        this.gameOver = false;
 
         // Setup keyboard input
         this.cursors = this.input.keyboard?.createCursorKeys() ?? null;
@@ -1976,7 +1978,6 @@ export default class GameScene extends Phaser.Scene {
         // (This is more for documentation, as the update method won't process input anyway)
         if (this.input) {
             // Remove pointer listeners
-            this.input.off('pointermove');
             this.input.off('pointerdown');
             this.input.off('pointerup');
         }
@@ -2656,24 +2657,7 @@ export default class GameScene extends Phaser.Scene {
     }
 
     // Setup touch input
-    private setupTouchInput() {
-        this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-            if (pointer.isDown && this.localPlayerSprite) {
-                console.log("Pointer move - setting tap target");
-                const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
-                this.tapTarget = new Phaser.Math.Vector2(worldPoint.x, worldPoint.y);
-                this.updateTapMarker();
-                
-                // Send waypoint to server immediately
-                if(!this.gameOver && this.spacetimeDBClient?.sdkConnection?.db) {
-                    this.spacetimeDBClient.sdkConnection.reducers.setPlayerWaypoint(
-                        this.tapTarget.x,
-                        this.tapTarget.y
-                    );
-                }
-            }
-        });
-        
+    private setupTouchInput() {        
         this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
             if (this.localPlayerSprite) {
                 console.log("Pointer down - setting tap target");
