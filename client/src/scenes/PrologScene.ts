@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import PlayerClass from '../autobindings/player_class_type';
+import { localization } from '../utils/localization';
 
 interface PrologSceneData {
     classType: PlayerClass;
@@ -7,7 +8,6 @@ interface PrologSceneData {
 }
 
 export default class PrologScene extends Phaser.Scene {
-    private translations: Record<string, string> = {};
     private storyIndex: number = 0;
     private isTyping: boolean = false;
     private typingTimer?: Phaser.Time.TimerEvent;
@@ -18,6 +18,7 @@ export default class PrologScene extends Phaser.Scene {
     private frameGraphics!: Phaser.GameObjects.Graphics;
     private storyText!: Phaser.GameObjects.Text;
     private nextButton!: Phaser.GameObjects.Text;
+    private languageSelector!: HTMLSelectElement;
 
     private readonly storyKeys = [
         "story.intro.1",
@@ -38,57 +39,125 @@ export default class PrologScene extends Phaser.Scene {
     }
 
     async preload() {
-        // Load translations synchronously
-        this.load.json('translations', '/loca/en.json');
-        // Ensure we wait for the file to load
-        this.load.on('complete', () => {
-            console.log('Translation file loaded successfully');
-        });
-        this.load.on('loaderror', (fileObj: any) => {
-            console.error('Error loading translation file:', fileObj);
-        });
-
         // Load background scenes
         this.load.image('scene_1', 'assets/scene_1.png');
         this.load.image('scene_2', 'assets/scene_2.png');
         this.load.image('scene_3', 'assets/scene_3.png');
     }
 
+    private createLanguageSelector() {
+        const languageSelector = document.createElement('select');
+        languageSelector.style.position = 'absolute';
+        languageSelector.style.bottom = '20px';
+        languageSelector.style.right = '20px';
+        languageSelector.style.padding = '8px';
+        languageSelector.style.fontFamily = 'Arial';
+        languageSelector.style.fontSize = '16px';
+        languageSelector.style.backgroundColor = '#2c3e50';
+        languageSelector.style.color = 'white';
+        languageSelector.style.border = '2px solid #34495e';
+        languageSelector.style.borderRadius = '5px';
+        languageSelector.style.cursor = 'pointer';
+        languageSelector.style.zIndex = '1000';
+
+        const languages = [
+            { code: 'en', name: 'English' },
+            { code: 'de', name: 'Deutsch' }
+        ];
+
+        languages.forEach(lang => {
+            const option = document.createElement('option');
+            option.value = lang.code;
+            option.textContent = lang.name;
+            languageSelector.appendChild(option);
+        });
+
+        // Set initial value
+        languageSelector.value = localization.getLanguage();
+
+        // Add change event listener
+        languageSelector.addEventListener('change', (e) => {
+            const target = e.target as HTMLSelectElement;
+            localization.setLanguage(target.value);
+            // Refresh current text
+            this.displayNextText();
+        });
+
+        document.body.appendChild(languageSelector);
+        this.languageSelector = languageSelector;
+    }
+
     private cleanupHTMLElements() {
-        // Clean up any DOM elements that might have been created by previous scenes
+        console.log("PrologScene: Cleaning up HTML elements");
         try {
-            // Remove class select container if present
+            // Remove any class select elements that might have been left over
             const classContainer = document.getElementById('class-select-container');
             if (classContainer && classContainer.parentNode) {
+                console.log("Removing class select container");
                 classContainer.remove();
             }
+
             // Remove all class select buttons
             document.querySelectorAll('.class-select-button').forEach(el => {
-                if (el && el.parentNode) el.remove();
-            });
-            // Remove confirm button
-            document.querySelectorAll('button').forEach(el => {
-                const content = (el as HTMLElement).textContent;
-                if (content && content.includes('Confirm Selection') && el.parentNode) {
+                if (el && el.parentNode) {
+                    console.log("Removing class select button");
                     el.remove();
                 }
             });
+
+            // Remove confirm button
+            document.querySelectorAll('button').forEach(el => {
+                const content = (el as HTMLElement).textContent;
+                if (content && (
+                    content.includes('Confirm Selection') || 
+                    content.includes('Set Name') ||
+                    content.includes('Quests')
+                )) {
+                    if (el && el.parentNode) {
+                        console.log("Removing button:", content);
+                        el.remove();
+                    }
+                }
+            });
+
+            // Remove any login elements that might have been left over
+            const loginInput = document.getElementById('login-name-input');
+            if (loginInput && loginInput.parentNode) {
+                console.log("Removing login input");
+                loginInput.remove();
+            }
+
+            // Remove any info panels
+            const infoPanel = document.getElementById('class-info-panel');
+            if (infoPanel && infoPanel.parentNode) {
+                console.log("Removing info panel");
+                infoPanel.remove();
+            }
+
+            // Remove any quest buttons
+            document.querySelectorAll('button').forEach(el => {
+                if ((el as HTMLElement).textContent?.includes('📜 Quests')) {
+                    if (el && el.parentNode) {
+                        console.log("Removing quest button");
+                        el.remove();
+                    }
+                }
+            });
+
+            // Remove language selector
+            if (this.languageSelector && this.languageSelector.parentNode) {
+                this.languageSelector.remove();
+            }
+
+            console.log("PrologScene HTML elements cleaned up successfully");
         } catch (e) {
-            console.error('Error in PrologScene cleanupHTMLElements:', e);
+            console.error("Error in PrologScene cleanupHTMLElements:", e);
         }
     }
 
     create() {
         this.cleanupHTMLElements();
-        // Get the loaded translations and verify they exist
-        const translations = this.cache.json.get('translations');
-        if (!translations) {
-            console.error('Translations not found in cache!');
-            return;
-        }
-        this.translations = translations;
-        console.log('Loaded translations:', this.translations);
-
+        
         // Clear background to black
         this.cameras.main.setBackgroundColor('#000000');
         
@@ -138,6 +207,9 @@ export default class PrologScene extends Phaser.Scene {
         // Add keyboard input
         this.input.keyboard?.on('keydown-ENTER', () => this.handleNext());
         this.input.keyboard?.on('keydown-SPACE', () => this.handleNext());
+
+        // Create language selector
+        this.createLanguageSelector();
 
         // Display first text and background
         this.displayNextText();
@@ -192,7 +264,7 @@ export default class PrologScene extends Phaser.Scene {
 
     private displayNextText() {
         const key = this.storyKeys[this.storyIndex];
-        const text = this.translations[key];
+        const text = localization.getText(key);
         
         // Add error handling for missing translations
         if (!text) {
@@ -229,7 +301,7 @@ export default class PrologScene extends Phaser.Scene {
                 this.typingTimer.remove();
             }
             const key = this.storyKeys[this.storyIndex];
-            this.storyText.setText(this.translations[key]);
+            this.storyText.setText(localization.getText(key));
             this.isTyping = false;
             this.nextButton.setText('▼');
         } else {
@@ -268,8 +340,17 @@ export default class PrologScene extends Phaser.Scene {
                 } catch (e) {
                     console.error('Error in PrologScene cleanupHTMLElements (end):', e);
                 }
-                this.scene.start('GameScene');
+                this.scene.start('ClassSelectScene');
             }
         }
+    }
+
+    shutdown() {
+        // Clean up event listeners
+        this.input.keyboard?.off('keydown-ENTER');
+        this.input.keyboard?.off('keydown-SPACE');
+        
+        // Clean up HTML elements
+        this.cleanupHTMLElements();
     }
 }

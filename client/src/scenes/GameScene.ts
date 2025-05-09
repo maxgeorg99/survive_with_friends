@@ -162,10 +162,12 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('monster_spawn_indicator', '/assets/monster_spawn_indicator.png');
         
         // Load boss monster assets
-
-        //Add assets for Jorge & Simon
-        this.load.image('final_boss_phase1', '/assets/final_boss_simon_phase_1.png');
-        this.load.image('final_boss_phase2', '/assets/final_boss_phase_2.png');
+        this.load.image('final_boss_jorge_phase_1', '/assets/final_boss_jorge_phase_1.png');
+        this.load.image('final_boss_jorge_phase_2', '/assets/final_boss_jorge_phase_2.png');
+        this.load.image('final_boss_bjorn_phase_1', '/assets/final_boss_phase_björn_1.png');
+        this.load.image('final_boss_bjorn_phase_2', '/assets/final_boss_phase_björn_2.png');
+        this.load.image('final_boss_simon_phase_1', '/assets/final_boss_simon_phase_1.png');
+        this.load.image('final_boss_simon_phase_2', '/assets/final_boss_simon_phase_2.png');
         
         // Load attack assets
         this.load.image('attack_sword', '/assets/attack_sword.png');

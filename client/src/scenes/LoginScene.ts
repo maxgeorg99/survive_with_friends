@@ -240,7 +240,7 @@ export default class LoginScene extends Phaser.Scene {
         // Show loading scene while setting name
         this.scene.start('LoadingScene', { 
             message: 'Setting your name...', 
-            nextScene: 'ClassSelectScene',
+            nextScene: 'PrologScene',
             timeoutDuration: 10000 // 10 seconds timeout
         });
         

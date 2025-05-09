@@ -252,7 +252,9 @@ public static partial class Module
         Log.Info($"Spawned {spawner.monster_type} monster (entity: {entityOpt.Value.entity_id}) targeting player: {targetPlayerName} with HP: {bestiaryEntry.Value.max_hp}/{bestiaryEntry.Value.max_hp}");
         
         // If this is a boss monster, update the game state with its ID
-        if (spawner.monster_type == MonsterType.FinalBossPhase1 || spawner.monster_type == MonsterType.FinalBossPhase2)
+        if (spawner.monster_type == MonsterType.FinalBossJorgePhase1 || spawner.monster_type == MonsterType.FinalBossJorgePhase2 ||
+            spawner.monster_type == MonsterType.FinalBossBjornPhase1 || spawner.monster_type == MonsterType.FinalBossBjornPhase2 ||
+            spawner.monster_type == MonsterType.FinalBossSimonPhase1 || spawner.monster_type == MonsterType.FinalBossSimonPhase2)
         {
             Log.Info($"Boss monster of type {spawner.monster_type} created with ID {monsterOpt.Value.monster_id}");
             UpdateBossMonsterID(ctx, monsterOpt.Value.monster_id);

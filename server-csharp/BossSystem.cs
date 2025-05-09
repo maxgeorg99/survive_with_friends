@@ -106,20 +106,39 @@ public static partial class Module
             throw new Exception("SpawnBossPhaseOne: Could not find game state!");
         }
         
-        // Update game state to indicate boss is active
+        // Randomly select a boss for this run
+        var rng = ctx.Rng;
+        int bossIndex = rng.Next(0, 3); // 0 = Jorge, 1 = Björn, 2 = Simon
+        MonsterType phase1Type;
+        MonsterType phase2Type;
+        switch (bossIndex)
+        {
+            case 0:
+                phase1Type = MonsterType.FinalBossJorgePhase1;
+                phase2Type = MonsterType.FinalBossJorgePhase2;
+                break;
+            case 1:
+                phase1Type = MonsterType.FinalBossBjornPhase1;
+                phase2Type = MonsterType.FinalBossBjornPhase2;
+                break;
+            default:
+                phase1Type = MonsterType.FinalBossSimonPhase1;
+                phase2Type = MonsterType.FinalBossSimonPhase2;
+                break;
+        }
+        
+        // Update game state to indicate boss is active and store selected boss type
         var gameState = gameStateOpt.Value;
         gameState.boss_active = true;
         gameState.boss_phase = 1;
         gameState.normal_spawning_paused = true;
+        // Store phase1Type as boss_monster_id for tracking (or add a new field if needed)
         ctx.Db.game_state.id.Update(gameState);
         
         // Calculate position at center of map
         float centerX = config.world_size / 2;
         float centerY = config.world_size / 2;
         DbVector2 centerPosition = new DbVector2(centerX, centerY);
-        
-        // Create a pre-spawner for the boss at the center of map
-        Log.Info($"Creating boss phase 1 pre-spawner at center of map ({centerX}, {centerY})");
         
         // Find the closest player to target
         uint closestPlayerId = 0;
@@ -148,22 +167,22 @@ public static partial class Module
         }
         
         // Schedule the boss to spawn using the existing monster spawning system
-        ScheduleBossSpawning(ctx, centerPosition, closestPlayerId, targetPlayerName);
+        ScheduleBossSpawning(ctx, centerPosition, closestPlayerId, targetPlayerName, phase1Type);
     }
     
     // Schedule boss spawning using the existing monster spawning system
-    private static void ScheduleBossSpawning(ReducerContext ctx, DbVector2 position, uint targetEntityId, string targetPlayerName)
+    private static void ScheduleBossSpawning(ReducerContext ctx, DbVector2 position, uint targetEntityId, string targetPlayerName, MonsterType bossType)
     {
         Log.Info($"Scheduling boss phase 1 spawn at position ({position.x}, {position.y}) targeting player: {targetPlayerName}");
         
         // Use the existing monster spawner system, but for the boss
         const int BOSS_SPAWN_VISUALIZATION_DELAY_MS = 3000; // 3 seconds for pre-spawn animation
         
-        // Insert a monster spawner with FinalBossPhase1 type
+        // Insert a monster spawner with the selected boss type
         MonsterSpawners? spawnerOpt = ctx.Db.monster_spawners.Insert(new MonsterSpawners
         {
             position = position,
-            monster_type = MonsterType.FinalBossPhase1,
+            monster_type = bossType,
             target_entity_id = targetEntityId,
             scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(BOSS_SPAWN_VISUALIZATION_DELAY_MS))
         });
@@ -192,6 +211,30 @@ public static partial class Module
         
         Log.Info($"Game state before update - Phase: {gameStateOpt.Value.boss_phase}, BossActive: {gameStateOpt.Value.boss_active}, BossMonsterID: {gameStateOpt.Value.boss_monster_id}");
         
+        // Determine which boss phase 2 to spawn based on the phase 1 boss type
+        var oldBossOpt = ctx.Db.monsters.monster_id.Find(oldBossEntityId);
+        if (oldBossOpt == null)
+        {
+            throw new Exception("SpawnBossPhaseTwo: Could not find old boss monster!");
+        }
+        var oldBossType = oldBossOpt.Value.bestiary_id;
+        MonsterType phase2Type;
+        switch (oldBossType)
+        {
+            case MonsterType.FinalBossJorgePhase1:
+                phase2Type = MonsterType.FinalBossJorgePhase2;
+                break;
+            case MonsterType.FinalBossBjornPhase1:
+                phase2Type = MonsterType.FinalBossBjornPhase2;
+                break;
+            case MonsterType.FinalBossSimonPhase1:
+                phase2Type = MonsterType.FinalBossSimonPhase2;
+                break;
+            default:
+                phase2Type = MonsterType.FinalBossBjornPhase2; // fallback
+                break;
+        }
+        
         // Update game state to indicate phase 2
         var gameState = gameStateOpt.Value;
         gameState.boss_phase = 2;
@@ -200,13 +243,13 @@ public static partial class Module
         Log.Info($"Game state updated to phase 2");
         
         // Get boss stats from bestiary
-        var bestiaryEntry = ctx.Db.bestiary.bestiary_id.Find((uint)MonsterType.FinalBossPhase2);
+        var bestiaryEntry = ctx.Db.bestiary.bestiary_id.Find((uint)phase2Type);
         if (bestiaryEntry == null)
         {
             throw new Exception($"SpawnBossPhaseTwo: Could not find bestiary entry for boss phase 2!");
         }
         
-        Log.Info($"Retrieved bestiary entry for FinalBossPhase2: HP={bestiaryEntry.Value.max_hp}, Speed={bestiaryEntry.Value.speed}, Radius={bestiaryEntry.Value.radius}");
+        Log.Info($"Retrieved bestiary entry for phase 2: HP={bestiaryEntry.Value.max_hp}, Speed={bestiaryEntry.Value.speed}, Radius={bestiaryEntry.Value.radius}");
         
         // Find the closest player to target
         uint closestPlayerId = 0;
@@ -260,7 +303,7 @@ public static partial class Module
             Monsters? monsterOpt = ctx.Db.monsters.Insert(new Monsters
             {
                 entity_id = entityOpt.Value.entity_id,
-                bestiary_id = MonsterType.FinalBossPhase2,
+                bestiary_id = phase2Type,
                 hp = bestiaryEntry.Value.max_hp,
                 max_hp = bestiaryEntry.Value.max_hp,
                 target_entity_id = closestPlayerId
@@ -393,25 +436,19 @@ public static partial class Module
         }
 
         var monster = monsterOpt.Value;
-        // Check if this is a boss monster (FinalBossPhase1)
-        if (monster.bestiary_id == MonsterType.FinalBossPhase1)
+        // Check if this is a boss monster (any phase 1)
+        if (monster.bestiary_id == MonsterType.FinalBossJorgePhase1 ||
+            monster.bestiary_id == MonsterType.FinalBossBjornPhase1 ||
+            monster.bestiary_id == MonsterType.FinalBossSimonPhase1)
         {
             Log.Info($"BOSS PHASE 1 CREATED: Updating game state with boss_monster_id={monster_id}");
-            
-            // Get game state
             var gameStateOpt = ctx.Db.game_state.id.Find(0);
-            if (gameStateOpt == null)
+            if (gameStateOpt != null)
             {
-                Log.Info("UpdateBossMonsterID: Could not find game state!");
-                return;
+                var gameState = gameStateOpt.Value;
+                gameState.boss_monster_id = monster_id;
+                ctx.Db.game_state.id.Update(gameState);
             }
-            
-            // Update the boss_monster_id in the game state
-            var gameState = gameStateOpt.Value;
-            gameState.boss_monster_id = monster_id;
-            ctx.Db.game_state.id.Update(gameState);
-            
-            Log.Info($"Game state updated with boss_monster_id={monster_id}, boss_active={gameState.boss_active}, boss_phase={gameState.boss_phase}");
         }
     }
 } 

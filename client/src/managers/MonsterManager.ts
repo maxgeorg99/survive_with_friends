@@ -422,7 +422,7 @@ export default class MonsterManager {
                     sprite.name = 'sprite'; // Name the sprite for easier identification later
                     
                     // For bosses, make them larger and ensure visibility
-                    if (monsterType === "FinalBossPhase1" || monsterType === "FinalBossPhase2") {
+                    if (isBossType(monsterType)) {
                         console.log(`Setting up boss sprite: ${monsterType} (ID: ${monsterData.monsterId})`);
                         console.log(`Boss data: HP=${monsterData.hp}/${monsterData.maxHp}, Entity ID=${monsterData.entityId}`);
                         sprite.setScale(1.0);
@@ -493,7 +493,7 @@ export default class MonsterManager {
                 console.log(`Successfully created monster: ${monsterType} (ID: ${monsterData.monsterId})`);
                 
                 // If this is a boss, do additional logging
-                if (monsterType === "FinalBossPhase1" || monsterType === "FinalBossPhase2") {
+                if (isBossType(monsterType)) {
                     console.log(`BOSS CONTAINER: visible=${container.visible}, alpha=${container.alpha}, x=${container.x}, y=${container.y}, depth=${container.depth}`);
                     console.log(`BOSS SPRITE: visible=${sprite.visible}, alpha=${sprite.alpha}`);
                 }
@@ -580,7 +580,7 @@ export default class MonsterManager {
         const monsterContainer = this.monsters.get(monsterId);
         if (monsterContainer) {
             const monsterType = monsterContainer.getData('monsterType');
-            if (monsterType === 'FinalBossPhase1') {
+            if (isBossType(monsterType)) {
                 console.log(`*** BOSS PHASE 1 DEFEATED (ID: ${monsterId})! Waiting for phase 2 to spawn... ***`);
                 
                 // Set tracking variables to monitor phase transition
@@ -592,7 +592,7 @@ export default class MonsterManager {
                 
                 // Add a visual indicator for phase transition
                 this.createBossTransformationEffect(monsterContainer.x, monsterContainer.y);
-            } else if (monsterType === 'FinalBossPhase2') {
+            } else if (isBossType(monsterType)) {
                 console.log(`*** FINAL BOSS DEFEATED (ID: ${monsterId})! GAME COMPLETE! ***`);
             }
         }
@@ -680,7 +680,7 @@ export default class MonsterManager {
         console.log(`Monster created: ${monster.monsterId}, type: ${monsterTypeName}, entity: ${monster.entityId}`);
         
         // Special handling for boss monsters
-        if (monsterTypeName === "FinalBossPhase1" || monsterTypeName === "FinalBossPhase2") {
+        if (isBossType(monsterTypeName)) {
             console.log(`BOSS SPAWNED: ${monsterTypeName}`);
             console.log(`- Monster ID: ${monster.monsterId}`);
             console.log(`- Entity ID: ${monster.entityId}`);
@@ -701,7 +701,7 @@ export default class MonsterManager {
             }
             
             // If this is phase 2, it means phase 1 was defeated
-            if (monsterTypeName === "FinalBossPhase2") {
+            if (monsterTypeName === "FinalBossJorgePhase2" || monsterTypeName === "FinalBossBjornPhase2" || monsterTypeName === "FinalBossSimonPhase2") {
                 console.log("*** PHASE 2 OF THE BOSS HAS BEGUN! ***");
                 
                 // Reset phase 1 tracking variables since phase 2 has spawned
@@ -724,7 +724,7 @@ export default class MonsterManager {
         }
 
         // If this is final boss phase 2 and it just spawned, play the dark transformation effect
-        if (monsterTypeName === "FinalBossPhase2") {
+        if (isBossType(monsterTypeName)) {
             console.log("Final Boss Phase 2 spawned - playing transformation effect");
             this.createBossTransformationEffect(entityData.position.x, entityData.position.y);
         }
@@ -733,7 +733,7 @@ export default class MonsterManager {
         this.createMonsterSprite(monster, entityData.position);
         
         // For boss monsters, do an additional check after creation
-        if (monsterTypeName === "FinalBossPhase1" || monsterTypeName === "FinalBossPhase2") {
+        if (isBossType(monsterTypeName)) {
             const bossContainer = this.monsters.get(monster.monsterId);
             if (bossContainer) {
                 console.log(`Boss container after creation: visible=${bossContainer.visible}, alpha=${bossContainer.alpha}`);
@@ -759,8 +759,12 @@ export default class MonsterManager {
             case 0: return "Rat";
             case 1: return "Slime";
             case 2: return "Orc";
-            case 3: return "FinalBossPhase1";
-            case 4: return "FinalBossPhase2";
+            case 3: return "FinalBossJorgePhase1";
+            case 4: return "FinalBossJorgePhase2";
+            case 5: return "FinalBossBjornPhase1";
+            case 6: return "FinalBossBjornPhase2";
+            case 7: return "FinalBossSimonPhase1";
+            case 8: return "FinalBossSimonPhase2";
             default: 
                 console.warn(`Unknown monster type: ${bestiaryId}`);
                 return "Unknown";
@@ -884,4 +888,12 @@ export default class MonsterManager {
             console.log("BOSS PHASE 2 SPAWN FAILED - Please report this bug!");
         }
     }
+}
+
+function isBossType(monsterType: string): boolean {
+    return [
+        "FinalBossJorgePhase1", "FinalBossJorgePhase2",
+        "FinalBossBjornPhase1", "FinalBossBjornPhase2",
+        "FinalBossSimonPhase1", "FinalBossSimonPhase2"
+    ].includes(monsterType);
 } 

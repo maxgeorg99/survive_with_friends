@@ -3,6 +3,7 @@ import SpacetimeDBClient from '../SpacetimeDBClient';
 import { Account } from '../autobindings';
 import PlayerClass from '../autobindings/player_class_type';
 import { GameEvents } from '../constants/GameEvents';
+import { localization } from '../utils/localization';
 
 // Map player class to numeric class ID
 const CLASS_ID_MAP = {
@@ -15,28 +16,28 @@ const CLASS_ID_MAP = {
 
 const CLASS_INFO = {
     "Til": {
-        description: "A melee specialist with high base damage.",
-        weapon: "Sword Slash - A close-range piercing attack with high damage",
-        strengths: "High base damage, Can hit multiple enemies",
-        weaknesses: "Limited range"
+        description: "class.til.description",
+        weapon: "class.til.weapon",
+        strengths: "class.til.strengths",
+        weaknesses: "class.til.weaknesses"
     },
     "Marc": {
-        description: "A swift assassin that excels at burst damage.",
-        weapon: "Throwing Knives - Multiple fast projectiles in a spread pattern",
-        strengths: "High attack speed, Multi-directional attacks",
-        weaknesses: "Low individual projectile damage"
+        description: "class.marc.description",
+        weapon: "class.marc.weapon",
+        strengths: "class.marc.strengths",
+        weaknesses: "class.marc.weaknesses"
     },
     "Max": {
-        description: "A ranged specialist with seeking projectiles.",
-        weapon: "Magic Bolt - Homes in on the nearest enemy",
-        strengths: "Auto-targeting attacks, Good single target damage",
-        weaknesses: "Low armor piercing"
+        description: "class.max.description",
+        weapon: "class.max.weapon",
+        strengths: "class.max.strengths",
+        weaknesses: "class.max.weaknesses"
     },
     "Chris": {
-        description: "A holy warrior protected by orbiting shields.",
-        weapon: "Shield Bash - Rotating shield that damages nearby enemies",
-        strengths: "Good defensive capabilities, Constant AoE damage",
-        weaknesses: "Slower attack speed"
+        description: "class.chris.description",
+        weapon: "class.chris.weapon",
+        strengths: "class.chris.strengths",
+        weaknesses: "class.chris.weaknesses"
     }
 } as const;
 
@@ -62,6 +63,8 @@ export default class ClassSelectScene extends Phaser.Scene {
     // State tracking
     private selectedClass: PlayerClass | null = null;
     private isLoading: boolean = false;
+    private titleElement: HTMLDivElement | null = null;
+    private subtitleElement: HTMLDivElement | null = null;
 
     constructor() {
         super('ClassSelectScene');
@@ -86,8 +89,8 @@ export default class ClassSelectScene extends Phaser.Scene {
     }
 
     create() {
-        // Set up background
-        const { width, height } = this.scale;
+        const width = this.cameras.main.width;
+        const height = this.cameras.main.height;
         
         // Use a dark blue color if no background image
         this.cameras.main.setBackgroundColor('#042E64');
@@ -103,7 +106,7 @@ export default class ClassSelectScene extends Phaser.Scene {
         }
               
         // Add title - centered on screen
-        this.titleText = this.add.text(width/2, height/4, 'SELECT YOUR CLASS', {
+        this.titleText = this.add.text(width/2, height/4, localization.getText('ui.select_class.title'), {
             fontFamily: 'Arial Black',
             fontSize: '48px',
             color: '#ffffff',
@@ -113,7 +116,7 @@ export default class ClassSelectScene extends Phaser.Scene {
         }).setOrigin(0.5);
         
         // Add subtitle - centered on screen below title
-        this.subtitleText = this.add.text(width/2, height/4 + 60, 'Choose wisely, brave survivor...', {
+        this.subtitleText = this.add.text(width/2, height/4 + 60, localization.getText('ui.select_class.subtitle'), {
             fontFamily: 'Arial',
             fontSize: '24px',
             color: '#ffffff',
@@ -126,6 +129,7 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.createClassButtons();
         this.createConfirmButton();
         this.createClassInfoPanel();
+        this.createLanguageSelector();
         
         // Add error text (initially hidden)
         this.errorText = this.add.text(width/2, height * 0.85, '', {
@@ -191,7 +195,7 @@ export default class ClassSelectScene extends Phaser.Scene {
     
     private createConfirmButton() {
         this.confirmButton = document.createElement('button');
-        this.confirmButton.textContent = 'Confirm Selection';
+        this.confirmButton.textContent = localization.getText('ui.confirm_selection');
         this.confirmButton.style.position = 'absolute';
         this.confirmButton.style.bottom = '0';
         this.confirmButton.style.left = '0';
@@ -430,16 +434,16 @@ export default class ClassSelectScene extends Phaser.Scene {
         // Update panel content
         this.classInfoPanel.innerHTML = `
             <h2 style="margin: 0 0 15px 0; font-size: 24px; color: #3498db;">${characterName}</h2>
-            <p style="margin: 0 0 15px 0;">${info.description}</p>
+            <p style="margin: 0 0 15px 0;">${localization.getText(info.description)}</p>
             <h3 style="margin: 0 0 10px 0; font-size: 18px; color:rgb(183, 204, 46);">Weapon</h3>
             <div style="display: flex; align-items: center; margin-bottom: 15px;">
-                <img src="/assets/${weaponImageFile}" style="height: 45px; width: 45px; margin-right: 10px;" alt="${info.weapon} icon" />
-                <p style="margin: 0 0 0 10px;">${info.weapon}</p>
+                <img src="/assets/${weaponImageFile}" style="height: 45px; width: 45px; margin-right: 10px;" alt="${localization.getText(info.weapon)} icon" />
+                <p style="margin: 0 0 0 10px;">${localization.getText(info.weapon)}</p>
             </div>
             <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #2ecc71;">Strengths 💪</h3>
-            <p style="margin: 0 0 15px 0;">${info.strengths}</p>
+            <p style="margin: 0 0 15px 0;">${localization.getText(info.strengths)}</p>
             <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #e74c3c;">Weaknesses 👎</h3>
-            <p style="margin: 0;">${info.weaknesses}</p>
+            <p style="margin: 0;">${localization.getText(info.weaknesses)}</p>
         `;
         
         // Update positions to maintain alignment
@@ -553,6 +557,12 @@ export default class ClassSelectScene extends Phaser.Scene {
                     }
                 }
             });
+
+            // Remove language selector
+            const languageSelector = document.querySelector('select');
+            if (languageSelector && languageSelector.parentNode) {
+                languageSelector.remove();
+            }
         } catch (e) {
             console.error("Error in cleanupHTMLElements:", e);
         }
@@ -561,6 +571,76 @@ export default class ClassSelectScene extends Phaser.Scene {
     private showError(message: string) {
         this.errorText.setText(message);
         this.errorText.setVisible(true);
+    }
+    
+    private createLanguageSelector() {
+        const languageSelector = document.createElement('select');
+        languageSelector.style.position = 'absolute';
+        languageSelector.style.bottom = '20px';
+        languageSelector.style.right = '20px';
+        languageSelector.style.padding = '8px';
+        languageSelector.style.fontFamily = 'Arial';
+        languageSelector.style.fontSize = '16px';
+        languageSelector.style.backgroundColor = '#2c3e50';
+        languageSelector.style.color = 'white';
+        languageSelector.style.border = '2px solid #34495e';
+        languageSelector.style.borderRadius = '5px';
+        languageSelector.style.cursor = 'pointer';
+
+        const languages = [
+            { code: 'en', name: 'English' },
+            { code: 'de', name: 'Deutsch' }
+        ];
+
+        languages.forEach(lang => {
+            const option = document.createElement('option');
+            option.value = lang.code;
+            option.textContent = lang.name;
+            languageSelector.appendChild(option);
+        });
+
+        // Set initial value
+        languageSelector.value = localization.getLanguage();
+
+        // Add change event listener
+        languageSelector.addEventListener('change', (event) => {
+            const target = event.target as HTMLSelectElement;
+            localization.setLanguage(target.value);
+            
+            // Update all text elements
+            this.titleText.setText(localization.getText('ui.select_class.title'));
+            this.subtitleText.setText(localization.getText('ui.select_class.subtitle'));
+            
+            // Update class descriptions
+            if (this.selectedClass) {
+                const button = this.getButtonForClass(this.selectedClass);
+                if (button) {
+                    this.selectClass(this.selectedClass, button);
+                }
+            }
+            
+            // Update confirm button text
+            if (this.confirmButton) {
+                this.confirmButton.textContent = localization.getText('ui.confirm_selection');
+            }
+        });
+
+        document.body.appendChild(languageSelector);
+    }
+
+    private getButtonForClass(classType: PlayerClass): HTMLButtonElement | null {
+        switch (classType.tag) {
+            case 'Fighter':
+                return this.fighterButton;
+            case 'Rogue':
+                return this.rogueButton;
+            case 'Mage':
+                return this.mageButton;
+            case 'Paladin':
+                return this.paladinButton;
+            default:
+                return null;
+        }
     }
     
     shutdown() {

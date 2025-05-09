@@ -9,7 +9,13 @@ public static partial class Module
         Slime,
         Orc,
         FinalBossPhase1,
-        FinalBossPhase2
+        FinalBossPhase2,
+        FinalBossJorgePhase1,
+        FinalBossJorgePhase2,
+        FinalBossBjornPhase1,
+        FinalBossBjornPhase2,
+        FinalBossSimonPhase1,
+        FinalBossSimonPhase2
     }
 
     [SpacetimeDB.Table(Name = "bestiary")]
@@ -93,6 +99,73 @@ public static partial class Module
         {
             bestiary_id = (uint)MonsterType.FinalBossPhase2,
             monster_type = MonsterType.FinalBossPhase2,
+            max_hp = 500,
+            speed = 150.0f,
+            exp = 500,
+            atk = 40.0f,
+            radius = 245.0f
+        });
+
+        // Insert Final Boss Jorge Phase 1 stats
+        ctx.Db.bestiary.Insert(new Bestiary
+        {
+            bestiary_id = (uint)MonsterType.FinalBossJorgePhase1,
+            monster_type = MonsterType.FinalBossJorgePhase1,
+            max_hp = 500,
+            speed = 120.0f,
+            exp = 100,
+            atk = 25.0f,
+            radius = 92.0f
+        });
+        // Insert Final Boss Jorge Phase 2 stats
+        ctx.Db.bestiary.Insert(new Bestiary
+        {
+            bestiary_id = (uint)MonsterType.FinalBossJorgePhase2,
+            monster_type = MonsterType.FinalBossJorgePhase2,
+            max_hp = 500,
+            speed = 150.0f,
+            exp = 500,
+            atk = 40.0f,
+            radius = 245.0f
+        });
+        // Insert Final Boss Björn Phase 1 stats
+        ctx.Db.bestiary.Insert(new Bestiary
+        {
+            bestiary_id = (uint)MonsterType.FinalBossBjornPhase1,
+            monster_type = MonsterType.FinalBossBjornPhase1,
+            max_hp = 500,
+            speed = 120.0f,
+            exp = 100,
+            atk = 25.0f,
+            radius = 92.0f
+        });
+        // Insert Final Boss Björn Phase 2 stats
+        ctx.Db.bestiary.Insert(new Bestiary
+        {
+            bestiary_id = (uint)MonsterType.FinalBossBjornPhase2,
+            monster_type = MonsterType.FinalBossBjornPhase2,
+            max_hp = 500,
+            speed = 150.0f,
+            exp = 500,
+            atk = 40.0f,
+            radius = 245.0f
+        });
+        // Insert Final Boss Simon Phase 1 stats
+        ctx.Db.bestiary.Insert(new Bestiary
+        {
+            bestiary_id = (uint)MonsterType.FinalBossSimonPhase1,
+            monster_type = MonsterType.FinalBossSimonPhase1,
+            max_hp = 500,
+            speed = 120.0f,
+            exp = 100,
+            atk = 25.0f,
+            radius = 92.0f
+        });
+        // Insert Final Boss Simon Phase 2 stats
+        ctx.Db.bestiary.Insert(new Bestiary
+        {
+            bestiary_id = (uint)MonsterType.FinalBossSimonPhase2,
+            monster_type = MonsterType.FinalBossSimonPhase2,
             max_hp = 500,
             speed = 150.0f,
             exp = 500,

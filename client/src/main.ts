@@ -8,6 +8,7 @@ import { Identity } from '@clockworklabs/spacetimedb-sdk';
 import SpacetimeDBClient from './SpacetimeDBClient';
 import { DbConnection, ErrorContext, Player, SubscriptionEventContext } from './autobindings';
 import { GameEvents } from './constants/GameEvents';
+import PrologScene from './scenes/PrologScene';
 
 console.log("Main script loading...");
 
@@ -34,7 +35,7 @@ const config: Phaser.Types.Core.GameConfig = {
             // debug: true // Set to true for physics debugging
         }
     },
-    scene: [LoginScene, ClassSelectScene, GameScene, LoadingScene, QuestScene],
+    scene: [LoginScene, PrologScene, ClassSelectScene, GameScene, LoadingScene, QuestScene],
     scale: {
         mode: Phaser.Scale.RESIZE,
         autoCenter: Phaser.Scale.CENTER_BOTH
