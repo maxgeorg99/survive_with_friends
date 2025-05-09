@@ -8,7 +8,10 @@ public enum AttackType
     Sword,
     Wand,
     Knives,
-    Shield
+    Shield,
+    BossBolt,
+    BossJorgeBolt,
+    BossBjornBolt
 }
 
 public static partial class Module
@@ -195,6 +198,57 @@ public static partial class Module
             radius = 32,             
             damage = 4,             
             armor_piercing = 10       
+        });
+
+        // Boss Bolt - basic boss projectile
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 5,
+            attack_type = AttackType.BossBolt,
+            name = "Boss Bolt",
+            cooldown = 2000,           // Boss fires every 2 seconds (can be tuned)
+            duration = 1200,           // Bolt lasts 1.2 seconds
+            projectiles = 1,           // Single bolt
+            fire_delay = 0,            // No burst
+            speed = 900,               // Fast
+            piercing = false,          // No piercing
+            radius = 18,               // Medium size
+            damage = 6,                // Tuned for boss
+            armor_piercing = 5         // Some armor pierce
+        });
+
+        // Boss Jorge Bolt - unique projectile for Jorge
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 6,
+            attack_type = AttackType.BossJorgeBolt,
+            name = "Jorge Bolt",
+            cooldown = 1200,           // Faster fire rate
+            duration = 2000,           // Flies longer
+            projectiles = 1,
+            fire_delay = 0,
+            speed = 950,               // Slightly faster
+            piercing = false,
+            radius = 10,               // Smaller
+            damage = 7,                // Slightly more damage
+            armor_piercing = 5
+        });
+
+        // Boss Björn Bolt - unique homing projectile for Björn
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 7,
+            attack_type = AttackType.BossBjornBolt,
+            name = "Björn Homing Bolt",
+            cooldown = 1800,           // Medium fire rate
+            duration = 2500,           // Flies longer
+            projectiles = 1,
+            fire_delay = 0,
+            speed = 800,               // Homing, so a bit slower
+            piercing = false,
+            radius = 12,               // Medium size
+            damage = 8,                // More damage
+            armor_piercing = 5
         });
 
         Log.Info("Attack data initialized successfully.");

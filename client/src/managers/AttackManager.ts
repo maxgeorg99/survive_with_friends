@@ -214,6 +214,15 @@ export class AttackManager {
             case 'Shield':
                 spriteKey = 'attack_shield';
                 break;
+            case 'BossBolt':
+                spriteKey = 'attack_boss_bolt';
+                break;
+            case 'BossJorgeBolt':
+                spriteKey = 'attack_boss_jorge';
+                break;
+            case 'BossBjornBolt':
+                spriteKey = 'attack_boss_björn';
+                break;
             default:
                 console.error(`Unknown attack type: ${attackType}`);
                 return null;
@@ -373,6 +382,22 @@ export class AttackManager {
                     // Draw at predicted position
                     this.updateAttackGraphic(attackGraphicData);
                 }
+            } else if (attackGraphicData.attackType === 'BossBjornBolt' && attackGraphicData.parameterU === 1) {
+                // Homing logic: update direction toward nearest player
+                const playerPos = this.getPlayerPosition(this.localPlayerId || 0);
+                if (playerPos) {
+                    const dx = playerPos.x - attackGraphicData.predictedPosition.x;
+                    const dy = playerPos.y - attackGraphicData.predictedPosition.y;
+                    const len = Math.sqrt(dx * dx + dy * dy);
+                    if (len > 0) {
+                        attackGraphicData.direction.x = dx / len;
+                        attackGraphicData.direction.y = dy / len;
+                    }
+                }
+                const moveDistance = attackGraphicData.speed * deltaTime;
+                attackGraphicData.predictedPosition.x += attackGraphicData.direction.x * moveDistance;
+                attackGraphicData.predictedPosition.y += attackGraphicData.direction.y * moveDistance;
+                this.updateAttackGraphic(attackGraphicData);
             } else {
                 // Normal projectile with directional movement
                 if (attackGraphicData.direction.length() > 0) {

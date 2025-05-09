@@ -333,6 +333,37 @@ export default class MonsterManager {
             // Store monster data for later when we get entity data
             this.pendingMonsters.set(monsterData.entityId, monsterData);
         }
+
+        const monsterType = this.getMonsterTypeName(monsterData.bestiaryId);
+        if (isSimonType(monsterType)) {
+            // Check for buff: if speed or damage is above base, show effect
+            // (Assume base speed = 120 for phase 1, 150 for phase 2, base atk = 25/40)
+            const baseSpeed = monsterType === "FinalBossSimonPhase1" ? 120 : 150;
+            const baseAtk = monsterType === "FinalBossSimonPhase1" ? 25 : 40;
+            const isBuffed = (monsterData as any).speed > baseSpeed || (monsterData as any).atk > baseAtk;
+            const container = this.monsters.get(monsterData.monsterId);
+            if (container) {
+                // Remove any existing buff effect
+                const existing = container.getByName('simonBuffEffect');
+                if (existing) existing.destroy();
+                if (isBuffed) {
+                    // Add the buff visual effect
+                    const buffSprite = this.scene.add.sprite(0, 0, 'attack_boss_simon');
+                    buffSprite.setAlpha(0.7);
+                    buffSprite.setScale(2.0);
+                    buffSprite.setDepth(2); // Above boss
+                    buffSprite.name = 'simonBuffEffect';
+                    container.add(buffSprite);
+                    // Animate the effect (fade out after 2s)
+                    this.scene.tweens.add({
+                        targets: buffSprite,
+                        alpha: 0,
+                        duration: 2000,
+                        onComplete: () => buffSprite.destroy()
+                    });
+                }
+            }
+        }
     }
     
     // Helper function to create monster sprite at a given position
@@ -896,4 +927,8 @@ function isBossType(monsterType: string): boolean {
         "FinalBossBjornPhase1", "FinalBossBjornPhase2",
         "FinalBossSimonPhase1", "FinalBossSimonPhase2"
     ].includes(monsterType);
+}
+
+function isSimonType(monsterType: string): boolean {
+    return ["FinalBossSimonPhase1", "FinalBossSimonPhase2"].includes(monsterType);
 } 
