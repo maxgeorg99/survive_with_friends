@@ -521,96 +521,16 @@ public static partial class Module
             scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(tick_rate))
         });
 
+        ClearCollisionCacheForFrame();
+
         ProcessPlayerMovement(ctx, tick_rate, worldSize);
         ProcessMonsterMovements(ctx);
         ProcessAttackMovements(ctx);
+        MaintainGems(ctx);
 
         ProcessPlayerMonsterCollisions(ctx);
         ProcessMonsterAttackCollisions(ctx);
-        ProcessGemCollisions(ctx);
-    }
-
-    private static void ProcessPlayerMovement(ReducerContext ctx, uint tick_rate, uint worldSize)
-    {
-        // Process all movable players
-        foreach (var player in ctx.Db.player.Iter())
-        {
-            // Update player status
-            if(player.spawn_grace_period_remaining > 0)
-            {
-                var modifiedPlayer = player;
-                if(modifiedPlayer.spawn_grace_period_remaining >= tick_rate)
-                {
-                    modifiedPlayer.spawn_grace_period_remaining -= tick_rate;
-                }
-                else
-                {   
-                    modifiedPlayer.spawn_grace_period_remaining = 0;
-                }
-                ctx.Db.player.player_id.Update(modifiedPlayer);
-            }
-
-            // Process player movement
-            float moveSpeed = player.speed;
-
-            var entityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
-
-            if(entityOpt is null)
-            {
-                continue;
-            }
-
-            var entity = entityOpt.Value;
-
-            if (!entity.is_moving || !entity.has_waypoint)
-            {
-                continue;
-            }
-            
-            // Calculate direction to waypoint
-            var directionVector = new DbVector2(
-                entity.waypoint.x - entity.position.x,
-                entity.waypoint.y - entity.position.y
-            );
-            
-            // Calculate distance to waypoint
-            float distanceToWaypoint = directionVector.Magnitude();
-            
-            // If we're close enough to the waypoint, stop moving
-            const float WAYPOINT_REACHED_DISTANCE = 5.0f;
-            if (distanceToWaypoint < WAYPOINT_REACHED_DISTANCE)
-            {
-                // Reached waypoint, stop moving
-                entity.is_moving = false;
-                entity.has_waypoint = false;
-                entity.direction = new DbVector2(0, 0);
-                ctx.Db.entity.entity_id.Update(entity);
-                continue;
-            }
-            
-            // Calculate new position based on direction, speed and time delta
-            float moveDistance = moveSpeed * DELTA_TIME;
-            var moveOffset = directionVector.Normalize() * moveDistance;
-            
-            // Update entity with new position
-            var updatedEntity = entity;
-            updatedEntity.position = entity.position + moveOffset;
-            
-            // Apply world boundary clamping using entity radius
-            updatedEntity.position.x = Math.Clamp(
-                updatedEntity.position.x, 
-                updatedEntity.radius, 
-                worldSize - updatedEntity.radius
-            );
-            updatedEntity.position.y = Math.Clamp(
-                updatedEntity.position.y, 
-                updatedEntity.radius, 
-                worldSize - updatedEntity.radius
-            );
-            
-            // Update entity in database
-            ctx.Db.entity.entity_id.Update(updatedEntity);
-        }
+        ProcessGemCollisionsSpatialHash(ctx);
     }
     
     // Helper method to process collisions between attacks and monsters

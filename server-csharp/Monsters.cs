@@ -320,96 +320,64 @@ public static partial class Module
                     stoppedEntity.direction = new DbVector2(0, 0);
                     ctx.Db.entity.entity_id.Update(stoppedEntity);
                 }
-                continue;
             }
-            
-            // If we're far enough from the target, start moving
-            if (distanceToTarget > MIN_DISTANCE_TO_MOVE)
+            else
             {
-                // Normalize the direction vector to get base movement direction
-                var normalizedDirection = directionVector.Normalize();
-                
-                // Get monster speed from bestiary
-                float monsterSpeed = monster.speed;
-                
-                // Check for collisions with other monsters and calculate avoidance vectors
-                var avoidanceVector = new DbVector2(0, 0);
-                
-                foreach (var otherMonsterEntry in ctx.Db.monsters.Iter())
+                // If we're far enough from the target, start moving
+                if (distanceToTarget > MIN_DISTANCE_TO_MOVE)
                 {
-                    if(otherMonsterEntry.monster_id == monster.monster_id)
-                    {
-                        continue;
-                    }
-
-                    var otherEntityOpt = ctx.Db.entity.entity_id.Find(otherMonsterEntry.entity_id);
-                    if(otherEntityOpt == null)
-                    {
-                        continue;
-                    }
-
-                    Entity otherEntity = otherEntityOpt.Value;
+                    // Normalize the direction vector to get base movement direction
+                    var normalizedDirection = directionVector.Normalize();
                     
-                    // Check if we're colliding with this entity
-                    float overlap = GetEntitiesOverlap(monsterEntity, otherEntity);
+                    // Get monster speed from bestiary
+                    float monsterSpeed = monster.speed;
                     
-                    if (overlap > 0)
+                    // Calculate new position based on direction, speed and time delta
+                    float moveDistance = monsterSpeed * DELTA_TIME;
+                    var moveOffset = normalizedDirection * moveDistance;
+                    
+                    // Update entity with new direction and position
+                    var updatedEntity = monsterEntity;
+                    updatedEntity.direction = normalizedDirection;
+                    updatedEntity.is_moving = true;
+                    updatedEntity.position = monsterEntity.position + moveOffset;
+                    
+                    // Get world size from config
+                    uint worldSize = 20000; // Default fallback (10x larger)
+                    var configOpt = ctx.Db.config.id.Find(0);
+                    if (configOpt != null)
                     {
-                        // We have a collision! Calculate repulsion vector
-                        DbVector2 repulsion = GetRepulsionVector(monsterEntity, otherEntity, overlap);
-                        
-                        // Add to avoidance vector
-                        avoidanceVector.x += repulsion.x;
-                        avoidanceVector.y += repulsion.y;
+                        worldSize = configOpt.Value.world_size;
                     }
                     
+                    // Apply world boundary clamping using entity radius
+                    updatedEntity.position.x = Math.Clamp(
+                        updatedEntity.position.x, 
+                        updatedEntity.radius, 
+                        worldSize - updatedEntity.radius
+                    );
+                    updatedEntity.position.y = Math.Clamp(
+                        updatedEntity.position.y, 
+                        updatedEntity.radius, 
+                        worldSize - updatedEntity.radius
+                    );
+                    
+                    // Update entity in database
+                    ctx.Db.entity.entity_id.Update(updatedEntity);
                 }
-                
-                // Combine the target direction with the avoidance vector
-                // We give more weight to avoidance to ensure monsters don't stack
-                var combinedDirection = new DbVector2(
-                    normalizedDirection.x + avoidanceVector.x * 1.5f,
-                    normalizedDirection.y + avoidanceVector.y * 1.5f
-                );
-                
-                // Re-normalize the combined direction
-                var finalDirection = combinedDirection.Magnitude() > 0.0001f 
-                    ? combinedDirection.Normalize() 
-                    : normalizedDirection;
-                
-                // Calculate new position based on direction, speed and time delta
-                float moveDistance = monsterSpeed * DELTA_TIME;
-                var moveOffset = finalDirection * moveDistance;
-                
-                // Update entity with new direction and position
-                var updatedEntity = monsterEntity;
-                updatedEntity.direction = finalDirection;
-                updatedEntity.is_moving = true;
-                updatedEntity.position = monsterEntity.position + moveOffset;
-                
-                // Get world size from config
-                uint worldSize = 20000; // Default fallback (10x larger)
-                var configOpt = ctx.Db.config.id.Find(0);
-                if (configOpt != null)
-                {
-                    worldSize = configOpt.Value.world_size;
-                }
-                
-                // Apply world boundary clamping using entity radius
-                updatedEntity.position.x = Math.Clamp(
-                    updatedEntity.position.x, 
-                    updatedEntity.radius, 
-                    worldSize - updatedEntity.radius
-                );
-                updatedEntity.position.y = Math.Clamp(
-                    updatedEntity.position.y, 
-                    updatedEntity.radius, 
-                    worldSize - updatedEntity.radius
-                );
-                
-                // Update entity in database
-                ctx.Db.entity.entity_id.Update(updatedEntity);
             }
+
+            //Update collision cache
+            KeysMonster[CachedCountMonsters] = monster.monster_id;
+            PosXMonster[CachedCountMonsters] = monsterEntity.position.x;
+            PosYMonster[CachedCountMonsters] = monsterEntity.position.y;
+            RadiusMonster[CachedCountMonsters] = monsterEntity.radius;
+
+            ushort gridCellKey = GetWorldCellFromPosition(monsterEntity.position.x, monsterEntity.position.y);
+            NextsMonster[CachedCountMonsters] = HeadsMonster[gridCellKey];
+            HeadsMonster[gridCellKey] = CachedCountMonsters;
+    
+            CachedCountMonsters++;
         }
     }
     

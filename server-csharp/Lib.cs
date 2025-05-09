@@ -59,6 +59,19 @@ public static partial class Module
     private const float TICK_RATE = 20.0f; // Updates per second (50ms)
     private const float DELTA_TIME = 1.0f / TICK_RATE; // Time between ticks in seconds
 
+    // --- World Constants ---
+    private const int WORLD_SIZE = 20000;
+    private const ushort NUM_WORLD_CELLS = 24649;
+    private const ushort WORLD_GRID_WIDTH = 157;
+    private const ushort WORLD_GRID_HEIGHT = 157;
+    private const ushort WORLD_CELL_SIZE = 128;
+    private const ushort WORLD_CELL_BIT_SHIFT = 8;
+    private const ushort WORLD_CELL_MASK = (1 << WORLD_CELL_BIT_SHIFT) - 1;
+    private const ushort MAX_PLAYERS = 32;
+    private const ushort MAX_MONSTERS = 1024;
+    private const ushort MAX_GEM_COUNT = 1024;
+    private const ushort MAX_ATTACK_COUNT = 4096;
+
     // --- Timer Table ---
     [Table(Name = "game_tick_timer", Scheduled = nameof(GameTick), ScheduledAt = nameof(scheduled_at))]
     public partial struct GameTickTimer

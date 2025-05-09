@@ -603,6 +603,18 @@ public static partial class Module
                 
                 ctx.Db.entity.entity_id.Update(updatedEntity);
             }
+
+            //Update collision cache
+            KeysAttack[CachedCountAttacks] = activeAttack.active_attack_id;
+            PosXAttack[CachedCountAttacks] = entity.position.x;
+            PosYAttack[CachedCountAttacks] = entity.position.y;
+            RadiusAttack[CachedCountAttacks] = entity.radius;
+
+            ushort gridCellKey = GetWorldCellFromPosition(entity.position.x, entity.position.y);
+            NextsAttack[CachedCountAttacks] = HeadsAttack[gridCellKey]; 
+            HeadsAttack[gridCellKey] = CachedCountAttacks;
+
+            CachedCountAttacks++;
         }
     }
 } 

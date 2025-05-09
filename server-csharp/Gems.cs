@@ -74,7 +74,7 @@ public static partial class Module
             exp_huge_gem = 100,
             base_exp_per_level = 40,
             level_exp_factor = 1.2f,
-            gem_radius = 18.0f
+            gem_radius = 24.0f
         });
 
         Log.Info("Experience system initialized with default configuration");
@@ -304,6 +304,37 @@ public static partial class Module
         ctx.Db.entity.entity_id.Delete(gemEntityId);
     }
 
+    public static void MaintainGems(ReducerContext ctx)
+    {
+        if(ctx.Db.gems.Count == 0)
+        {
+            return;
+        }
+
+        //Populate collision cache
+        foreach(var gem in ctx.Db.gems.Iter())
+        {
+            var gemEntityOpt = ctx.Db.entity.entity_id.Find(gem.entity_id);
+            if(gemEntityOpt == null)
+            {
+                continue;
+            }
+
+            var gemEntity = gemEntityOpt.Value;
+
+            KeysGem[CachedCountGems] = gem.gem_id;
+            PosXGem[CachedCountGems] = gemEntity.position.x;
+            PosYGem[CachedCountGems] = gemEntity.position.y;
+            RadiusGem[CachedCountGems] = gemEntity.radius;
+            
+            ushort gridCellKey = GetWorldCellFromPosition(gemEntity.position.x, gemEntity.position.y);
+            NextsGem[CachedCountGems] = HeadsGem[gridCellKey];
+            HeadsGem[gridCellKey] = CachedCountGems;
+
+            CachedCountGems++;
+        }
+    }
+
     // This function should be called from GameTick to process gem collections
     public static void ProcessGemCollisions(ReducerContext ctx)
     {
@@ -349,6 +380,54 @@ public static partial class Module
             foreach (var gemId in collectedGems)
             {
                 CollectGem(ctx, gemId, player.player_id);
+            }
+        }
+    }
+
+    public static void ProcessGemCollisionsSpatialHash(ReducerContext ctx)
+    {
+        if(ctx.Db.gems.Count == 0)
+        {
+            return;
+        }
+
+        //Iterate through all players using spatial hash
+        for(var pid = 0; pid < CachedCountPlayers; pid++)
+        {
+            var px = PosXPlayer[pid];
+            var py = PosYPlayer[pid];
+            var pr = RadiusPlayer[pid];
+
+            //Check against all gems in the same spatial hash cell
+            var cellKey = GetWorldCellFromPosition(px, py);
+
+            int cx =  cellKey & WORLD_CELL_MASK;
+            int cy = (cellKey >> WORLD_CELL_BIT_SHIFT);
+
+            for (int dy = -1; dy <= +1; ++dy)
+            {
+                int ny = cy + dy;
+                if ((uint)ny >= (uint)WORLD_GRID_HEIGHT) continue;   // unsigned trick == clamp
+
+                int rowBase = (ny << WORLD_CELL_BIT_SHIFT);
+                for (int dx = -1; dx <= +1; ++dx)
+                {
+                    int nx = cx + dx;
+                    if ((uint)nx >= (uint)WORLD_GRID_WIDTH) continue;
+
+                    int testCellKey = rowBase | nx;
+                    for(var gid = HeadsGem[testCellKey]; gid != -1; gid = NextsGem[gid])
+                    {
+                        var gx = PosXGem[gid];
+                        var gy = PosYGem[gid];
+                        var gr = RadiusGem[gid];
+
+                        if(SpatialHashCollisionChecker(px, py, pr, gx, gy, gr))
+                        {                     
+                            CollectGem(ctx, KeysGem[gid], KeysPlayer[pid]);
+                        }
+                    }
+                }
             }
         }
     }
