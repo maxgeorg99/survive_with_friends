@@ -296,74 +296,76 @@ public static partial class Module
             {
                 // Target entity no longer exists - find a new target
                 ReassignMonsterTarget(ctx, monster);
-                continue;
-            }
-            var targetEntity = targetEntityOpt.Value;
-            
-            // Calculate direction vector from monster to target
-            var directionVector = new DbVector2(
-                targetEntity.position.x - monsterEntity.position.x,
-                targetEntity.position.y - monsterEntity.position.y
-            );
-            
-            // Calculate distance to target
-            float distanceToTarget = directionVector.Magnitude();
-            
-            // If we're too close to the target, stop moving
-            if (distanceToTarget < MIN_DISTANCE_TO_REACH)
-            {
-                // Monster reached the target, stop moving
-                if (monsterEntity.is_moving)
-                {
-                    var stoppedEntity = monsterEntity;
-                    stoppedEntity.is_moving = false;
-                    stoppedEntity.direction = new DbVector2(0, 0);
-                    ctx.Db.entity.entity_id.Update(stoppedEntity);
-                }
             }
             else
             {
-                // If we're far enough from the target, start moving
-                if (distanceToTarget > MIN_DISTANCE_TO_MOVE)
+                var targetEntity = targetEntityOpt.Value;
+                
+                // Calculate direction vector from monster to target
+                var directionVector = new DbVector2(
+                    targetEntity.position.x - monsterEntity.position.x,
+                    targetEntity.position.y - monsterEntity.position.y
+                );
+                
+                // Calculate distance to target
+                float distanceToTarget = directionVector.Magnitude();
+                
+                // If we're too close to the target, stop moving
+                if (distanceToTarget < MIN_DISTANCE_TO_REACH)
                 {
-                    // Normalize the direction vector to get base movement direction
-                    var normalizedDirection = directionVector.Normalize();
-                    
-                    // Get monster speed from bestiary
-                    float monsterSpeed = monster.speed;
-                    
-                    // Calculate new position based on direction, speed and time delta
-                    float moveDistance = monsterSpeed * DELTA_TIME;
-                    var moveOffset = normalizedDirection * moveDistance;
-                    
-                    // Update entity with new direction and position
-                    var updatedEntity = monsterEntity;
-                    updatedEntity.direction = normalizedDirection;
-                    updatedEntity.is_moving = true;
-                    updatedEntity.position = monsterEntity.position + moveOffset;
-                    
-                    // Get world size from config
-                    uint worldSize = 20000; // Default fallback (10x larger)
-                    var configOpt = ctx.Db.config.id.Find(0);
-                    if (configOpt != null)
+                    // Monster reached the target, stop moving
+                    if (monsterEntity.is_moving)
                     {
-                        worldSize = configOpt.Value.world_size;
+                        var stoppedEntity = monsterEntity;
+                        stoppedEntity.is_moving = false;
+                        stoppedEntity.direction = new DbVector2(0, 0);
+                        ctx.Db.entity.entity_id.Update(stoppedEntity);
                     }
-                    
-                    // Apply world boundary clamping using entity radius
-                    updatedEntity.position.x = Math.Clamp(
-                        updatedEntity.position.x, 
-                        updatedEntity.radius, 
-                        worldSize - updatedEntity.radius
-                    );
-                    updatedEntity.position.y = Math.Clamp(
-                        updatedEntity.position.y, 
-                        updatedEntity.radius, 
-                        worldSize - updatedEntity.radius
-                    );
-                    
-                    // Update entity in database
-                    ctx.Db.entity.entity_id.Update(updatedEntity);
+                }
+                else
+                {
+                    // If we're far enough from the target, start moving
+                    if (distanceToTarget > MIN_DISTANCE_TO_MOVE)
+                    {
+                        // Normalize the direction vector to get base movement direction
+                        var normalizedDirection = directionVector.Normalize();
+                        
+                        // Get monster speed from bestiary
+                        float monsterSpeed = monster.speed;
+                        
+                        // Calculate new position based on direction, speed and time delta
+                        float moveDistance = monsterSpeed * DELTA_TIME;
+                        var moveOffset = normalizedDirection * moveDistance;
+                        
+                        // Update entity with new direction and position
+                        var updatedEntity = monsterEntity;
+                        updatedEntity.direction = normalizedDirection;
+                        updatedEntity.is_moving = true;
+                        updatedEntity.position = monsterEntity.position + moveOffset;
+                        
+                        // Get world size from config
+                        uint worldSize = 20000; // Default fallback (10x larger)
+                        var configOpt = ctx.Db.config.id.Find(0);
+                        if (configOpt != null)
+                        {
+                            worldSize = configOpt.Value.world_size;
+                        }
+                        
+                        // Apply world boundary clamping using entity radius
+                        updatedEntity.position.x = Math.Clamp(
+                            updatedEntity.position.x, 
+                            updatedEntity.radius, 
+                            worldSize - updatedEntity.radius
+                        );
+                        updatedEntity.position.y = Math.Clamp(
+                            updatedEntity.position.y, 
+                            updatedEntity.radius, 
+                            worldSize - updatedEntity.radius
+                        );
+                        
+                        // Update entity in database
+                        ctx.Db.entity.entity_id.Update(updatedEntity);
+                    }
                 }
             }
 

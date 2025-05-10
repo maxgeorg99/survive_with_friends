@@ -3,6 +3,80 @@ using System;
 
 public static partial class Module
 {    
+    [Reducer]
+    public static void SetPlayerWaypoint(ReducerContext ctx, float waypointX, float waypointY)
+    {
+        // Get the identity of the caller
+        var identity = ctx.Sender;
+        
+        //Find the account for the caller   
+        var accountOpt = ctx.Db.account.identity.Find(identity);
+        if (accountOpt is null)
+        {
+            throw new Exception($"SetPlayerWaypoint: Account {identity} does not exist.");
+        }
+
+        var account = accountOpt.Value;
+        var player_id = account.current_player_id;
+
+        var playerOpt = ctx.Db.player.player_id.Find(player_id);
+        if (playerOpt is null)
+        {
+            throw new Exception($"SetPlayerWaypoint: Player {player_id} does not exist.");
+        }
+        var player = playerOpt.Value;
+        
+        // Find the entity associated with this player
+        var entityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
+        if (entityOpt is null)
+        {
+            throw new Exception($"SetPlayerWaypoint: Player {player_id} (entity_id: {player.entity_id}) has no matching entity!");
+        }
+        
+        // Get world size from config for boundary checking
+        uint worldSize = 20000; // Default fallback
+        var configOpt = ctx.Db.config.id.Find(0);
+        if (configOpt != null)
+        {
+            worldSize = configOpt.Value.world_size;
+        }
+        
+        // Clamp waypoint to world boundaries using entity radius
+        var entity = entityOpt.Value;
+        var waypoint = new DbVector2(
+            Math.Clamp(waypointX, entity.radius, worldSize - entity.radius),
+            Math.Clamp(waypointY, entity.radius, worldSize - entity.radius)
+        );
+        
+        // Update entity with new waypoint
+        entity.waypoint = waypoint;
+        entity.has_waypoint = true;
+        entity.is_moving = true;
+        
+        // Calculate direction to waypoint
+        var directionVector = new DbVector2(
+            waypoint.x - entity.position.x,
+            waypoint.y - entity.position.y
+        );
+        
+        // Only set direction if we're not at the waypoint
+        if (directionVector.Magnitude() > 0.1f)
+        {
+            entity.direction = directionVector.Normalize();
+        }
+        else
+        {
+            entity.direction = new DbVector2(0, 0);
+            entity.is_moving = false;
+            entity.has_waypoint = false;
+        }
+        
+        // Update the entity in the database
+        ctx.Db.entity.entity_id.Update(entity);
+        
+        Log.Info($"Set waypoint for player {player.name} to ({waypoint.x}, {waypoint.y})");
+    }
+
     // Schedule for health regeneration
     [SpacetimeDB.Table(Name = "health_regen_scheduler", 
                       Scheduled = nameof(ProcessHealthRegen), 
@@ -103,54 +177,52 @@ public static partial class Module
 
             var entity = entityOpt.Value;
 
-            if (!entity.is_moving || !entity.has_waypoint)
+            if (entity.is_moving && entity.has_waypoint)
             {
-                continue;
-            }
-            
-            // Calculate direction to waypoint
-            var directionVector = new DbVector2(
-                entity.waypoint.x - entity.position.x,
-                entity.waypoint.y - entity.position.y
-            );
-            
-            // Calculate distance to waypoint
-            float distanceToWaypoint = directionVector.Magnitude();
-            
-            // If we're close enough to the waypoint, stop moving
-            const float WAYPOINT_REACHED_DISTANCE = 5.0f;
-            if (distanceToWaypoint < WAYPOINT_REACHED_DISTANCE)
-            {
-                // Reached waypoint, stop moving
-                entity.is_moving = false;
-                entity.has_waypoint = false;
-                entity.direction = new DbVector2(0, 0);
-                ctx.Db.entity.entity_id.Update(entity);
-            }
-            else
-            {
-                // Calculate new position based on direction, speed and time delta
-                float moveDistance = moveSpeed * DELTA_TIME;
-                var moveOffset = directionVector.Normalize() * moveDistance;
-                
-                // Update entity with new position
-                var updatedEntity = entity;
-                updatedEntity.position = entity.position + moveOffset;
-                
-                // Apply world boundary clamping using entity radius
-                updatedEntity.position.x = Math.Clamp(
-                    updatedEntity.position.x, 
-                    updatedEntity.radius, 
-                    worldSize - updatedEntity.radius
-                );
-                updatedEntity.position.y = Math.Clamp(
-                    updatedEntity.position.y, 
-                    updatedEntity.radius, 
-                    worldSize - updatedEntity.radius
+                // Calculate direction to waypoint
+                var directionVector = new DbVector2(
+                    entity.waypoint.x - entity.position.x,
+                    entity.waypoint.y - entity.position.y
                 );
                 
-                // Update entity in database
-                ctx.Db.entity.entity_id.Update(updatedEntity);
+                // Calculate distance to waypoint
+                float distanceToWaypoint = directionVector.Magnitude();
+                
+                // If we're close enough to the waypoint, stop moving
+                const float WAYPOINT_REACHED_DISTANCE = 5.0f;
+                if (distanceToWaypoint < WAYPOINT_REACHED_DISTANCE)
+                {
+                    // Reached waypoint, stop moving
+                    entity.is_moving = false;
+                    entity.has_waypoint = false;
+                    entity.direction = new DbVector2(0, 0);
+                    ctx.Db.entity.entity_id.Update(entity);
+                }
+                else
+                {
+                    // Calculate new position based on direction, speed and time delta
+                    float moveDistance = moveSpeed * DELTA_TIME;
+                    var moveOffset = directionVector.Normalize() * moveDistance;
+                    
+                    // Update entity with new position
+                    var updatedEntity = entity;
+                    updatedEntity.position = entity.position + moveOffset;
+                    
+                    // Apply world boundary clamping using entity radius
+                    updatedEntity.position.x = Math.Clamp(
+                        updatedEntity.position.x, 
+                        updatedEntity.radius, 
+                        worldSize - updatedEntity.radius
+                    );
+                    updatedEntity.position.y = Math.Clamp(
+                        updatedEntity.position.y, 
+                        updatedEntity.radius, 
+                        worldSize - updatedEntity.radius
+                    );
+                    
+                    // Update entity in database
+                    ctx.Db.entity.entity_id.Update(updatedEntity);
+                }
             }
 
             //Update collision cache
@@ -164,6 +236,124 @@ public static partial class Module
             HeadsPlayer[gridCellKey] = CachedCountPlayers;
 
             CachedCountPlayers++;
+        }
+    }
+    private static void ProcessPlayerMonsterCollisions(ReducerContext ctx)
+    {        
+        // Check each player for collisions with monsters
+        foreach (var player in ctx.Db.player.Iter())
+        {
+            var playerEntityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
+            if (playerEntityOpt == null)
+            {
+                continue; // Skip if player has no entity
+            }
+            
+            Entity playerEntity = playerEntityOpt.Value;
+
+            bool playerIsDead = false;
+            
+            // Check against each monster
+            foreach (var monsterEntry in ctx.Db.monsters.Iter())
+            {
+                uint monsterId = monsterEntry.monster_id;
+
+                Entity? monsterEntityOpt = ctx.Db.entity.entity_id.Find(monsterEntry.entity_id);
+                if(monsterEntityOpt == null)
+                {
+                    continue;
+                }
+
+                Entity monsterEntity = monsterEntityOpt.Value;
+                
+                // Check if player is colliding with this monster
+                if (AreEntitiesColliding(playerEntity, monsterEntity))
+                {                    
+                    // Apply damage to player
+                    playerIsDead = DamagePlayer(ctx, player.player_id, monsterEntry.atk);
+
+                    if(playerIsDead)
+                    {
+                        break;
+                    }
+                }
+            }
+
+            if(playerIsDead)
+            {
+                continue;
+            }
+        }
+    }
+
+    private static void ProcessPlayerMonsterCollisionsSpatialHash(ReducerContext ctx)
+    {
+        if(ctx.Db.monsters.Count == 0)
+        {
+            return;
+        }
+
+        //Iterate through all players using spatial hash
+        for(var pid = 0; pid < CachedCountPlayers; pid++)
+        {
+            bool playerIsDead = false;
+
+            var px = PosXPlayer[pid];
+            var py = PosYPlayer[pid];
+            var pr = RadiusPlayer[pid];
+
+            //Check against all gems in the same spatial hash cell
+            var cellKey = GetWorldCellFromPosition(px, py);
+
+            int cx =  cellKey & WORLD_CELL_MASK;
+            int cy = (cellKey >> WORLD_CELL_BIT_SHIFT);
+
+            for (int dy = -1; dy <= +1; ++dy)
+            {
+                int ny = cy + dy;
+                if ((uint)ny >= (uint)WORLD_GRID_HEIGHT) continue;   // unsigned trick == clamp
+
+                int rowBase = (ny << WORLD_CELL_BIT_SHIFT);
+                for (int dx = -1; dx <= +1; ++dx)
+                {
+                    int nx = cx + dx;
+                    if ((uint)nx >= (uint)WORLD_GRID_WIDTH) continue;
+
+                    int testCellKey = rowBase | nx;
+                    for(var mid = HeadsMonster[testCellKey]; mid != -1; mid = NextsMonster[mid])
+                    {
+                        var mx = PosXMonster[mid];
+                        var my = PosYMonster[mid];
+                        var mr = RadiusMonster[mid];
+
+                        if(SpatialHashCollisionChecker(px, py, pr, mx, my, mr))
+                        {                     
+                            var monsterEntry = ctx.Db.monsters.monster_id.Find(KeysMonster[mid]);
+                            if(monsterEntry is null)
+                            {
+                                continue;
+                            }
+
+                            playerIsDead = DamagePlayer(ctx, KeysPlayer[pid], monsterEntry.Value.atk);
+                        }
+
+                        if(playerIsDead)
+                        {
+                            break;
+                        }
+                    }
+
+                    if(playerIsDead)
+                    {
+                        break;
+                    }
+                }
+
+                if(playerIsDead)
+                {
+                    break;
+                }
+            }
         }
     }
 } 

@@ -611,8 +611,11 @@ public static partial class Module
             RadiusAttack[CachedCountAttacks] = entity.radius;
 
             ushort gridCellKey = GetWorldCellFromPosition(entity.position.x, entity.position.y);
+            Log.Info($"Processing attack {activeAttack.active_attack_id} in grid cell {gridCellKey}");
             NextsAttack[CachedCountAttacks] = HeadsAttack[gridCellKey]; 
+            Log.Info($"NextsAttack[{CachedCountAttacks}] = {NextsAttack[CachedCountAttacks]}");
             HeadsAttack[gridCellKey] = CachedCountAttacks;
+            Log.Info($"HeadsAttack[{gridCellKey}] = {HeadsAttack[gridCellKey]}");
 
             CachedCountAttacks++;
         }

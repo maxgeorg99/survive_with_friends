@@ -74,7 +74,7 @@ public static partial class Module
             exp_huge_gem = 100,
             base_exp_per_level = 40,
             level_exp_factor = 1.2f,
-            gem_radius = 24.0f
+            gem_radius = 20.0f
         });
 
         Log.Info("Experience system initialized with default configuration");

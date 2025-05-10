@@ -61,7 +61,8 @@ public static partial class Module
         Log.Info("Scheduling boss spawn after 5 minutes...");
         
         // Create timer that will trigger after 5 minutes
-        const int BOSS_SPAWN_DELAY_MS = 5 * 60 * 1000; // 5 minutes in milliseconds
+        //const int BOSS_SPAWN_DELAY_MS = 5 * 60 * 1000; // 5 minutes in milliseconds
+        const int BOSS_SPAWN_DELAY_MS = 5000;
         
         ctx.Db.boss_spawn_timer.Insert(new BossSpawnTimer
         {

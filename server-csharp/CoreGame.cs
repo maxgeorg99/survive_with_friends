@@ -527,8 +527,8 @@ public static partial class Module
         ProcessMonsterMovements(ctx);
         ProcessAttackMovements(ctx);
         MaintainGems(ctx);
-
-        ProcessPlayerMonsterCollisions(ctx);
+        
+        ProcessPlayerMonsterCollisionsSpatialHash(ctx);
         ProcessMonsterAttackCollisions(ctx);
         ProcessGemCollisionsSpatialHash(ctx);
     }
@@ -604,55 +604,6 @@ public static partial class Module
         }
     }
     
-    // Helper method to process collisions between players and monsters and apply damage
-    private static void ProcessPlayerMonsterCollisions(ReducerContext ctx)
-    {        
-        // Check each player for collisions with monsters
-        foreach (var player in ctx.Db.player.Iter())
-        {
-            var playerEntityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
-            if (playerEntityOpt == null)
-            {
-                continue; // Skip if player has no entity
-            }
-            
-            Entity playerEntity = playerEntityOpt.Value;
-
-            bool playerIsDead = false;
-            
-            // Check against each monster
-            foreach (var monsterEntry in ctx.Db.monsters.Iter())
-            {
-                uint monsterId = monsterEntry.monster_id;
-
-                Entity? monsterEntityOpt = ctx.Db.entity.entity_id.Find(monsterEntry.entity_id);
-                if(monsterEntityOpt == null)
-                {
-                    continue;
-                }
-
-                Entity monsterEntity = monsterEntityOpt.Value;
-                
-                // Check if player is colliding with this monster
-                if (AreEntitiesColliding(playerEntity, monsterEntity))
-                {                    
-                    // Apply damage to player
-                    playerIsDead = DamagePlayer(ctx, player.player_id, monsterEntry.atk);
-
-                    if(playerIsDead)
-                    {
-                        break;
-                    }
-                }
-            }
-
-            if(playerIsDead)
-            {
-                continue;
-            }
-        }
-    }
-    
     // Helper function to check if two entities are colliding using circle-based detection
     private static bool AreEntitiesColliding(Entity entityA, Entity entityB)
     {
@@ -722,79 +673,5 @@ public static partial class Module
         
         // Delete the damage record
         ctx.Db.monster_damage.damage_id.Delete(cleanup.damage_id);
-    }
-
-    [Reducer]
-    public static void SetPlayerWaypoint(ReducerContext ctx, float waypointX, float waypointY)
-    {
-        // Get the identity of the caller
-        var identity = ctx.Sender;
-        
-        //Find the account for the caller   
-        var accountOpt = ctx.Db.account.identity.Find(identity);
-        if (accountOpt is null)
-        {
-            throw new Exception($"SetPlayerWaypoint: Account {identity} does not exist.");
-        }
-
-        var account = accountOpt.Value;
-        var player_id = account.current_player_id;
-
-        var playerOpt = ctx.Db.player.player_id.Find(player_id);
-        if (playerOpt is null)
-        {
-            throw new Exception($"SetPlayerWaypoint: Player {player_id} does not exist.");
-        }
-        var player = playerOpt.Value;
-        
-        // Find the entity associated with this player
-        var entityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
-        if (entityOpt is null)
-        {
-            throw new Exception($"SetPlayerWaypoint: Player {player_id} (entity_id: {player.entity_id}) has no matching entity!");
-        }
-        
-        // Get world size from config for boundary checking
-        uint worldSize = 20000; // Default fallback
-        var configOpt = ctx.Db.config.id.Find(0);
-        if (configOpt != null)
-        {
-            worldSize = configOpt.Value.world_size;
-        }
-        
-        // Clamp waypoint to world boundaries using entity radius
-        var entity = entityOpt.Value;
-        var waypoint = new DbVector2(
-            Math.Clamp(waypointX, entity.radius, worldSize - entity.radius),
-            Math.Clamp(waypointY, entity.radius, worldSize - entity.radius)
-        );
-        
-        // Update entity with new waypoint
-        entity.waypoint = waypoint;
-        entity.has_waypoint = true;
-        entity.is_moving = true;
-        
-        // Calculate direction to waypoint
-        var directionVector = new DbVector2(
-            waypoint.x - entity.position.x,
-            waypoint.y - entity.position.y
-        );
-        
-        // Only set direction if we're not at the waypoint
-        if (directionVector.Magnitude() > 0.1f)
-        {
-            entity.direction = directionVector.Normalize();
-        }
-        else
-        {
-            entity.direction = new DbVector2(0, 0);
-            entity.is_moving = false;
-            entity.has_waypoint = false;
-        }
-        
-        // Update the entity in the database
-        ctx.Db.entity.entity_id.Update(entity);
-        
-        Log.Info($"Set waypoint for player {player.name} to ({waypoint.x}, {waypoint.y})");
     }
 }
