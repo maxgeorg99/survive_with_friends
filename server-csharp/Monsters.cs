@@ -412,4 +412,188 @@ public static partial class Module
         updatedMonster.target_entity_id = newTarget.entity_id;
         ctx.Db.monsters.monster_id.Update(updatedMonster);
     }
+
+    // Helper method to process collisions between attacks and monsters
+    private static void ProcessMonsterAttackCollisions(ReducerContext ctx)
+    {        
+        // Check each active attack for collisions with monsters
+        foreach (var activeAttack in ctx.Db.active_attacks.Iter())
+        {
+            // Get the attack entity
+            var attackEntityOpt = ctx.Db.entity.entity_id.Find(activeAttack.entity_id);
+            if (attackEntityOpt is null)
+            {
+                continue; // Skip if entity not found
+            }
+            
+            var attackEntity = attackEntityOpt.Value;
+            
+            bool attackHitMonster = false;
+            
+            // Check for collisions with monsters
+            foreach (var monsterEntry in ctx.Db.monsters.Iter())
+            {
+                var monsterEntityOpt = ctx.Db.entity.entity_id.Find(monsterEntry.entity_id);
+                if(monsterEntityOpt == null)
+                {
+                    continue;
+                }
+                Entity monsterEntity = monsterEntityOpt.Value;
+                
+                // Check if the attack is colliding with this monster
+                if (AreEntitiesColliding(attackEntity, monsterEntity))
+                {
+                    // Check if this monster has already been hit by this attack
+                    if (HasMonsterBeenHitByAttack(ctx, monsterEntry.monster_id, attackEntity.entity_id))
+                    {
+                        continue; // Skip if monster already hit by this attack
+                    }
+                    
+                    // Record the hit
+                    RecordMonsterHitByAttack(ctx, monsterEntry.monster_id, attackEntity.entity_id);
+                    
+                    // Apply damage to monster using the active attack's damage value
+                    uint damage = activeAttack.damage;
+                    
+                    // Apply armor piercing if needed
+                    // (Not implemented in this version)
+                    
+                    bool monsterKilled = DamageMonster(ctx, monsterEntry.monster_id, damage);
+                    attackHitMonster = true;
+                    
+                    // For non-piercing attacks, stop checking other monsters and destroy the attack
+                    if (!activeAttack.piercing)
+                    {
+                        break;
+                    }
+                }
+            }
+            
+            // If the attack hit a monster and it's not piercing, remove the attack
+            if (attackHitMonster && !activeAttack.piercing)
+            {
+                // Delete the attack entity
+                ctx.Db.entity.entity_id.Delete(attackEntity.entity_id);
+                
+                // Delete the active attack record
+                ctx.Db.active_attacks.active_attack_id.Delete(activeAttack.active_attack_id);
+                
+                // Clean up any damage records for this attack
+                CleanupAttackDamageRecords(ctx, attackEntity.entity_id);
+            }
+        }
+    }
+
+    // Helper method to process collisions between attacks and monsters using spatial hash
+    private static void ProcessMonsterAttackCollisionsSpatialHash(ReducerContext ctx)
+    {        
+        if(ctx.Db.active_attacks.Count == 0 || ctx.Db.monsters.Count == 0)
+        {
+            return;
+        }
+
+        // Iterate through all attacks using spatial hash
+        for(var aid = 0; aid < CachedCountAttacks; aid++)
+        {
+            var ax = PosXAttack[aid];
+            var ay = PosYAttack[aid];
+            var ar = RadiusAttack[aid];
+
+            bool attackHitMonster = false;
+
+            // Check against all monsters in the same spatial hash cell
+            var cellKey = GetWorldCellFromPosition(ax, ay);
+
+            int cx =  cellKey & WORLD_CELL_MASK;
+            int cy = (cellKey >> WORLD_CELL_BIT_SHIFT);
+
+            ActiveAttack? currentAttackData = null;
+            bool activeAttackIsPiercing = false;
+
+            for (int dy = -1; dy <= +1; ++dy)
+            {
+                int ny = cy + dy;
+                if ((uint)ny >= (uint)WORLD_GRID_HEIGHT) continue;   // unsigned trick == clamp
+
+                int rowBase = (ny << WORLD_CELL_BIT_SHIFT);
+                for (int dx = -1; dx <= +1; ++dx)
+                {
+                    int nx = cx + dx;
+                    if ((uint)nx >= (uint)WORLD_GRID_WIDTH) continue;
+
+                    int testCellKey = rowBase | nx;
+                    for(var mid = HeadsMonster[testCellKey]; mid != -1; mid = NextsMonster[mid])
+                    {
+                        var mx = PosXMonster[mid];
+                        var my = PosYMonster[mid];
+                        var mr = RadiusMonster[mid];
+
+                        if(SpatialHashCollisionChecker(ax, ay, ar, mx, my, mr))
+                        {
+                            // Get the active attack data
+                            if(currentAttackData is null)
+                            {
+                                var activeAttackOpt = ctx.Db.active_attacks.active_attack_id.Find(KeysAttack[aid]);
+                                if(activeAttackOpt is null)
+                                {
+                                    continue;
+                                }
+                                currentAttackData = activeAttackOpt.Value;
+                            }
+
+                            var activeAttack = currentAttackData.Value;
+                            activeAttackIsPiercing = activeAttack.piercing;
+
+                            // Check if this monster has already been hit by this attack
+                            if (HasMonsterBeenHitByAttack(ctx, KeysMonster[mid], activeAttack.entity_id))
+                            {
+                                continue; // Skip if monster already hit by this attack
+                            }
+                            
+                            // Record the hit
+                            RecordMonsterHitByAttack(ctx, KeysMonster[mid], activeAttack.entity_id);
+                            
+                            // Apply damage to monster using the active attack's damage value
+                            uint damage = activeAttack.damage;
+                            bool monsterKilled = DamageMonster(ctx, KeysMonster[mid], damage);
+                            attackHitMonster = true;
+                            
+                            // For non-piercing attacks, stop checking other monsters and destroy the attack
+                            if (activeAttackIsPiercing)
+                            {
+                                break;
+                            }
+                        }
+                    }
+
+                    // If attack hit a monster and it's not piercing, break out of the cell checks
+                    if (attackHitMonster && !activeAttackIsPiercing)
+                    {
+                        break;
+                    }
+                }
+
+                // If attack hit a monster and it's not piercing, break out of the cell checks
+                if (attackHitMonster && !activeAttackIsPiercing)
+                {
+                    break;
+                }
+            }
+            
+            // If the attack hit a monster and it's not piercing, remove the attack
+            if (attackHitMonster && !activeAttackIsPiercing && currentAttackData is not null)
+            {
+                var activeAttack = currentAttackData.Value;
+
+                // Delete the attack entity
+                ctx.Db.entity.entity_id.Delete(activeAttack.entity_id);
+                
+                // Delete the active attack record
+                ctx.Db.active_attacks.active_attack_id.Delete(activeAttack.active_attack_id);
+                
+                // Clean up any damage records for this attack
+                CleanupAttackDamageRecords(ctx, activeAttack.entity_id);
+            }
+        }
+    }
 }
