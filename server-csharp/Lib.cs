@@ -61,7 +61,7 @@ public static partial class Module
 
     // --- World Constants ---
     private const int WORLD_SIZE = 20000;
-    private const ushort NUM_WORLD_CELLS = 65535;
+    private const ushort NUM_WORLD_CELLS = 40704;
     private const ushort WORLD_GRID_WIDTH = 157;
     private const ushort WORLD_GRID_HEIGHT = 157;
     private const ushort WORLD_CELL_SIZE = 128;
