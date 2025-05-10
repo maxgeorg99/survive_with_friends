@@ -332,7 +332,7 @@ public static partial class Module
                         var normalizedDirection = directionVector.Normalize();
                         
                         // Get monster speed from bestiary
-                        float monsterSpeed = monster.speed;
+                        float monsterSpeed = monster.speed * 0.0f;
                         
                         // Calculate new position based on direction, speed and time delta
                         float moveDistance = monsterSpeed * DELTA_TIME;
@@ -381,6 +381,35 @@ public static partial class Module
             HeadsMonster[gridCellKey] = CachedCountMonsters;
     
             CachedCountMonsters++;
+        }
+    }
+
+    private static void ProcessMonsterMotionSimple(ReducerContext ctx)
+    {
+        foreach (var monster in ctx.Db.monsters.Iter())
+        {
+            var monsterEntityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
+            if(monsterEntityOpt == null)
+            {
+                continue;
+            }
+            var monsterEntity = monsterEntityOpt.Value;
+
+            //monsterEntity.position.x += 1.0f;
+            //monsterEntity.position.y += 1.0f;
+
+            KeysMonster[CachedCountMonsters] = monster.monster_id;
+            PosXMonster[CachedCountMonsters] = monsterEntity.position.x;
+            PosYMonster[CachedCountMonsters] = monsterEntity.position.y;
+            RadiusMonster[CachedCountMonsters] = monsterEntity.radius;
+
+            ushort gridCellKey = GetWorldCellFromPosition(monsterEntity.position.x, monsterEntity.position.y);
+            NextsMonster[CachedCountMonsters] = HeadsMonster[gridCellKey];
+            HeadsMonster[gridCellKey] = CachedCountMonsters;
+    
+            CachedCountMonsters++;
+
+            //ctx.Db.entity.entity_id.Update(monsterEntity);
         }
     }
     
@@ -649,10 +678,12 @@ public static partial class Module
                         float wA = RadiusMonster[iB] / rSum;
                         float wB = rA / rSum;
 
-                        PosXMonster[iA] += nxAB * penetration * wA * 0.5f;
-                        PosYMonster[iA] += nyAB * penetration * wA * 0.5f;
-                        PosXMonster[iB] -= nxAB * penetration * wB * 0.5f;
-                        PosYMonster[iB] -= nyAB * penetration * wB * 0.5f;
+                        float pushFactor = 1.0f;
+
+                        PosXMonster[iA] += nxAB * penetration * wA * pushFactor;
+                        PosYMonster[iA] += nyAB * penetration * wA * pushFactor;
+                        PosXMonster[iB] -= nxAB * penetration * wB * pushFactor;
+                        PosYMonster[iB] -= nyAB * penetration * wB * pushFactor;
 
                         BumpedMonster[iA] = true;
                         BumpedMonster[iB] = true;

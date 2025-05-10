@@ -12,6 +12,7 @@ import { createPlayerDamageEffect, createMonsterDamageEffect } from '../utils/Da
 import UpgradeUI from '../ui/UpgradeUI';
 import PlayerHUD from '../ui/PlayerHUD';
 import BossTimerUI from '../ui/BossTimerUI';
+import MonsterCounterUI from '../ui/MonsterCounterUI';
 
 // Constants
 const PLAYER_SPEED = 200;
@@ -140,6 +141,9 @@ export default class GameScene extends Phaser.Scene {
 
     // Add predicted position for client-side prediction
     private predictedPosition: Phaser.Math.Vector2 | null = null;
+
+    // Add monster counter UI
+    private monsterCounterUI: MonsterCounterUI | null = null;
 
     constructor() {
         super('GameScene');
@@ -317,6 +321,16 @@ export default class GameScene extends Phaser.Scene {
         this.createMinimap();
 
         this.spacetimeDBClient.sdkConnection?.reducers.updateLastLogin();
+
+        // Initialize monster counter UI
+        this.monsterCounterUI = new MonsterCounterUI(this);
+
+        // Add key listener for toggling monster counter UI
+        this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.D).on('down', () => {
+            if (this.monsterCounterUI) {
+                this.monsterCounterUI.toggleVisible();
+            }
+        });
     }
 
     private registerEventListeners() {
@@ -2015,6 +2029,12 @@ export default class GameScene extends Phaser.Scene {
         if (this.bossTimerUI) {
             this.bossTimerUI.destroy();
             this.bossTimerUI = null;
+        }
+        
+        // Clean up monster counter UI
+        if (this.monsterCounterUI) {
+            this.monsterCounterUI.destroy();
+            this.monsterCounterUI = null;
         }
         
         // Note: SpacetimeDB event handlers are managed by the SDK

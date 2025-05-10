@@ -7,8 +7,9 @@ import { GameEvents } from './constants/GameEvents';
 const SPACETIMEDB_DB_NAME = "vibesurvivors";
 const SPACETIMEDB_URI = "ws://localhost:3000"; // Use wss for cloud, corrected order
 const REMOTE_SPACETIMEDB_URI = "wss://maincloud.spacetimedb.com";
+const PROXY_SPACETIMEDB_URI = "http://localhost:3001";
 
-const URI_TO_USE = SPACETIMEDB_URI;
+const URI_TO_USE = PROXY_SPACETIMEDB_URI;
 
 class SpacetimeDBClient {
     // Initialize sdkClient to null, it will be set in handleConnect

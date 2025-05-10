@@ -506,7 +506,7 @@ public static partial class Module
             }
             if(world.tick_count % 10 == 0)
             {
-                isReupulsionFrame = true;
+                isReupulsionFrame = false;
             }
             ctx.Db.world.world_id.Update(world);
         }
@@ -530,7 +530,9 @@ public static partial class Module
         ClearCollisionCacheForFrame();
 
         ProcessPlayerMovement(ctx, tick_rate, worldSize);
+
         ProcessMonsterMovements(ctx);
+        //ProcessMonsterMotionSimple(ctx);
         if(isReupulsionFrame)
         {
             SolveMonsterRepulsionSpatialHash(ctx);
