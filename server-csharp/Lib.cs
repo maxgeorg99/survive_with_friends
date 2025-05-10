@@ -443,7 +443,7 @@ public static partial class Module
             exp_for_next_level = initialExpNeeded,
             max_hp = maxHp,
             hp = maxHp,
-            hp_regen = 0,
+            hp_regen = 100,
             speed = speed,
             armor = (uint)armor,
             unspent_upgrades = 0,

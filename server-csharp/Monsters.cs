@@ -250,6 +250,7 @@ public static partial class Module
         }
 
         Log.Info($"Spawned {spawner.monster_type} monster (entity: {entityOpt.Value.entity_id}) targeting player: {targetPlayerName} with HP: {bestiaryEntry.Value.max_hp}/{bestiaryEntry.Value.max_hp}");
+        Log.Info($"Total monsters: {ctx.Db.monsters.Count}");
         
         // If this is a boss monster, update the game state with its ID
         if (spawner.monster_type == MonsterType.FinalBossPhase1 || spawner.monster_type == MonsterType.FinalBossPhase2)
@@ -267,7 +268,7 @@ public static partial class Module
         // Schedule monster spawning every 5 seconds
         ctx.Db.monster_spawn_timer.Insert(new MonsterSpawnTimer
         {
-            scheduled_at = new ScheduleAt.Interval(TimeSpan.FromSeconds(1))
+            scheduled_at = new ScheduleAt.Interval(TimeSpan.FromSeconds(0.2))
         });
         
         Log.Info("Monster spawning scheduled successfully");
@@ -505,7 +506,7 @@ public static partial class Module
             var cellKey = GetWorldCellFromPosition(ax, ay);
 
             int cx =  cellKey & WORLD_CELL_MASK;
-            int cy = (cellKey >> WORLD_CELL_BIT_SHIFT);
+            int cy = cellKey >> WORLD_CELL_BIT_SHIFT;
 
             ActiveAttack? currentAttackData = null;
             bool activeAttackIsPiercing = false;
@@ -513,13 +514,13 @@ public static partial class Module
             for (int dy = -1; dy <= +1; ++dy)
             {
                 int ny = cy + dy;
-                if ((uint)ny >= (uint)WORLD_GRID_HEIGHT) continue;   // unsigned trick == clamp
+                if ((uint)ny >= WORLD_GRID_HEIGHT) continue;   // unsigned trick == clamp
 
-                int rowBase = (ny << WORLD_CELL_BIT_SHIFT);
+                int rowBase = ny << WORLD_CELL_BIT_SHIFT;
                 for (int dx = -1; dx <= +1; ++dx)
                 {
                     int nx = cx + dx;
-                    if ((uint)nx >= (uint)WORLD_GRID_WIDTH) continue;
+                    if ((uint)nx >= WORLD_GRID_WIDTH) continue;
 
                     int testCellKey = rowBase | nx;
                     for(var mid = HeadsMonster[testCellKey]; mid != -1; mid = NextsMonster[mid])
@@ -593,6 +594,92 @@ public static partial class Module
                 
                 // Clean up any damage records for this attack
                 CleanupAttackDamageRecords(ctx, activeAttack.entity_id);
+            }
+        }
+    }
+
+    private static void SolveMonsterRepulsionSpatialHash(ReducerContext ctx)
+    {
+        for (int iA = 0; iA < CachedCountMonsters; ++iA)
+        {
+            float ax = PosXMonster[iA];
+            float ay = PosYMonster[iA];
+            float rA = RadiusMonster[iA];
+
+            int keyA = GetWorldCellFromPosition(ax, ay);
+            int cx   =  keyA & WORLD_CELL_MASK;
+            int cy   = keyA >> WORLD_CELL_BIT_SHIFT;
+
+            // ------------------------------------------------------------------
+            for (int dy = -1; dy <= +1; ++dy)
+            {
+                int ny = cy + dy;
+                if ((uint)ny >= WORLD_GRID_HEIGHT) continue;
+
+                int rowBase = ny << WORLD_CELL_BIT_SHIFT;
+                for (int dx = -1; dx <= +1; ++dx)
+                {
+                    int nx = cx + dx;
+                    if ((uint)nx >= WORLD_GRID_WIDTH) continue;
+
+                    int key = rowBase | nx;
+
+                    for (int iB = HeadsMonster[key];
+                        iB != -1;
+                        iB  = NextsMonster[iB])
+                    {
+                        if (iB <= iA) continue;          // unordered pair once
+
+                        float dxAB = ax - PosXMonster[iB];
+                        float dyAB = ay - PosYMonster[iB];
+                        float d2   = dxAB * dxAB + dyAB * dyAB;
+
+                        float rSum  = rA + RadiusMonster[iB];
+                        float rSum2 = rSum * rSum;
+                        if (d2 >= rSum2) continue;       // no overlap
+
+                        // ---- penetration & normal (inv-sqrt) -----------------
+                        float invLen      = FastInvSqrt(d2);
+                        float penetration = rSum - (1.0f * invLen);   // rSum − √d2
+                        float nxAB        = dxAB * invLen;
+                        float nyAB        = dyAB * invLen;
+
+                        // ---- split the push: heavier = larger radius ----------
+                        //   wA = rB / (rA + rB)   ,   wB = rA / (rA + rB)
+                        float wA = RadiusMonster[iB] / rSum;
+                        float wB = rA / rSum;
+
+                        PosXMonster[iA] += nxAB * penetration * wA * 0.5f;
+                        PosYMonster[iA] += nyAB * penetration * wA * 0.5f;
+                        PosXMonster[iB] -= nxAB * penetration * wB * 0.5f;
+                        PosYMonster[iB] -= nyAB * penetration * wB * 0.5f;
+
+                        BumpedMonster[iA] = true;
+                        BumpedMonster[iB] = true;
+                    }
+                }
+            }
+        }
+
+        // Update the positions of all monsters that have been bumped
+        for (int monsterIdx = 0; monsterIdx < CachedCountMonsters; ++monsterIdx)
+        {
+            if (BumpedMonster[monsterIdx])
+            {
+                var monsterId = KeysMonster[monsterIdx];
+                var monsterData = ctx.Db.monsters.monster_id.Find(monsterId);
+                if (monsterData is null)
+                {
+                    continue;
+                }
+
+                var entity = ctx.Db.entity.entity_id.Find(monsterData.Value.entity_id);
+                if (entity is not null)
+                {
+                    var updatedEntity = entity.Value;
+                    updatedEntity.position = new DbVector2(PosXMonster[monsterIdx], PosYMonster[monsterIdx]);
+                    ctx.Db.entity.entity_id.Update(updatedEntity);
+                }
             }
         }
     }

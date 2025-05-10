@@ -84,7 +84,7 @@ public static partial class Module
             ClassId = (uint)PlayerClass.Paladin,
             PlayerClass = PlayerClass.Paladin,
             MaxHp = 100,
-            Armor = 0,
+            Armor = 12,
             Speed = 200.0f,
             StartingAttackType = AttackType.Shield
         });

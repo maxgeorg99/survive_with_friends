@@ -493,6 +493,8 @@ public static partial class Module
             return;
         }
 
+        bool isReupulsionFrame = false;
+
         var worldOpt = ctx.Db.world.world_id.Find(0);
         if (worldOpt != null)
         {
@@ -501,6 +503,10 @@ public static partial class Module
             if(world.tick_count % 50 == 0)
             {
                 Log.Info($"Game tick: {world.tick_count}");
+            }
+            if(world.tick_count % 10 == 0)
+            {
+                isReupulsionFrame = true;
             }
             ctx.Db.world.world_id.Update(world);
         }
@@ -525,6 +531,10 @@ public static partial class Module
 
         ProcessPlayerMovement(ctx, tick_rate, worldSize);
         ProcessMonsterMovements(ctx);
+        if(isReupulsionFrame)
+        {
+            SolveMonsterRepulsionSpatialHash(ctx);
+        }
         ProcessAttackMovements(ctx);
         MaintainGems(ctx);
 

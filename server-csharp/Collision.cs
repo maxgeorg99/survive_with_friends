@@ -19,6 +19,7 @@ public static partial class Module
     private static readonly float[] PosXMonster = new float[MAX_MONSTERS];
     private static readonly float[] PosYMonster = new float[MAX_MONSTERS];
     private static readonly float[] RadiusMonster = new float[MAX_MONSTERS];
+    private static readonly bool[] BumpedMonster = new bool[MAX_MONSTERS];
     private static int CachedCountMonsters = 0;
 
     // --- Gem Collision ---
@@ -59,6 +60,7 @@ public static partial class Module
         Array.Fill(PosXMonster, 0);
         Array.Fill(PosYMonster, 0);
         Array.Fill(RadiusMonster, 0);
+        Array.Fill(BumpedMonster, false);
 
         Array.Fill(KeysGem, (uint)0);
         Array.Fill(HeadsGem, -1);
@@ -99,5 +101,18 @@ public static partial class Module
         
         // If distance squared is less than minimum distance squared, they are colliding
         return distanceSquared < minDistanceSquared;
+    }
+
+    public static float FastInvSqrt(float x)
+    {
+        unsafe
+        {
+            float xhalf = 0.5f * x;
+            int i = *(int*)&x;              // get bits for floating value
+            i = 0x5f3759df - (i >> 1);      // initial guess
+            x = *(float*)&i;                // convert bits back to float
+            x = x * (1.5f - xhalf * x * x); // one Newton-Raphson iteration
+            return x;
+        }
     }
 }
