@@ -28,9 +28,14 @@ export enum GameEvents {
     MONSTER_DELETED = 'monster:deleted',
     
     // Attack events
-    ATTACK_CREATED = 'attack:created',
-    ATTACK_UPDATED = 'attack:updated',
-    ATTACK_DELETED = 'attack:deleted',
+    ATTACK_CREATED = 'attack_created',
+    ATTACK_UPDATED = 'attack_updated',
+    ATTACK_DELETED = 'attack_deleted',
+    
+    // Boss attack events
+    BOSS_ATTACK_CREATED = 'boss_attack_created',
+    BOSS_ATTACK_UPDATED = 'boss_attack_updated',
+    BOSS_ATTACK_DELETED = 'boss_attack_deleted',
     
     // Gem events
     GEM_CREATED = 'gem:created',

@@ -343,24 +343,43 @@ export default class MonsterManager {
             const isBuffed = (monsterData as any).speed > baseSpeed || (monsterData as any).atk > baseAtk;
             const container = this.monsters.get(monsterData.monsterId);
             if (container) {
-                // Remove any existing buff effect
+                // Remove any existing buff effects
                 const existing = container.getByName('simonBuffEffect');
                 if (existing) existing.destroy();
                 if (isBuffed) {
-                    // Add the buff visual effect
-                    const buffSprite = this.scene.add.sprite(0, 0, 'attack_boss_simon');
-                    buffSprite.setAlpha(0.7);
-                    buffSprite.setScale(2.0);
-                    buffSprite.setDepth(2); // Above boss
-                    buffSprite.name = 'simonBuffEffect';
-                    container.add(buffSprite);
-                    // Animate the effect (fade out after 2s)
-                    this.scene.tweens.add({
-                        targets: buffSprite,
-                        alpha: 0,
-                        duration: 2000,
-                        onComplete: () => buffSprite.destroy()
-                    });
+                    // Create multiple buff sprites in a circular pattern
+                    const numSprites = 4; // Number of sprites to show
+                    const radius = 30; // Radius of the circle
+                    
+                    for (let i = 0; i < numSprites; i++) {
+                        const angle = (i / numSprites) * Math.PI * 2;
+                        const x = Math.cos(angle) * radius;
+                        const y = Math.sin(angle) * radius;
+                        
+                        const buffSprite = this.scene.add.sprite(x, y, 'attack_boss_simon');
+                        buffSprite.setAlpha(0.7);
+                        buffSprite.setScale(1.5);
+                        buffSprite.setDepth(2); // Above boss
+                        buffSprite.name = 'simonBuffEffect';
+                        container.add(buffSprite);
+                        
+                        // Animate each sprite with a slight delay
+                        this.scene.tweens.add({
+                            targets: buffSprite,
+                            alpha: 0,
+                            duration: 2000,
+                            delay: i * 200, // Stagger the animations
+                            onComplete: () => buffSprite.destroy()
+                        });
+                        
+                        // Add rotation animation
+                        this.scene.tweens.add({
+                            targets: buffSprite,
+                            angle: 360,
+                            duration: 2000,
+                            ease: 'Linear'
+                        });
+                    }
                 }
             }
         }

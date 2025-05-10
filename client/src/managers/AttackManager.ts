@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import { ActiveAttack, AttackType, EventContext } from '../autobindings';
+import { ActiveAttack, ActiveBossAttack, AttackType, EventContext } from '../autobindings';
 import { AttackData } from '../autobindings';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { GameEvents } from '../constants/GameEvents';
@@ -68,6 +68,11 @@ export class AttackManager {
         for (const attack of ctx.db?.activeAttacks.iter()) {
             this.createOrUpdateAttackGraphic(ctx, attack);
         }
+
+        // Force immediate update for all boss attacks with known entities
+        for (const bossAttack of ctx.db?.activeBossAttacks.iter()) {
+            this.createOrUpdateBossAttackGraphic(ctx, bossAttack);
+        }
     }
 
     public registerAttackListeners() {
@@ -75,6 +80,11 @@ export class AttackManager {
         this.gameEvents.on(GameEvents.ATTACK_CREATED, this.handleAttackInsert, this);
         this.gameEvents.on(GameEvents.ATTACK_UPDATED, this.handleAttackUpdate, this);
         this.gameEvents.on(GameEvents.ATTACK_DELETED, this.handleAttackDelete, this);
+        
+        // Subscribe to boss attack events
+        this.gameEvents.on(GameEvents.BOSS_ATTACK_CREATED, this.handleBossAttackInsert, this);
+        this.gameEvents.on(GameEvents.BOSS_ATTACK_UPDATED, this.handleBossAttackUpdate, this);
+        this.gameEvents.on(GameEvents.BOSS_ATTACK_DELETED, this.handleBossAttackDelete, this);
     }
 
     public unregisterAttackListeners() {
@@ -82,6 +92,11 @@ export class AttackManager {
         this.gameEvents.off(GameEvents.ATTACK_CREATED, this.handleAttackInsert, this);
         this.gameEvents.off(GameEvents.ATTACK_UPDATED, this.handleAttackUpdate, this);
         this.gameEvents.off(GameEvents.ATTACK_DELETED, this.handleAttackDelete, this);
+        
+        // Remove boss attack event listeners
+        this.gameEvents.off(GameEvents.BOSS_ATTACK_CREATED, this.handleBossAttackInsert, this);
+        this.gameEvents.off(GameEvents.BOSS_ATTACK_UPDATED, this.handleBossAttackUpdate, this);
+        this.gameEvents.off(GameEvents.BOSS_ATTACK_DELETED, this.handleBossAttackDelete, this);
     }
 
     public setLocalPlayerId(playerId: number) {
@@ -110,6 +125,28 @@ export class AttackManager {
                 attackData.sprite.destroy();
             }
             this.attackGraphics.delete(attack.activeAttackId);
+        }
+    }
+
+    private handleBossAttackInsert(ctx: EventContext, attack: ActiveBossAttack) {
+        console.log(`Boss attack created: ${attack.activeBossAttackId} of type ${attack.attackType.tag}`);
+        this.createOrUpdateBossAttackGraphic(ctx, attack);
+    }
+
+    private handleBossAttackUpdate(ctx: EventContext, _oldAttack: ActiveBossAttack, newAttack: ActiveBossAttack) {
+        console.log(`Boss attack updated: ${newAttack.activeBossAttackId}`);
+        this.createOrUpdateBossAttackGraphic(ctx, newAttack);
+    }
+
+    private handleBossAttackDelete(_ctx: EventContext, attack: ActiveBossAttack) {
+        console.log(`Boss attack deleted: ${attack.activeBossAttackId}`);
+        const attackData = this.attackGraphics.get(attack.activeBossAttackId);
+        if (attackData) {
+            attackData.graphic.destroy();
+            if (attackData.sprite) {
+                attackData.sprite.destroy();
+            }
+            this.attackGraphics.delete(attack.activeBossAttackId);
         }
     }
 
@@ -390,13 +427,45 @@ export class AttackManager {
                     const dy = playerPos.y - attackGraphicData.predictedPosition.y;
                     const len = Math.sqrt(dx * dx + dy * dy);
                     if (len > 0) {
-                        attackGraphicData.direction.x = dx / len;
-                        attackGraphicData.direction.y = dy / len;
+                        // Smoothly interpolate direction for more natural movement
+                        const targetDirX = dx / len;
+                        const targetDirY = dy / len;
+                        attackGraphicData.direction.x = Phaser.Math.Linear(attackGraphicData.direction.x, targetDirX, 0.1);
+                        attackGraphicData.direction.y = Phaser.Math.Linear(attackGraphicData.direction.y, targetDirY, 0.1);
+                        // Normalize after interpolation
+                        const newLen = Math.sqrt(attackGraphicData.direction.x * attackGraphicData.direction.x + 
+                                               attackGraphicData.direction.y * attackGraphicData.direction.y);
+                        if (newLen > 0) {
+                            attackGraphicData.direction.x /= newLen;
+                            attackGraphicData.direction.y /= newLen;
+                        }
                     }
                 }
                 const moveDistance = attackGraphicData.speed * deltaTime;
                 attackGraphicData.predictedPosition.x += attackGraphicData.direction.x * moveDistance;
                 attackGraphicData.predictedPosition.y += attackGraphicData.direction.y * moveDistance;
+                this.updateAttackGraphic(attackGraphicData);
+            } else if (attackGraphicData.attackType === 'BossSimonBolt') {
+                // Special handling for Simon's attacks - they move in a spiral pattern
+                const time = this.gameTime / 1000; // Convert to seconds
+                const spiralRadius = 20 * (1 + time * 0.1); // Gradually increasing radius
+                const spiralSpeed = 5; // Base rotation speed
+                
+                // Calculate spiral position
+                const angle = time * spiralSpeed;
+                const offsetX = Math.cos(angle) * spiralRadius;
+                const offsetY = Math.sin(angle) * spiralRadius;
+                
+                // Apply spiral offset to base movement
+                const moveDistance = attackGraphicData.speed * deltaTime;
+                attackGraphicData.predictedPosition.x += attackGraphicData.direction.x * moveDistance + offsetX * deltaTime;
+                attackGraphicData.predictedPosition.y += attackGraphicData.direction.y * moveDistance + offsetY * deltaTime;
+                
+                // Update sprite rotation to match spiral movement
+                if (attackGraphicData.sprite) {
+                    attackGraphicData.sprite.setRotation(angle);
+                }
+                
                 this.updateAttackGraphic(attackGraphicData);
             } else {
                 // Normal projectile with directional movement
@@ -436,5 +505,96 @@ export class AttackManager {
         for (const attackGraphicData of this.attackGraphics.values()) {
             this.updateAttackGraphic(attackGraphicData);
         }
+    }
+
+    private createOrUpdateBossAttackGraphic(ctx: EventContext, attack: ActiveBossAttack) {
+        if (!this.spacetimeClient.sdkConnection) {
+            console.error("Cannot create boss attack graphic: no connection");
+            return;
+        }
+        
+        // Find the entity for this attack
+        const entity = ctx.db?.entity.entityId.find(attack.entityId);
+        if (!entity) {
+            console.error(`Entity ${attack.entityId} not found for boss attack ${attack.activeBossAttackId}`);
+            return;
+        }
+
+        console.log(`Creating/updating boss attack graphic for ${attack.activeBossAttackId} at position (${entity.position.x}, ${entity.position.y})`);
+
+        // Find attack data for this attack type
+        const attackData = this.findAttackDataByType(ctx, attack.attackType);
+        if (!attackData) {
+            console.error(`Attack data not found for type ${attack.attackType.tag}`);
+            return;
+        }
+
+        // Boss attacks are always enemy attacks
+        const alpha = 0.4;
+        
+        // Get or create attack graphic data
+        let attackGraphicData = this.attackGraphics.get(attack.activeBossAttackId);
+        if (!attackGraphicData) {
+            console.log(`Creating new boss attack graphic for ${attack.activeBossAttackId}`);
+            // Create a new graphics object (for the circle)
+            const graphic = this.scene.add.graphics();
+            // Set depth to be behind sprites
+            graphic.setDepth(1.4);
+            
+            // Create sprite based on attack type
+            const sprite = this.createAttackSprite(attack.attackType.tag, entity.position.x, entity.position.y);
+            if (!sprite) {
+                console.error(`Failed to create sprite for boss attack type ${attack.attackType.tag}`);
+            }
+            
+            // Setup direction vector based on entity direction
+            const direction = new Phaser.Math.Vector2(entity.direction.x, entity.direction.y);
+            
+            // Store the attack graphic data with prediction values
+            attackGraphicData = {
+                graphic,
+                sprite,
+                radius: attack.radius,
+                baseRadius: attackData.radius,
+                alpha,
+                lastUpdateTime: this.gameTime,
+                predictedPosition: new Phaser.Math.Vector2(entity.position.x, entity.position.y),
+                serverPosition: new Phaser.Math.Vector2(entity.position.x, entity.position.y),
+                direction: direction,
+                speed: attackData.speed,
+                isShield: false, // Boss attacks don't use shields
+                playerId: null, // Boss attacks don't have a player ID
+                parameterU: attack.parameterU,
+                ticksElapsed: attack.ticksElapsed,
+                attackType: attack.attackType.tag
+            };
+            
+            this.attackGraphics.set(attack.activeBossAttackId, attackGraphicData);
+            console.log(`Created new boss attack graphic data for ${attack.activeBossAttackId}`);
+        } else {
+            console.log(`Updating existing boss attack graphic for ${attack.activeBossAttackId}`);
+            // Update the server position and time for existing attack graphic
+            attackGraphicData.serverPosition.set(entity.position.x, entity.position.y);
+            attackGraphicData.lastUpdateTime = this.gameTime;
+            attackGraphicData.ticksElapsed = attack.ticksElapsed;
+            attackGraphicData.attackType = attack.attackType.tag;
+            attackGraphicData.radius = attack.radius;
+            
+            // Check if predicted position is too far from server position
+            const dx = attackGraphicData.predictedPosition.x - entity.position.x;
+            const dy = attackGraphicData.predictedPosition.y - entity.position.y;
+            const distSquared = dx * dx + dy * dy;
+
+            var threshold = (DELTA_TIME * attackGraphicData.speed) * (DELTA_TIME * attackGraphicData.speed);
+            
+            if (distSquared > threshold) {
+                console.log(`Correcting boss attack position for ${attack.activeBossAttackId}`);
+                // Correction needed - reset prediction to match server
+                attackGraphicData.predictedPosition.set(entity.position.x, entity.position.y);
+            }
+        }
+
+        // Update the graphic right away
+        this.updateAttackGraphic(attackGraphicData);
     }
 } 

@@ -321,6 +321,8 @@ public static partial class Module
                 bestiary_id = phase2Type,
                 hp = bestiaryEntry.Value.max_hp,
                 max_hp = bestiaryEntry.Value.max_hp,
+                atk = bestiaryEntry.Value.atk,
+                speed = bestiaryEntry.Value.speed,
                 target_entity_id = closestPlayerId
             });
             
@@ -465,27 +467,30 @@ public static partial class Module
     [Reducer]
     public static void BossFireProjectile(ReducerContext ctx, BossAttackTimer timer)
     {
-        // Use player_id = uint.MaxValue to indicate boss projectiles (see Attacks.cs for convention)
-        const uint BOSS_PLAYER_ID = uint.MaxValue;
-        const int BOSS_PROJECTILE_COOLDOWN_MS = 600;
-
+        Log.Info("BossFireProjectile triggered!");
+        
         var gameStateOpt = ctx.Db.game_state.id.Find(0);
         if (gameStateOpt == null || !gameStateOpt.Value.boss_active || gameStateOpt.Value.boss_monster_id == 0)
         {
+            Log.Info("BossFireProjectile: No active boss found");
             return;
         }
         var bossMonsterOpt = ctx.Db.monsters.monster_id.Find(gameStateOpt.Value.boss_monster_id);
         if (bossMonsterOpt == null)
         {
+            Log.Info("BossFireProjectile: Boss monster not found");
             return;
         }
         var bossMonster = bossMonsterOpt.Value;
         var bossEntityOpt = ctx.Db.entity.entity_id.Find(bossMonster.entity_id);
         if (bossEntityOpt == null)
         {
+            Log.Info("BossFireProjectile: Boss entity not found");
             return;
         }
         var bossEntity = bossEntityOpt.Value;
+
+        Log.Info($"BossFireProjectile: Processing boss {bossMonster.monster_id} of type {bossMonster.bestiary_id}");
 
         // Find the nearest player
         uint nearestPlayerId = 0;
@@ -510,17 +515,21 @@ public static partial class Module
         }
         if (nearestPlayerId == 0 || nearestPlayerPos == null)
         {
+            Log.Info("BossFireProjectile: No players found to target");
             ctx.Db.boss_attack_timer.Insert(new BossAttackTimer
             {
-                scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(BOSS_PROJECTILE_COOLDOWN_MS))
+                scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(600))
             });
             return;
         }
+
+        Log.Info($"BossFireProjectile: Targeting player {nearestPlayerId} at distance {Math.Sqrt(nearestDistance)}");
 
         // Determine boss type
         var bossType = bossMonster.bestiary_id;
         if (bossType == MonsterType.FinalBossJorgePhase1 || bossType == MonsterType.FinalBossJorgePhase2)
         {
+            Log.Info("BossFireProjectile: Creating Jorge projectile");
             // Jorge: Standard projectile
             var dirX = nearestPlayerPos.Value.x - bossEntity.position.x;
             var dirY = nearestPlayerPos.Value.y - bossEntity.position.y;
@@ -534,10 +543,12 @@ public static partial class Module
                 radius = 10
             });
 
-            ctx.Db.active_attacks.Insert(new ActiveAttack
+            Log.Info($"BossFireProjectile: Created projectile entity {projectileEntity.entity_id}");
+
+            var activeBossAttack = ctx.Db.active_boss_attacks.Insert(new ActiveBossAttack
             {
                 entity_id = projectileEntity.entity_id,
-                player_id = BOSS_PLAYER_ID,
+                boss_monster_id = bossMonster.monster_id,
                 attack_type = AttackType.BossJorgeBolt,
                 id_within_burst = 0,
                 parameter_u = 0,
@@ -546,11 +557,15 @@ public static partial class Module
                 piercing = false
             });
 
-            ctx.Db.active_attack_cleanup.Insert(new ActiveAttackCleanup
+            Log.Info($"BossFireProjectile: Created boss attack {activeBossAttack.active_boss_attack_id}");
+
+            ctx.Db.active_boss_attack_cleanup.Insert(new ActiveBossAttackCleanup
             {
-                active_attack_id = ctx.Db.active_attacks.Iter().Last().active_attack_id,
+                active_boss_attack_id = activeBossAttack.active_boss_attack_id,
                 scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(2000))
             });
+
+            Log.Info("BossFireProjectile: Scheduled cleanup for boss attack");
         }
         else if (bossType == MonsterType.FinalBossBjornPhase1 || bossType == MonsterType.FinalBossBjornPhase2)
         {
@@ -567,10 +582,10 @@ public static partial class Module
                 radius = 12
             });
 
-            ctx.Db.active_attacks.Insert(new ActiveAttack
+            var activeBossAttack = ctx.Db.active_boss_attacks.Insert(new ActiveBossAttack
             {
                 entity_id = projectileEntity.entity_id,
-                player_id = BOSS_PLAYER_ID,
+                boss_monster_id = bossMonster.monster_id,
                 attack_type = AttackType.BossBjornBolt,
                 id_within_burst = 0,
                 parameter_u = 1, // Mark as homing for client
@@ -579,23 +594,79 @@ public static partial class Module
                 piercing = false
             });
 
-            ctx.Db.active_attack_cleanup.Insert(new ActiveAttackCleanup
+            ctx.Db.active_boss_attack_cleanup.Insert(new ActiveBossAttackCleanup
             {
-                active_attack_id = ctx.Db.active_attacks.Iter().Last().active_attack_id,
+                active_boss_attack_id = activeBossAttack.active_boss_attack_id,
                 scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(2500))
             });
         }
         else if (bossType == MonsterType.FinalBossSimonPhase1 || bossType == MonsterType.FinalBossSimonPhase2)
         {
-            // Simon: Buff self (increase speed and damage), show visual effect
+            // Simon: Buff self and fire projectiles
             ApplySimonBuff(ctx, bossMonster.monster_id, bossEntity.entity_id);
+
+            // Fire multiple projectiles in a spread pattern
+            const int NUM_PROJECTILES = 3;
+            const float SPREAD_ANGLE = 30f; // degrees
+
+            // Calculate base direction to target
+            float baseDirX = nearestPlayerPos.Value.x - bossEntity.position.x;
+            float baseDirY = nearestPlayerPos.Value.y - bossEntity.position.y;
+            float baseLength = (float)Math.Sqrt(baseDirX * baseDirX + baseDirY * baseDirY);
+            if (baseLength > 0)
+            {
+                baseDirX /= baseLength;
+                baseDirY /= baseLength;
+            }
+
+            for (int i = 0; i < NUM_PROJECTILES; i++)
+            {
+                // Calculate spread angle for this projectile
+                float angleOffset = (i - (NUM_PROJECTILES - 1) / 2f) * SPREAD_ANGLE;
+                float angleRad = (float)(Math.Atan2(baseDirY, baseDirX) + angleOffset * Math.PI / 180f);
+                
+                // Calculate direction vector for this projectile
+                float spreadDirX = (float)Math.Cos(angleRad);
+                float spreadDirY = (float)Math.Sin(angleRad);
+                DbVector2 spreadDirection = new DbVector2(spreadDirX, spreadDirY);
+
+                // Create projectile entity
+                var projectileEntity = ctx.Db.entity.Insert(new Entity
+                {
+                    position = bossEntity.position,
+                    direction = spreadDirection,
+                    radius = 10
+                });
+
+                // Create the boss attack
+                var activeBossAttack = ctx.Db.active_boss_attacks.Insert(new ActiveBossAttack
+                {
+                    entity_id = projectileEntity.entity_id,
+                    boss_monster_id = bossMonster.monster_id,
+                    attack_type = AttackType.BossBolt,
+                    id_within_burst = (uint)i,
+                    parameter_u = 0,
+                    damage = 6,
+                    radius = 10,
+                    piercing = false
+                });
+
+                // Schedule cleanup
+                ctx.Db.active_boss_attack_cleanup.Insert(new ActiveBossAttackCleanup
+                {
+                    active_boss_attack_id = activeBossAttack.active_boss_attack_id,
+                    scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(2000))
+                });
+            }
         }
 
         // Reschedule the next boss attack
         ctx.Db.boss_attack_timer.Insert(new BossAttackTimer
         {
-            scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(BOSS_PROJECTILE_COOLDOWN_MS))
+            scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(600))
         });
+        
+        Log.Info("BossFireProjectile: Scheduled next attack");
     }
 
     // Helper to apply Simon's buff
@@ -605,8 +676,8 @@ public static partial class Module
         var monsterOpt = ctx.Db.monsters.monster_id.Find(monsterId);
         if (monsterOpt == null) return;
         var monster = monsterOpt.Value;
-        monster.speed += 50.0f; // Increase speed
-        monster.atk += 10.0f;   // Increase damage
+        monster.speed *= 1.1f; // Increase speed
+        monster.atk *= 1.1f;   // Increase damage
         ctx.Db.monsters.monster_id.Update(monster);
         // Optionally: schedule a debuff after duration to revert stats
         // Optionally: create a visual effect entity or flag for the client

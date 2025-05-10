@@ -85,6 +85,8 @@ class SpacetimeDBClient {
                 "SELECT * FROM entity",
                 "SELECT * FROM monsters",
                 "SELECT * FROM active_attacks",
+                "SELECT * FROM active_boss_attacks",
+                "SELECT * FROM active_boss_attack_cleanup",
                 "SELECT * FROM attack_data",
                 "SELECT * FROM gems",
                 "SELECT * FROM upgrade_options",
@@ -171,6 +173,19 @@ class SpacetimeDBClient {
             });
             connection.db.activeAttacks.onDelete((ctx, attack) => {
                 this.gameEvents.emit(GameEvents.ATTACK_DELETED, ctx, attack);
+            });
+        }
+
+        // Boss Attack Events
+        if (connection.db.activeBossAttacks) {
+            connection.db.activeBossAttacks.onInsert((ctx, attack) => {
+                this.gameEvents.emit(GameEvents.BOSS_ATTACK_CREATED, ctx, attack);
+            });
+            connection.db.activeBossAttacks.onUpdate((ctx, oldAttack, newAttack) => {
+                this.gameEvents.emit(GameEvents.BOSS_ATTACK_UPDATED, ctx, oldAttack, newAttack);
+            });
+            connection.db.activeBossAttacks.onDelete((ctx, attack) => {
+                this.gameEvents.emit(GameEvents.BOSS_ATTACK_DELETED, ctx, attack);
             });
         }
 

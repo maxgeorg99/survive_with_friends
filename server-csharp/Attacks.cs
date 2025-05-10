@@ -120,6 +120,40 @@ public static partial class Module
         public ScheduleAt scheduled_at; // When to trigger the attack
     }
 
+    // Active boss attacks - tracks currently active boss attacks in the game
+    [SpacetimeDB.Table(Name = "active_boss_attacks", Public = true)]
+    public partial struct ActiveBossAttack
+    {
+        [PrimaryKey, AutoInc]
+        public uint active_boss_attack_id;
+        
+        public uint entity_id;        // The projectile entity ID
+        [SpacetimeDB.Index.BTree]
+        public uint boss_monster_id;  // The boss monster that created this attack
+        public AttackType attack_type; // The type of attack
+        public uint id_within_burst;   // Position within a burst (0-based index)
+        public uint parameter_u;       // Parameter used for special attacks
+        public uint ticks_elapsed;    // Number of ticks since the attack was created
+        public uint damage;           // Damage of this specific attack instance
+        public float radius;          // Radius of this attack (for area effects)
+        public bool piercing;         // Whether this attack pierces through enemies
+    }
+
+    //Scheduled cleanup of active boss attacks
+    [SpacetimeDB.Table(Name = "active_boss_attack_cleanup", 
+                      Scheduled = nameof(CleanupActiveBossAttack), 
+                      ScheduledAt = nameof(scheduled_at))]
+    public partial struct ActiveBossAttackCleanup
+    {
+        [PrimaryKey, AutoInc]   
+        public ulong scheduled_id;
+
+        public ScheduleAt scheduled_at; // When to cleanup the active boss attack
+
+        [SpacetimeDB.Index.BTree]
+        public uint active_boss_attack_id; // The active boss attack to cleanup
+    }
+
     // Initialization of attack data
     [Reducer]
     public static void InitAttackData(ReducerContext ctx)
@@ -520,34 +554,55 @@ public static partial class Module
             throw new Exception("CleanupActiveAttack may not be invoked by clients, only via scheduling.");
         }
 
-        // Get the active attack to cleanup
-        var activeAttackOpt = ctx.Db.active_attacks.active_attack_id.Find(cleanup.active_attack_id);
-        if (activeAttackOpt == null)
+        try
         {
-            //This isn't an error, it just means the attack has already been cleaned up
-            return;
+            // Get the active attack to cleanup
+            var activeAttackOpt = ctx.Db.active_attacks.active_attack_id.Find(cleanup.active_attack_id);
+            if (activeAttackOpt == null)
+            {
+                // Attack already cleaned up, just delete the cleanup record
+                ctx.Db.active_attack_cleanup.scheduled_id.Delete(cleanup.scheduled_id);
+                return;
+            }
+
+            var activeAttack = activeAttackOpt.Value;
+
+            // Get the entity to cleanup
+            var entityOpt = ctx.Db.entity.entity_id.Find(activeAttack.entity_id);
+            if (entityOpt == null)
+            {
+                // Entity already cleaned up, just clean up the attack record
+                ctx.Db.active_attacks.active_attack_id.Delete(cleanup.active_attack_id);
+                ctx.Db.active_attack_cleanup.scheduled_id.Delete(cleanup.scheduled_id);
+                return;
+            }
+
+            // Clean up any damage records associated with this attack
+            CleanupAttackDamageRecords(ctx, entityOpt.Value.entity_id);
+            
+            // Delete the entity
+            ctx.Db.entity.entity_id.Delete(entityOpt.Value.entity_id);
+
+            // Delete the active attack
+            ctx.Db.active_attacks.active_attack_id.Delete(cleanup.active_attack_id);
+            
+            // Finally delete the cleanup record
+            ctx.Db.active_attack_cleanup.scheduled_id.Delete(cleanup.scheduled_id);
         }
-
-        var activeAttack = activeAttackOpt.Value;
-
-        // Get the entity to cleanup
-        var entityOpt = ctx.Db.entity.entity_id.Find(activeAttack.entity_id);
-        if (entityOpt == null)
+        catch (Exception ex)
         {
-            //This isn't an error, it just means the entity has already been cleaned up
-            return;
+            Log.Error($"Error in CleanupActiveAttack: {ex.Message}");
+            // Try to clean up the cleanup record even if other cleanup fails
+            try
+            {
+                ctx.Db.active_attack_cleanup.scheduled_id.Delete(cleanup.scheduled_id);
+            }
+            catch
+            {
+                // If this fails too, just log it
+                Log.Error("Failed to delete cleanup record after error");
+            }
         }
-
-        var entity = entityOpt.Value;
-
-        // Clean up any damage records associated with this attack
-        CleanupAttackDamageRecords(ctx, entity.entity_id);
-        
-        // Delete the entity
-        ctx.Db.entity.entity_id.Delete(entity.entity_id);
-
-        // Delete the active attack
-        ctx.Db.active_attacks.active_attack_id.Delete(cleanup.active_attack_id);
     }   
 
     // Call this from the existing Init method
@@ -706,6 +761,148 @@ public static partial class Module
                     // Update entity position
                     ctx.Db.entity.entity_id.Update(updatedEntity);
                 }
+            }
+        }
+    }
+
+    // Cleanup active boss attacks
+    [Reducer]
+    public static void CleanupActiveBossAttack(ReducerContext ctx, ActiveBossAttackCleanup cleanup)
+    {
+        if (ctx.Sender != ctx.Identity)
+        {
+            throw new Exception("CleanupActiveBossAttack may not be invoked by clients, only via scheduling.");
+        }
+
+        try
+        {
+            // Get the active boss attack to cleanup
+            var activeBossAttackOpt = ctx.Db.active_boss_attacks.active_boss_attack_id.Find(cleanup.active_boss_attack_id);
+            if (activeBossAttackOpt == null)
+            {
+                // Attack already cleaned up, just delete the cleanup record
+                ctx.Db.active_boss_attack_cleanup.scheduled_id.Delete(cleanup.scheduled_id);
+                return;
+            }
+
+            var activeBossAttack = activeBossAttackOpt.Value;
+
+            // Get the entity to cleanup
+            var entityOpt = ctx.Db.entity.entity_id.Find(activeBossAttack.entity_id);
+            if (entityOpt == null)
+            {
+                // Entity already cleaned up, just clean up the attack record
+                ctx.Db.active_boss_attacks.active_boss_attack_id.Delete(cleanup.active_boss_attack_id);
+                ctx.Db.active_boss_attack_cleanup.scheduled_id.Delete(cleanup.scheduled_id);
+                return;
+            }
+
+            // Clean up any damage records associated with this attack
+            CleanupAttackDamageRecords(ctx, entityOpt.Value.entity_id);
+            
+            // Delete the entity
+            ctx.Db.entity.entity_id.Delete(entityOpt.Value.entity_id);
+
+            // Delete the active boss attack
+            ctx.Db.active_boss_attacks.active_boss_attack_id.Delete(cleanup.active_boss_attack_id);
+            
+            // Finally delete the cleanup record
+            ctx.Db.active_boss_attack_cleanup.scheduled_id.Delete(cleanup.scheduled_id);
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"Error in CleanupActiveBossAttack: {ex.Message}");
+            // Try to clean up the cleanup record even if other cleanup fails
+            try
+            {
+                ctx.Db.active_boss_attack_cleanup.scheduled_id.Delete(cleanup.scheduled_id);
+            }
+            catch
+            {
+                // If this fails too, just log it
+                Log.Error("Failed to delete cleanup record after error");
+            }
+        }
+    }
+
+    // Helper method to process boss attack movements
+    public static void ProcessBossAttackMovements(ReducerContext ctx, uint worldSize)
+    {
+        // Process each active boss attack
+        foreach (var rawActiveBossAttack in ctx.Db.active_boss_attacks.Iter())
+        {
+            var activeBossAttackOpt = ctx.Db.active_boss_attacks.active_boss_attack_id.Find(rawActiveBossAttack.active_boss_attack_id);
+            if (activeBossAttackOpt == null)
+            {
+                continue; // Skip if active boss attack not found
+            }
+
+            var activeBossAttack = activeBossAttackOpt.Value;
+
+            activeBossAttack.ticks_elapsed += 1; 
+            ctx.Db.active_boss_attacks.active_boss_attack_id.Update(activeBossAttack);
+
+            // Get the attack entity
+            var entityOpt = ctx.Db.entity.entity_id.Find(activeBossAttack.entity_id);
+            if (entityOpt is null)
+            {
+                continue; // Skip if entity not found
+            }
+            
+            var entity = entityOpt.Value;
+            
+            // Get attack data
+            var attackDataOpt = FindAttackDataByType(ctx, activeBossAttack.attack_type);
+            if (attackDataOpt is null)
+            {
+                continue; // Skip if attack data not found
+            }
+            
+            var attackData = attackDataOpt.Value;
+
+            // Regular projectile movement based on direction and speed
+            float moveSpeed = attackData.speed;
+            
+            // Calculate movement based on direction, speed and time delta
+            float moveDistance = moveSpeed * DELTA_TIME;
+            var moveOffset = entity.direction * moveDistance;
+            
+            // Update entity with new position
+            var updatedEntity = entity;
+            updatedEntity.position = entity.position + moveOffset;
+            
+            // Apply world boundary clamping
+            updatedEntity.position.x = Math.Clamp(
+                updatedEntity.position.x, 
+                updatedEntity.radius, 
+                worldSize - updatedEntity.radius
+            );
+            updatedEntity.position.y = Math.Clamp(
+                updatedEntity.position.y, 
+                updatedEntity.radius, 
+                worldSize - updatedEntity.radius
+            );
+            
+            // Check if entity hit the world boundary, if so mark for deletion
+            bool hitBoundary = 
+                updatedEntity.position.x <= updatedEntity.radius ||
+                updatedEntity.position.x >= worldSize - updatedEntity.radius ||
+                updatedEntity.position.y <= updatedEntity.radius ||
+                updatedEntity.position.y >= worldSize - updatedEntity.radius;
+            
+            if (hitBoundary)
+            {
+                // Delete attack entity and active boss attack record
+                ctx.Db.entity.entity_id.Delete(entity.entity_id);
+                ctx.Db.active_boss_attacks.active_boss_attack_id.Delete(activeBossAttack.active_boss_attack_id);
+                
+                // Clean up any damage records associated with this attack
+                CleanupAttackDamageRecords(ctx, entity.entity_id);
+            }
+            else
+            {
+                // Update entity position
+                ctx.Db.entity.entity_id.Update(updatedEntity);
             }
         }
     }
