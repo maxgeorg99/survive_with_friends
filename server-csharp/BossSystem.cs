@@ -275,6 +275,14 @@ public static partial class Module
         }
         
         Log.Info($"{truesurvivorsCount} players marked as True Survivors!");
+
+         // Clean up all gems and their entities
+        foreach (var gem in ctx.Db.gems.Iter())
+        {
+            ctx.Db.entity.entity_id.Delete(gem.entity_id);
+            ctx.Db.gems.gem_id.Delete(gem.gem_id);
+        }
+        Log.Info("All gems cleaned up after boss defeat.");
         
         // Schedule the next boss spawn
         ScheduleBossSpawn(ctx);
