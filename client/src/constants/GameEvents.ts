@@ -28,14 +28,14 @@ export enum GameEvents {
     MONSTER_DELETED = 'monster:deleted',
     
     // Attack events
-    ATTACK_CREATED = 'attack_created',
-    ATTACK_UPDATED = 'attack_updated',
-    ATTACK_DELETED = 'attack_deleted',
+    ATTACK_CREATED = 'ATTACK_CREATED',
+    ATTACK_UPDATED = 'ATTACK_UPDATED',
+    ATTACK_DELETED = 'ATTACK_DELETED',
     
     // Boss attack events
-    BOSS_ATTACK_CREATED = 'boss_attack_created',
-    BOSS_ATTACK_UPDATED = 'boss_attack_updated',
-    BOSS_ATTACK_DELETED = 'boss_attack_deleted',
+    BOSS_ATTACK_CREATED = 'BOSS_ATTACK_CREATED',
+    BOSS_ATTACK_UPDATED = 'BOSS_ATTACK_UPDATED',
+    BOSS_ATTACK_DELETED = 'BOSS_ATTACK_DELETED',
     
     // Gem events
     GEM_CREATED = 'gem:created',
@@ -55,5 +55,13 @@ export enum GameEvents {
     GAME_STATE_UPDATED = 'game_state:updated',
     BOSS_SPAWN_TIMER_CREATED = 'boss_spawn_timer:created',
     BOSS_SPAWN_TIMER_DELETED = 'boss_spawn_timer:deleted',
-    BOSS_PHASE_CHANGED = 'boss_phase_changed'
+    BOSS_PHASE_CHANGED = 'boss_phase_changed',
+    
+    // New attack-related events
+    ACTIVE_ATTACK_CLEANUP_CREATED = 'ACTIVE_ATTACK_CLEANUP_CREATED',
+    ACTIVE_ATTACK_CLEANUP_DELETED = 'ACTIVE_ATTACK_CLEANUP_DELETED',
+    ACTIVE_BOSS_ATTACK_CLEANUP_CREATED = 'ACTIVE_BOSS_ATTACK_CLEANUP_CREATED',
+    ACTIVE_BOSS_ATTACK_CLEANUP_DELETED = 'ACTIVE_BOSS_ATTACK_CLEANUP_DELETED',
+    ATTACK_DATA_CREATED = 'ATTACK_DATA_CREATED',
+    ATTACK_DATA_UPDATED = 'ATTACK_DATA_UPDATED'
 } 

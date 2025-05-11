@@ -119,20 +119,16 @@ public static partial class Module
         var rng = ctx.Rng;
         int bossIndex = rng.Next(0, 3); // 0 = Jorge, 1 = Björn, 2 = Simon
         MonsterType phase1Type;
-        MonsterType phase2Type;
         switch (bossIndex)
         {
             case 0:
                 phase1Type = MonsterType.FinalBossJorgePhase1;
-                phase2Type = MonsterType.FinalBossJorgePhase2;
                 break;
             case 1:
                 phase1Type = MonsterType.FinalBossBjornPhase1;
-                phase2Type = MonsterType.FinalBossBjornPhase2;
                 break;
             default:
                 phase1Type = MonsterType.FinalBossSimonPhase1;
-                phase2Type = MonsterType.FinalBossSimonPhase2;
                 break;
         }
         
@@ -530,12 +526,17 @@ public static partial class Module
         if (bossType == MonsterType.FinalBossJorgePhase1 || bossType == MonsterType.FinalBossJorgePhase2)
         {
             Log.Info("BossFireProjectile: Creating Jorge projectile");
-            // Jorge: Standard projectile
+            // Jorge: Calculate direction to nearest player
             var dirX = nearestPlayerPos.Value.x - bossEntity.position.x;
             var dirY = nearestPlayerPos.Value.y - bossEntity.position.y;
             var length = Math.Sqrt(dirX * dirX + dirY * dirY);
-            DbVector2 direction = length > 0 ? new DbVector2((float)(dirX / length), (float)(dirY / length)) : new DbVector2(1, 0);
+            DbVector2 direction = new DbVector2((float)(dirX / length), (float)(dirY / length));
+            
+            Log.Info($"Boss position: ({bossEntity.position.x}, {bossEntity.position.y})");
+            Log.Info($"Player position: ({nearestPlayerPos.Value.x}, {nearestPlayerPos.Value.y})");
+            Log.Info($"Calculated direction vector: ({direction.x}, {direction.y})");
 
+            // Create projectile at boss position
             var projectileEntity = ctx.Db.entity.Insert(new Entity
             {
                 position = bossEntity.position,
@@ -543,7 +544,7 @@ public static partial class Module
                 radius = 10
             });
 
-            Log.Info($"BossFireProjectile: Created projectile entity {projectileEntity.entity_id}");
+            Log.Info($"Created projectile entity {projectileEntity.entity_id} with direction ({projectileEntity.direction.x}, {projectileEntity.direction.y})");
 
             var activeBossAttack = ctx.Db.active_boss_attacks.Insert(new ActiveBossAttack
             {
@@ -834,4 +835,4 @@ public static partial class Module
             });
         }
     }
-} 
+}

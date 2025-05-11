@@ -174,6 +174,9 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('attack_wand', '/assets/attack_wand.png');
         this.load.image('attack_knife', '/assets/attack_knife.png');
         this.load.image('attack_shield', '/assets/attack_shield.png');
+        this.load.image('attack_boss_jorge', '/assets/attack_boss_jorge.png');
+        this.load.image('attack_boss_björn', '/assets/attack_boss_björn.png');
+        this.load.image('attack_boss_simon', '/assets/attack_boss_simon.png');
         
         // Load upgrade assets
         this.load.image('card_blank', '/assets/card_blank.png');

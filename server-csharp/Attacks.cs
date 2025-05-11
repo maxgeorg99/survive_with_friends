@@ -233,24 +233,6 @@ public static partial class Module
             damage = 4,             
             armor_piercing = 10       
         });
-
-        // Boss Bolt - basic boss projectile
-        ctx.Db.attack_data.Insert(new AttackData
-        {
-            attack_id = 5,
-            attack_type = AttackType.BossBolt,
-            name = "Boss Bolt",
-            cooldown = 2000,           // Boss fires every 2 seconds (can be tuned)
-            duration = 1200,           // Bolt lasts 1.2 seconds
-            projectiles = 1,           // Single bolt
-            fire_delay = 0,            // No burst
-            speed = 900,               // Fast
-            piercing = false,          // No piercing
-            radius = 18,               // Medium size
-            damage = 6,                // Tuned for boss
-            armor_piercing = 5         // Some armor pierce
-        });
-
         // Boss Jorge Bolt - unique projectile for Jorge
         ctx.Db.attack_data.Insert(new AttackData
         {
@@ -838,11 +820,6 @@ public static partial class Module
             }
 
             var activeBossAttack = activeBossAttackOpt.Value;
-
-            activeBossAttack.ticks_elapsed += 1; 
-            ctx.Db.active_boss_attacks.active_boss_attack_id.Update(activeBossAttack);
-
-            // Get the attack entity
             var entityOpt = ctx.Db.entity.entity_id.Find(activeBossAttack.entity_id);
             if (entityOpt is null)
             {
@@ -866,11 +843,18 @@ public static partial class Module
             // Calculate movement based on direction, speed and time delta
             float moveDistance = moveSpeed * DELTA_TIME;
             var moveOffset = entity.direction * moveDistance;
+
+            Log.Info($"Boss attack {activeBossAttack.active_boss_attack_id} movement:");
+            Log.Info($"  Current pos: ({entity.position.x}, {entity.position.y})");
+            Log.Info($"  Direction: ({entity.direction.x}, {entity.direction.y})");
+            Log.Info($"  Move offset: ({moveOffset.x}, {moveOffset.y})");
             
             // Update entity with new position
             var updatedEntity = entity;
             updatedEntity.position = entity.position + moveOffset;
             
+            Log.Info($"  New pos: ({updatedEntity.position.x}, {updatedEntity.position.y})");
+
             // Apply world boundary clamping
             updatedEntity.position.x = Math.Clamp(
                 updatedEntity.position.x, 
@@ -883,27 +867,11 @@ public static partial class Module
                 worldSize - updatedEntity.radius
             );
             
-            // Check if entity hit the world boundary, if so mark for deletion
-            bool hitBoundary = 
-                updatedEntity.position.x <= updatedEntity.radius ||
-                updatedEntity.position.x >= worldSize - updatedEntity.radius ||
-                updatedEntity.position.y <= updatedEntity.radius ||
-                updatedEntity.position.y >= worldSize - updatedEntity.radius;
-            
-            if (hitBoundary)
-            {
-                // Delete attack entity and active boss attack record
-                ctx.Db.entity.entity_id.Delete(entity.entity_id);
-                ctx.Db.active_boss_attacks.active_boss_attack_id.Delete(activeBossAttack.active_boss_attack_id);
-                
-                // Clean up any damage records associated with this attack
-                CleanupAttackDamageRecords(ctx, entity.entity_id);
-            }
-            else
-            {
-                // Update entity position
-                ctx.Db.entity.entity_id.Update(updatedEntity);
-            }
+            // Update entity position
+            ctx.Db.entity.entity_id.Update(updatedEntity);
+
+            activeBossAttack.ticks_elapsed += 1; 
+            ctx.Db.active_boss_attacks.active_boss_attack_id.Update(activeBossAttack);
         }
     }
-} 
+}

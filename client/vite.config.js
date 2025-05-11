@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import path from 'path';
 
 export default defineConfig({
   server: {
@@ -7,5 +8,10 @@ export default defineConfig({
   build: {
     outDir: 'dist'
   },
-  base: './' // Ensure assets are loaded correctly
+  base: './', // Ensure assets are loaded correctly
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src')
+    }
+  }
 }); 

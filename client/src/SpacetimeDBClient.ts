@@ -86,14 +86,14 @@ class SpacetimeDBClient {
                 "SELECT * FROM monsters",
                 "SELECT * FROM active_attacks",
                 "SELECT * FROM active_boss_attacks",
-                "SELECT * FROM active_boss_attack_cleanup",
                 "SELECT * FROM attack_data",
                 "SELECT * FROM gems",
                 "SELECT * FROM upgrade_options",
                 "SELECT * FROM chosen_upgrades",
                 "SELECT * FROM monster_spawners",
                 "SELECT * FROM game_state",
-                "SELECT * FROM boss_spawn_timer"
+                "SELECT * FROM boss_spawn_timer",
+                "SELECT * FROM boss_attack_timer"
             ]);
 
         // Register table event callbacks
@@ -216,6 +216,36 @@ class SpacetimeDBClient {
                 if(newWorld.tickCount % 50 == 0) {
                     console.log("Game tick:", newWorld.tickCount);
                 }
+            });
+        }
+
+        // Attack Data Events
+        if (connection.db.attackData) {
+            connection.db.attackData.onInsert((ctx, data) => {
+                this.gameEvents.emit(GameEvents.ATTACK_DATA_CREATED, ctx, data);
+            });
+            connection.db.attackData.onUpdate((ctx, oldData, newData) => {
+                this.gameEvents.emit(GameEvents.ATTACK_DATA_UPDATED, ctx, oldData, newData);
+            });
+        }
+
+        // Active Attack Cleanup Events
+        if (connection.db.activeAttackCleanup) {
+            connection.db.activeAttackCleanup.onInsert((ctx, cleanup) => {
+                this.gameEvents.emit(GameEvents.ACTIVE_ATTACK_CLEANUP_CREATED, ctx, cleanup);
+            });
+            connection.db.activeAttackCleanup.onDelete((ctx, cleanup) => {
+                this.gameEvents.emit(GameEvents.ACTIVE_ATTACK_CLEANUP_DELETED, ctx, cleanup);
+            });
+        }
+
+        // Active Boss Attack Cleanup Events
+        if (connection.db.activeBossAttackCleanup) {
+            connection.db.activeBossAttackCleanup.onInsert((ctx, cleanup) => {
+                this.gameEvents.emit(GameEvents.ACTIVE_BOSS_ATTACK_CLEANUP_CREATED, ctx, cleanup);
+            });
+            connection.db.activeBossAttackCleanup.onDelete((ctx, cleanup) => {
+                this.gameEvents.emit(GameEvents.ACTIVE_BOSS_ATTACK_CLEANUP_DELETED, ctx, cleanup);
             });
         }
     }

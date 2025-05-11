@@ -85,6 +85,16 @@ export class AttackManager {
         this.gameEvents.on(GameEvents.BOSS_ATTACK_CREATED, this.handleBossAttackInsert, this);
         this.gameEvents.on(GameEvents.BOSS_ATTACK_UPDATED, this.handleBossAttackUpdate, this);
         this.gameEvents.on(GameEvents.BOSS_ATTACK_DELETED, this.handleBossAttackDelete, this);
+
+        // Subscribe to attack cleanup events
+        this.gameEvents.on(GameEvents.ACTIVE_ATTACK_CLEANUP_CREATED, this.handleAttackCleanupCreated, this);
+        this.gameEvents.on(GameEvents.ACTIVE_ATTACK_CLEANUP_DELETED, this.handleAttackCleanupDeleted, this);
+        this.gameEvents.on(GameEvents.ACTIVE_BOSS_ATTACK_CLEANUP_CREATED, this.handleBossAttackCleanupCreated, this);
+        this.gameEvents.on(GameEvents.ACTIVE_BOSS_ATTACK_CLEANUP_DELETED, this.handleBossAttackCleanupDeleted, this);
+
+        // Subscribe to attack data events
+        this.gameEvents.on(GameEvents.ATTACK_DATA_CREATED, this.handleAttackDataCreated, this);
+        this.gameEvents.on(GameEvents.ATTACK_DATA_UPDATED, this.handleAttackDataUpdated, this);
     }
 
     public unregisterAttackListeners() {
@@ -235,7 +245,6 @@ export class AttackManager {
     }
 
     private createAttackSprite(attackType: string, x: number, y: number): Phaser.GameObjects.Sprite | null {
-        // Create a sprite based on attack type
         let spriteKey = '';
         
         switch (attackType) {
@@ -251,25 +260,31 @@ export class AttackManager {
             case 'Shield':
                 spriteKey = 'attack_shield';
                 break;
-            case 'BossBolt':
-                spriteKey = 'attack_boss_bolt';
-                break;
             case 'BossJorgeBolt':
                 spriteKey = 'attack_boss_jorge';
                 break;
             case 'BossBjornBolt':
                 spriteKey = 'attack_boss_björn';
                 break;
+            case 'BossSimonBolt':
+                spriteKey = 'attack_boss_simon';
+                break;
             default:
-                console.error(`Unknown attack type: ${attackType}`);
-                return null;
+                console.warn(`Unknown attack type: ${attackType}, using default sprite`);
         }
         
-        // Create the sprite with a higher depth to show in front of the circle
+        // Create the sprite and set its properties
         const sprite = this.scene.add.sprite(x, y, spriteKey);
         sprite.setDepth(1.5); // Set depth higher than circle but below UI
+        sprite.setOrigin(0.5, 0.5); // Center the sprite's pivot point
+        sprite.setAlpha(1); // Make sure sprite is fully visible
         
-        // The scale will be set in updateAttackGraphic based on radius comparison
+        // Set an initial scale based on attack type
+        if (attackType === 'BossJorgeBolt' || attackType === 'BossBjornBolt' || attackType === 'BossSimonBolt') {
+            sprite.setScale(0.4); // Smaller scale for boss bolts
+        } else {
+            sprite.setScale(1.0); // Normal scale for other attacks
+        }
         
         return sprite;
     }
@@ -297,7 +312,7 @@ export class AttackManager {
             );
         }
 
-        // Update the sprite position and rotation - always visible regardless of debug mode
+        // Update the sprite position and rotation
         if (attackGraphicData.sprite) {
             const sprite = attackGraphicData.sprite;
             
@@ -305,44 +320,44 @@ export class AttackManager {
             sprite.x = attackGraphicData.predictedPosition.x;
             sprite.y = attackGraphicData.predictedPosition.y;
             
-            // Calculate scale based on radius compared to base radius
-            // Only apply if baseRadius is not zero to avoid division by zero
-            if (attackGraphicData.baseRadius > 0) {
-                const scale = attackGraphicData.radius / attackGraphicData.baseRadius;
-                sprite.setScale(scale);
-            }
-            
-            // Handle different attack types
-            switch (attackGraphicData.attackType) {
-                case 'Sword':
-                    // Mirror horizontally if moving left
-                    if (attackGraphicData.direction.x < 0) {
-                        sprite.setFlipX(true);
-                    } else {
+            // For boss bolts, always rotate to match direction of travel
+            if (attackGraphicData.attackType.includes('Boss')) {
+                // Use atan2 to get the angle from the direction vector
+                const angle = Math.atan2(attackGraphicData.direction.y, attackGraphicData.direction.x);
+                sprite.setRotation(angle);
+            } else {
+                // Handle other attack types as before
+                switch (attackGraphicData.attackType) {
+                    case 'Sword':
+                        // Mirror horizontally if moving left
+                        if (attackGraphicData.direction.x < 0) {
+                            sprite.setFlipX(true);
+                        } else {
+                            sprite.setFlipX(false);
+                        }
+                        sprite.setRotation(0); // Reset rotation
+                        break;
+                        
+                    case 'Wand':
+                    case 'Knives':
+                        // Rotate to point in the direction of motion
+                        if (attackGraphicData.direction.length() > 0) {
+                            sprite.setRotation(Math.atan2(attackGraphicData.direction.y, attackGraphicData.direction.x));
+                        }
+                        sprite.setFlipX(false); // Reset flip
+                        break;
+                        
+                    case 'Shield':
+                        // Shield just draws normally
+                        sprite.setRotation(0); // Reset rotation
+                        sprite.setFlipX(false); // Reset flip
+                        break;
+                        
+                    default:
+                        // Default handling
+                        sprite.setRotation(0);
                         sprite.setFlipX(false);
-                    }
-                    sprite.setRotation(0); // Reset rotation
-                    break;
-                    
-                case 'Wand':
-                case 'Knives':
-                    // Rotate to point in the direction of motion
-                    if (attackGraphicData.direction.length() > 0) {
-                        sprite.setRotation(Math.atan2(attackGraphicData.direction.y, attackGraphicData.direction.x));
-                    }
-                    sprite.setFlipX(false); // Reset flip
-                    break;
-                    
-                case 'Shield':
-                    // Shield just draws normally
-                    sprite.setRotation(0); // Reset rotation
-                    sprite.setFlipX(false); // Reset flip
-                    break;
-                    
-                default:
-                    // Default handling
-                    sprite.setRotation(0);
-                    sprite.setFlipX(false);
+                }
             }
         }
     }
@@ -471,8 +486,20 @@ export class AttackManager {
                 // Normal projectile with directional movement
                 if (attackGraphicData.direction.length() > 0) {
                     const moveDistance = attackGraphicData.speed * deltaTime;
-                    attackGraphicData.predictedPosition.x += attackGraphicData.direction.x * moveDistance;
-                    attackGraphicData.predictedPosition.y += attackGraphicData.direction.y * moveDistance;
+                    
+                    // For boss attacks, ensure we keep the original direction
+                    if (attackGraphicData.attackType.includes('Boss')) {
+                        // Normalize direction to ensure consistent speed
+                        const dir = attackGraphicData.direction.normalize();
+                        
+                        // Move in the normalized direction
+                        attackGraphicData.predictedPosition.x += dir.x * moveDistance;
+                        attackGraphicData.predictedPosition.y += dir.y * moveDistance;
+                    } else {
+                        // Normal attack movement
+                        attackGraphicData.predictedPosition.x += attackGraphicData.direction.x * moveDistance;
+                        attackGraphicData.predictedPosition.y += attackGraphicData.direction.y * moveDistance;
+                    }
                     
                     // Draw at predicted position
                     this.updateAttackGraphic(attackGraphicData);
@@ -547,7 +574,7 @@ export class AttackManager {
                 console.error(`Failed to create sprite for boss attack type ${attack.attackType.tag}`);
             }
             
-            // Setup direction vector based on entity direction
+            // !Setup direction vector need to be based on player position
             const direction = new Phaser.Math.Vector2(entity.direction.x, entity.direction.y);
             
             // Store the attack graphic data with prediction values
@@ -560,7 +587,7 @@ export class AttackManager {
                 lastUpdateTime: this.gameTime,
                 predictedPosition: new Phaser.Math.Vector2(entity.position.x, entity.position.y),
                 serverPosition: new Phaser.Math.Vector2(entity.position.x, entity.position.y),
-                direction: direction,
+                direction: direction,  // This now contains the correct direction from boss to player
                 speed: attackData.speed,
                 isShield: false, // Boss attacks don't use shields
                 playerId: null, // Boss attacks don't have a player ID
@@ -568,6 +595,11 @@ export class AttackManager {
                 ticksElapsed: attack.ticksElapsed,
                 attackType: attack.attackType.tag
             };
+
+            // Also set the sprite rotation to match the projectile direction
+            if (sprite) {
+                sprite.setRotation(Math.atan2(direction.y, direction.x));
+            }
             
             this.attackGraphics.set(attack.activeBossAttackId, attackGraphicData);
             console.log(`Created new boss attack graphic data for ${attack.activeBossAttackId}`);
@@ -597,4 +629,35 @@ export class AttackManager {
         // Update the graphic right away
         this.updateAttackGraphic(attackGraphicData);
     }
-} 
+
+    // Add new event handlers
+    private handleAttackCleanupCreated(ctx: EventContext, cleanup: any) {
+        // Handle attack cleanup creation
+        console.log("Attack cleanup created:", cleanup);
+    }
+
+    private handleAttackCleanupDeleted(ctx: EventContext, cleanup: any) {
+        // Handle attack cleanup deletion
+        console.log("Attack cleanup deleted:", cleanup);
+    }
+
+    private handleBossAttackCleanupCreated(ctx: EventContext, cleanup: any) {
+        // Handle boss attack cleanup creation
+        console.log("Boss attack cleanup created:", cleanup);
+    }
+
+    private handleBossAttackCleanupDeleted(ctx: EventContext, cleanup: any) {
+        // Handle boss attack cleanup deletion
+        console.log("Boss attack cleanup deleted:", cleanup);
+    }
+
+    private handleAttackDataCreated(ctx: EventContext, attackData: AttackData) {
+        // Handle attack data creation
+        console.log("Attack data created:", attackData);
+    }
+
+    private handleAttackDataUpdated(ctx: EventContext, oldData: AttackData, newData: AttackData) {
+        // Handle attack data update
+        console.log("Attack data updated:", oldData, newData);
+    }
+}
