@@ -106,7 +106,8 @@ public static partial class Module
                 case AttackType.Wand:
                 {
                     // Wands shoot at the nearest enemy
-                    Entity? nearestEnemy = FindNearestEnemy(ctx, entity);
+                    // TODO: can we use the spatial hash to speed this up?
+                    Monsters? nearestEnemy = FindNearestEnemy(ctx, entity);
                     if (nearestEnemy != null)
                     {
                         var enemyActual = nearestEnemy.Value;
@@ -148,33 +149,25 @@ public static partial class Module
         }
 
         // Find the nearest enemy to a player entity
-        public static Entity? FindNearestEnemy(ReducerContext ctx, Entity playerEntity)
+        public static Monsters? FindNearestEnemy(ReducerContext ctx, Entity playerEntity)
         {
-            Entity? nearestEnemy = null;
+            Monsters? nearestEnemy = null;
             float nearestDistanceSquared = float.MaxValue;
 
             // Iterate through all monsters in the game
+            // TODO: can we use the spatial hash to speed this up?
             foreach (var monster in ctx.Db.monsters.Iter())
             {
-                // Get the monster's entity
-                var monsterEntityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
-                if (monsterEntityOpt == null)
-                {
-                    continue; // Skip if entity not found
-                }
-
-                var monsterEntity = monsterEntityOpt.Value;
-
                 // Calculate squared distance (more efficient than using square root)
-                var dx = monsterEntity.position.x - playerEntity.position.x;
-                var dy = monsterEntity.position.y - playerEntity.position.y;
+                var dx = monster.position.x - playerEntity.position.x;
+                var dy = monster.position.y - playerEntity.position.y;
                 var distanceSquared = dx * dx + dy * dy;
 
                 // If this monster is closer than the current nearest, update nearest
                 if (distanceSquared < nearestDistanceSquared)
                 {
                     nearestDistanceSquared = distanceSquared;
-                    nearestEnemy = monsterEntity;
+                    nearestEnemy = monster;
                 }
             }
 

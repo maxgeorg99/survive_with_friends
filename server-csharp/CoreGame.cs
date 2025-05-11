@@ -144,10 +144,7 @@ public static partial class Module
             Log.Info($"Monster {monster.monster_id} (type: {monster.bestiary_id}) was killed!");
             
             // Get the monster's position before deleting it
-            var entityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
-            DbVector2 position = entityOpt != null
-                ? entityOpt.Value.position
-                : new DbVector2(0, 0); // Fallback if entity not found
+            DbVector2 position = monster.position;
             
             // Clean up any monster damage records for this monster
             CleanupMonsterDamageRecords(ctx, monsterId);
@@ -155,11 +152,7 @@ public static partial class Module
             // Check if this is a boss monster
             bool isBoss = false;
             var gameStateOpt = ctx.Db.game_state.id.Find(0);
-            
-            // Add debug info to verify boss identification
-            if (gameStateOpt != null) {
-                Log.Info($"DamageMonster ID={monsterId}, GameState boss_monster_id={gameStateOpt.Value.boss_monster_id}, boss_active={gameStateOpt.Value.boss_active}, boss_phase={gameStateOpt.Value.boss_phase}");
-            }
+
             
             if (gameStateOpt != null && gameStateOpt.Value.boss_active && gameStateOpt.Value.boss_monster_id == monsterId)
             {
@@ -171,32 +164,19 @@ public static partial class Module
                 {
                     // Phase 1 boss defeated, transition to phase 2
                     Log.Info("BOSS PHASE 1 DEFEATED! TRANSITIONING TO PHASE 2...");
-                    Log.Info($"Phase 1 details - Entity ID: {monster.entity_id}, Position: ({position.x}, {position.y})");
+                    Log.Info($"Phase 1 details - Monster ID: {monster.monster_id}, Position: ({position.x}, {position.y})");
                     
                     // Store the entity ID and position before deletion
-                    uint entityId = monster.entity_id;
                     DbVector2 bossPosition = position;
                     
                     // Spawn phase 2 first, before deleting phase 1 monster
                     Log.Info("Calling SpawnBossPhaseTwo now...");
-                    try 
-                    {
-                        SpawnBossPhaseTwo(ctx, entityId, bossPosition);
-                        Log.Info("SpawnBossPhaseTwo completed successfully");
-                        
-                        // Only after successful spawn of phase 2, delete phase 1
-                        ctx.Db.monsters.monster_id.Delete(monsterId);
-                        ctx.Db.entity.entity_id.Delete(entityId);
-                        Log.Info("Phase 1 boss monster and entity deleted after phase 2 spawned");
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Info($"ERROR spawning boss phase 2: {ex.Message}");
-                        // Don't rethrow - we still want to delete the phase 1 boss
-                        ctx.Db.monsters.monster_id.Delete(monsterId);
-                        ctx.Db.entity.entity_id.Delete(entityId);
-                        Log.Info("Phase 1 boss monster and entity deleted after spawn failure");
-                    }
+                    SpawnBossPhaseTwo(ctx, bossPosition);
+                    Log.Info("SpawnBossPhaseTwo completed successfully");
+                    
+                    // Only after successful spawn of phase 2, delete phase 1
+                    ctx.Db.monsters.monster_id.Delete(monsterId);
+                    Log.Info("Phase 1 boss monster and entity deleted after phase 2 spawned");
                     
                     // Add a verification check to confirm phase 2 exists
                     Log.Info("Verifying phase 2 boss was created:");
@@ -210,7 +190,7 @@ public static partial class Module
                             var phase2BossOpt = ctx.Db.monsters.monster_id.Find(gameStateAfter.Value.boss_monster_id);
                             if (phase2BossOpt != null)
                             {
-                                Log.Info($"Phase 2 boss verified: Monster ID={phase2BossOpt.Value.monster_id}, HP={phase2BossOpt.Value.hp}, Entity ID={phase2BossOpt.Value.entity_id}");
+                                Log.Info($"Phase 2 boss verified: Monster ID={phase2BossOpt.Value.monster_id}");
                             }
                             else
                             {
@@ -232,7 +212,6 @@ public static partial class Module
                     
                     // Delete the monster and entity
                     ctx.Db.monsters.monster_id.Delete(monsterId);
-                    ctx.Db.entity.entity_id.Delete(monster.entity_id);
                     
                     // Handle boss defeated (true victory!)
                     HandleBossDefeated(ctx);
@@ -253,9 +232,6 @@ public static partial class Module
                 
                 // Delete the monster
                 ctx.Db.monsters.monster_id.Delete(monsterId);
-                
-                // Delete the entity
-                ctx.Db.entity.entity_id.Delete(monster.entity_id);
             }
             
             return true;
@@ -264,7 +240,7 @@ public static partial class Module
         {
             // Monster is still alive, update with reduced HP
             monster.hp -= damageAmount;
-            ctx.Db.monsters.monster_id.Update(monster);
+            //ctx.Db.monsters.monster_id.Update(monster);
             
             return false;
         }
@@ -500,13 +476,13 @@ public static partial class Module
         {
             var world = worldOpt.Value;
             world.tick_count += 1;
-            if(world.tick_count % 50 == 0)
+            if(world.tick_count % 20 == 0)
             {
                 Log.Info($"Game tick: {world.tick_count}");
             }
             if(world.tick_count % 10 == 0)
             {
-                isReupulsionFrame = false;
+                isReupulsionFrame = true;
             }
             ctx.Db.world.world_id.Update(world);
         }
@@ -531,12 +507,14 @@ public static partial class Module
 
         ProcessPlayerMovement(ctx, tick_rate, worldSize);
 
-        ProcessMonsterMovements(ctx);
-        //ProcessMonsterMotionSimple(ctx);
+        //ProcessMonsterMovements(ctx);
+        ProcessMonsterMotionSimple(ctx);
         if(isReupulsionFrame)
         {
             SolveMonsterRepulsionSpatialHash(ctx);
         }
+        CommitMonsterMotion(ctx);
+        
         ProcessAttackMovements(ctx);
         MaintainGems(ctx);
 

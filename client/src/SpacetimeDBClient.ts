@@ -9,7 +9,7 @@ const SPACETIMEDB_URI = "ws://localhost:3000"; // Use wss for cloud, corrected o
 const REMOTE_SPACETIMEDB_URI = "wss://maincloud.spacetimedb.com";
 const PROXY_SPACETIMEDB_URI = "ws://localhost:3001";
 
-const URI_TO_USE = PROXY_SPACETIMEDB_URI;
+const URI_TO_USE = REMOTE_SPACETIMEDB_URI;
 
 class SpacetimeDBClient {
     // Initialize sdkClient to null, it will be set in handleConnect
@@ -40,8 +40,8 @@ class SpacetimeDBClient {
         DbConnection.builder()
             .withUri(URI_TO_USE)
             .withModuleName(SPACETIMEDB_DB_NAME)
-            //.withToken(localStorage.getItem('auth_token') || '')
-            .withToken('')
+            .withToken(localStorage.getItem('auth_token') || '')
+            //.withToken('')
             .onConnect(this.handleConnect.bind(this))
             .onDisconnect(this.handleDisconnect.bind(this))
             .onConnectError(this.handleConnectError.bind(this))

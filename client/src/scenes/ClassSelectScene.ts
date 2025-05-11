@@ -307,7 +307,7 @@ export default class ClassSelectScene extends Phaser.Scene {
                 this.scene.start('LoadingScene', { 
                     message: 'Creating your character...', 
                     nextScene: 'GameScene',
-                    timeoutDuration: 10000 // 10 seconds timeout
+                    timeoutDuration: 30000 // 10 seconds timeout
                 });
                 
                 // Call the spawnPlayer reducer with the numeric class ID

@@ -238,54 +238,6 @@ public static partial class Module
             CachedCountPlayers++;
         }
     }
-    private static void ProcessPlayerMonsterCollisions(ReducerContext ctx)
-    {        
-        // Check each player for collisions with monsters
-        foreach (var player in ctx.Db.player.Iter())
-        {
-            var playerEntityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
-            if (playerEntityOpt == null)
-            {
-                continue; // Skip if player has no entity
-            }
-            
-            Entity playerEntity = playerEntityOpt.Value;
-
-            bool playerIsDead = false;
-            
-            // Check against each monster
-            foreach (var monsterEntry in ctx.Db.monsters.Iter())
-            {
-                uint monsterId = monsterEntry.monster_id;
-
-                Entity? monsterEntityOpt = ctx.Db.entity.entity_id.Find(monsterEntry.entity_id);
-                if(monsterEntityOpt == null)
-                {
-                    continue;
-                }
-
-                Entity monsterEntity = monsterEntityOpt.Value;
-                
-                // Check if player is colliding with this monster
-                if (AreEntitiesColliding(playerEntity, monsterEntity))
-                {                    
-                    // Apply damage to player
-                    playerIsDead = DamagePlayer(ctx, player.player_id, monsterEntry.atk);
-
-                    if(playerIsDead)
-                    {
-                        break;
-                    }
-                }
-            }
-
-            if(playerIsDead)
-            {
-                continue;
-            }
-        }
-    }
-
     private static void ProcessPlayerMonsterCollisionsSpatialHash(ReducerContext ctx)
     {
         if(ctx.Db.monsters.Count == 0)
@@ -306,18 +258,18 @@ public static partial class Module
             var cellKey = GetWorldCellFromPosition(px, py);
 
             int cx =  cellKey & WORLD_CELL_MASK;
-            int cy = (cellKey >> WORLD_CELL_BIT_SHIFT);
+            int cy = cellKey >> WORLD_CELL_BIT_SHIFT;
 
             for (int dy = -1; dy <= +1; ++dy)
             {
                 int ny = cy + dy;
                 if ((uint)ny >= (uint)WORLD_GRID_HEIGHT) continue;   // unsigned trick == clamp
 
-                int rowBase = (ny << WORLD_CELL_BIT_SHIFT);
+                int rowBase = ny << WORLD_CELL_BIT_SHIFT;
                 for (int dx = -1; dx <= +1; ++dx)
                 {
                     int nx = cx + dx;
-                    if ((uint)nx >= (uint)WORLD_GRID_WIDTH) continue;
+                    if ((uint)nx >= WORLD_GRID_WIDTH) continue;
 
                     int testCellKey = rowBase | nx;
                     for(var mid = HeadsMonster[testCellKey]; mid != -1; mid = NextsMonster[mid])

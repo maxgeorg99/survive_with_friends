@@ -19,19 +19,17 @@ public static partial class Module
         [PrimaryKey, AutoInc]
         public uint monster_id;
 
-        [Unique]
-        public uint entity_id;
-
-        public MonsterType bestiary_id;
-        
         // monster attributes
+        public MonsterType bestiary_id;
         public uint hp;
         public uint max_hp; // Maximum HP copied from bestiary
         public float atk;
         public float speed;
-        
-        // target entity id the monster is following
         public uint target_entity_id;
+
+        // entity attributes
+        public DbVector2 position;  
+        public float radius;     
     }
 
     // Timer table for spawning monsters
@@ -181,6 +179,7 @@ public static partial class Module
         var monsterCount = ctx.Db.monsters.Count;
         if (monsterCount >= config.max_monsters)
         {
+            //TODO: If we're at monster capacity, we need to make sure we can still spawn the boss.
             Log.Info($"SpawnMonster: At maximum monster capacity ({monsterCount}/{config.max_monsters}), skipping spawn.");
             return;
         }
@@ -190,20 +189,6 @@ public static partial class Module
         if (bestiaryEntry == null)
         {
             throw new Exception($"SpawnMonster: Could not find bestiary entry for monster type: {spawner.monster_type}");
-        }
-        
-        // Create an entity for the monster using the pre-determined position
-        Entity? entityOpt = ctx.Db.entity.Insert(new Entity
-        {
-            position = spawner.position,
-            direction = new DbVector2(0, 0), // Initial direction
-            is_moving = false,  // Not moving initially
-            radius = bestiaryEntry.Value.radius // Set radius from bestiary entry
-        });
-        
-        if (entityOpt == null)
-        {
-            throw new Exception("SpawnMonster: Failed to create entity for monster!");
         }
         
         // Find the closest player to target
@@ -235,13 +220,15 @@ public static partial class Module
         // Create the monster
         Monsters? monsterOpt = ctx.Db.monsters.Insert(new Monsters
         {
-            entity_id = entityOpt.Value.entity_id,
             bestiary_id = spawner.monster_type,
             hp = bestiaryEntry.Value.max_hp,
-            max_hp = bestiaryEntry.Value.max_hp, // Store max_hp from bestiary
+            max_hp = bestiaryEntry.Value.max_hp,
             atk = bestiaryEntry.Value.atk,
             speed = bestiaryEntry.Value.speed,
-            target_entity_id = closestPlayerId
+            target_entity_id = closestPlayerId,
+
+            position = spawner.position,
+            radius = bestiaryEntry.Value.radius
         });
         
         if (monsterOpt is null)
@@ -249,8 +236,7 @@ public static partial class Module
             throw new Exception("SpawnMonster: Failed to create monster!");
         }
 
-        Log.Info($"Spawned {spawner.monster_type} monster (entity: {entityOpt.Value.entity_id}) targeting player: {targetPlayerName} with HP: {bestiaryEntry.Value.max_hp}/{bestiaryEntry.Value.max_hp}");
-        Log.Info($"Total monsters: {ctx.Db.monsters.Count}");
+        Log.Info($"Spawned {spawner.monster_type} monster. Total monsters: {ctx.Db.monsters.Count}");
         
         // If this is a boss monster, update the game state with its ID
         if (spawner.monster_type == MonsterType.FinalBossPhase1 || spawner.monster_type == MonsterType.FinalBossPhase2)
@@ -284,14 +270,14 @@ public static partial class Module
         // Now process each monster's movement with collision avoidance
         foreach (var monster in ctx.Db.monsters.Iter())
         {
-            var monsterEntityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
-            if(monsterEntityOpt == null)
-            {
-                continue;
-            }
-            var monsterEntity = monsterEntityOpt.Value;
+            // Populate the monster cache
+            KeysMonster[CachedCountMonsters] = monster.monster_id;
+            PosXMonster[CachedCountMonsters] = monster.position.x;
+            PosYMonster[CachedCountMonsters] = monster.position.y;
+            RadiusMonster[CachedCountMonsters] = monster.radius;
 
             // Get the target entity
+            // TODO: we need to have already cached the target position
             var targetEntityOpt = ctx.Db.entity.entity_id.Find(monster.target_entity_id);
             if (targetEntityOpt == null)
             {
@@ -304,79 +290,56 @@ public static partial class Module
                 
                 // Calculate direction vector from monster to target
                 var directionVector = new DbVector2(
-                    targetEntity.position.x - monsterEntity.position.x,
-                    targetEntity.position.y - monsterEntity.position.y
+                    targetEntity.position.x - monster.position.x,
+                    targetEntity.position.y - monster.position.y
                 );
                 
                 // Calculate distance to target
                 float distanceToTarget = directionVector.Magnitude();
                 
                 // If we're too close to the target, stop moving
-                if (distanceToTarget < MIN_DISTANCE_TO_REACH)
+                if (distanceToTarget > MIN_DISTANCE_TO_REACH && distanceToTarget > MIN_DISTANCE_TO_MOVE)
                 {
-                    // Monster reached the target, stop moving
-                    if (monsterEntity.is_moving)
+                    // Normalize the direction vector to get base movement direction
+                    var normalizedDirection = directionVector.Normalize();
+                    
+                    // Get monster speed from bestiary
+                    float monsterSpeed = monster.speed * 0.0f;
+                    
+                    // Calculate new position based on direction, speed and time delta
+                    float moveDistance = monsterSpeed * DELTA_TIME;
+                    var moveOffset = normalizedDirection * moveDistance;
+                    
+                    // Update entity with new direction and position
+                    var monsterPosition = monster.position + moveOffset;
+                    
+                    // Get world size from config
+                    uint worldSize = 20000; // Default fallback (10x larger)
+                    var configOpt = ctx.Db.config.id.Find(0);
+                    if (configOpt != null)
                     {
-                        var stoppedEntity = monsterEntity;
-                        stoppedEntity.is_moving = false;
-                        stoppedEntity.direction = new DbVector2(0, 0);
-                        ctx.Db.entity.entity_id.Update(stoppedEntity);
+                        worldSize = configOpt.Value.world_size;
                     }
-                }
-                else
-                {
-                    // If we're far enough from the target, start moving
-                    if (distanceToTarget > MIN_DISTANCE_TO_MOVE)
-                    {
-                        // Normalize the direction vector to get base movement direction
-                        var normalizedDirection = directionVector.Normalize();
-                        
-                        // Get monster speed from bestiary
-                        float monsterSpeed = monster.speed * 0.0f;
-                        
-                        // Calculate new position based on direction, speed and time delta
-                        float moveDistance = monsterSpeed * DELTA_TIME;
-                        var moveOffset = normalizedDirection * moveDistance;
-                        
-                        // Update entity with new direction and position
-                        var updatedEntity = monsterEntity;
-                        updatedEntity.direction = normalizedDirection;
-                        updatedEntity.is_moving = true;
-                        updatedEntity.position = monsterEntity.position + moveOffset;
-                        
-                        // Get world size from config
-                        uint worldSize = 20000; // Default fallback (10x larger)
-                        var configOpt = ctx.Db.config.id.Find(0);
-                        if (configOpt != null)
-                        {
-                            worldSize = configOpt.Value.world_size;
-                        }
-                        
-                        // Apply world boundary clamping using entity radius
-                        updatedEntity.position.x = Math.Clamp(
-                            updatedEntity.position.x, 
-                            updatedEntity.radius, 
-                            worldSize - updatedEntity.radius
-                        );
-                        updatedEntity.position.y = Math.Clamp(
-                            updatedEntity.position.y, 
-                            updatedEntity.radius, 
-                            worldSize - updatedEntity.radius
-                        );
-                        
-                        // Update entity in database
-                        ctx.Db.entity.entity_id.Update(updatedEntity);
-                    }
+                    
+                    // Apply world boundary clamping using entity radius
+                    monsterPosition.x = Math.Clamp(
+                        monsterPosition.x, 
+                        monster.radius, 
+                        worldSize - monster.radius
+                    );
+                    monsterPosition.y = Math.Clamp(
+                        monsterPosition.y, 
+                        monster.radius, 
+                        worldSize - monster.radius
+                    );
+                    
+                    PosXMonster[CachedCountMonsters] = monsterPosition.x;
+                    PosYMonster[CachedCountMonsters] = monsterPosition.y;
                 }
             }
 
-            //Update collision cache
-            KeysMonster[CachedCountMonsters] = monster.monster_id;
-            PosXMonster[CachedCountMonsters] = monsterEntity.position.x;
-            PosYMonster[CachedCountMonsters] = monsterEntity.position.y;
-            RadiusMonster[CachedCountMonsters] = monsterEntity.radius;
-
-            ushort gridCellKey = GetWorldCellFromPosition(monsterEntity.position.x, monsterEntity.position.y);
+            //Update collision grid
+            ushort gridCellKey = GetWorldCellFromPosition(monster.position.x, monster.position.y);
             NextsMonster[CachedCountMonsters] = HeadsMonster[gridCellKey];
             HeadsMonster[gridCellKey] = CachedCountMonsters;
     
@@ -388,28 +351,35 @@ public static partial class Module
     {
         foreach (var monster in ctx.Db.monsters.Iter())
         {
-            var monsterEntityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
-            if(monsterEntityOpt == null)
-            {
-                continue;
-            }
-            var monsterEntity = monsterEntityOpt.Value;
+            var monsterUpdated = monster;
 
-            //monsterEntity.position.x += 1.0f;
-            //monsterEntity.position.y += 1.0f;
+            monsterUpdated.position.x += 1.0f;
+            monsterUpdated.position.y += 1.0f;
 
-            KeysMonster[CachedCountMonsters] = monster.monster_id;
-            PosXMonster[CachedCountMonsters] = monsterEntity.position.x;
-            PosYMonster[CachedCountMonsters] = monsterEntity.position.y;
-            RadiusMonster[CachedCountMonsters] = monsterEntity.radius;
+            KeysMonster[CachedCountMonsters] = monsterUpdated.monster_id;
+            PosXMonster[CachedCountMonsters] = monsterUpdated.position.x;
+            PosYMonster[CachedCountMonsters] = monsterUpdated.position.y;
+            RadiusMonster[CachedCountMonsters] = monsterUpdated.radius;
 
-            ushort gridCellKey = GetWorldCellFromPosition(monsterEntity.position.x, monsterEntity.position.y);
+            ushort gridCellKey = GetWorldCellFromPosition(monsterUpdated.position.x, monsterUpdated.position.y);
             NextsMonster[CachedCountMonsters] = HeadsMonster[gridCellKey];
             HeadsMonster[gridCellKey] = CachedCountMonsters;
     
             CachedCountMonsters++;
+        }
+    }
 
-            //ctx.Db.entity.entity_id.Update(monsterEntity);
+    private static void CommitMonsterMotion(ReducerContext ctx)
+    {
+        uint monsterCacheIdx = 0;
+        foreach (var monster in ctx.Db.monsters.Iter())
+        {
+            var monsterUpdated = monster;
+            monsterUpdated.position.x = PosXMonster[monsterCacheIdx];
+            monsterUpdated.position.y = PosYMonster[monsterCacheIdx];
+
+            ctx.Db.monsters.monster_id.Update(monsterUpdated);
+            monsterCacheIdx++;
         }
     }
     
@@ -420,20 +390,12 @@ public static partial class Module
         var players = ctx.Db.player.Iter().ToArray();
         if (players.Length == 0)
         {
-            // Make the monster stop moving
-            var entityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
-            if (entityOpt != null)
-            {
-                var entity = entityOpt.Value;
-                entity.is_moving = false;
-                entity.direction = new DbVector2(0, 0);
-                ctx.Db.entity.entity_id.Update(entity);
-            }
             return;
         }
         
         // Choose a random player as the new target
         var rng = ctx.Rng;
+        // Can we pull from cached players instead?
         var randomIndex = rng.Next(0, players.Length);
         var newTarget = players[randomIndex];
         
@@ -443,86 +405,9 @@ public static partial class Module
         ctx.Db.monsters.monster_id.Update(updatedMonster);
     }
 
-    // Helper method to process collisions between attacks and monsters
-    private static void ProcessMonsterAttackCollisions(ReducerContext ctx)
-    {        
-        // Check each active attack for collisions with monsters
-        foreach (var activeAttack in ctx.Db.active_attacks.Iter())
-        {
-            // Get the attack entity
-            var attackEntityOpt = ctx.Db.entity.entity_id.Find(activeAttack.entity_id);
-            if (attackEntityOpt is null)
-            {
-                continue; // Skip if entity not found
-            }
-            
-            var attackEntity = attackEntityOpt.Value;
-            
-            bool attackHitMonster = false;
-            
-            // Check for collisions with monsters
-            foreach (var monsterEntry in ctx.Db.monsters.Iter())
-            {
-                var monsterEntityOpt = ctx.Db.entity.entity_id.Find(monsterEntry.entity_id);
-                if(monsterEntityOpt == null)
-                {
-                    continue;
-                }
-                Entity monsterEntity = monsterEntityOpt.Value;
-                
-                // Check if the attack is colliding with this monster
-                if (AreEntitiesColliding(attackEntity, monsterEntity))
-                {
-                    // Check if this monster has already been hit by this attack
-                    if (HasMonsterBeenHitByAttack(ctx, monsterEntry.monster_id, attackEntity.entity_id))
-                    {
-                        continue; // Skip if monster already hit by this attack
-                    }
-                    
-                    // Record the hit
-                    RecordMonsterHitByAttack(ctx, monsterEntry.monster_id, attackEntity.entity_id);
-                    
-                    // Apply damage to monster using the active attack's damage value
-                    uint damage = activeAttack.damage;
-                    
-                    // Apply armor piercing if needed
-                    // (Not implemented in this version)
-                    
-                    bool monsterKilled = DamageMonster(ctx, monsterEntry.monster_id, damage);
-                    attackHitMonster = true;
-                    
-                    // For non-piercing attacks, stop checking other monsters and destroy the attack
-                    if (!activeAttack.piercing)
-                    {
-                        break;
-                    }
-                }
-            }
-            
-            // If the attack hit a monster and it's not piercing, remove the attack
-            if (attackHitMonster && !activeAttack.piercing)
-            {
-                // Delete the attack entity
-                ctx.Db.entity.entity_id.Delete(attackEntity.entity_id);
-                
-                // Delete the active attack record
-                ctx.Db.active_attacks.active_attack_id.Delete(activeAttack.active_attack_id);
-                
-                // Clean up any damage records for this attack
-                CleanupAttackDamageRecords(ctx, attackEntity.entity_id);
-            }
-        }
-    }
-
     // Helper method to process collisions between attacks and monsters using spatial hash
     private static void ProcessMonsterAttackCollisionsSpatialHash(ReducerContext ctx)
-    {        
-        if(ctx.Db.active_attacks.Count == 0 || ctx.Db.monsters.Count == 0)
-        {
-            return;
-        }
-
-        // Iterate through all attacks using spatial hash
+    {
         for(var aid = 0; aid < CachedCountAttacks; aid++)
         {
             var ax = PosXAttack[aid];
@@ -688,28 +573,6 @@ public static partial class Module
                         BumpedMonster[iA] = true;
                         BumpedMonster[iB] = true;
                     }
-                }
-            }
-        }
-
-        // Update the positions of all monsters that have been bumped
-        for (int monsterIdx = 0; monsterIdx < CachedCountMonsters; ++monsterIdx)
-        {
-            if (BumpedMonster[monsterIdx])
-            {
-                var monsterId = KeysMonster[monsterIdx];
-                var monsterData = ctx.Db.monsters.monster_id.Find(monsterId);
-                if (monsterData is null)
-                {
-                    continue;
-                }
-
-                var entity = ctx.Db.entity.entity_id.Find(monsterData.Value.entity_id);
-                if (entity is not null)
-                {
-                    var updatedEntity = entity.Value;
-                    updatedEntity.position = new DbVector2(PosXMonster[monsterIdx], PosYMonster[monsterIdx]);
-                    ctx.Db.entity.entity_id.Update(updatedEntity);
                 }
             }
         }
