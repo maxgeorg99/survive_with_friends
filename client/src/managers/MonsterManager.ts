@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
-import { Monsters, Entity, EventContext, MonsterType } from "../autobindings";
+import { Monsters, EventContext, MonsterType } from "../autobindings";
 import SpacetimeDBClient from '../SpacetimeDBClient';
-import { MONSTER_ASSET_KEYS, MONSTER_SHADOW_OFFSETS, MONSTER_MAX_HP } from '../constants/MonsterConfig';
+import { MONSTER_ASSET_KEYS, MONSTER_SHADOW_OFFSETS_X, MONSTER_SHADOW_OFFSETS_Y} from '../constants/MonsterConfig';
 import { GameEvents } from '../constants/GameEvents';
 import { createMonsterDamageEffect } from '../utils/DamageEffects';
 
@@ -16,32 +16,33 @@ const MONSTER_HEALTH_BAR_OFFSET_Y = 12;
 const BASE_DEPTH = 1000; // Base depth to ensure all sprites are above background
 const SHADOW_DEPTH_OFFSET = -1; // Always behind the sprite
 const HEALTH_BG_DEPTH_OFFSET = 1; // Just behind health bar
-const HEALTH_BAR_DEPTH_OFFSET = 1.1; // In front of background
+const HEALTH_BAR_DEPTH_OFFSET = 1.1;
 
 export default class MonsterManager {
     // Reference to the scene
     private scene: Phaser.Scene;
-    // Client for database access
     private spacetimeDBClient: SpacetimeDBClient;
-    // Map to store monster sprites (keyed by monsterId)
-    private monsters: Map<number, Phaser.GameObjects.Container> = new Map();
-    // Map to hold monster data waiting for corresponding entity data (keyed by entityId)
-    private pendingMonsters: Map<number, Monsters> = new Map();
+    
+    // Map of monster ID to container
+    private monsters: Map<number, Phaser.GameObjects.Container>;
+    
     // Add a property for the game events
     private gameEvents: Phaser.Events.EventEmitter;
+    
     // Add a property to track boss state
     private bossPhase1Killed: boolean = false;
     private timeOfBossPhase1Death: number = 0;
     private bossMonsterId: number = 0;
     private bossPosition: { x: number, y: number } | null = null;
-
-    constructor(scene: Phaser.Scene, client: SpacetimeDBClient) {
+    
+    constructor(scene: Phaser.Scene, spacetimeDBClient: SpacetimeDBClient) {
         this.scene = scene;
-        this.spacetimeDBClient = client;
+        this.spacetimeDBClient = spacetimeDBClient;
+        this.monsters = new Map();
         this.gameEvents = (window as any).gameEvents;
         console.log("MonsterManager constructed");
     }
-
+    
     // Initialize monster handlers
     initializeMonsters(ctx: EventContext) {
         if (!this.spacetimeDBClient?.sdkConnection?.db) {
@@ -49,29 +50,17 @@ export default class MonsterManager {
             return;
         }
 
-        console.log("MonsterManager initalizing monsters");
+        console.log("MonsterManager initializing monsters");
         
         // Register monster listeners
         this.registerMonsterListeners();
         
-        // Register entity event listeners
-        this.registerEntityListeners();
-        
-        // Force immediate update for all monsters with known entities
+        // Force immediate update for all monsters
         for (const monster of ctx.db?.monsters.iter()) {
-            // Look up the entity directly using the entity_id index
-            const entityData = ctx.db?.entity.entityId.find(monster.entityId);
-            
-            if (entityData) {
-                // Entity exists, create directly with correct position
-                this.createMonsterSprite(monster, entityData.position);
-            } else {
-                // Entity doesn't exist yet, create at origin and track for updates
-                this.createOrUpdateMonster(monster);
-            }
+            this.createOrUpdateMonster(monster);
         }
     }
-
+    
     // Register monster-related event listeners
     registerMonsterListeners() {
         console.log("Registering monster listeners for MonsterManager");
@@ -86,490 +75,99 @@ export default class MonsterManager {
             this.removeMonster(monster.monsterId);
         });
     }
-
-    // Add method to register for entity events
-    registerEntityListeners() {
-        console.log("Registering entity event listeners for MonsterManager");
-        
-        // Listen for entity events
-        this.gameEvents.on(GameEvents.ENTITY_CREATED, this.handleEntityEvent, this);
-    }
-
-    // Add method to handle entity events
-    handleEntityEvent(ctx: EventContext, entity: Entity) {
-        // Call the existing handleEntityUpdate method
-        this.handleEntityUpdate(ctx, entity);
-    }
-
-    // Handle entity updates for monsters
-    handleEntityUpdate(ctx: EventContext, entityData: Entity) {
-        // Check if we have a pending monster waiting for this entity
-        const pendingMonster = this.pendingMonsters.get(entityData.entityId);
-        if (pendingMonster) {
-            // Check if the monster sprite exists already
-            const monsterContainer = this.monsters.get(pendingMonster.monsterId);
-            if (monsterContainer) {
-                // For pending monsters, set position immediately to avoid teleporting from (0,0)
-                monsterContainer.x = entityData.position.x;
-                monsterContainer.y = entityData.position.y;
-                
-                // Update depth based on Y position
-                monsterContainer.setDepth(BASE_DEPTH + entityData.position.y);
-                
-                // Set target position data for later lerping
-                monsterContainer.setData('targetX', entityData.position.x);
-                monsterContainer.setData('targetY', entityData.position.y);
-                monsterContainer.setData('lastUpdateTime', Date.now());
-                
-                // Remove from pending after updating
-                this.pendingMonsters.delete(entityData.entityId);
-                return true;
-            } else {
-                // Create the monster with the entity position
-                // Remove from pending monsters first to avoid infinite recursion
-                this.pendingMonsters.delete(entityData.entityId);
-                // Create the monster with the entity data
-                this.createMonsterSprite(pendingMonster, entityData.position);
-                return true;
-            }
-        }
-        
-        // Check if this entity belongs to an existing monster using the proper index
-        // Look up monsters by entityId using the entity_id index if available
-        const monster = ctx.db?.monsters.entityId?.find(entityData.entityId);
-        
-        if (monster) {
-            // Entity belongs to a monster, update its position
-            const monsterContainer = this.monsters.get(monster.monsterId);
-            if (monsterContainer) {
-                // Cancel any existing tween to prevent overlapping animations
-                this.scene.tweens.killTweensOf(monsterContainer);
-                
-                const monsterType = monster.bestiaryId.tag;
-                
-                // Store target position for lerping in update
-                monsterContainer.setData('targetX', entityData.position.x);
-                monsterContainer.setData('targetY', entityData.position.y);
-                monsterContainer.setData('lastUpdateTime', Date.now());
-                
-                // Use tween for smooth movement instead of direct position setting
-                const isMoving = entityData.isMoving;
-                
-                // If monster is far away from its current server position, teleport it instead of tweening
-                const distSquared = Math.pow(monsterContainer.x - entityData.position.x, 2) + 
-                                   Math.pow(monsterContainer.y - entityData.position.y, 2);
-                
-                if (distSquared > 10000) { // More than 100 units away, teleport
-                    monsterContainer.x = entityData.position.x;
-                    monsterContainer.y = entityData.position.y;
-                } else if (isMoving) {
-                    // Server tick rate is 50ms
-                    // Use a tween that finishes just before the next server update for smoothest motion
-                    // (49ms tween for a 50ms server tick)
-                    this.scene.tweens.add({
-                        targets: monsterContainer,
-                        x: entityData.position.x,
-                        y: entityData.position.y,
-                        duration: 49, // Just under the server tick rate of 50ms
-                        ease: 'Linear',
-                        onUpdate: () => {
-                            // Update depth on each tween update
-                            monsterContainer.setDepth(BASE_DEPTH + monsterContainer.y);
-                        }
-                    });
-                    
-                    // Debug log the monster type and movement details for diagnosis
-                    const moveDistance = Math.sqrt(
-                        Math.pow(entityData.position.x - monsterContainer.x, 2) + 
-                        Math.pow(entityData.position.y - monsterContainer.y, 2)
-                    );
-                    
-                } else {
-                    // For non-moving monsters, use a shorter tween duration
-                    this.scene.tweens.add({
-                        targets: monsterContainer,
-                        x: entityData.position.x,
-                        y: entityData.position.y,
-                        duration: 40, // Even faster tween for stopped monsters
-                        ease: 'Power1',
-                        onUpdate: () => {
-                            monsterContainer.setDepth(BASE_DEPTH + monsterContainer.y);
-                        }
-                    });
-                }
-                
-                // Store the movement state and monster type
-                monsterContainer.setData('isMoving', isMoving);
-                monsterContainer.setData('monsterType', monsterType);
-                monsterContainer.setData('direction', {
-                    x: entityData.direction.x,
-                    y: entityData.direction.y
-                });
-                
-                return true;
-            } else {
-                // If container doesn't exist yet, try to create it
-                this.createMonsterSprite(monster, entityData.position);
-                return true;
-            }
-        }
-        
-        // If we didn't find the monster with the index above, try a fallback approach
-        // This is a slower method but will work if the index isn't defined
-        if (!monster) {
-            // Iterate through monsters to find one with this entityId
-            for (const iterMonster of ctx.db?.monsters.iter() || []) {
-                if (iterMonster.entityId === entityData.entityId) {
-                    // Update the monster
-                    const monsterContainer = this.monsters.get(iterMonster.monsterId);
-                    if (monsterContainer) {
-                        // Update position
-                        monsterContainer.setData('targetX', entityData.position.x);
-                        monsterContainer.setData('targetY', entityData.position.y);
-                        monsterContainer.setData('lastUpdateTime', Date.now());
-                        
-                        // Use tween for smooth movement
-                        this.scene.tweens.add({
-                            targets: monsterContainer,
-                            x: entityData.position.x,
-                            y: entityData.position.y,
-                            duration: 49,
-                            ease: 'Linear',
-                            onUpdate: () => {
-                                monsterContainer.setDepth(BASE_DEPTH + monsterContainer.y);
-                            }
-                        });
-                        
-                        return true;
-                    } else {
-                        // Create the monster container
-                        this.createMonsterSprite(iterMonster, entityData.position);
-                        return true;
-                    }
-                }
-            }
-        }
-        
-        // Not a monster entity
-        return false;
-    }
-
-    // Helper function to determine health bar color based on percentage
-    private getHealthBarColor(healthPercent: number): number {
-        if (healthPercent > 0.6) {
-            return 0x00FF00; // Green
-        } else if (healthPercent > 0.3) {
-            return 0xFFFF00; // Yellow
-        } else {
-            return 0xFF0000; // Red
-        }
-    }
-
-    // Helper function to create or update monster sprites
+    
+    // Create or update a monster sprite
     createOrUpdateMonster(monsterData: Monsters) {
-        // Ensure database connection exists
-        if (!this.spacetimeDBClient?.sdkConnection?.db) {
-            console.error("Cannot create monster sprite: database connection not available");
-            return;
+        const monsterTypeName = this.getMonsterTypeName(monsterData.bestiaryId);
+        const assetKey = MONSTER_ASSET_KEYS[monsterTypeName];
+        
+        // Check if we already have a container for this monster
+        let container = this.monsters.get(monsterData.monsterId);
+        
+        if (!container) {
+            // Create new container if it doesn't exist
+            container = this.scene.add.container(monsterData.position.x, monsterData.position.y);
+            container.setDepth(BASE_DEPTH + monsterData.position.y);
+            this.monsters.set(monsterData.monsterId, container);
+            
+            // Create shadow first (so it appears behind the sprite)
+            const shadowX = MONSTER_SHADOW_OFFSETS_X[monsterTypeName] || 0;
+            const shadowY = MONSTER_SHADOW_OFFSETS_Y[monsterTypeName] || 0;
+            const shadow = this.scene.add.image(shadowX, shadowY, SHADOW_ASSET_KEY);
+            shadow.setAlpha(SHADOW_ALPHA);
+            shadow.setDepth(SHADOW_DEPTH_OFFSET);
+            container.add(shadow);
+
+            // Create the sprite
+            const sprite = this.scene.add.sprite(0, 0, assetKey);
+            sprite.setDepth(0);
+            container.add(sprite);
+            
+            // Create health bar background
+            const healthBarBg = this.scene.add.rectangle(
+                0,
+                -sprite.height/2 - MONSTER_HEALTH_BAR_OFFSET_Y,
+                MONSTER_HEALTH_BAR_WIDTH,
+                MONSTER_HEALTH_BAR_HEIGHT,
+                0x000000,
+                0.7
+            );
+            healthBarBg.setDepth(HEALTH_BG_DEPTH_OFFSET);
+            healthBarBg.setName('healthBarBg');
+            container.add(healthBarBg);
+
+            // Update health bar if it exists
+            const healthBar = this.scene.add.rectangle(
+                0,
+                -sprite.height/2 - MONSTER_HEALTH_BAR_OFFSET_Y,
+                MONSTER_HEALTH_BAR_WIDTH,
+                MONSTER_HEALTH_BAR_HEIGHT,
+                0x000000,
+                0.7
+            );
+            healthBar.setDepth(HEALTH_BAR_DEPTH_OFFSET);
+            healthBar.setName('healthBar');
+            container.add(healthBar);
+            
+            // For bosses, make them larger and ensure visibility
+            if (monsterTypeName === "FinalBossPhase1" || monsterTypeName === "FinalBossPhase2") {
+                console.log(`Setting up boss sprite: ${monsterTypeName} (ID: ${monsterData.monsterId})`);
+                console.log(`Boss data: HP=${monsterData.hp}/${monsterData.maxHp}`);
+                sprite.setScale(1.0);
+                sprite.setAlpha(1);
+                sprite.setVisible(true);
+            }
+            
+            console.log(`Created new monster sprite for ${monsterTypeName} (ID: ${monsterData.monsterId})`);
         }
         
-        // First check if we already have this monster with a valid position
-        const existingMonster = this.monsters.get(monsterData.monsterId);
-        if (existingMonster && (existingMonster.x !== 0 || existingMonster.y !== 0)) {
-            
-            // Get current HP to compare
-            const currentHp = existingMonster.getData('currentHP') || monsterData.maxHp;
-            
-            // Show damage effect if HP decreased
-            if (monsterData.hp < currentHp) {
-                const sprite = existingMonster.getByName('sprite') as Phaser.GameObjects.Sprite;
-                if (sprite) {
-                    createMonsterDamageEffect(sprite);
-                }
-            }
-            
-            // Just update health and other properties, but keep the position
-            const children = existingMonster.getAll();
-            for (const child of children) {
-                if (child.name === 'healthBar') {
-                    const healthBar = child as Phaser.GameObjects.Rectangle;
-                    // Use the server-provided max_hp instead of local constants
-                    const maxHP = monsterData.maxHp;
-                    
-                    // Update health bar width based on current HP percentage
-                    const healthPercent = monsterData.hp / maxHP;
-                    healthBar.width = MONSTER_HEALTH_BAR_WIDTH * healthPercent;
-                    
-                    // Update health bar color based on percentage
-                    healthBar.fillColor = this.getHealthBarColor(healthPercent);
-                    
-                    // Update HP data in container
-                    existingMonster.setData('currentHP', monsterData.hp);
-                    existingMonster.setData('maxHP', maxHP);
-                    break;
-                }
-            }
-            
-            return;
-        }
+        // Update position and other properties
+        container.setPosition(monsterData.position.x, monsterData.position.y);
+        container.setDepth(BASE_DEPTH + monsterData.position.y);
         
-        // Get entity data for position
-        // Check if we have an entity for this monster
-        const entityData = this.spacetimeDBClient.sdkConnection.db.entity.entityId.find(monsterData.entityId);
+        // Update health bar
+        var healthBarToUpdate = container.getByName('healthBar') as Phaser.GameObjects.Rectangle;
+        this.updateHealthBar(healthBarToUpdate, monsterData.hp, monsterData.maxHp);
         
-        if (entityData) {
-            // We have entity data, so create the sprite at the correct position
-            this.createMonsterSprite(monsterData, entityData.position);
-        } else {
-            // No entity data yet, store monster as pending
-            
-            // Check if we already have a sprite - if so, we need to delay until we get entity data
-            let existingContainer = this.monsters.get(monsterData.monsterId);
-            if (!existingContainer) {
-                // No sprite yet, create a temporary one at origin for now
-                this.createMonsterSprite(monsterData, { x: 0, y: 0 });
-            }
-            
-            // Store monster data for later when we get entity data
-            this.pendingMonsters.set(monsterData.entityId, monsterData);
+        // Update monster data
+        container.setData('monsterData', monsterData);
+        
+        // Special handling for boss monsters
+        if (monsterTypeName === "FinalBossPhase1" || monsterTypeName === "FinalBossPhase2") {
+            console.log(`Updating boss monster ${monsterTypeName} (ID: ${monsterData.monsterId}):`);
+            console.log(`- Position: (${monsterData.position.x}, ${monsterData.position.y})`);
+            console.log(`- HP: ${monsterData.hp}/${monsterData.maxHp}`);
+            console.log(`- Container visible: ${container.visible}`);
+            console.log(`- Container alpha: ${container.alpha}`);
+            console.log(`- Container depth: ${container.depth}`);
         }
     }
     
-    // Helper function to create monster sprite at a given position
-    createMonsterSprite(monsterData: Monsters, position: { x: number, y: number }) {
-        // Get monster type from bestiaryId
-        const monsterType = monsterData.bestiaryId.tag;
-        const spriteKey = MONSTER_ASSET_KEYS[monsterType];
-        
-        console.log(`Creating monster sprite: type=${monsterType}, spriteKey=${spriteKey}, position=(${position.x}, ${position.y})`);
-        
-        if (!spriteKey) {
-            console.error(`No sprite key defined for monster type: ${monsterType}`);
-            return;
-        }
-        
-        if (!this.scene.textures.exists(spriteKey)) {
-            console.error(`Missing texture for monster type: ${monsterType}, key: ${spriteKey}`);
-            console.log('Available textures:', this.scene.textures.list);
-            return;
-        }
-        
-        // Check if we already have this monster
-        if (this.monsters.has(monsterData.monsterId)) {
-            // Update existing monster
-            const monsterContainer = this.monsters.get(monsterData.monsterId);
-            if (monsterContainer) {
-                // Update position
-                
-                // Force direct position update - no tweening
-                monsterContainer.setPosition(position.x, position.y);
-                
-                // Update depth based on Y position
-                monsterContainer.setDepth(BASE_DEPTH + position.y);
-                
-                // Update health bar if it exists
-                const children = monsterContainer.getAll();
-                for (const child of children) {
-                    if (child.name === 'healthBar') {
-                        const healthBar = child as Phaser.GameObjects.Rectangle;
-                        // Use monster server data instead of local constants
-                        const maxHP = monsterData.maxHp;
-                        
-                        // Update health bar width based on current HP percentage
-                        const healthPercent = monsterData.hp / maxHP;
-                        healthBar.width = MONSTER_HEALTH_BAR_WIDTH * healthPercent;
-                        
-                        // Update health bar color based on percentage
-                        healthBar.fillColor = this.getHealthBarColor(healthPercent);
-                        
-                        // Update HP data in container
-                        monsterContainer.setData('currentHP', monsterData.hp);
-                        monsterContainer.setData('maxHP', monsterData.maxHp);
-                        break;
-                    }
-                }
-                
-                // Find and update radius visualization if debug mode is on
-                this.updateCollisionCircle(monsterContainer, monsterData.entityId);
-            }
-        } else {
-            // Create new monster sprite
-            try {
-                console.log(`Creating new monster container for ${monsterType} at (${position.x}, ${position.y})`);
-                
-                // Calculate depth based on Y position
-                const initialDepth = BASE_DEPTH + position.y;
-                
-                // Create container for monster and its components
-                const container = this.scene.add.container(position.x, position.y);
-                
-                // Get monster-specific shadow offset from lookup table
-                const shadowOffset = MONSTER_SHADOW_OFFSETS[monsterType] || 8; // Use default if not found
-                
-                // Add shadow with monster-specific offset
-                const shadow = this.scene.add.image(0, shadowOffset, SHADOW_ASSET_KEY)
-                    .setAlpha(SHADOW_ALPHA)
-                    .setDepth(SHADOW_DEPTH_OFFSET); // Relative depth within container
-                shadow.setScale(0.7); // Make monster shadows slightly smaller
-                
-                console.log(`Added shadow for ${monsterType}`);
-                
-                // Add sprite with error handling
-                let sprite;
-                try {
-                    sprite = this.scene.add.sprite(0, 0, spriteKey);
-                    sprite.setDepth(0); // Base sprite at 0 relative to container
-                    sprite.name = 'sprite'; // Name the sprite for easier identification later
-                    
-                    // For bosses, make them larger and ensure visibility
-                    if (monsterType === "FinalBossPhase1" || monsterType === "FinalBossPhase2") {
-                        console.log(`Setting up boss sprite: ${monsterType} (ID: ${monsterData.monsterId})`);
-                        console.log(`Boss data: HP=${monsterData.hp}/${monsterData.maxHp}, Entity ID=${monsterData.entityId}`);
-                        sprite.setScale(1.0);
-                        sprite.setAlpha(1); // Ensure full opacity
-                        sprite.setVisible(true); // Explicitly set visibility
-                        
-                        // Debug check for texture
-                        console.log(`Boss sprite properties: visible=${sprite.visible}, alpha=${sprite.alpha}, scale=${sprite.scaleX}, texture=${sprite.texture.key}`);
-                        console.log(`Is boss sprite texture missing: ${sprite.texture.key === '__MISSING'}`);
-                    }
-                    
-                    console.log(`Added sprite for ${monsterType}: visible=${sprite.visible}, alpha=${sprite.alpha}`);
-                } catch (e) {
-                    console.error(`Failed to create sprite for ${monsterType}:`, e);
-                    return;
-                }
-                
-                // Use the server-provided max_hp instead of hardcoded values
-                const maxHP = monsterData.maxHp;
-                
-                // Store health data in container
-                container.setData('maxHP', maxHP);
-                container.setData('currentHP', monsterData.hp);
-                container.setData('entityId', monsterData.entityId);
-                container.setData('monsterId', monsterData.monsterId);
-                container.setData('monsterType', monsterType);
-                
-                // Health bar background
-                const healthBarBg = this.scene.add.rectangle(
-                    0,
-                    -sprite.height/2 - MONSTER_HEALTH_BAR_OFFSET_Y,
-                    MONSTER_HEALTH_BAR_WIDTH,
-                    MONSTER_HEALTH_BAR_HEIGHT,
-                    0x000000,
-                    0.7
-                );
-                healthBarBg.setDepth(HEALTH_BG_DEPTH_OFFSET); // Relative depth
-                
-                // Health bar
-                const healthPercent = monsterData.hp / maxHP;
-                const healthBar = this.scene.add.rectangle(
-                    -MONSTER_HEALTH_BAR_WIDTH/2,
-                    -sprite.height/2 - MONSTER_HEALTH_BAR_OFFSET_Y,
-                    MONSTER_HEALTH_BAR_WIDTH * healthPercent,
-                    MONSTER_HEALTH_BAR_HEIGHT,
-                    this.getHealthBarColor(healthPercent), // Use color based on health percentage
-                    1
-                );
-                healthBar.setOrigin(0, 0.5);
-                healthBar.setDepth(HEALTH_BAR_DEPTH_OFFSET); // Relative depth
-                healthBar.name = 'healthBar';
-                
-                // Add all components to container
-                container.add([shadow, sprite, healthBarBg, healthBar]);
-                
-                // Set container properties
-                container.setDepth(initialDepth);
-                container.setSize(sprite.width, sprite.height);
-                container.setAlpha(1); // Ensure fully visible
-                container.setVisible(true); // Ensure visible
-                
-                // Create collision circle visualization (will only be visible in debug mode)
-                this.createCollisionCircle(container, monsterData.entityId);
-                
-                // Store in monsters map
-                this.monsters.set(monsterData.monsterId, container);
-                
-                console.log(`Successfully created monster: ${monsterType} (ID: ${monsterData.monsterId})`);
-                
-                // If this is a boss, do additional logging
-                if (monsterType === "FinalBossPhase1" || monsterType === "FinalBossPhase2") {
-                    console.log(`BOSS CONTAINER: visible=${container.visible}, alpha=${container.alpha}, x=${container.x}, y=${container.y}, depth=${container.depth}`);
-                    console.log(`BOSS SPRITE: visible=${sprite.visible}, alpha=${sprite.alpha}`);
-                }
-            } catch (error) {
-                console.error(`Failed to create monster sprite for ${monsterType}:`, error);
-            }
-        }
-    }
-    
-    // Create a visual representation of collision circle (for debugging)
-    private createCollisionCircle(container: Phaser.GameObjects.Container, entityId: number) {
-        // For now, we'll only create this in debug mode
-        const DEBUG_COLLISIONS = false; // Set to true to enable collision circle visualization
-        
-        if (!DEBUG_COLLISIONS) return;
-        
-        const entityData = this.spacetimeDBClient.sdkConnection?.db.entity.entityId.find(entityId);
-        if (!entityData) return;
-        
-        // Get radius from entity data or fallback to defaults based on monster type
-        // Note: We're accessing radius as a property that might not be in the type yet
-        const radius = (entityData as any).radius || this.getDefaultRadiusForMonster(container);
-        
-        // Create the collision circle
-        const circle = this.scene.add.circle(0, 0, radius, 0xff0000, 0.2);
-        circle.setStrokeStyle(1, 0xff0000, 0.8);
-        circle.setDepth(-2); // Below sprite
-        circle.name = 'collisionCircle';
-        
-        // Add to container
-        container.add(circle);
-    }
-    
-    // Update the collision circle when entity data changes
-    private updateCollisionCircle(container: Phaser.GameObjects.Container, entityId: number) {
-        // For now, we'll only update this in debug mode
-        const DEBUG_COLLISIONS = false; // Set to true to enable collision circle visualization
-        
-        if (!DEBUG_COLLISIONS) return;
-        
-        const entityData = this.spacetimeDBClient.sdkConnection?.db.entity.entityId.find(entityId);
-        if (!entityData) return;
-        
-        // Get radius from entity data or fallback to defaults based on monster type
-        // Note: We're accessing radius as a property that might not be in the type yet
-        const radius = (entityData as any).radius || this.getDefaultRadiusForMonster(container);
-        
-        // Find existing collision circle
-        const children = container.getAll();
-        for (const child of children) {
-            if (child.name === 'collisionCircle') {
-                const circle = child as Phaser.GameObjects.Arc;
-                circle.setRadius(radius);
-                return;
-            }
-        }
-        
-        // If no collision circle exists yet, create it
-        this.createCollisionCircle(container, entityId);
-    }
-    
-    // Helper function to get a default radius based on monster type
-    private getDefaultRadiusForMonster(container: Phaser.GameObjects.Container): number {
-        const monsterType = container.getData('monsterType');
-        
-        // Default radii based on monster type
-        switch(monsterType) {
-            case 'Rat':
-                return 24;
-            case 'Slime':
-                return 30;
-            case 'Orc':
-                return 40;
-            default:
-                return 30; // Default radius
-        }
+    // Helper function to get health bar color based on health percentage
+    private getHealthBarColor(healthPercent: number): number {
+        if (healthPercent > 0.6) return 0x00ff00; // Green
+        if (healthPercent > 0.3) return 0xffff00; // Yellow
+        return 0xff0000; // Red
     }
     
     // Helper function to remove monster sprites
@@ -604,101 +202,56 @@ export default class MonsterManager {
         }
         this.monsters.delete(monsterId);
     }
-
+    
     // Get monster by ID
     getMonster(monsterId: number): Phaser.GameObjects.Container | undefined {
         return this.monsters.get(monsterId);
     }
-
+    
     // Get all monsters
     getAllMonsters(): Map<number, Phaser.GameObjects.Container> {
         return this.monsters;
     }
-
+    
     // Get count of monsters
     getMonsterCount(): number {
         return this.monsters.size;
     }
-
-    // Get count of pending monsters
-    getPendingMonsterCount(): number {
-        return this.pendingMonsters.size;
-    }
-
+    
     // Update method to be called from scene's update method
     update(time: number, delta: number) {
         // Perform the boss transition check
         this.checkForBossPhaseTransition();
-        
-        // Existing update logic
-        const lerp = (a: number, b: number, t: number) => a + (b - a) * Math.min(t, 1.0);
-        
-        // Update monster positions via lerping
-        this.monsters.forEach((container, id) => {
-            const targetX = container.getData('targetX');
-            const targetY = container.getData('targetY');
-            const lastUpdate = container.getData('lastUpdateTime');
-            const isMoving = container.getData('isMoving');
-            
-            // If we have target position data and the monster is moving
-            if (targetX !== undefined && targetY !== undefined && lastUpdate !== undefined && isMoving) {
-                // We already have tweens, this is just additional smoothing if needed
-                // This can be enabled if you want extra smoothing between tween updates
-                /* 
-                const lerpFactor = 0.1;
-                container.x = lerp(container.x, targetX, lerpFactor);
-                container.y = lerp(container.y, targetY, lerpFactor);
-                container.setDepth(BASE_DEPTH + container.y);
-                */
-            }
-        });
     }
-
+    
     // Add method to clean up event listeners
     unregisterListeners() {
         console.log("Unregistering event listeners for MonsterManager");
         
-        // Remove entity event listeners
-        this.gameEvents.off(GameEvents.ENTITY_CREATED, this.handleEntityEvent, this);
-
         // Remove monster event listeners
         this.gameEvents.off(GameEvents.MONSTER_CREATED, this.handleMonsterCreated, this);
         this.gameEvents.off(GameEvents.MONSTER_UPDATED);
         this.gameEvents.off(GameEvents.MONSTER_DELETED);
     }
-
+    
     shutdown() {
         this.unregisterListeners();
     }
-
+    
     // Handles when a monster is created
     handleMonsterCreated(ctx: EventContext, monster: Monsters) {
-        // Get the entity for this monster
-        const entityData = ctx.db?.entity.entityId.find(monster.entityId);
         const monsterTypeName = this.getMonsterTypeName(monster.bestiaryId);
         
-        console.log(`Monster created: ${monster.monsterId}, type: ${monsterTypeName}, entity: ${monster.entityId}`);
+        console.log(`Monster created: ${monster.monsterId}, type: ${monsterTypeName}`);
         
         // Special handling for boss monsters
         if (monsterTypeName === "FinalBossPhase1" || monsterTypeName === "FinalBossPhase2") {
             console.log(`BOSS SPAWNED: ${monsterTypeName}`);
             console.log(`- Monster ID: ${monster.monsterId}`);
-            console.log(`- Entity ID: ${monster.entityId}`);
             console.log(`- HP: ${monster.hp}/${monster.maxHp}`);
             console.log(`- Asset key: ${MONSTER_ASSET_KEYS[monsterTypeName]}`);
             console.log(`- Texture exists: ${this.scene.textures.exists(MONSTER_ASSET_KEYS[monsterTypeName])}`);
-            
-            if (entityData) {
-                console.log(`- Position: (${entityData.position.x}, ${entityData.position.y})`);
-            } else {
-                console.log(`- WARNING: No entity data found for boss!`);
-            }
-            
-            // Log information about all entities to help with debugging
-            console.log("All entities in database:");
-            for (const entity of ctx.db?.entity.iter() || []) {
-                console.log(`- Entity ID: ${entity.entityId}, Position: (${entity.position.x}, ${entity.position.y})`);
-            }
+            console.log(`- Position: (${monster.position.x}, ${monster.position.y})`);
             
             // If this is phase 2, it means phase 1 was defeated
             if (monsterTypeName === "FinalBossPhase2") {
@@ -711,26 +264,16 @@ export default class MonsterManager {
                     this.bossPhase1Killed = false;
                 }
                 
-                // Play a dramatic sound effect or add special visual effects here
+                // Play the dark transformation effect
+                this.createBossTransformationEffect(monster.position.x, monster.position.y);
             }
             
             // Log all sprites to debug visibility issues
             this.debugLogAllSprites();
         }
         
-        if (!entityData) {
-            console.warn(`Monster created but no entity found: ${monster.monsterId} (type: ${monsterTypeName})`);
-            return;
-        }
-
-        // If this is final boss phase 2 and it just spawned, play the dark transformation effect
-        if (monsterTypeName === "FinalBossPhase2") {
-            console.log("Final Boss Phase 2 spawned - playing transformation effect");
-            this.createBossTransformationEffect(entityData.position.x, entityData.position.y);
-        }
-        
-        // Create the monster sprite
-        this.createMonsterSprite(monster, entityData.position);
+        // Use createOrUpdateMonster instead of directly creating the sprite
+        this.createOrUpdateMonster(monster);
         
         // For boss monsters, do an additional check after creation
         if (monsterTypeName === "FinalBossPhase1" || monsterTypeName === "FinalBossPhase2") {
@@ -832,13 +375,8 @@ export default class MonsterManager {
                 text.destroy();
             }
         });
-        
-        // Play a sound effect if available
-        // If you have a sound asset for boss transition:
-        // const sound = this.scene.sound.add('boss_transform_sound');
-        // if (sound) sound.play({ volume: 0.5 });
     }
-
+    
     // Add debug method to log all sprites on the scene
     debugLogAllSprites() {
         console.log("=== ALL SPRITES IN SCENE ===");
@@ -860,7 +398,7 @@ export default class MonsterManager {
             }
         });
     }
-
+    
     // Implement a method to check for boss state transitions
     private checkForBossPhaseTransition() {
         const now = Date.now();
@@ -883,5 +421,16 @@ export default class MonsterManager {
             // Display an alert in-game that the boss is missing - development only!
             console.log("BOSS PHASE 2 SPAWN FAILED - Please report this bug!");
         }
+    }
+    
+    private updateHealthBar(healthBar: Phaser.GameObjects.Rectangle, currentHp: number, maxHp: number) {
+        const width = MONSTER_HEALTH_BAR_WIDTH;
+        const height = MONSTER_HEALTH_BAR_HEIGHT;
+        const x = healthBar.x;
+        const y = healthBar.y;
+        
+        const healthPercent = currentHp / maxHp;
+        healthBar.fillColor = this.getHealthBarColor(healthPercent);
+        healthBar.width = MONSTER_HEALTH_BAR_WIDTH * healthPercent;
     }
 } 

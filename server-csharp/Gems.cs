@@ -335,55 +335,6 @@ public static partial class Module
         }
     }
 
-    // This function should be called from GameTick to process gem collections
-    public static void ProcessGemCollisions(ReducerContext ctx)
-    {
-        if(ctx.Db.gems.Count == 0)
-        {
-            return;
-        }
-        
-        // Check each player for collisions with gems
-        foreach (var player in ctx.Db.player.Iter())
-        {
-            var playerEntityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
-            if (playerEntityOpt == null)
-            {
-                continue; // Skip if player has no entity
-            }
-            
-            Entity playerEntity = playerEntityOpt.Value;
-            
-            // List to track gems that player has collected
-            var collectedGems = new List<uint>();
-            
-            // Check against each gem
-            foreach (var gemEntry in ctx.Db.gems.Iter())
-            {
-                uint gemEntityId = gemEntry.entity_id;
-                var gemEntityOpt = ctx.Db.entity.entity_id.Find(gemEntityId);
-                if(gemEntityOpt == null)
-                {
-                    continue;
-                }
-                var gemEntity = gemEntityOpt.Value;
-                
-                // Check if player is colliding with this gem
-                if (AreEntitiesColliding(playerEntity, gemEntity))
-                {
-                    // Add to collected list
-                    collectedGems.Add(gemEntry.gem_id);
-                }
-            }
-            
-            // Process all collected gems for this player
-            foreach (var gemId in collectedGems)
-            {
-                CollectGem(ctx, gemId, player.player_id);
-            }
-        }
-    }
-
     public static void ProcessGemCollisionsSpatialHash(ReducerContext ctx)
     {
         if(ctx.Db.gems.Count == 0)

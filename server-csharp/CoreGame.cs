@@ -240,7 +240,7 @@ public static partial class Module
         {
             // Monster is still alive, update with reduced HP
             monster.hp -= damageAmount;
-            //ctx.Db.monsters.monster_id.Update(monster);
+            ctx.Db.monsters.monster_id.Update(monster);
             
             return false;
         }
@@ -469,8 +469,6 @@ public static partial class Module
             return;
         }
 
-        bool isReupulsionFrame = false;
-
         var worldOpt = ctx.Db.world.world_id.Find(0);
         if (worldOpt != null)
         {
@@ -479,10 +477,6 @@ public static partial class Module
             if(world.tick_count % 20 == 0)
             {
                 Log.Info($"Game tick: {world.tick_count}");
-            }
-            if(world.tick_count % 10 == 0)
-            {
-                isReupulsionFrame = true;
             }
             ctx.Db.world.world_id.Update(world);
         }
@@ -505,21 +499,20 @@ public static partial class Module
 
         ClearCollisionCacheForFrame();
 
+        Log.Info("Processing player movement...");
         ProcessPlayerMovement(ctx, tick_rate, worldSize);
-
-        //ProcessMonsterMovements(ctx);
-        ProcessMonsterMotionSimple(ctx);
-        if(isReupulsionFrame)
-        {
-            SolveMonsterRepulsionSpatialHash(ctx);
-        }
-        CommitMonsterMotion(ctx);
-        
+        Log.Info("Processing monster movements...");
+        ProcessMonsterMovements(ctx);
+        Log.Info("Processing attack movements...");
         ProcessAttackMovements(ctx);
+        Log.Info("Maintaining gems...");
         MaintainGems(ctx);
 
+        Log.Info("Processing player monster collisions...");
         ProcessPlayerMonsterCollisionsSpatialHash(ctx);
+        Log.Info("Processing monster attack collisions...");
         ProcessMonsterAttackCollisionsSpatialHash(ctx);
+        Log.Info("Processing gem collisions...");
         ProcessGemCollisionsSpatialHash(ctx);
     }
     

@@ -1,3 +1,4 @@
+using System.Data;
 using System.Formats.Tar;
 using SpacetimeDB;
 
@@ -260,8 +261,21 @@ public static partial class Module
         Log.Info("Monster spawning scheduled successfully");
     }
 
-    // Helper method to process monster movements
     private static void ProcessMonsterMovements(ReducerContext ctx)
+    {
+        //MoveMonsters(ctx);
+        Log.Info("Processing monster movements...");
+        MoveMonstersSimple(ctx);
+        Log.Info("Calculating spatial hash grid...");
+        CalculateSpatialHashGrid(ctx);
+        //SolveMonsterRepulsionSpatialHash(ctx);
+        //CalculateSpatialHashGrid(ctx);
+        Log.Info("Committing monster motion...");
+        CommitMonsterMotion(ctx);
+    }
+
+    // Helper method to process monster movements
+    private static void MoveMonsters(ReducerContext ctx)
     {
         // Constants for monster behavior
         const float MIN_DISTANCE_TO_MOVE = 20.0f;  // Minimum distance before monster starts moving
@@ -337,33 +351,29 @@ public static partial class Module
                     PosYMonster[CachedCountMonsters] = monsterPosition.y;
                 }
             }
-
-            //Update collision grid
-            ushort gridCellKey = GetWorldCellFromPosition(monster.position.x, monster.position.y);
-            NextsMonster[CachedCountMonsters] = HeadsMonster[gridCellKey];
-            HeadsMonster[gridCellKey] = CachedCountMonsters;
     
             CachedCountMonsters++;
         }
     }
 
-    private static void ProcessMonsterMotionSimple(ReducerContext ctx)
+    private static void CalculateSpatialHashGrid(ReducerContext ctx)
+    {
+        for(var mid = 0; mid < CachedCountMonsters; mid++)
+        {
+            ushort gridCellKey = GetWorldCellFromPosition(PosXMonster[mid], PosYMonster[mid]);
+            NextsMonster[mid] = HeadsMonster[gridCellKey];
+            HeadsMonster[gridCellKey] = mid;
+        }
+    }   
+
+    private static void MoveMonstersSimple(ReducerContext ctx)
     {
         foreach (var monster in ctx.Db.monsters.Iter())
         {
-            var monsterUpdated = monster;
-
-            monsterUpdated.position.x += 1.0f;
-            monsterUpdated.position.y += 1.0f;
-
-            KeysMonster[CachedCountMonsters] = monsterUpdated.monster_id;
-            PosXMonster[CachedCountMonsters] = monsterUpdated.position.x;
-            PosYMonster[CachedCountMonsters] = monsterUpdated.position.y;
-            RadiusMonster[CachedCountMonsters] = monsterUpdated.radius;
-
-            ushort gridCellKey = GetWorldCellFromPosition(monsterUpdated.position.x, monsterUpdated.position.y);
-            NextsMonster[CachedCountMonsters] = HeadsMonster[gridCellKey];
-            HeadsMonster[gridCellKey] = CachedCountMonsters;
+            KeysMonster[CachedCountMonsters] = monster.monster_id;
+            PosXMonster[CachedCountMonsters] = monster.position.x + 1.0f;
+            PosYMonster[CachedCountMonsters] = monster.position.y + 1.0f;
+            RadiusMonster[CachedCountMonsters] = monster.radius;
     
             CachedCountMonsters++;
         }

@@ -11,6 +11,8 @@ const PROXY_SPACETIMEDB_URI = "ws://localhost:3001";
 
 const URI_TO_USE = REMOTE_SPACETIMEDB_URI;
 
+const TOKEN_TO_USE = (URI_TO_USE == REMOTE_SPACETIMEDB_URI) ? "space_token" : 'local_token';
+
 class SpacetimeDBClient {
     // Initialize sdkClient to null, it will be set in handleConnect
     public sdkConnection: DbConnection | null = null;
@@ -40,7 +42,7 @@ class SpacetimeDBClient {
         DbConnection.builder()
             .withUri(URI_TO_USE)
             .withModuleName(SPACETIMEDB_DB_NAME)
-            .withToken(localStorage.getItem('auth_token') || '')
+            .withToken(localStorage.getItem(TOKEN_TO_USE) || '')
             //.withToken('')
             .onConnect(this.handleConnect.bind(this))
             .onDisconnect(this.handleDisconnect.bind(this))
@@ -72,7 +74,7 @@ class SpacetimeDBClient {
         this.identity = identity;
         console.log("Local Identity:", this.identity?.toHexString());
 
-        localStorage.setItem('auth_token', token);
+        localStorage.setItem(TOKEN_TO_USE, token);
 
         // Subscribe using the subscriptionBuilder on the valid sdkClient
         console.log("Subscribing to relevant tables...");

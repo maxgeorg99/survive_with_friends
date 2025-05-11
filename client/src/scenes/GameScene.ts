@@ -109,12 +109,7 @@ export default class GameScene extends Phaser.Scene {
     private localPlayerId: number = 0;
     
     private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null;
-    private wasdKeys: {
-        W: Phaser.Input.Keyboard.Key;
-        A: Phaser.Input.Keyboard.Key;
-        S: Phaser.Input.Keyboard.Key;
-        D: Phaser.Input.Keyboard.Key;
-    } | null = null;
+
     private backgroundTile: Phaser.GameObjects.TileSprite | null = null;
     private isPlayerDataReady = false;
     
@@ -243,12 +238,6 @@ export default class GameScene extends Phaser.Scene {
         
         // Setup WASD keys
         if (this.input.keyboard) {
-            this.wasdKeys = {
-                W: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
-                A: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
-                S: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-                D: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D)
-            };
             
             // Add debug key to toggle attack circles (use backtick key)
             this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.BACKTICK).on('down', this.toggleAttackDebugCircles, this);
@@ -1066,14 +1055,7 @@ export default class GameScene extends Phaser.Scene {
     }
 
     // Helper function to handle entity updates and move corresponding sprites
-    handleEntityUpdate(ctx: EventContext, entityData: Entity) {
-        // First check if this is a monster entity through the monster manager
-        const wasMonsterEntity = this.monsterManager?.handleEntityUpdate(ctx, entityData);
-        if (wasMonsterEntity) {
-            // If it was a monster entity, we're done
-            return;
-        }
-        
+    handleEntityUpdate(ctx: EventContext, entityData: Entity) {        
         // Get local player EntityId by first getting account, then player
         let localPlayerEntityId: number | undefined = undefined;
         try {
