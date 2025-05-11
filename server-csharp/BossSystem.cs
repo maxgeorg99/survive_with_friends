@@ -121,15 +121,12 @@ public static partial class Module
         // Create a pre-spawner for the boss at the center of map
         Log.Info($"Creating boss phase 1 pre-spawner at center of map ({centerX}, {centerY})");
         
-        // Find the closest player to target
-        uint closestPlayerId = GetClosestPlayer(ctx, centerPosition);
-        
         // Schedule the boss to spawn using the existing monster spawning system
-        ScheduleBossSpawning(ctx, centerPosition, closestPlayerId);
+        ScheduleBossSpawning(ctx, centerPosition);
     }
     
     // Schedule boss spawning using the existing monster spawning system
-    private static void ScheduleBossSpawning(ReducerContext ctx, DbVector2 position, uint targetEntityId)
+    private static void ScheduleBossSpawning(ReducerContext ctx, DbVector2 position)
     {
         Log.Info($"Scheduling boss phase 1 spawn at position ({position.x}, {position.y})");
         
@@ -141,7 +138,6 @@ public static partial class Module
         {
             position = position,
             monster_type = MonsterType.FinalBossPhase1,
-            target_entity_id = targetEntityId,
             scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(BOSS_SPAWN_VISUALIZATION_DELAY_MS))
         });
         
@@ -186,7 +182,7 @@ public static partial class Module
         Log.Info($"Retrieved bestiary entry for FinalBossPhase2: HP={bestiaryEntry.Value.max_hp}, Speed={bestiaryEntry.Value.speed}, Radius={bestiaryEntry.Value.radius}");
         
         // Find the closest player to target
-        uint closestPlayerId = GetClosestPlayer(ctx, position);
+        (uint closestPlayerId, int closestPlayerOrdinalIndex) = GetClosestPlayer(ctx, position);
         
         // Create the boss monster
         Log.Info($"Creating phase 2 boss monster...");
@@ -198,7 +194,7 @@ public static partial class Module
             atk = bestiaryEntry.Value.atk,
             speed = bestiaryEntry.Value.speed,
             target_player_id = closestPlayerId,
-
+            target_player_ordinal_index = closestPlayerOrdinalIndex,
             position = position,
             radius = bestiaryEntry.Value.radius
         });

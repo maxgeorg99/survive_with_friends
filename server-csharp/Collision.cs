@@ -10,7 +10,7 @@ public static partial class Module
     private static readonly float[] PosXPlayer = new float[MAX_PLAYERS];
     private static readonly float[] PosYPlayer = new float[MAX_PLAYERS];
     private static readonly float[] RadiusPlayer = new float[MAX_PLAYERS];
-    private static int CachedCountPlayers = 0;
+    private static uint CachedCountPlayers = 0;
 
     // --- Monster Collision ---
     private static readonly uint[] KeysMonster = new uint[MAX_MONSTERS];
@@ -19,7 +19,6 @@ public static partial class Module
     private static readonly float[] PosXMonster = new float[MAX_MONSTERS];
     private static readonly float[] PosYMonster = new float[MAX_MONSTERS];
     private static readonly float[] RadiusMonster = new float[MAX_MONSTERS];
-    private static readonly bool[] BumpedMonster = new bool[MAX_MONSTERS];
     private static int CachedCountMonsters = 0;
 
     // --- Gem Collision ---
@@ -60,7 +59,6 @@ public static partial class Module
         Array.Fill(PosXMonster, 0);
         Array.Fill(PosYMonster, 0);
         Array.Fill(RadiusMonster, 0);
-        Array.Fill(BumpedMonster, false);
 
         Array.Fill(KeysGem, (uint)0);
         Array.Fill(HeadsGem, -1);

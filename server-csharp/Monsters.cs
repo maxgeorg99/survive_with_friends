@@ -27,7 +27,7 @@ public static partial class Module
         public float atk;
         public float speed;
         public uint target_player_id;
-
+        public int target_player_ordinal_index;
         // entity attributes
         public DbVector2 position;  
         public float radius;     
@@ -51,7 +51,6 @@ public static partial class Module
         
         public DbVector2 position;          // Where the monster will spawn
         public MonsterType monster_type;    // The type of monster to spawn
-        public uint target_entity_id;       // The player entity ID to target
         public ScheduleAt scheduled_at;     // When the monster will be spawned
     }
 
@@ -163,11 +162,10 @@ public static partial class Module
         {
             position = position,
             monster_type = monsterType,
-            target_entity_id = targetPlayer.player_id,
             scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(PRE_SPAWN_DELAY_MS))
         });
         
-        Log.Info($"PreSpawned {monsterType} monster for position ({position.x}, {position.y}) targeting player: {targetPlayer.name}. Will spawn in {PRE_SPAWN_DELAY_MS}ms");
+        Log.Info($"PreSpawned {monsterType} monster for position ({position.x}, {position.y}) for player: {targetPlayer.name}. Will spawn in {PRE_SPAWN_DELAY_MS}ms");
     }
     
     [Reducer]
@@ -211,7 +209,7 @@ public static partial class Module
         }
         
         // Find the closest player to target
-        uint closestPlayerId = GetClosestPlayer(ctx, spawner.position);
+        (uint closestPlayerId, int closestPlayerOrdinalIndex) = GetClosestPlayer(ctx, spawner.position);
         
         // Create the monster
         Monsters? monsterOpt = ctx.Db.monsters.Insert(new Monsters
@@ -222,7 +220,7 @@ public static partial class Module
             atk = bestiaryEntry.Value.atk,
             speed = bestiaryEntry.Value.speed,
             target_player_id = closestPlayerId,
-
+            target_player_ordinal_index = closestPlayerOrdinalIndex,
             position = spawner.position,
             radius = bestiaryEntry.Value.radius
         });
@@ -242,9 +240,10 @@ public static partial class Module
         }
     }
 
-    private static uint GetClosestPlayer(ReducerContext ctx, DbVector2 position)
+    private static (uint, int) GetClosestPlayer(ReducerContext ctx, DbVector2 position)
     {
         uint closestPlayerId = 0;
+        int closestPlayerOrdinalIndex = -1;
         float closestDistance = float.MaxValue;
         
         foreach (var player in ctx.Db.player.Iter())
@@ -259,10 +258,12 @@ public static partial class Module
             {
                 closestDistance = distanceSquared;
                 closestPlayerId = player.player_id;
+                closestPlayerOrdinalIndex = player.ordinal_index;
             }
         }
 
-        return closestPlayerId;
+        //Pair of closest player and its ordinal index
+        return (closestPlayerId, closestPlayerOrdinalIndex);
     }
     
     // Method to schedule monster spawning - called from Init in Lib.cs
@@ -281,8 +282,8 @@ public static partial class Module
 
     private static void ProcessMonsterMovements(ReducerContext ctx)
     {
-        //MoveMonsters(ctx);
-        MoveMonstersSimple(ctx);
+        MoveMonsters(ctx);
+        //MoveMonstersSimple(ctx);
         CalculateMonsterSpatialHashGrid(ctx);
         SolveMonsterRepulsionSpatialHash(ctx);
         CalculateMonsterSpatialHashGrid(ctx);
@@ -295,7 +296,19 @@ public static partial class Module
         // Constants for monster behavior
         const float MIN_DISTANCE_TO_MOVE = 20.0f;  // Minimum distance before monster starts moving
         const float MIN_DISTANCE_TO_REACH = 5.0f;  // Distance considered "reached" the target
-        
+
+        const float MIN_DISTANCE_TO_MOVE_SQUARED = MIN_DISTANCE_TO_MOVE * MIN_DISTANCE_TO_MOVE;
+        const float MIN_DISTANCE_TO_REACH_SQUARED = MIN_DISTANCE_TO_REACH * MIN_DISTANCE_TO_REACH;
+
+
+        // Get world size from config
+        uint worldSize = 20000; // Default fallback (10x larger)
+        var configOpt = ctx.Db.config.id.Find(0);
+        if (configOpt != null)
+        {
+            worldSize = configOpt.Value.world_size;
+        }
+
         // Now process each monster's movement with collision avoidance
         foreach (var monster in ctx.Db.monsters.Iter())
         {
@@ -305,66 +318,53 @@ public static partial class Module
             PosYMonster[CachedCountMonsters] = monster.position.y;
             RadiusMonster[CachedCountMonsters] = monster.radius;
 
-            // Get the target entity
-            // TODO: we need to have already cached the target position
-            var targetPlayerOpt = ctx.Db.player.player_id.Find(monster.target_player_id);
-            if (targetPlayerOpt == null)
+            int targetPlayerOrdinalIndex = monster.target_player_ordinal_index;
+
+            // Move the monster to the target player
+            if (targetPlayerOrdinalIndex != -1)
             {
-                // Target entity no longer exists - find a new target
-                ReassignMonsterTarget(ctx, monster);
-            }
-            else
-            {     
-                var targetPlayer = targetPlayerOpt.Value;
-               
-                // Calculate direction vector from monster to target
-                var directionVector = new DbVector2(
-                    targetPlayer.position.x - monster.position.x,
-                    targetPlayer.position.y - monster.position.y
-                );
+                float dx = PosXPlayer[targetPlayerOrdinalIndex] - monster.position.x;
+                float dy = PosYPlayer[targetPlayerOrdinalIndex] - monster.position.y;
                 
                 // Calculate distance to target
-                float distanceToTarget = directionVector.Magnitude();
+                float distanceToTargetSquared = dx * dx + dy * dy;
                 
                 // If we're too close to the target, stop moving
-                if (distanceToTarget > MIN_DISTANCE_TO_REACH && distanceToTarget > MIN_DISTANCE_TO_MOVE)
+                if (distanceToTargetSquared > MIN_DISTANCE_TO_REACH_SQUARED && distanceToTargetSquared > MIN_DISTANCE_TO_MOVE_SQUARED)
                 {
-                    // Normalize the direction vector to get base movement direction
-                    var normalizedDirection = directionVector.Normalize();
+                    float approxLength = FastInvSqrt(distanceToTargetSquared);
+
+                    float normX = dx * approxLength;
+                    float normY = dy * approxLength;
                     
                     // Get monster speed from bestiary
-                    float monsterSpeed = monster.speed * 0.0f;
+                    float monsterSpeed = monster.speed;
                     
                     // Calculate new position based on direction, speed and time delta
                     float moveDistance = monsterSpeed * DELTA_TIME;
-                    var moveOffset = normalizedDirection * moveDistance;
-                    
-                    // Update entity with new direction and position
-                    var monsterPosition = monster.position + moveOffset;
-                    
-                    // Get world size from config
-                    uint worldSize = 20000; // Default fallback (10x larger)
-                    var configOpt = ctx.Db.config.id.Find(0);
-                    if (configOpt != null)
-                    {
-                        worldSize = configOpt.Value.world_size;
-                    }
-                    
+                    var moveX = normX * moveDistance;
+                    var moveY = normY * moveDistance;
+
+                    PosXMonster[CachedCountMonsters] += moveX;
+                    PosYMonster[CachedCountMonsters] += moveY;
+
                     // Apply world boundary clamping using entity radius
-                    monsterPosition.x = Math.Clamp(
-                        monsterPosition.x, 
+                    PosXMonster[CachedCountMonsters] = Math.Clamp(
+                        PosXMonster[CachedCountMonsters], 
                         monster.radius, 
                         worldSize - monster.radius
                     );
-                    monsterPosition.y = Math.Clamp(
-                        monsterPosition.y, 
+                    PosYMonster[CachedCountMonsters] = Math.Clamp(
+                        PosYMonster[CachedCountMonsters], 
                         monster.radius, 
                         worldSize - monster.radius
                     );
-                    
-                    PosXMonster[CachedCountMonsters] = monsterPosition.x;
-                    PosYMonster[CachedCountMonsters] = monsterPosition.y;
                 }
+            }
+            else
+            {
+                // Target entity no longer exists - find a new target
+                ReassignMonsterTarget(ctx, monster);
             }
     
             CachedCountMonsters++;
@@ -432,6 +432,7 @@ public static partial class Module
         // Update the monster with the new target
         var updatedMonster = monster;
         updatedMonster.target_player_id = newTarget.player_id;
+        updatedMonster.target_player_ordinal_index = newTarget.ordinal_index;
         ctx.Db.monsters.monster_id.Update(updatedMonster);
     }
 
@@ -593,15 +594,12 @@ public static partial class Module
                         float wA = RadiusMonster[iB] / rSum;
                         float wB = rA / rSum;
 
-                        float pushFactor = 0.2f;
+                        float pushFactor = 0.75f;
 
                         PosXMonster[iA] += nxAB * penetration * wA * pushFactor;
                         PosYMonster[iA] += nyAB * penetration * wA * pushFactor;
                         PosXMonster[iB] -= nxAB * penetration * wB * pushFactor;
                         PosYMonster[iB] -= nyAB * penetration * wB * pushFactor;
-
-                        BumpedMonster[iA] = true;
-                        BumpedMonster[iB] = true;
                     }
                 }
             }

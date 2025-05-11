@@ -368,11 +368,14 @@ public static partial class Module
             player_spawn_grace_period = configOpt.Value.player_spawn_grace_period;
         }
 
+        int _ordinal_index = (int)ctx.Db.player.Count;
+
         // 2. Create the Player record, linking to the new entity
         // Use class data for stats
         Player? newPlayerOpt = ctx.Db.player.Insert(new Player
         {
             player_id = 0,
+            ordinal_index = _ordinal_index,
             name = name,
             spawn_grace_period_remaining = player_spawn_grace_period,
             player_class = playerClass,

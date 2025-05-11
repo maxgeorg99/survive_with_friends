@@ -8,6 +8,7 @@ public static partial class Module
     {
         [PrimaryKey, AutoInc]
         public uint player_id;
+        public int ordinal_index;
 
         public string name;
 
@@ -239,7 +240,7 @@ public static partial class Module
 
             ushort gridCellKey = GetWorldCellFromPosition(modifiedPlayer.position.x, modifiedPlayer.position.y);
             NextsPlayer[CachedCountPlayers] = HeadsPlayer[gridCellKey];
-            HeadsPlayer[gridCellKey] = CachedCountPlayers;
+            HeadsPlayer[gridCellKey] = (int)CachedCountPlayers;
 
             CachedCountPlayers++;
         }
