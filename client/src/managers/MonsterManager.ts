@@ -68,6 +68,16 @@ export default class MonsterManager {
         this.gameEvents.on(GameEvents.MONSTER_CREATED, this.handleMonsterCreated, this);
 
         this.gameEvents.on(GameEvents.MONSTER_UPDATED, (ctx: EventContext, oldMonster: Monsters, newMonster: Monsters) => {
+            // Check for damage
+            if (newMonster.hp < oldMonster.hp) {
+                const container = this.monsters.get(newMonster.monsterId);
+                if (container) {
+                    const sprite = container.list.find(child => child instanceof Phaser.GameObjects.Sprite) as Phaser.GameObjects.Sprite;
+                    if (sprite) {
+                        createMonsterDamageEffect(sprite);
+                    }
+                }
+            }
             this.createOrUpdateMonster(newMonster);
         });
 
