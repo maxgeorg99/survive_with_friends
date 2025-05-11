@@ -63,10 +63,10 @@ const CLASS_ASSET_KEYS: Record<string, string> = {
     "Rogue": 'player_rogue',
     "Mage": 'player_mage',
     "Paladin": 'player_paladin',
-    "Football": 'player_fighter',  // Temporary placeholder
-    "Gambler": 'player_fighter',   // Temporary placeholder
-    "Athlete": 'player_fighter',   // Temporary placeholder
-    "Gourmand": 'player_fighter'   // Temporary placeholder
+    "Football": 'class_football',
+    "Gambler": 'class_gambler',
+    "Athlete": 'class_athlete',
+    "Gourmand": 'class_chef'
 };
 
 export default class GameScene extends Phaser.Scene {
@@ -152,10 +152,14 @@ export default class GameScene extends Phaser.Scene {
     preload() {
         console.log("GameScene preload started.");
         // Load assets from the /assets path (copied from public)
-        this.load.image('player_fighter', '/assets/class_fighter_1.png');
-        this.load.image('player_rogue', '/assets/class_rogue_1.png');
-        this.load.image('player_mage', '/assets/class_mage_1.png');
-        this.load.image('player_paladin', '/assets/class_paladin_1.png');
+        this.load.image('class_fighter', '/assets/class_fighter_1.png');
+        this.load.image('class_rogue', '/assets/class_rogue_1.png');
+        this.load.image('class_mage', '/assets/class_mage_1.png');
+        this.load.image('class_paladin', '/assets/class_paladin_1.png');
+        this.load.image('class_football', '/assets/class_football_1.png');
+        this.load.image('class_gambler', '/assets/class_gambler_1.png');
+        this.load.image('class_athlete', '/assets/class_athlete_1.png');
+        this.load.image('class_chef', '/assets/class_chef_1.png');
         this.load.image(GRASS_ASSET_KEY, '/assets/grass.png');
         this.load.image(SHADOW_ASSET_KEY, '/assets/shadow.png');
         
@@ -1275,34 +1279,58 @@ export default class GameScene extends Phaser.Scene {
 
     // Get class-specific sprite key
     getClassSpriteKey(playerClass: any): string {
-        
-        // Handle case when playerClass is a simple object with a tag property
-        if (playerClass && typeof playerClass === 'object' && 'tag' in playerClass) {
-            const className = playerClass.tag;
-            const spriteKey = CLASS_ASSET_KEYS[className] || 'player_fighter';
-            return spriteKey;
-        } 
-        
-        // Handle case when playerClass is just a string
-        if (typeof playerClass === 'string') {
-            const spriteKey = CLASS_ASSET_KEYS[playerClass] || 'player_fighter';
-            return spriteKey;
-        }
-        
-        // Handle case when playerClass is a number (enum value)
-        if (typeof playerClass === 'number') {
-            // Map numeric enum values to class names
-            const classNames = ["Fighter", "Rogue", "Mage", "Paladin"];
-            const className = classNames[playerClass] || "Fighter";
-            const spriteKey = CLASS_ASSET_KEYS[className] || 'player_fighter';
-            return spriteKey;
-        }
-        
-        // Default fallback
-        console.log("Using default fighter class");
-        return 'player_fighter';
+    // Handle case when playerClass is a simple object with a tag property
+    if (playerClass && typeof playerClass === 'object' && 'tag' in playerClass) {
+        const className = playerClass.tag;
+        const iconMap: Record<string, string> = {
+            'Fighter': 'class_fighter',
+            'Rogue': 'class_rogue',
+            'Mage': 'class_mage',
+            'Paladin': 'class_paladin',
+            'Football': 'class_football',
+            'Gambler': 'class_gambler',
+            'Athlete': 'class_athlete',
+            'Gourmand': 'class_chef'
+        };
+        return iconMap[className] || 'class_fighter';
+    } 
+    
+    // Handle case when playerClass is just a string
+    if (typeof playerClass === 'string') {
+        const iconMap: Record<string, string> = {
+            'Fighter': 'class_fighter',
+            'Rogue': 'class_rogue',
+            'Mage': 'class_mage',
+            'Paladin': 'class_paladin',
+            'Football': 'class_football',
+            'Gambler': 'class_gambler',
+            'Athlete': 'class_athlete',
+            'Gourmand': 'class_chef'
+        };
+        return iconMap[playerClass] || 'class_fighter';
     }
     
+    // Handle case when playerClass is a number (enum value)
+    if (typeof playerClass === 'number') {
+        // Map numeric enum values to class names
+        const classNames = [
+            'class_fighter',  // 0 - Fighter
+            'class_rogue',    // 1 - Rogue
+            'class_mage',     // 2 - Mage
+            'class_paladin',  // 3 - Paladin
+            'class_football', // 4 - Football
+            'class_gambler',  // 5 - Gambler
+            'class_athlete',  // 6 - Athlete
+            'class_chef'      // 7 - Gourmand
+        ];
+        return classNames[playerClass] || 'class_fighter';
+    }
+    
+    // Default fallback
+    console.log("Using default fighter class");
+    return 'class_fighter_1';
+}
+
     // Update the function to properly use the player's playerId
     createOtherPlayerSprite(playerData: Player, entityData: Entity) {
         // Check if we already have this player

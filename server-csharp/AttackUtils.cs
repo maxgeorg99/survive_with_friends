@@ -140,6 +140,32 @@ public static partial class Module
                     // Shield attacks have rotation motion
                     return new DbVector2(0, 0);
                 }
+                case AttackType.Football:
+                {
+                    // Football attacks have a direction based on the player's movement
+                    var playerDirection = GetNormalizedDirection(entity.direction);
+                    return new DbVector2(playerDirection.x, playerDirection.y);
+                }
+                case AttackType.Cards:
+                {
+                    // Cards works like knives, attacking in a circle pattern
+                    var startAngle = (double)parameterU * Math.PI / 180.0;                       
+                    var angleStep = 360.0 / (double)attackData.Value.projectiles;
+                    var attackAngle = startAngle + (angleStep * (double)idWithinBurst);
+                    return new DbVector2((float)Math.Cos(attackAngle), (float)Math.Sin(attackAngle));
+                }
+                case AttackType.Dumbbell:
+                {
+                    // Dumbbells always fall down, with slight random x offset
+                    var random = ctx.Rng;
+                    var xOffset = (random.NextDouble() - 0.5) * 200; // Random offset between -100 and 100
+                    return new DbVector2((float)xOffset / 200, 1); // Normalized direction vector pointing down with slight x variation
+                }
+                case AttackType.Garlic:
+                {
+                    // Garlic stays with player, no movement needed
+                    return new DbVector2(0, 0);
+                }
                 default:
                 {
                     throw new Exception($"DetermineAttackDirection: Unknown attack type {attackType}");
@@ -205,4 +231,4 @@ public static partial class Module
             }
         }
     }
-} 
+}

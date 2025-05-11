@@ -86,6 +86,50 @@ public static partial class Module
             MaxHp = 100,
             Armor = 1,
             Speed = 200.0f,
+            StartingAttackType = AttackType.Shield
+        });
+
+        // Til (Football class)
+        ctx.Db.class_data.Insert(new ClassData 
+        {
+            ClassId = (uint)PlayerClass.Football,
+            PlayerClass = PlayerClass.Football,
+            MaxHp = 130,
+            Armor = 3,
+            Speed = 210.0f,
+            StartingAttackType = AttackType.Football
+        });
+
+        // Yu-gi-oh Marc (Gambler class)
+        ctx.Db.class_data.Insert(new ClassData 
+        {
+            ClassId = (uint)PlayerClass.Gambler,
+            PlayerClass = PlayerClass.Gambler,
+            MaxHp = 90,
+            Armor = 0,
+            Speed = 220.0f,
+            StartingAttackType = AttackType.Cards
+        });
+
+        // Gym Max (Athlete class)
+        ctx.Db.class_data.Insert(new ClassData 
+        {
+            ClassId = (uint)PlayerClass.Athlete,
+            PlayerClass = PlayerClass.Athlete,
+            MaxHp = 110,
+            Armor = 1,
+            Speed = 230.0f,
+            StartingAttackType = AttackType.Dumbbell
+        });
+
+        // Chef Chris (Gourmand class)
+        ctx.Db.class_data.Insert(new ClassData 
+        {
+            ClassId = (uint)PlayerClass.Gourmand,
+            PlayerClass = PlayerClass.Gourmand,
+            MaxHp = 120,
+            Armor = 2,
+            Speed = 200.0f,
             StartingAttackType = AttackType.Garlic
         });
         

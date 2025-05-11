@@ -170,21 +170,21 @@ public static partial class Module
 
         Log.Info("Initializing attack data...");
 
-        // Football - bouncing projectile
+        // Football - bouncing projectile with knockback
         ctx.Db.attack_data.Insert(new AttackData
         {
             attack_id = 11,
             attack_type = AttackType.Football,
             name = "Football Shot",
             cooldown = 800,          // Slower attack speed
-            duration = 2000,         // Stays longer
-            projectiles = 1,         
-            fire_delay = 0,          
+            duration = 2500,         // Stays longer
+            projectiles = 3,         // Burst of 3 footballs
+            fire_delay = 100,        // Small delay between shots
             speed = 600,             // Medium speed
             piercing = true,         // Goes through enemies
             radius = 24,             // Medium size
-            damage = 6,              // High damage
-            armor_piercing = 5       
+            damage = 4,              // Moderate damage
+            armor_piercing = 2       
         });
 
         // Cards - spread attack
@@ -204,21 +204,21 @@ public static partial class Module
             armor_piercing = 2       
         });
 
-        // Dumbbell - heavy projectile
+        // Dumbbell - falling aerial attack
         ctx.Db.attack_data.Insert(new AttackData
         {
             attack_id = 13,
             attack_type = AttackType.Dumbbell,
             name = "Dumbbell Drop",
             cooldown = 1200,         // Slow attack speed
-            duration = 500,          // Short duration
-            projectiles = 1,         
-            fire_delay = 0,          
-            speed = 400,             // Slow speed
-            piercing = false,        
-            radius = 40,             // Large radius
-            damage = 12,             // Very high damage
-            armor_piercing = 8       
+            duration = 800,          // Quick impact
+            projectiles = 4,         // Multiple dumbbells
+            fire_delay = 200,        // Delay between drops
+            speed = 800,             // Fast falling speed
+            piercing = true,         // Goes through enemies
+            radius = 40,             // Large impact radius
+            damage = 8,              // High damage
+            armor_piercing = 4       
         });
 
         // Garlic - aura attack
@@ -227,15 +227,15 @@ public static partial class Module
             attack_id = 14,
             attack_type = AttackType.Garlic,
             name = "Garlic Aura",
-            cooldown = 3000,         // Long cooldown
-            duration = 5000,         // Long duration
-            projectiles = 1,         
-            fire_delay = 0,          
+            cooldown = 800,          // Frequent ticks
+            duration = 800,          // Duration of each pulse
+            projectiles = 1,         // Single aura
+            fire_delay = 0,          // Continuous
             speed = 0,               // Stationary
             piercing = true,         // Hits all enemies in range
-            radius = 100,            // Very large radius
+            radius = 100,            // Large aura radius
             damage = 2,              // Low damage but constant
-            armor_piercing = 3       
+            armor_piercing = 1       
         });
 
         // Sword - melee attack
@@ -769,6 +769,67 @@ public static partial class Module
                 
                 ctx.Db.entity.entity_id.Update(updatedEntity);
             }
+            else if (activeAttack.attack_type == AttackType.Garlic)
+            {
+                // Garlic aura stays with player
+                var playerOpt = ctx.Db.player.player_id.Find(activeAttack.player_id);
+                if (playerOpt is null)
+                {
+                    continue;
+                }
+                
+                var player = playerOpt.Value;
+                var playerEntityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
+                if (playerEntityOpt is null)
+                {
+                    continue;
+                }
+                
+                var playerEntity = playerEntityOpt.Value;
+                
+                // Update garlic aura position to player position
+                var updatedEntity = entity;
+                updatedEntity.position = playerEntity.position;
+                ctx.Db.entity.entity_id.Update(updatedEntity);
+
+                // Apply knockback to nearby monsters
+                foreach (var monster in ctx.Db.monsters.Iter())
+                {
+                    var monsterEntityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
+                    if (monsterEntityOpt is null) continue;
+                    
+                    var monsterEntity = monsterEntityOpt.Value;
+                    
+                    // Calculate distance to monster
+                    var dx = monsterEntity.position.x - playerEntity.position.x;
+                    var dy = monsterEntity.position.y - playerEntity.position.y;
+                    var distanceSquared = dx * dx + dy * dy;
+                    var radiusSum = entity.radius + monsterEntity.radius;
+                    
+                    // If monster is within garlic radius
+                    if (distanceSquared <= radiusSum * radiusSum)
+                    {
+                        // Calculate normalized direction for knockback
+                        var distance = Math.Sqrt(distanceSquared);
+                        if (distance > 0)
+                        {
+                            var knockbackDirection = new DbVector2(
+                                (float)(dx / distance),
+                                (float)(dy / distance)
+                            );
+                            
+                            // Apply knockback
+                            var knockbackStrength = 50f;
+                            var knockbackPos = monsterEntity.position + (knockbackDirection * knockbackStrength);
+                            
+                            // Update monster position with knockback
+                            var updatedMonster = monsterEntity;
+                            updatedMonster.position = knockbackPos;
+                            ctx.Db.entity.entity_id.Update(updatedMonster);
+                        }
+                    }
+                }
+            }
             else
             {
                 // Regular projectile movement based on direction and speed
@@ -794,7 +855,38 @@ public static partial class Module
                     worldSize - updatedEntity.radius
                 );
                 
-                // Check if entity hit the world boundary, if so mark for deletion
+                // For Football attacks, apply knockback to hit monsters
+                if (activeAttack.attack_type == AttackType.Football)
+                {
+                    foreach (var monster in ctx.Db.monsters.Iter())
+                    {
+                        var monsterEntityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
+                        if (monsterEntityOpt is null) continue;
+                        
+                        var monsterEntity = monsterEntityOpt.Value;
+                        
+                        // Calculate distance to monster
+                        var dx = monsterEntity.position.x - updatedEntity.position.x;
+                        var dy = monsterEntity.position.y - updatedEntity.position.y;
+                        var distanceSquared = dx * dx + dy * dy;
+                        var radiusSum = updatedEntity.radius + monsterEntity.radius;
+                        
+                        // If monster is hit by football
+                        if (distanceSquared <= radiusSum * radiusSum)
+                        {
+                            // Apply strong knockback in the football's direction
+                            var knockbackStrength = 100f;
+                            var knockbackPos = monsterEntity.position + (entity.direction * knockbackStrength);
+                            
+                            // Update monster position with knockback
+                            var updatedMonster = monsterEntity;
+                            updatedMonster.position = knockbackPos;
+                            ctx.Db.entity.entity_id.Update(updatedMonster);
+                        }
+                    }
+                }
+                
+                // Check if entity hit the world boundary
                 bool hitBoundary = 
                     updatedEntity.position.x <= updatedEntity.radius ||
                     updatedEntity.position.x >= worldSize - updatedEntity.radius ||

@@ -114,8 +114,8 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.load.image('paladin_icon', '/assets/class_paladin_1.png');
         // Temporarily use fighter sprite as placeholder for new classes
         this.load.image('football_icon', '/assets/class_football_1.png');
-        this.load.image('gambler_icon', '/assets/class_fighter_1.png');
-        this.load.image('athlete_icon', '/assets/class_fighter_1.png');
+        this.load.image('gambler_icon', '/assets/class_gambler_1.png');
+        this.load.image('athlete_icon', '/assets/class_athlete_1.png');
         this.load.image('gourmand_icon', '/assets/class_chef_1.png');
         
         // Load weapon icons

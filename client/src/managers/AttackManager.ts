@@ -307,97 +307,64 @@ export class AttackManager {
     }
 
     private updateAttackGraphic(attackGraphicData: AttackGraphicData) {
-        // Clear previous drawing
-        attackGraphicData.graphic.clear();
+        const { graphic, sprite, radius, alpha, predictedPosition, serverPosition, direction, speed, ticksElapsed } = attackGraphicData;
 
-        // Only draw the circle if debug mode is enabled
-        if (this.debugCirclesEnabled) {
-            // Draw the attack as a light gray transparent circle
-            attackGraphicData.graphic.fillStyle(ATTACK_CIRCLE_COLOR, ATTACK_CIRCLE_ALPHA);
-            attackGraphicData.graphic.fillCircle(
-                attackGraphicData.predictedPosition.x, 
-                attackGraphicData.predictedPosition.y, 
-                attackGraphicData.radius
-            );
-            
-            // Add a thin border for better visibility
-            attackGraphicData.graphic.lineStyle(ATTACK_CIRCLE_BORDER_WIDTH, ATTACK_CIRCLE_COLOR, ATTACK_CIRCLE_BORDER_ALPHA);
-            attackGraphicData.graphic.strokeCircle(
-                attackGraphicData.predictedPosition.x, 
-                attackGraphicData.predictedPosition.y, 
-                attackGraphicData.radius
-            );
-        }
+        // Clear previous graphics
+        graphic.clear();
 
-        // Update the sprite position and rotation
-        if (attackGraphicData.sprite) {
-            const sprite = attackGraphicData.sprite;
+        // Draw the attack circle
+        if (this.debugCirclesEnabled || attackGraphicData.attackType === 'Garlic') {
+            graphic.lineStyle(1, 0xffffff, alpha * 0.4);
+            graphic.strokeCircle(0, 0, radius);
             
-            // Position sprite at predicted position
-            sprite.x = attackGraphicData.predictedPosition.x;
-            sprite.y = attackGraphicData.predictedPosition.y;
-            
-            // For boss bolts, always rotate to match direction of travel
-            if (attackGraphicData.attackType.includes('Boss')) {
-                // Use atan2 to get the angle from the direction vector
-                const angle = Math.atan2(attackGraphicData.direction.y, attackGraphicData.direction.x);
-                sprite.setRotation(angle);
-            } else {
-                // Handle other attack types
-                switch (attackGraphicData.attackType) {
-                    case 'Sword':
-                        // Mirror horizontally if moving left
-                        if (attackGraphicData.direction.x < 0) {
-                            sprite.setFlipX(true);
-                        } else {
-                            sprite.setFlipX(false);
-                        }
-                        sprite.setRotation(0); // Reset rotation
-                        break;
-                        
-                    case 'Wand':
-                    case 'Knives':
-                    case 'Cards':
-                        // These attacks rotate to point in the direction of motion
-                        if (attackGraphicData.direction.length() > 0) {
-                            sprite.setRotation(Math.atan2(attackGraphicData.direction.y, attackGraphicData.direction.x));
-                        }
-                        sprite.setFlipX(false); // Reset flip
-                        break;
-                        
-                    case 'Shield':
-                        // Shield just draws normally
-                        sprite.setRotation(0); // Reset rotation
-                        sprite.setFlipX(false); // Reset flip
-                        break;
-                        
-                    case 'Football':
-                        // Football spins continuously as it moves
-                        sprite.setRotation(sprite.rotation + 0.2); // Add constant rotation
-                        sprite.setFlipX(false);
-                        break;
-                        
-                    case 'Dumbbell':
-                        // Dumbbell rotates with movement but slower
-                        if (attackGraphicData.direction.length() > 0) {
-                            sprite.setRotation(Math.atan2(attackGraphicData.direction.y, attackGraphicData.direction.x) * 0.5);
-                        }
-                        sprite.setFlipX(false);
-                        break;
-                        
-                    case 'Garlic':
-                        // Garlic slowly rotates in place
-                        sprite.setRotation(sprite.rotation + 0.05);
-                        sprite.setFlipX(false);
-                        break;
-                        
-                    default:
-                        // Default handling
-                        sprite.setRotation(0);
-                        sprite.setFlipX(false);
-                }
+            if (attackGraphicData.attackType === 'Garlic') {
+                // Add pulsing effect for garlic
+                const pulseScale = 1 + Math.sin(ticksElapsed * 0.2) * 0.2;
+                graphic.scale = pulseScale;
+                
+                // Add particle effects for garlic
+                this.createGarlicParticles(predictedPosition.x, predictedPosition.y);
             }
         }
+
+        // Special handling for Dumbbell
+        if (attackGraphicData.attackType === 'Dumbbell') {
+            // Add shadow effect for dumbbell
+            if (sprite) {
+                const shadowAlpha = Math.max(0.1, 1 - (ticksElapsed * 0.1));
+                graphic.fillStyle(0x000000, shadowAlpha);
+                graphic.fillCircle(0, radius, radius * 0.5);
+            }
+        }
+
+        // Update position with interpolation
+        graphic.setPosition(predictedPosition.x, predictedPosition.y);
+        if (sprite) {
+            sprite.setPosition(predictedPosition.x, predictedPosition.y);
+        }
+    }
+
+    private createGarlicParticles(x: number, y: number) {
+        if (!this.scene) return;
+        
+        // Create particles only occasionally
+        if (Math.random() > 0.1) return;
+
+        const particles = this.scene.add.particles(x, y, 'white_pixel', {
+            speed: { min: 20, max: 50 },
+            angle: { min: 0, max: 360 },
+            scale: { start: 0.5, end: 0 },
+            lifespan: 500,
+            tint: 0xccffcc,
+            blendMode: 'ADD',
+            gravityY: -50,
+            quantity: 1
+        });
+
+        // Auto-destroy after animation
+        this.scene.time.delayedCall(500, () => {
+            particles.destroy();
+        });
     }
 
     private findAttackDataByType(ctx: EventContext, attackType: AttackType): AttackData | undefined {
