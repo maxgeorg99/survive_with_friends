@@ -50,7 +50,7 @@ const CLASS_INFO = {
         weapon: "class.max.weapon",
         strengths: "class.max.strengths",
         weaknesses: "class.max.weaknesses",
-        altName: "Gym Addict Max",
+        altName: "Gym Rat Max",
         altClass: "Athlete"
     },
     "Chris": {
@@ -415,7 +415,9 @@ export default class ClassSelectScene extends Phaser.Scene {
         const altKey = `class.${this.getAltVersionKey(originalCharName)}`;
         const currentKey = isAltVersion ? altKey : baseKey;
 
-        // Update button content synchronously
+        const weaponImageFile = this.getWeaponImageFile(currentClass);
+
+        // Update button content first
         const iconElement = document.getElementById(`${originalCharName.toLowerCase()}-icon`) as HTMLImageElement;
         const textElement = document.getElementById(`${originalCharName.toLowerCase()}-text`);
         
@@ -427,8 +429,6 @@ export default class ClassSelectScene extends Phaser.Scene {
         if (textElement) {
             textElement.textContent = currentName;
         }
-        
-        const weaponImageFile = this.getWeaponImageFile(currentClass);
 
         // Create toggle button
         const toggleHtml = info.altClass ? `
@@ -452,7 +452,6 @@ export default class ClassSelectScene extends Phaser.Scene {
             </button>
         ` : '';
 
-        // Update panel content
         this.classInfoPanel.innerHTML = `
             <div style="position: relative; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
                 <h2 style="margin: 0; font-size: 24px; color: #3498db;">
@@ -479,25 +478,80 @@ export default class ClassSelectScene extends Phaser.Scene {
             </p>
         `;
 
-        // Add event listener to toggle button
+        // Add event listener to toggle button with immediate content update
         const toggleButton = document.getElementById('version-toggle');
         if (toggleButton) {
             toggleButton.addEventListener('click', () => {
-                // Toggle the alt version state
+                // Update the alt version state
                 this.selectedAltVersions[originalCharName] = !this.selectedAltVersions[originalCharName];
                 const newIsAlt = this.selectedAltVersions[originalCharName];
-                
-                // Immediately update button text and icon
+
+                // Immediately update button content
                 if (iconElement) {
-                    const iconFile = newIsAlt ? this.getAltClassIcon(info.altClass) : this.getClassIcon(classType.tag);
-                    iconElement.src = `/assets/${iconFile}`;
+                    const newIconFile = newIsAlt ? this.getAltClassIcon(info.altClass) : this.getClassIcon(classType.tag);
+                    iconElement.src = `/assets/${newIconFile}`;
                 }
                 
                 if (textElement) {
                     textElement.textContent = newIsAlt ? info.altName : originalCharName;
                 }
 
-                // Now handle class selection
+                // Update class info panel content with new version information
+                const newCurrentName = newIsAlt ? info.altName : originalCharName;
+                const newCurrentClass = newIsAlt ? info.altClass : classType.tag;
+                const newCurrentKey = newIsAlt ? altKey : baseKey;
+                const newWeaponImageFile = this.getWeaponImageFile(newCurrentClass);
+
+                // Create new toggle button HTML
+                const newToggleHtml = info.altClass ? `
+                    <button id="version-toggle" style="
+                        position: absolute;
+                        right: 20px;
+                        background-color: #3498db;
+                        border: none;
+                        border-radius: 15px;
+                        padding: 6px 12px;
+                        color: white;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        font-size: 14px;
+                        transition: background-color 0.2s;
+                    ">
+                    <span style="font-size: 18px;">🔒</span>
+                    <span>Switch to ${newIsAlt ? originalCharName : info.altName}</span>
+                    </button>
+                ` : '';
+
+                // Update the panel content
+                this.classInfoPanel.innerHTML = `
+                    <div style="position: relative; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+                        <h2 style="margin: 0; font-size: 24px; color: #3498db;">
+                            ${newCurrentName}
+                        </h2>
+                        ${newToggleHtml}
+                    </div>
+                    <p style="margin: 0 0 15px 0;">${localization.getText(`${newCurrentKey}.description`)}</p>
+                    <h3 style="margin: 0 0 10px 0; font-size: 18px; color:rgb(183, 204, 46);">Weapon</h3>
+                    <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                        <img src="/assets/${newWeaponImageFile}" style="height: 45px; width: 45px; margin-right: 10px;" 
+                            alt="${localization.getText(`${newCurrentKey}.weapon`)} icon" />
+                        <p style="margin: 0 0 0 10px;">
+                            ${localization.getText(`${newCurrentKey}.weapon`)}
+                        </p>
+                    </div>
+                    <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #2ecc71;">Strengths 💪</h3>
+                    <p style="margin: 0 0 15px 0;">
+                        ${localization.getText(`${newCurrentKey}.strengths`)}
+                    </p>
+                    <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #e74c3c;">Weaknesses 👎</h3>
+                    <p style="margin: 0;">
+                        ${localization.getText(`${newCurrentKey}.weaknesses`)}
+                    </p>
+                `;
+
+                // Get the current button and handle class selection
                 const button = this.getButtonForClass(classType);
                 if (button) {
                     if (newIsAlt && info.altClass) {
@@ -506,6 +560,16 @@ export default class ClassSelectScene extends Phaser.Scene {
                     } else {
                         this.selectClass(classType, button);
                     }
+                }
+
+                // Re-attach event listener to new toggle button
+                const newToggleButton = document.getElementById('version-toggle');
+                if (newToggleButton) {
+                    newToggleButton.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        toggleButton.click();
+                    });
                 }
             });
         }
@@ -617,6 +681,24 @@ export default class ClassSelectScene extends Phaser.Scene {
 
         // Show and update the info panel
         this.classInfoPanel.style.display = 'block';
+        
+        // Update button content before updating panel
+        const originalCharName = this.getOriginalCharacterName(baseClassName);
+        const isAltVersion = this.selectedAltVersions[originalCharName] || false;
+        
+        const iconElement = document.getElementById(`${originalCharName.toLowerCase()}-icon`) as HTMLImageElement;
+        const textElement = document.getElementById(`${originalCharName.toLowerCase()}-text`);
+        
+        if (iconElement) {
+            const iconFile = isAltVersion ? this.getAltClassIcon(info.altClass) : this.getClassIcon(classType.tag);
+            iconElement.src = `/assets/${iconFile}`;
+        }
+        
+        if (textElement) {
+            textElement.textContent = isAltVersion ? info.altName : originalCharName;
+        }
+        
+        // Update the info panel
         this.updateClassInfoPanel(baseClassName, classType, info);
         
         // Update positions to maintain alignment
