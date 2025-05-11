@@ -46,6 +46,9 @@ export enum GameEvents {
     GAME_ENDED = 'game_ended',
     SUBSCRIPTION_APPLIED = 'subscription:applied',
     
+    // World events
+    WORLD_UPDATED = 'world:updated',
+    
     // Boss-related events
     GAME_STATE_UPDATED = 'game_state:updated',
     BOSS_SPAWN_TIMER_CREATED = 'boss_spawn_timer:created',

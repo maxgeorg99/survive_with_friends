@@ -202,6 +202,7 @@ class SpacetimeDBClient {
 
         if(connection.db.world) {
             connection.db.world.onUpdate((ctx, oldWorld, newWorld) => {
+                this.gameEvents.emit(GameEvents.WORLD_UPDATED, ctx, oldWorld, newWorld);
                 if(newWorld.tickCount % 50 == 0) {
                     console.log("Game tick:", newWorld.tickCount);
                 }

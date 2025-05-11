@@ -1,8 +1,6 @@
 import Phaser from 'phaser';
 import SpacetimeDBClient from '../SpacetimeDBClient';
-import { Player, Entity, PlayerClass, Monsters, MonsterType, Bestiary, Account, DeadPlayer, EventContext, ErrorContext, UpgradeOptionData } from "../autobindings";
-import { Identity } from '@clockworklabs/spacetimedb-sdk';
-import { MONSTER_ASSET_KEYS, MONSTER_SHADOW_OFFSETS, MONSTER_MAX_HP } from '../constants/MonsterConfig';
+import { Player, Entity, PlayerClass, Account, EventContext, ErrorContext, UpgradeOptionData } from "../autobindings";
 import MonsterManager from '../managers/MonsterManager';
 import MonsterSpawnerManager from '../managers/MonsterSpawnerManager';
 import { GameEvents } from '../constants/GameEvents';
@@ -333,11 +331,6 @@ export default class GameScene extends Phaser.Scene {
         this.gameEvents.on(GameEvents.PLAYER_DELETED, this.handlePlayerDeleted, this);
         this.gameEvents.on(GameEvents.PLAYER_DIED, this.handlePlayerDied, this);
         
-        // Entity events
-        this.gameEvents.on(GameEvents.ENTITY_CREATED, this.handleEntityCreated, this);
-        this.gameEvents.on(GameEvents.ENTITY_UPDATED, this.handleEntityUpdated, this);
-        this.gameEvents.on(GameEvents.ENTITY_DELETED, this.handleEntityDeleted, this);
-        
         // Connection events
         this.gameEvents.on(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
 
@@ -590,40 +583,30 @@ export default class GameScene extends Phaser.Scene {
         
         // Initialize PlayerHUD for reroll count display
         this.playerHUD = new PlayerHUD(this, this.spacetimeDBClient, this.localPlayerId);
-        
-        // Get the entity data for this player
-        const entityData = ctx.db?.entity.entityId.find(player.entityId);
-        if (!entityData) {
-            console.log("Entity data not found for local player, adding to pending players");
-            this.pendingPlayers.set(player.entityId, player);
-            return;
-        }
 
-        this.attackManager?.setLocalPlayerRadius(entityData.radius);
-
-        console.log("Found entity data for player:", entityData);
+        this.attackManager?.setLocalPlayerRadius(player.radius);
 
         // Set up the player sprite based on their class
         const spriteKey = this.getClassSpriteKey(player.playerClass);
         
         // Create the player sprite
         if (!this.localPlayerSprite) {
-            console.log("Creating new player sprite at position:", entityData.position);
-            this.localPlayerSprite = this.physics.add.sprite(entityData.position.x, entityData.position.y, spriteKey);
-            this.localPlayerSprite.setDepth(BASE_DEPTH + entityData.position.y);
+            console.log("Creating new player sprite at position:", player.position);
+            this.localPlayerSprite = this.physics.add.sprite(player.position.x, player.position.y, spriteKey);
+            this.localPlayerSprite.setDepth(BASE_DEPTH + player.position.y);
             
             // Store the entity ID for later reference
-            this.localPlayerSprite.setData('entityId', entityData.entityId);
+            this.localPlayerSprite.setData('playerId', player.playerId);
             
             // Add shadow
-            this.localPlayerShadow = this.add.image(entityData.position.x, entityData.position.y, SHADOW_ASSET_KEY);
+            this.localPlayerShadow = this.add.image(player.position.x, player.position.y, SHADOW_ASSET_KEY);
             this.localPlayerShadow.setAlpha(SHADOW_ALPHA);
-            this.localPlayerShadow.setDepth(BASE_DEPTH + entityData.position.y + SHADOW_DEPTH_OFFSET);
+            this.localPlayerShadow.setDepth(BASE_DEPTH + player.position.y + SHADOW_DEPTH_OFFSET);
             
             // Add player name text - Using consistent position calculation with NAME_OFFSET_Y
             this.localPlayerNameText = this.add.text(
-                entityData.position.x, 
-                entityData.position.y - Math.floor(this.localPlayerSprite.height / 2) - NAME_OFFSET_Y, 
+                player.position.x, 
+                player.position.y - Math.floor(this.localPlayerSprite.height / 2) - NAME_OFFSET_Y, 
                 `${player.name} (${player.level})`, 
                 {
                     fontSize: '16px',
@@ -633,11 +616,11 @@ export default class GameScene extends Phaser.Scene {
                     fontStyle: 'bold'
                 }
             ).setOrigin(0.5);
-            this.localPlayerNameText.setDepth(BASE_DEPTH + entityData.position.y + NAME_DEPTH_OFFSET);
+            this.localPlayerNameText.setDepth(BASE_DEPTH + player.position.y + NAME_DEPTH_OFFSET);
             
             // Create health bar
-            const startX = entityData.position.x;
-            const startY = entityData.position.y;
+            const startX = player.position.x;
+            const startY = player.position.y;
             
             // Health bar background (black)
             const healthBarBackground = this.add.rectangle(
@@ -685,10 +668,10 @@ export default class GameScene extends Phaser.Scene {
             ).setOrigin(0, 0.5);
             
             // Set appropriate depths
-            healthBarBackground.setDepth(BASE_DEPTH + entityData.position.y + HEALTH_BG_DEPTH_OFFSET);
-            healthBar.setDepth(BASE_DEPTH + entityData.position.y + HEALTH_BAR_DEPTH_OFFSET);
-            expBarBackground.setDepth(BASE_DEPTH + entityData.position.y + EXP_BG_DEPTH_OFFSET);
-            expBar.setDepth(BASE_DEPTH + entityData.position.y + EXP_BAR_DEPTH_OFFSET);
+            healthBarBackground.setDepth(BASE_DEPTH + player.position.y + HEALTH_BG_DEPTH_OFFSET);
+            healthBar.setDepth(BASE_DEPTH + player.position.y + HEALTH_BAR_DEPTH_OFFSET);
+            expBarBackground.setDepth(BASE_DEPTH + player.position.y + EXP_BG_DEPTH_OFFSET);
+            expBar.setDepth(BASE_DEPTH + player.position.y + EXP_BAR_DEPTH_OFFSET);
             
             // Store references to health bar elements and current health values
             this.localPlayerSprite.setData('healthBarBackground', healthBarBackground);
@@ -715,7 +698,7 @@ export default class GameScene extends Phaser.Scene {
         } else {
             // Update the existing player sprite
             this.localPlayerSprite.setTexture(spriteKey);
-            this.localPlayerSprite.setPosition(entityData.position.x, entityData.position.y);
+            this.localPlayerSprite.setPosition(player.position.x, player.position.y);
             
             // Update health bar if it exists
             const healthBar = this.localPlayerSprite.getData('healthBar');
@@ -723,11 +706,11 @@ export default class GameScene extends Phaser.Scene {
             
             if (healthBar && healthBarBackground) {
                 // Update health bar position
-                healthBarBackground.x = entityData.position.x;
-                healthBarBackground.y = entityData.position.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
+                healthBarBackground.x = player.position.x;
+                healthBarBackground.y = player.position.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
                 
-                healthBar.x = entityData.position.x - (HEALTH_BAR_WIDTH / 2);
-                healthBar.y = entityData.position.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
+                healthBar.x = player.position.x - (HEALTH_BAR_WIDTH / 2);
+                healthBar.y = player.position.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
                 
                 // Update health bar width
                 const healthPercent = Math.max(0, Math.min(1, player.hp / player.maxHp));
@@ -748,11 +731,11 @@ export default class GameScene extends Phaser.Scene {
             
             if (expBar && expBarBackground) {
                 // Update exp bar position
-                expBarBackground.x = entityData.position.x;
-                expBarBackground.y = entityData.position.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
+                expBarBackground.x = player.position.x;
+                expBarBackground.y = player.position.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
                 
-                expBar.x = entityData.position.x - (EXP_BAR_WIDTH / 2);
-                expBar.y = entityData.position.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
+                expBar.x = player.position.x - (EXP_BAR_WIDTH / 2);
+                expBar.y = player.position.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
                 
                 // Calculate exp progress percentage
                 const expProgress = player.expForNextLevel > 0 
@@ -776,22 +759,11 @@ export default class GameScene extends Phaser.Scene {
         this.registry.set('localPlayerSprite', this.localPlayerSprite);
         
         // Store server position for interpolation
-        this.serverPosition = new Phaser.Math.Vector2(entityData.position.x, entityData.position.y);
-        
-        // Store initial direction
-        this.currentDirection.x = entityData.direction.x;
-        this.currentDirection.y = entityData.direction.y;
-        this.isMoving = entityData.isMoving;
+        this.serverPosition = new Phaser.Math.Vector2(player.position.x, player.position.y);
         
         // Mark as initialized
         this.playerInitialized = true;
         this.isPlayerDataReady = true;
-
-        // Remove timer auto-start - it's now checked from database
-        // if (this.bossTimerUI) {
-        //    this.bossTimerUI.startTimer();
-        //    console.log("Boss timer started for testing after player initialization");
-        // }
 
         // Check if player has pending upgrades and initialize the upgrade UI if needed
         if (player.unspentUpgrades > 0) {
@@ -956,14 +928,10 @@ export default class GameScene extends Phaser.Scene {
         }
         
         // Get the latest entity data
-        const entityData = ctx.db?.entity.entityId.find(player.entityId);
-        if (entityData && this.serverPosition) {
-            this.serverPosition.set(entityData.position.x, entityData.position.y);
+        if (this.serverPosition) {
+            this.serverPosition.set(player.position.x, player.position.y);
         }
-        if(entityData)
-        {
-            this.attackManager?.setLocalPlayerRadius(entityData.radius);
-        }
+        this.attackManager?.setLocalPlayerRadius(player.radius);
     }
     
     /**
@@ -1054,210 +1022,6 @@ export default class GameScene extends Phaser.Scene {
         });
     }
 
-    // Helper function to handle entity updates and move corresponding sprites
-    handleEntityUpdate(ctx: EventContext, entityData: Entity) {        
-        // Get local player EntityId by first getting account, then player
-        let localPlayerEntityId: number | undefined = undefined;
-        try {
-            if (this.spacetimeDBClient?.identity) 
-            {
-                // Get account by identity
-                const localAccount = ctx.db?.account.identity.find(
-                    this.spacetimeDBClient.identity
-                );
-                
-                if (localAccount && localAccount.currentPlayerId > 0) {
-                    // Get player by player_id from account
-                    const localPlayer = ctx.db?.player.playerId.find(
-                        localAccount.currentPlayerId
-                    );
-                    
-                    if (localPlayer) {
-                        localPlayerEntityId = localPlayer.entityId;
-                    }
-                }
-            }
-        } catch (error) {
-            console.error("Error getting local player entity ID:", error);
-        }
-        
-        // Check if this entity update is for the local player
-        if (localPlayerEntityId === entityData.entityId) {
-            // If local player sprite doesn't exist yet, create it now
-            if (!this.localPlayerSprite) {
-                const startX = Math.floor(entityData.position.x);
-                const startY = Math.floor(entityData.position.y);
-                
-                // Get local player data for the name
-                let playerName = 'Player';
-                let playerClass = PlayerClass.Fighter; // Default class
-                let playerLevel = 1; // Default level
-                let playerMaxHp = 100; // Default max HP
-                let playerHp = 100; // Default HP
-                let playerExp = 0; // Default EXP
-                let playerExpForNextLevel = 100; // Default EXP for next level
-                
-                try {
-                    if (this.spacetimeDBClient?.identity) {
-                        // Get account by identity
-                        const localAccount = ctx.db?.account.identity.find(
-                            this.spacetimeDBClient.identity
-                        );
-                        
-                        if (localAccount && localAccount.currentPlayerId > 0) {
-                            // Get player by player_id from account
-                            const localPlayer = ctx.db?.player.playerId.find(
-                                localAccount.currentPlayerId
-                            );
-                            
-                            if (localPlayer) {
-                                if (localPlayer.name) {
-                                    playerName = localPlayer.name;
-                                }
-                                if (localPlayer.playerClass) {
-                                    playerClass = localPlayer.playerClass;
-                                }
-                                if (localPlayer.level) {
-                                    playerLevel = localPlayer.level;
-                                }
-                                if (localPlayer.maxHp) {
-                                    playerMaxHp = localPlayer.maxHp;
-                                }
-                                if (localPlayer.hp) {
-                                    playerHp = localPlayer.hp;
-                                }
-                                if (localPlayer.exp !== undefined) {
-                                    playerExp = localPlayer.exp;
-                                }
-                                if (localPlayer.expForNextLevel) {
-                                    playerExpForNextLevel = localPlayer.expForNextLevel;
-                                }
-                            }
-                        }
-                    }
-                } catch (error) {
-                    console.error("Error getting player data:", error);
-                }
-                
-                // Get class-specific sprite key
-                const classKey = this.getClassSpriteKey(playerClass);
-                this.localPlayerSprite = this.physics.add.sprite(startX, startY, classKey);
-                
-                // Use Y position for depth instead of fixed value
-                const initialDepth = BASE_DEPTH + startY;
-                this.localPlayerNameText = this.add.text(startX, startY - Math.floor(this.localPlayerSprite.height / 2) - NAME_OFFSET_Y, 
-                    `${playerName} (${playerLevel})`, PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
-                this.localPlayerNameText.setDepth(initialDepth + NAME_DEPTH_OFFSET);
-
-                // Create health bar
-                const healthBarBackground = this.add.rectangle(
-                    startX,
-                    startY - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y,
-                    HEALTH_BAR_WIDTH,
-                    HEALTH_BAR_HEIGHT,
-                    0x000000,
-                    0.7
-                ).setOrigin(0.5, 0.5);
-                
-                const healthBar = this.add.rectangle(
-                    startX - (HEALTH_BAR_WIDTH / 2),
-                    startY - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y,
-                    HEALTH_BAR_WIDTH * (playerHp / playerMaxHp),
-                    HEALTH_BAR_HEIGHT,
-                    0x00FF00,
-                    1
-                ).setOrigin(0, 0.5);
-                
-                // Create exp bar
-                const expBarBackground = this.add.rectangle(
-                    startX,
-                    startY - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y,
-                    EXP_BAR_WIDTH,
-                    EXP_BAR_HEIGHT,
-                    0x000000,
-                    0.7
-                ).setOrigin(0.5, 0.5);
-                
-                // Calculate exp progress percentage
-                const expProgress = playerExpForNextLevel > 0 
-                    ? Math.min(1, playerExp / playerExpForNextLevel) 
-                    : 0;
-                
-                // Exp bar foreground (blue)
-                const expBar = this.add.rectangle(
-                    startX - (EXP_BAR_WIDTH / 2),
-                    startY - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y,
-                    EXP_BAR_WIDTH * expProgress,
-                    EXP_BAR_HEIGHT,
-                    0x3498db, // Blue color
-                    1
-                ).setOrigin(0, 0.5);
-                
-                // Set health bar properties with Y-based depth
-                healthBarBackground.setDepth(initialDepth + HEALTH_BG_DEPTH_OFFSET);
-                healthBar.setDepth(initialDepth + HEALTH_BAR_DEPTH_OFFSET);
-                expBarBackground.setDepth(initialDepth + EXP_BG_DEPTH_OFFSET);
-                expBar.setDepth(initialDepth + EXP_BAR_DEPTH_OFFSET);
-                
-                // Store health bar references
-                this.localPlayerSprite.setData('healthBarBackground', healthBarBackground);
-                this.localPlayerSprite.setData('healthBar', healthBar);
-                this.localPlayerSprite.setData('hp', playerHp);
-                this.localPlayerSprite.setData('maxHp', playerMaxHp);
-                
-                // Store exp bar references
-                this.localPlayerSprite.setData('expBarBackground', expBarBackground);
-                this.localPlayerSprite.setData('expBar', expBar);
-                this.localPlayerSprite.setData('exp', playerExp);
-                this.localPlayerSprite.setData('expForNextLevel', playerExpForNextLevel);
-                
-                this.localPlayerShadow = this.add.image(startX, startY + SHADOW_OFFSET_Y, SHADOW_ASSET_KEY)
-                    .setAlpha(SHADOW_ALPHA)
-                    .setDepth(initialDepth + SHADOW_DEPTH_OFFSET);
-
-                // Set collision bounds
-                this.localPlayerSprite.setCollideWorldBounds(true);
-
-                // Camera follow
-                this.cameras.main.startFollow(this.localPlayerSprite, true, 1, 1);
-                this.cameras.main.setRoundPixels(true);
-            }
-            
-            // Update server position for interpolation in update loop
-            if (this.serverPosition === null) {
-                this.serverPosition = new Phaser.Math.Vector2(entityData.position.x, entityData.position.y);
-            } else {
-                this.serverPosition.set(entityData.position.x, entityData.position.y);
-            }
-        } else {
-            // This is an entity update for another player
-            // Find which player owns this entity
-            let playerOwningEntity: Player | null = null;
-            try {
-                // Find player by entity ID
-                playerOwningEntity = ctx.db?.player.entityId.find(entityData.entityId) || null;
-            } catch (error) {
-                console.error("Error finding player for entity:", error);
-            }
-            
-            if (playerOwningEntity) {
-                // Update the other player's position
-                try {
-                    const otherPlayerContainer = this.otherPlayers.get(playerOwningEntity.playerId);
-                    if (otherPlayerContainer) {
-                        this.updateOtherPlayerPosition(playerOwningEntity.playerId, entityData.position.x, entityData.position.y);
-                    } else {
-                        // If we have the entity data but no sprite, we may need to create it
-                        // This can happen if the entity update comes before the player insert
-                        this.pendingPlayers.set(entityData.entityId, playerOwningEntity);
-                    }
-                } catch (error) {
-                    console.error("Error updating other player position:", error);
-                }
-            }
-        }
-    }
-
     // Get class-specific sprite key
     getClassSpriteKey(playerClass: any): string {
         
@@ -1289,16 +1053,16 @@ export default class GameScene extends Phaser.Scene {
     }
     
     // Update the function to properly use the player's playerId
-    createOtherPlayerSprite(playerData: Player, entityData: Entity) {
+    createOtherPlayerSprite(playerData: Player) {
         // Check if we already have this player
         if (this.otherPlayers.has(playerData.playerId)) {
-            this.updateOtherPlayerPosition(playerData.playerId, entityData.position.x, entityData.position.y);
+            this.updateOtherPlayerPosition(playerData.playerId, playerData.position.x, playerData.position.y);
             return;
         }
         
         // Round position on creation
-        const startX = Math.floor(entityData.position.x);
-        const startY = Math.floor(entityData.position.y);
+        const startX = Math.floor(playerData.position.x);
+        const startY = Math.floor(playerData.position.y);
         
         // Calculate depth based on Y position
         const initialDepth = BASE_DEPTH + startY;
@@ -1368,7 +1132,7 @@ export default class GameScene extends Phaser.Scene {
         
         // Create container and add all elements
         const container = this.add.container(startX, startY, [shadow, sprite, text, healthBarBackground, healthBar, expBarBackground, expBar]);
-        container.setData('entityId', entityData.entityId);
+        container.setData('playerId', playerData.playerId);
         container.setData('hp', playerData.hp);
         container.setData('maxHp', playerData.maxHp);
         container.setData('exp', playerData.exp);
@@ -1433,18 +1197,10 @@ export default class GameScene extends Phaser.Scene {
             
             // If we don't have a container for this player yet, we need to find its entity
             if (!this.otherPlayers.has(playerData.playerId)) {
-                if (playerData.entityId) {
-                    const entityData = ctx.db?.entity.entityId.find(playerData.entityId);
-                    if (entityData) {
-                        // Create the sprite with the entity data
-                        this.createOtherPlayerSprite(playerData, entityData);
-                    } else {
-                        // If no entity found, we need to wait for the entity update
-                        // Store player data for later
-                        this.pendingPlayers.set(playerData.entityId, playerData);
-                    }
-                }
+                this.createOtherPlayerSprite(playerData);
             } else {
+                this.updateOtherPlayerPosition(playerData.playerId, playerData.position.x, playerData.position.y);
+
                 // Just update the container with any player changes if needed
                 const container = this.otherPlayers.get(playerData.playerId);
                 if (container) {
@@ -1663,15 +1419,8 @@ export default class GameScene extends Phaser.Scene {
         const deltaTime = delta / 1000;
         
         // Get current entity data from server
-        const entityData = this.spacetimeDBClient?.sdkConnection?.db?.entity.entityId.find(
-            this.localPlayerSprite.getData('entityId')
-        );
-        
-        if (!entityData) return;
-
-        // Get player data for accurate speed
-        const playerData = this.spacetimeDBClient?.sdkConnection?.db?.player.entityId.find(
-            entityData.entityId
+        const playerData = this.spacetimeDBClient?.sdkConnection?.db?.player.playerId.find(
+            this.localPlayerSprite.getData('playerId')
         );
         
         if (!playerData) return;
@@ -1704,7 +1453,7 @@ export default class GameScene extends Phaser.Scene {
         }
         
         // If we have a waypoint and are moving, update predicted position
-        if (entityData.hasWaypoint && entityData.isMoving) {
+        if (playerData.hasWaypoint) {
             // Initialize predicted position if needed
             if (!this.predictedPosition) {
                 this.predictedPosition = new Phaser.Math.Vector2(
@@ -1715,8 +1464,8 @@ export default class GameScene extends Phaser.Scene {
             
             // Calculate direction to waypoint
             const directionVector = new Phaser.Math.Vector2(
-                entityData.waypoint.x - this.predictedPosition.x,
-                entityData.waypoint.y - this.predictedPosition.y
+                playerData.waypoint.x - this.predictedPosition.x,
+                playerData.waypoint.y - this.predictedPosition.y
             );
             
             // Calculate distance to waypoint
@@ -1728,7 +1477,7 @@ export default class GameScene extends Phaser.Scene {
                 // Reached waypoint, stop moving
                 this.isMoving = false;
                 this.currentDirection.set(0, 0);
-                this.predictedPosition.set(entityData.waypoint.x, entityData.waypoint.y);
+                this.predictedPosition.set(playerData.waypoint.x, playerData.waypoint.y);
                 
                 // Clear tap target and marker
                 this.tapTarget = null;
@@ -1763,6 +1512,11 @@ export default class GameScene extends Phaser.Scene {
             this.isMoving = false;
             this.currentDirection.set(0, 0);
             this.predictedPosition = null; // Clear prediction when not moving
+
+            this.tapTarget = null;
+            if (this.tapMarker) {
+                this.tapMarker.setVisible(false);
+            }
         }
 
         // Always update depth and UI after any position change
@@ -1812,21 +1566,8 @@ export default class GameScene extends Phaser.Scene {
             return;
         }
         
-        // First, handle local player if not already created
         if (!this.localPlayerSprite && localAccount.currentPlayerId > 0) {
-            //const localPlayer = allPlayers.find(p => p.playerId === localAccount.currentPlayerId);
-            const localPlayer = ctx.db.player.playerId.find(localAccount.currentPlayerId) as Player;
-            if (localPlayer) {
-                const entityData = ctx.db.entity.entityId.find(localPlayer.entityId) as Entity;
-                if (entityData) {
-                    console.log(`Creating local player during sync: ${localPlayer.name} at (${entityData.position.x}, ${entityData.position.y})`);
-                    this.handleEntityUpdate(ctx, entityData);
-                } else {
-                    console.warn(`Entity data not found for local player (entityId: ${localPlayer.entityId})`);
-                }
-            } else {
-                console.warn(`Local player data not found in player table during sync`);
-            }
+            throw new Error("Local player data not found in player table during sync");
         }
         
         // Then handle all other players
@@ -1836,20 +1577,14 @@ export default class GameScene extends Phaser.Scene {
                 continue;
             }
             
-            const entityData = ctx.db.entity.entityId.find(player.entityId) as Entity;
-            if (entityData) {
-                // Check if this player already has a sprite
-                const existingContainer = this.otherPlayers.get(player.playerId);
-                if (!existingContainer) {
-                    // Create the sprite directly - this bypasses the normal flow but ensures
-                    // the sprite is created immediately
-                    this.createOtherPlayerSprite(player, entityData);
-                } else {
-                    // Just update position if sprite already exists
-                    this.updateOtherPlayerPosition(player.playerId, entityData.position.x, entityData.position.y);
-                }
+            const existingContainer = this.otherPlayers.get(player.playerId);
+            if (!existingContainer) {
+                // Create the sprite directly - this bypasses the normal flow but ensures
+                // the sprite is created immediately
+                this.createOtherPlayerSprite(player);
             } else {
-                console.warn(`Entity data not found for player ${player.name} (entityId: ${player.entityId})`);
+                // Just update position if sprite already exists
+                this.updateOtherPlayerPosition(player.playerId, player.position.x, player.position.y);
             }
         }
         
@@ -2033,11 +1768,6 @@ export default class GameScene extends Phaser.Scene {
         this.gameEvents.off(GameEvents.PLAYER_DELETED, this.handlePlayerDeleted, this);
         this.gameEvents.off(GameEvents.PLAYER_DIED, this.handlePlayerDied, this);
         
-        // Remove entity event listeners
-        this.gameEvents.off(GameEvents.ENTITY_CREATED, this.handleEntityCreated, this);
-        this.gameEvents.off(GameEvents.ENTITY_UPDATED, this.handleEntityUpdated, this);
-        this.gameEvents.off(GameEvents.ENTITY_DELETED, this.handleEntityDeleted, this);
-        
         this.gameEvents.off(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
         
         // Clean up MonsterManager event listeners
@@ -2095,34 +1825,6 @@ export default class GameScene extends Phaser.Scene {
         console.log("GameScene shutdown complete.");
     }
 
-    // New entity event handlers
-    private handleEntityCreated(ctx: EventContext, entity: Entity) {
-        this.handleEntityUpdate(ctx, entity);
-    }
-
-    private handleEntityUpdated(ctx: EventContext, oldEntity: Entity, newEntity: Entity) {
-        // If this is our local player's entity, check if we need to update the tap marker
-        if (this.localPlayerSprite) {
-            const localEntityId = this.localPlayerSprite.getData('entityId');
-            if (localEntityId === newEntity.entityId) {
-                // If we were moving and have now stopped with no waypoint, clear the marker
-                if (oldEntity.isMoving && !newEntity.isMoving && !newEntity.hasWaypoint) {
-                    console.log("Player stopped moving, clearing marker");
-                    this.tapTarget = null;
-                    if (this.tapMarker) {
-                        this.tapMarker.setVisible(false);
-                    }
-                }
-            }
-        }
-        this.handleEntityUpdate(ctx, newEntity);
-    }
-
-    private handleEntityDeleted(_ctx: EventContext, entity: Entity) {
-        // Handle entity deletion (if needed)
-        // Currently no specific handling is needed as player/monster deletions are handled by respective events
-    }
-
     private cleanupLingeringUIElements() {
         console.log("GameScene: Cleaning up lingering UI elements from other scenes only");
         
@@ -2154,27 +1856,18 @@ export default class GameScene extends Phaser.Scene {
         // Default fallback radius
         let entityRadius = 48;
         
-        try {
-            if (this.spacetimeDBClient?.identity && this.spacetimeDBClient?.sdkConnection?.db) {
-                const account = this.spacetimeDBClient.sdkConnection.db.account.identity.find(
-                    this.spacetimeDBClient.identity
+        if (this.spacetimeDBClient?.identity && this.spacetimeDBClient?.sdkConnection?.db) {
+            const account = this.spacetimeDBClient.sdkConnection.db.account.identity.find(
+                this.spacetimeDBClient.identity
+            );
+            
+            if (account && account.currentPlayerId > 0) {
+                const player = this.spacetimeDBClient.sdkConnection.db.player.playerId.find(
+                    account.currentPlayerId
                 );
-                
-                if (account && account.currentPlayerId > 0) {
-                    const player = this.spacetimeDBClient.sdkConnection.db.player.playerId.find(
-                        account.currentPlayerId
-                    );
-                    
-                    if (player && player.entityId) {
-                        const entity = this.spacetimeDBClient.sdkConnection.db.entity.entityId.find(player.entityId);
-                        if (entity && entity.radius) {
-                            entityRadius = entity.radius;
-                        }
-                    }
-                }
+
+                entityRadius = player?.radius ?? 48;
             }
-        } catch (error) {
-            console.error("Error getting entity radius:", error);
         }
         
         return entityRadius;

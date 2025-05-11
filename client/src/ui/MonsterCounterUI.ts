@@ -62,7 +62,7 @@ export default class MonsterCounterUI {
         this.gameEvents.on(GameEvents.MONSTER_DELETED, this.updateCounter, this);
         
         // Subscribe to world updates for tick tracking
-        this.subscribeToWorldTick();
+        this.gameEvents.on(GameEvents.WORLD_UPDATED, this.handleWorldUpdated, this);
         
         // Initial update
         this.updateCounter();
@@ -76,27 +76,22 @@ export default class MonsterCounterUI {
         this.text.setText(monsterCount.toString());
     }
 
-    private subscribeToWorldTick() {
-        const spacetimeDBClient = (window as any).spacetimeDBClient as SpacetimeDBClient;
-        if (!spacetimeDBClient?.sdkConnection?.db?.world) return;
-        // Listen for world updates
-        spacetimeDBClient.sdkConnection.db.world.onUpdate((ctx: any, oldWorld: any, newWorld: any) => {
-            if (!oldWorld || !newWorld) return;
-            if (this.lastTickCount !== null && newWorld.tickCount !== this.lastTickCount) {
-                const now = performance.now();
-                if (this.lastTickTimestamp !== null) {
-                    const interval = now - this.lastTickTimestamp;
-                    this.tickIntervals.push(interval);
-                    if (this.tickIntervals.length > TICK_AVG_WINDOW) {
-                        this.tickIntervals.shift();
-                    }
-                    const avg = this.tickIntervals.reduce((a, b) => a + b, 0) / this.tickIntervals.length;
-                    this.tickText.setText(`Avg Tick: ${avg.toFixed(1)} ms`);
+    private handleWorldUpdated(ctx: any, oldWorld: any, newWorld: any) {
+        if (!oldWorld || !newWorld) return;
+        if (this.lastTickCount !== null && newWorld.tickCount !== this.lastTickCount) {
+            const now = performance.now();
+            if (this.lastTickTimestamp !== null) {
+                const interval = now - this.lastTickTimestamp;
+                this.tickIntervals.push(interval);
+                if (this.tickIntervals.length > TICK_AVG_WINDOW) {
+                    this.tickIntervals.shift();
                 }
-                this.lastTickTimestamp = now;
+                const avg = this.tickIntervals.reduce((a, b) => a + b, 0) / this.tickIntervals.length;
+                this.tickText.setText(`Avg Tick: ${avg.toFixed(1)} ms`);
             }
-            this.lastTickCount = newWorld.tickCount;
-        });
+            this.lastTickTimestamp = now;
+        }
+        this.lastTickCount = newWorld.tickCount;
     }
 
     public toggleVisible() {
@@ -108,7 +103,7 @@ export default class MonsterCounterUI {
         this.gameEvents.off(GameEvents.MONSTER_CREATED, this.updateCounter, this);
         this.gameEvents.off(GameEvents.MONSTER_UPDATED, this.updateCounter, this);
         this.gameEvents.off(GameEvents.MONSTER_DELETED, this.updateCounter, this);
-        // Note: world.onUpdate does not have an off method, so this is a leak if the scene is recreated often
+        this.gameEvents.off(GameEvents.WORLD_UPDATED, this.handleWorldUpdated, this);
         this.container.destroy();
     }
 } 
