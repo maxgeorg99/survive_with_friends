@@ -45,48 +45,48 @@ public static partial class Module
             ctx.Db.class_data.ClassId.Delete(classData.ClassId);
         }
         
-        // Insert Fighter class data
+        // Til (Fighter class) - Football Player
         ctx.Db.class_data.Insert(new ClassData 
         {
             ClassId = (uint)PlayerClass.Fighter,
             PlayerClass = PlayerClass.Fighter,
-            MaxHp = 100,
-            Armor = 0,
+            MaxHp = 120,
+            Armor = 2,
             Speed = 200.0f,
-            StartingAttackType = AttackType.Sword
+            StartingAttackType = AttackType.Football
         });
         
-        // Insert Rogue class data
+        // Marc (Rogue class) - Yu-Gi-Oh Player
         ctx.Db.class_data.Insert(new ClassData 
         {
             ClassId = (uint)PlayerClass.Rogue,
             PlayerClass = PlayerClass.Rogue,
-            MaxHp = 100,
+            MaxHp = 90,
             Armor = 0,
-            Speed = 200.0f,
-            StartingAttackType = AttackType.Knives
+            Speed = 220.0f,
+            StartingAttackType = AttackType.Cards
         });
         
-        // Insert Mage class data
+        // Max (Mage class) - Bodybuilder
         ctx.Db.class_data.Insert(new ClassData 
         {
             ClassId = (uint)PlayerClass.Mage,
             PlayerClass = PlayerClass.Mage,
-            MaxHp = 100,
-            Armor = 0,
-            Speed = 200.0f,
-            StartingAttackType = AttackType.Wand
+            MaxHp = 150,
+            Armor = 3,
+            Speed = 180.0f,
+            StartingAttackType = AttackType.Dumbbell
         });
         
-        // Insert Paladin class data
+        // Chris (Paladin class) - Chef
         ctx.Db.class_data.Insert(new ClassData 
         {
             ClassId = (uint)PlayerClass.Paladin,
             PlayerClass = PlayerClass.Paladin,
             MaxHp = 100,
-            Armor = 0,
+            Armor = 1,
             Speed = 200.0f,
-            StartingAttackType = AttackType.Shield
+            StartingAttackType = AttackType.Garlic
         });
         
         Log.Info("Class data initialization complete.");
@@ -100,4 +100,4 @@ public static partial class Module
         // Call the existing ScheduleNewPlayerAttack method from Attacks.cs
         ScheduleNewPlayerAttack(ctx, playerId, attackType);
     }
-} 
+}

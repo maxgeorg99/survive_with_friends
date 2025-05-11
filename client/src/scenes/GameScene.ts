@@ -59,10 +59,14 @@ const POSITION_CORRECTION_THRESHOLD = 49; // Distance squared threshold for posi
 
 // Asset keys for different player classes
 const CLASS_ASSET_KEYS: Record<string, string> = {
-    "Fighter": 'player_fighter',  // These should match the keys used in preload()
+    "Fighter": 'player_fighter',
     "Rogue": 'player_rogue',
     "Mage": 'player_mage',
-    "Paladin": 'player_paladin'
+    "Paladin": 'player_paladin',
+    "Football": 'player_fighter',  // Temporary placeholder
+    "Gambler": 'player_fighter',   // Temporary placeholder
+    "Athlete": 'player_fighter',   // Temporary placeholder
+    "Gourmand": 'player_fighter'   // Temporary placeholder
 };
 
 export default class GameScene extends Phaser.Scene {
@@ -174,8 +178,12 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('attack_wand', '/assets/attack_wand.png');
         this.load.image('attack_knife', '/assets/attack_knife.png');
         this.load.image('attack_shield', '/assets/attack_shield.png');
+        this.load.image('attack_football', '/assets/attack_football.png');
+        this.load.image('attack_cards', '/assets/attack_cards.png');
+        this.load.image('attack_dumbbell', '/assets/attack_dumbbell.png');
+        this.load.image('attack_garlic', '/assets/attack_garlic.png');
         this.load.image('attack_boss_jorge', '/assets/attack_boss_jorge.png');
-        this.load.image('attack_boss_björn', '/assets/attack_boss_björn.png');
+        this.load.image('attack_boss_bjorn', '/assets/attack_boss_björn.png');
         this.load.image('attack_boss_simon', '/assets/attack_boss_simon.png');
         
         // Load upgrade assets
@@ -754,7 +762,7 @@ export default class GameScene extends Phaser.Scene {
                 expBar.x = entityData.position.x - (EXP_BAR_WIDTH / 2);
                 expBar.y = entityData.position.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
                 
-                // Calculate exp progress percentage
+                // Calculate progress percentage
                 const expProgress = player.expForNextLevel > 0 
                     ? Math.min(1, player.exp / player.expForNextLevel) 
                     : 0;

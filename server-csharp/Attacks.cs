@@ -9,6 +9,10 @@ public enum AttackType
     Wand,
     Knives,
     Shield,
+    Football,
+    Cards,
+    Dumbbell,
+    Garlic,
     BossBolt,
     BossJorgeBolt,
     BossBjornBolt
@@ -165,6 +169,74 @@ public static partial class Module
         }
 
         Log.Info("Initializing attack data...");
+
+        // Football - bouncing projectile
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 11,
+            attack_type = AttackType.Football,
+            name = "Football Shot",
+            cooldown = 800,          // Slower attack speed
+            duration = 2000,         // Stays longer
+            projectiles = 1,         
+            fire_delay = 0,          
+            speed = 600,             // Medium speed
+            piercing = true,         // Goes through enemies
+            radius = 24,             // Medium size
+            damage = 6,              // High damage
+            armor_piercing = 5       
+        });
+
+        // Cards - spread attack
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 12,
+            attack_type = AttackType.Cards,
+            name = "Card Throw",
+            cooldown = 600,          
+            duration = 800,          
+            projectiles = 3,         // Multiple cards
+            fire_delay = 50,         
+            speed = 700,             
+            piercing = false,        
+            radius = 16,             
+            damage = 3,              
+            armor_piercing = 2       
+        });
+
+        // Dumbbell - heavy projectile
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 13,
+            attack_type = AttackType.Dumbbell,
+            name = "Dumbbell Drop",
+            cooldown = 1200,         // Slow attack speed
+            duration = 500,          // Short duration
+            projectiles = 1,         
+            fire_delay = 0,          
+            speed = 400,             // Slow speed
+            piercing = false,        
+            radius = 40,             // Large radius
+            damage = 12,             // Very high damage
+            armor_piercing = 8       
+        });
+
+        // Garlic - aura attack
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 14,
+            attack_type = AttackType.Garlic,
+            name = "Garlic Aura",
+            cooldown = 3000,         // Long cooldown
+            duration = 5000,         // Long duration
+            projectiles = 1,         
+            fire_delay = 0,          
+            speed = 0,               // Stationary
+            piercing = true,         // Hits all enemies in range
+            radius = 100,            // Very large radius
+            damage = 2,              // Low damage but constant
+            armor_piercing = 3       
+        });
 
         // Sword - melee attack
         ctx.Db.attack_data.Insert(new AttackData

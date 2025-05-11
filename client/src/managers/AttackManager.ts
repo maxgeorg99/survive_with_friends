@@ -260,19 +260,32 @@ export class AttackManager {
             case 'Shield':
                 spriteKey = 'attack_shield';
                 break;
+            case 'Football':
+                spriteKey = 'attack_football';
+                break;
+            case 'Cards':
+                spriteKey = 'attack_cards';
+                break;
+            case 'Dumbbell':
+                spriteKey = 'attack_dumbbell';
+                break;
+            case 'Garlic':
+                spriteKey = 'attack_garlic';
+                break;
             case 'BossJorgeBolt':
                 spriteKey = 'attack_boss_jorge';
                 break;
             case 'BossBjornBolt':
-                spriteKey = 'attack_boss_björn';
+                spriteKey = 'attack_boss_bjorn';
                 break;
             case 'BossSimonBolt':
                 spriteKey = 'attack_boss_simon';
                 break;
             default:
                 console.warn(`Unknown attack type: ${attackType}, using default sprite`);
+                return null;
         }
-        
+
         // Create the sprite and set its properties
         const sprite = this.scene.add.sprite(x, y, spriteKey);
         sprite.setDepth(1.5); // Set depth higher than circle but below UI
@@ -282,6 +295,10 @@ export class AttackManager {
         // Set an initial scale based on attack type
         if (attackType === 'BossJorgeBolt' || attackType === 'BossBjornBolt' || attackType === 'BossSimonBolt') {
             sprite.setScale(0.4); // Smaller scale for boss bolts
+        } else if (attackType === 'Football') {
+            sprite.setScale(0.6); // Slightly larger for the football
+        } else if (attackType === 'Garlic') {
+            sprite.setScale(0.8); // Larger for the garlic AoE
         } else {
             sprite.setScale(1.0); // Normal scale for other attacks
         }
@@ -326,7 +343,7 @@ export class AttackManager {
                 const angle = Math.atan2(attackGraphicData.direction.y, attackGraphicData.direction.x);
                 sprite.setRotation(angle);
             } else {
-                // Handle other attack types as before
+                // Handle other attack types
                 switch (attackGraphicData.attackType) {
                     case 'Sword':
                         // Mirror horizontally if moving left
@@ -340,7 +357,8 @@ export class AttackManager {
                         
                     case 'Wand':
                     case 'Knives':
-                        // Rotate to point in the direction of motion
+                    case 'Cards':
+                        // These attacks rotate to point in the direction of motion
                         if (attackGraphicData.direction.length() > 0) {
                             sprite.setRotation(Math.atan2(attackGraphicData.direction.y, attackGraphicData.direction.x));
                         }
@@ -351,6 +369,26 @@ export class AttackManager {
                         // Shield just draws normally
                         sprite.setRotation(0); // Reset rotation
                         sprite.setFlipX(false); // Reset flip
+                        break;
+                        
+                    case 'Football':
+                        // Football spins continuously as it moves
+                        sprite.setRotation(sprite.rotation + 0.2); // Add constant rotation
+                        sprite.setFlipX(false);
+                        break;
+                        
+                    case 'Dumbbell':
+                        // Dumbbell rotates with movement but slower
+                        if (attackGraphicData.direction.length() > 0) {
+                            sprite.setRotation(Math.atan2(attackGraphicData.direction.y, attackGraphicData.direction.x) * 0.5);
+                        }
+                        sprite.setFlipX(false);
+                        break;
+                        
+                    case 'Garlic':
+                        // Garlic slowly rotates in place
+                        sprite.setRotation(sprite.rotation + 0.05);
+                        sprite.setFlipX(false);
                         break;
                         
                     default:
