@@ -253,23 +253,13 @@ public static partial class Module
         
         var player = playerOpt.Value;
         
-        // Get player's entity data to determine position and direction
-        var entityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
-        if (entityOpt == null)
-        {
-            Log.Error($"Entity {player.entity_id} not found for player {playerId}");
-            return;
-        }
-        
-        var entity = entityOpt.Value;
-        
         // Get attack direction using AttackUtils
         var direction = AttackUtils.DetermineAttackDirection(ctx, playerId, attackType, idWithinBurst, parameterU, parameterI);
         
         // Create a new entity for the projectile and get its ID
         var projectileEntity = ctx.Db.entity.Insert(new Entity
         {
-            position = entity.position,
+            position = player.position,
             direction = direction,
             radius = scheduledAttack.Value.radius
         });
@@ -542,13 +532,6 @@ public static partial class Module
                 }
                 
                 var player = playerOpt.Value;
-                var playerEntityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
-                if (playerEntityOpt is null)
-                {
-                    continue; // Skip if player entity not found
-                }
-                
-                var playerEntity = playerEntityOpt.Value;
                 
                 // Get all shields for this player to determine total count and positioning
                 int totalShields = 0;
@@ -573,7 +556,7 @@ public static partial class Module
                 double shieldAngle = baseAngle + rotationSpeed * activeAttack.ticks_elapsed;
                 
                 // Calculate offset distance from player center
-                float offsetDistance = (playerEntity.radius + entity.radius) * 2; // Added some spacing
+                float offsetDistance = (player.radius + entity.radius) * 2; // Added some spacing
                 
                 // Calculate new position using angle
                 float offsetX = (float)Math.Cos(shieldAngle) * offsetDistance;
@@ -582,8 +565,8 @@ public static partial class Module
                 // Update shield entity with new position
                 var updatedEntity = entity;
                 updatedEntity.position = new DbVector2(
-                    playerEntity.position.x + offsetX,
-                    playerEntity.position.y + offsetY
+                    player.position.x + offsetX,
+                    player.position.y + offsetY
                 );
                 
                 ctx.Db.entity.entity_id.Update(updatedEntity);

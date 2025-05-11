@@ -122,39 +122,16 @@ public static partial class Module
         Log.Info($"Creating boss phase 1 pre-spawner at center of map ({centerX}, {centerY})");
         
         // Find the closest player to target
-        uint closestPlayerId = 0;
-        float closestDistance = float.MaxValue;
-        string targetPlayerName = "unknown";
-        
-        foreach (var player in ctx.Db.player.Iter())
-        {
-            var playerEntityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
-            if (playerEntityOpt != null)
-            {
-                // Calculate distance to center
-                var playerEntity = playerEntityOpt.Value;
-                float dx = playerEntity.position.x - centerPosition.x;
-                float dy = playerEntity.position.y - centerPosition.y;
-                float distanceSquared = dx * dx + dy * dy;
-                
-                // Update closest player if this one is closer
-                if (distanceSquared < closestDistance)
-                {
-                    closestDistance = distanceSquared;
-                    closestPlayerId = player.entity_id;
-                    targetPlayerName = player.name;
-                }
-            }
-        }
+        uint closestPlayerId = GetClosestPlayer(ctx, centerPosition);
         
         // Schedule the boss to spawn using the existing monster spawning system
-        ScheduleBossSpawning(ctx, centerPosition, closestPlayerId, targetPlayerName);
+        ScheduleBossSpawning(ctx, centerPosition, closestPlayerId);
     }
     
     // Schedule boss spawning using the existing monster spawning system
-    private static void ScheduleBossSpawning(ReducerContext ctx, DbVector2 position, uint targetEntityId, string targetPlayerName)
+    private static void ScheduleBossSpawning(ReducerContext ctx, DbVector2 position, uint targetEntityId)
     {
-        Log.Info($"Scheduling boss phase 1 spawn at position ({position.x}, {position.y}) targeting player: {targetPlayerName}");
+        Log.Info($"Scheduling boss phase 1 spawn at position ({position.x}, {position.y})");
         
         // Use the existing monster spawner system, but for the boss
         const int BOSS_SPAWN_VISUALIZATION_DELAY_MS = 3000; // 3 seconds for pre-spawn animation
@@ -209,32 +186,7 @@ public static partial class Module
         Log.Info($"Retrieved bestiary entry for FinalBossPhase2: HP={bestiaryEntry.Value.max_hp}, Speed={bestiaryEntry.Value.speed}, Radius={bestiaryEntry.Value.radius}");
         
         // Find the closest player to target
-        uint closestPlayerId = 0;
-        float closestDistance = float.MaxValue;
-        string targetPlayerName = "unknown";
-        
-        foreach (var player in ctx.Db.player.Iter())
-        {
-            var playerEntityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
-            if (playerEntityOpt != null)
-            {
-                // Calculate distance to boss position
-                var playerEntity = playerEntityOpt.Value;
-                float dx = playerEntity.position.x - position.x;
-                float dy = playerEntity.position.y - position.y;
-                float distanceSquared = dx * dx + dy * dy;
-                
-                // Update closest player if this one is closer
-                if (distanceSquared < closestDistance)
-                {
-                    closestDistance = distanceSquared;
-                    closestPlayerId = player.entity_id;
-                    targetPlayerName = player.name;
-                }
-            }
-        }
-        
-        Log.Info($"Selected target player: {targetPlayerName} (ID: {closestPlayerId}, Distance: {Math.Sqrt(closestDistance)})");
+        uint closestPlayerId = GetClosestPlayer(ctx, position);
         
         // Create the boss monster
         Log.Info($"Creating phase 2 boss monster...");
@@ -245,7 +197,7 @@ public static partial class Module
             max_hp = bestiaryEntry.Value.max_hp,
             atk = bestiaryEntry.Value.atk,
             speed = bestiaryEntry.Value.speed,
-            target_entity_id = closestPlayerId,
+            target_player_id = closestPlayerId,
 
             position = position,
             radius = bestiaryEntry.Value.radius
@@ -271,7 +223,7 @@ public static partial class Module
         ctx.Db.game_state.id.Update(gameState);
         
         // Announce boss phase 2 spawn to players
-        Log.Info($"FINAL BOSS PHASE 2 SPAWNED! (monster: {monsterOpt.Value.monster_id}) targeting player: {targetPlayerName}");
+        Log.Info($"FINAL BOSS PHASE 2 SPAWNED! (monster: {monsterOpt.Value.monster_id})");
     }
     
     // Called when phase 2 boss is defeated - all players defeat the game!
@@ -319,7 +271,6 @@ public static partial class Module
                 
                 // Delete the player (entity will be cleaned up separately)
                 ctx.Db.player.player_id.Delete(player.player_id);
-                ctx.Db.entity.entity_id.Delete(player.entity_id);
             }
         }
         

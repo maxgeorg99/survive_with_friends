@@ -3,6 +3,49 @@ using System;
 
 public static partial class Module
 {    
+    [SpacetimeDB.Table(Name = "player", Public = true)]
+    public partial struct Player
+    {
+        [PrimaryKey, AutoInc]
+        public uint player_id;
+
+        public string name;
+
+        public uint spawn_grace_period_remaining;
+
+        public PlayerClass player_class;
+        public uint level;
+        public uint exp;
+        public uint exp_for_next_level;
+        public float max_hp;
+        public float hp;
+        public uint hp_regen;
+        public float speed;
+        public uint armor; 
+        public uint unspent_upgrades;
+        public uint rerolls;
+
+        // For tap-to-move
+        public DbVector2 waypoint;    // Target position for movement
+        public bool has_waypoint;     // Whether entity has an active waypoint
+
+        // entity attributes
+        public DbVector2 position;  
+        public float radius;   
+    }
+
+    // Table to store dead players for run history purposes
+    [SpacetimeDB.Table(Name = "dead_players", Public = true)]
+    public partial struct DeadPlayer
+    {
+        [PrimaryKey]
+        public uint player_id;
+
+        public string name;
+        
+        public bool is_true_survivor; // Flag to indicate the player defeated the final boss
+    }
+
     [Reducer]
     public static void SetPlayerWaypoint(ReducerContext ctx, float waypointX, float waypointY)
     {
@@ -26,13 +69,6 @@ public static partial class Module
         }
         var player = playerOpt.Value;
         
-        // Find the entity associated with this player
-        var entityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
-        if (entityOpt is null)
-        {
-            throw new Exception($"SetPlayerWaypoint: Player {player_id} (entity_id: {player.entity_id}) has no matching entity!");
-        }
-        
         // Get world size from config for boundary checking
         uint worldSize = 20000; // Default fallback
         var configOpt = ctx.Db.config.id.Find(0);
@@ -42,37 +78,17 @@ public static partial class Module
         }
         
         // Clamp waypoint to world boundaries using entity radius
-        var entity = entityOpt.Value;
         var waypoint = new DbVector2(
-            Math.Clamp(waypointX, entity.radius, worldSize - entity.radius),
-            Math.Clamp(waypointY, entity.radius, worldSize - entity.radius)
+            Math.Clamp(waypointX, player.radius, worldSize - player.radius),
+            Math.Clamp(waypointY, player.radius, worldSize - player.radius)
         );
         
         // Update entity with new waypoint
-        entity.waypoint = waypoint;
-        entity.has_waypoint = true;
-        entity.is_moving = true;
-        
-        // Calculate direction to waypoint
-        var directionVector = new DbVector2(
-            waypoint.x - entity.position.x,
-            waypoint.y - entity.position.y
-        );
-        
-        // Only set direction if we're not at the waypoint
-        if (directionVector.Magnitude() > 0.1f)
-        {
-            entity.direction = directionVector.Normalize();
-        }
-        else
-        {
-            entity.direction = new DbVector2(0, 0);
-            entity.is_moving = false;
-            entity.has_waypoint = false;
-        }
+        player.waypoint = waypoint;
+        player.has_waypoint = true;
         
         // Update the entity in the database
-        ctx.Db.entity.entity_id.Update(entity);
+        ctx.Db.player.player_id.Update(player);
         
         Log.Info($"Set waypoint for player {player.name} to ({waypoint.x}, {waypoint.y})");
     }
@@ -150,10 +166,12 @@ public static partial class Module
         // Process all movable players
         foreach (var player in ctx.Db.player.Iter())
         {
+            var modifiedPlayer = player;
+
             // Update player status
             if(player.spawn_grace_period_remaining > 0)
             {
-                var modifiedPlayer = player;
+                
                 if(modifiedPlayer.spawn_grace_period_remaining >= tick_rate)
                 {
                     modifiedPlayer.spawn_grace_period_remaining -= tick_rate;
@@ -168,21 +186,12 @@ public static partial class Module
             // Process player movement
             float moveSpeed = player.speed;
 
-            var entityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
-
-            if(entityOpt is null)
-            {
-                continue;
-            }
-
-            var entity = entityOpt.Value;
-
-            if (entity.is_moving && entity.has_waypoint)
+            if (player.has_waypoint)
             {
                 // Calculate direction to waypoint
                 var directionVector = new DbVector2(
-                    entity.waypoint.x - entity.position.x,
-                    entity.waypoint.y - entity.position.y
+                    player.waypoint.x - player.position.x,
+                    player.waypoint.y - player.position.y
                 );
                 
                 // Calculate distance to waypoint
@@ -193,10 +202,8 @@ public static partial class Module
                 if (distanceToWaypoint < WAYPOINT_REACHED_DISTANCE)
                 {
                     // Reached waypoint, stop moving
-                    entity.is_moving = false;
-                    entity.has_waypoint = false;
-                    entity.direction = new DbVector2(0, 0);
-                    ctx.Db.entity.entity_id.Update(entity);
+                    modifiedPlayer.has_waypoint = false;
+                    ctx.Db.player.player_id.Update(modifiedPlayer);
                 }
                 else
                 {
@@ -205,33 +212,32 @@ public static partial class Module
                     var moveOffset = directionVector.Normalize() * moveDistance;
                     
                     // Update entity with new position
-                    var updatedEntity = entity;
-                    updatedEntity.position = entity.position + moveOffset;
+                    modifiedPlayer.position = modifiedPlayer.position + moveOffset;
                     
                     // Apply world boundary clamping using entity radius
-                    updatedEntity.position.x = Math.Clamp(
-                        updatedEntity.position.x, 
-                        updatedEntity.radius, 
-                        worldSize - updatedEntity.radius
+                    modifiedPlayer.position.x = Math.Clamp(
+                        modifiedPlayer.position.x, 
+                        modifiedPlayer.radius, 
+                        worldSize - modifiedPlayer.radius
                     );
-                    updatedEntity.position.y = Math.Clamp(
-                        updatedEntity.position.y, 
-                        updatedEntity.radius, 
-                        worldSize - updatedEntity.radius
+                    modifiedPlayer.position.y = Math.Clamp(
+                        modifiedPlayer.position.y, 
+                        modifiedPlayer.radius, 
+                        worldSize - modifiedPlayer.radius
                     );
                     
                     // Update entity in database
-                    ctx.Db.entity.entity_id.Update(updatedEntity);
+                    ctx.Db.player.player_id.Update(modifiedPlayer);
                 }
             }
 
             //Update collision cache
-            KeysPlayer[CachedCountPlayers] = player.player_id;
-            PosXPlayer[CachedCountPlayers] = entity.position.x;
-            PosYPlayer[CachedCountPlayers] = entity.position.y;
-            RadiusPlayer[CachedCountPlayers] = entity.radius;
+            KeysPlayer[CachedCountPlayers] = modifiedPlayer.player_id;
+            PosXPlayer[CachedCountPlayers] = modifiedPlayer.position.x;
+            PosYPlayer[CachedCountPlayers] = modifiedPlayer.position.y;
+            RadiusPlayer[CachedCountPlayers] = modifiedPlayer.radius;
 
-            ushort gridCellKey = GetWorldCellFromPosition(entity.position.x, entity.position.y);
+            ushort gridCellKey = GetWorldCellFromPosition(modifiedPlayer.position.x, modifiedPlayer.position.y);
             NextsPlayer[CachedCountPlayers] = HeadsPlayer[gridCellKey];
             HeadsPlayer[gridCellKey] = CachedCountPlayers;
 

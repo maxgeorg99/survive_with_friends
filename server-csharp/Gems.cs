@@ -353,14 +353,14 @@ public static partial class Module
             var cellKey = GetWorldCellFromPosition(px, py);
 
             int cx =  cellKey & WORLD_CELL_MASK;
-            int cy = (cellKey >> WORLD_CELL_BIT_SHIFT);
+            int cy = cellKey >> WORLD_CELL_BIT_SHIFT;
 
             for (int dy = -1; dy <= +1; ++dy)
             {
                 int ny = cy + dy;
                 if ((uint)ny >= (uint)WORLD_GRID_HEIGHT) continue;   // unsigned trick == clamp
 
-                int rowBase = (ny << WORLD_CELL_BIT_SHIFT);
+                int rowBase = ny << WORLD_CELL_BIT_SHIFT;
                 for (int dx = -1; dx <= +1; ++dx)
                 {
                     int nx = cx + dx;

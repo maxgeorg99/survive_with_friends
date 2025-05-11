@@ -26,7 +26,7 @@ public static partial class Module
         public uint max_hp; // Maximum HP copied from bestiary
         public float atk;
         public float speed;
-        public uint target_entity_id;
+        public uint target_player_id;
 
         // entity attributes
         public DbVector2 position;  
@@ -53,6 +53,33 @@ public static partial class Module
         public MonsterType monster_type;    // The type of monster to spawn
         public uint target_entity_id;       // The player entity ID to target
         public ScheduleAt scheduled_at;     // When the monster will be spawned
+    }
+
+            // Table to track which monsters have been hit by which attacks
+    [SpacetimeDB.Table(Name = "monster_damage", Public = true)]
+    public partial struct MonsterDamage
+    {
+        [PrimaryKey, AutoInc]
+        public uint damage_id;
+        
+        [SpacetimeDB.Index.BTree]
+        public uint monster_id;       // The monster that was hit
+
+        [SpacetimeDB.Index.BTree]
+        public uint attack_entity_id; // The attack entity that hit the monster
+    }
+
+    // Scheduled table for monster hit cleanup
+    [SpacetimeDB.Table(Name = "monster_hit_cleanup", 
+                       Scheduled = nameof(CleanupMonsterHitRecord), 
+                       ScheduledAt = nameof(scheduled_at))]
+    public partial struct MonsterHitCleanup
+    {
+        [PrimaryKey, AutoInc]
+        public ulong scheduled_id;
+        
+        public uint damage_id;        // The damage record to clean up
+        public ScheduleAt scheduled_at; // When to clean up the record
     }
     
     [Reducer]
@@ -113,23 +140,14 @@ public static partial class Module
         var randomSkip = rng.Next(0, (int)playerCount);
         var targetPlayer = ctx.Db.player.Iter().Skip(randomSkip).First();
         
-        // Get the player's entity for position
-        var playerEntityOpt = ctx.Db.entity.entity_id.Find(targetPlayer.entity_id);
-        if (playerEntityOpt == null)
-        {
-            Log.Info($"PreSpawnMonster: Could not find entity for player {targetPlayer.name}");
-            return;
-        }
-        var playerEntity = playerEntityOpt.Value;
-        
         // Calculate spawn position near the player (random direction, within 300-800 pixel radius)
         float spawnRadius = rng.Next(300, 801); // Distance from player
         float spawnAngle = (float)(rng.NextDouble() * Math.PI * 2); // Random angle in radians
         
         // Calculate spawn position
         DbVector2 position = new DbVector2(
-            playerEntity.position.x + spawnRadius * (float)Math.Cos(spawnAngle),
-            playerEntity.position.y + spawnRadius * (float)Math.Sin(spawnAngle)
+            targetPlayer.position.x + spawnRadius * (float)Math.Cos(spawnAngle),
+            targetPlayer.position.y + spawnRadius * (float)Math.Sin(spawnAngle)
         );
         
         // Clamp to world boundaries using monster radius
@@ -145,7 +163,7 @@ public static partial class Module
         {
             position = position,
             monster_type = monsterType,
-            target_entity_id = targetPlayer.entity_id,
+            target_entity_id = targetPlayer.player_id,
             scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(PRE_SPAWN_DELAY_MS))
         });
         
@@ -193,30 +211,7 @@ public static partial class Module
         }
         
         // Find the closest player to target
-        uint closestPlayerId = 0;
-        float closestDistance = float.MaxValue;
-        string targetPlayerName = "unknown";
-        
-        foreach (var player in ctx.Db.player.Iter())
-        {
-            var playerEntityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
-            if (playerEntityOpt != null)
-            {
-                // Calculate distance to this player
-                var playerEntity = playerEntityOpt.Value;
-                float dx = playerEntity.position.x - spawner.position.x;
-                float dy = playerEntity.position.y - spawner.position.y;
-                float distanceSquared = dx * dx + dy * dy;
-                
-                // Update closest player if this one is closer
-                if (distanceSquared < closestDistance)
-                {
-                    closestDistance = distanceSquared;
-                    closestPlayerId = player.entity_id;
-                    targetPlayerName = player.name;
-                }
-            }
-        }
+        uint closestPlayerId = GetClosestPlayer(ctx, spawner.position);
         
         // Create the monster
         Monsters? monsterOpt = ctx.Db.monsters.Insert(new Monsters
@@ -226,7 +221,7 @@ public static partial class Module
             max_hp = bestiaryEntry.Value.max_hp,
             atk = bestiaryEntry.Value.atk,
             speed = bestiaryEntry.Value.speed,
-            target_entity_id = closestPlayerId,
+            target_player_id = closestPlayerId,
 
             position = spawner.position,
             radius = bestiaryEntry.Value.radius
@@ -246,6 +241,29 @@ public static partial class Module
             UpdateBossMonsterID(ctx, monsterOpt.Value.monster_id);
         }
     }
+
+    private static uint GetClosestPlayer(ReducerContext ctx, DbVector2 position)
+    {
+        uint closestPlayerId = 0;
+        float closestDistance = float.MaxValue;
+        
+        foreach (var player in ctx.Db.player.Iter())
+        {
+            // Calculate distance to this player
+            float dx = player.position.x - position.x;
+            float dy = player.position.y - position.y;
+            float distanceSquared = dx * dx + dy * dy;
+            
+            // Update closest player if this one is closer
+            if (distanceSquared < closestDistance)
+            {
+                closestDistance = distanceSquared;
+                closestPlayerId = player.player_id;
+            }
+        }
+
+        return closestPlayerId;
+    }
     
     // Method to schedule monster spawning - called from Init in Lib.cs
     public static void ScheduleMonsterSpawning(ReducerContext ctx)
@@ -264,13 +282,10 @@ public static partial class Module
     private static void ProcessMonsterMovements(ReducerContext ctx)
     {
         //MoveMonsters(ctx);
-        Log.Info("Processing monster movements...");
         MoveMonstersSimple(ctx);
-        Log.Info("Calculating spatial hash grid...");
-        CalculateSpatialHashGrid(ctx);
-        //SolveMonsterRepulsionSpatialHash(ctx);
-        //CalculateSpatialHashGrid(ctx);
-        Log.Info("Committing monster motion...");
+        CalculateMonsterSpatialHashGrid(ctx);
+        SolveMonsterRepulsionSpatialHash(ctx);
+        CalculateMonsterSpatialHashGrid(ctx);
         CommitMonsterMotion(ctx);
     }
 
@@ -292,20 +307,20 @@ public static partial class Module
 
             // Get the target entity
             // TODO: we need to have already cached the target position
-            var targetEntityOpt = ctx.Db.entity.entity_id.Find(monster.target_entity_id);
-            if (targetEntityOpt == null)
+            var targetPlayerOpt = ctx.Db.player.player_id.Find(monster.target_player_id);
+            if (targetPlayerOpt == null)
             {
                 // Target entity no longer exists - find a new target
                 ReassignMonsterTarget(ctx, monster);
             }
             else
-            {
-                var targetEntity = targetEntityOpt.Value;
-                
+            {     
+                var targetPlayer = targetPlayerOpt.Value;
+               
                 // Calculate direction vector from monster to target
                 var directionVector = new DbVector2(
-                    targetEntity.position.x - monster.position.x,
-                    targetEntity.position.y - monster.position.y
+                    targetPlayer.position.x - monster.position.x,
+                    targetPlayer.position.y - monster.position.y
                 );
                 
                 // Calculate distance to target
@@ -356,8 +371,13 @@ public static partial class Module
         }
     }
 
-    private static void CalculateSpatialHashGrid(ReducerContext ctx)
+    private static void CalculateMonsterSpatialHashGrid(ReducerContext ctx)
     {
+        // Reset the spatial hash grid
+        Array.Fill(HeadsMonster, -1);
+        Array.Fill(NextsMonster, -1);
+
+        // Calculate the spatial hash grid
         for(var mid = 0; mid < CachedCountMonsters; mid++)
         {
             ushort gridCellKey = GetWorldCellFromPosition(PosXMonster[mid], PosYMonster[mid]);
@@ -411,7 +431,7 @@ public static partial class Module
         
         // Update the monster with the new target
         var updatedMonster = monster;
-        updatedMonster.target_entity_id = newTarget.entity_id;
+        updatedMonster.target_player_id = newTarget.player_id;
         ctx.Db.monsters.monster_id.Update(updatedMonster);
     }
 
@@ -573,7 +593,7 @@ public static partial class Module
                         float wA = RadiusMonster[iB] / rSum;
                         float wB = rA / rSum;
 
-                        float pushFactor = 1.0f;
+                        float pushFactor = 0.2f;
 
                         PosXMonster[iA] += nxAB * penetration * wA * pushFactor;
                         PosYMonster[iA] += nyAB * penetration * wA * pushFactor;
@@ -586,5 +606,70 @@ public static partial class Module
                 }
             }
         }
+    }
+
+    // Helper function to check if a monster has already been hit by an attack
+    private static bool HasMonsterBeenHitByAttack(ReducerContext ctx, uint monsterId, uint attackEntityId)
+    {
+        // First filter: Use the BTree index to efficiently find all damage records for this attack
+        var attackDamageRecords = ctx.Db.monster_damage.attack_entity_id.Filter(attackEntityId);
+        
+        // Second filter: Check if any of those records match our monster
+        foreach (var damage in attackDamageRecords)
+        {
+            if (damage.monster_id == monsterId)
+            {
+                return true; // Found a record - this monster was hit by this attack
+            }
+        }
+        
+        return false; // No matching record found
+    }
+
+    // Helper function to record a monster being hit by an attack
+    private static void RecordMonsterHitByAttack(ReducerContext ctx, uint monsterId, uint attackEntityId)
+    {
+        // Insert the damage record
+        MonsterDamage? damageRecord = ctx.Db.monster_damage.Insert(new MonsterDamage
+        {
+            monster_id = monsterId,
+            attack_entity_id = attackEntityId
+        });
+        
+        if (damageRecord == null)
+        {
+            Log.Error($"Failed to insert monster damage record for monster {monsterId}, attack {attackEntityId}");
+            return;
+        }
+        
+        // Get cleanup delay from config
+        uint cleanupDelay = 500; // Default to 500ms if config not found
+        var configOpt = ctx.Db.config.id.Find(0);
+        if (configOpt != null)
+        {
+            cleanupDelay = configOpt.Value.monster_hit_cleanup_delay;
+        }
+        
+        // Schedule cleanup after the configured delay
+        ctx.Db.monster_hit_cleanup.Insert(new MonsterHitCleanup
+        {
+            damage_id = damageRecord.Value.damage_id,
+            scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(cleanupDelay))
+        });
+        
+        Log.Info($"Recorded monster {monsterId} hit by attack {attackEntityId}, cleanup scheduled in {cleanupDelay}ms");
+    }
+
+        // Reducer to clean up a monster hit record
+    [Reducer]
+    public static void CleanupMonsterHitRecord(ReducerContext ctx, MonsterHitCleanup cleanup)
+    {
+        if (ctx.Sender != ctx.Identity)
+        {
+            throw new Exception("CleanupMonsterHitRecord may not be invoked by clients, only via scheduling.");
+        }
+        
+        // Delete the damage record
+        ctx.Db.monster_damage.damage_id.Delete(cleanup.damage_id);
     }
 }

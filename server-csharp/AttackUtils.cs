@@ -8,25 +8,8 @@ public static partial class Module
     {
         public static uint GetParameterU(ReducerContext ctx, PlayerScheduledAttack attack)
         {
-            var playerId = attack.player_id;
             var attackType = attack.attack_type;
-            
-            var playerOpt = ctx.Db.player.player_id.Find(playerId);
-            if (playerOpt == null)
-            {
-                throw new Exception($"GetParameterU: Player {playerId} not found");
-            }
 
-            var player = playerOpt.Value;
-
-            var entityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
-            if (entityOpt == null)
-            {
-                throw new Exception($"GetParameterU: Entity {player.entity_id} not found for player {playerId}");
-            }
-
-            var pEntity = entityOpt.Value;
-            
             switch (attackType)
             {
                 case AttackType.Sword:
@@ -71,15 +54,6 @@ public static partial class Module
             }
 
             var player = playerOpt.Value;
-            
-            // Get the entity
-            var entityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
-            if (entityOpt == null)
-            {
-                throw new Exception($"DetermineAttackDirection: Entity {player.entity_id} not found for player {playerId}");
-            }
-
-            var entity = entityOpt.Value;
 
             var attackData = FindAttackDataByType(ctx, attackType);
             if (attackData == null)
@@ -107,25 +81,26 @@ public static partial class Module
                 {
                     // Wands shoot at the nearest enemy
                     // TODO: can we use the spatial hash to speed this up?
-                    Monsters? nearestEnemy = FindNearestEnemy(ctx, entity);
+                    Monsters? nearestEnemy = FindNearestEnemy(ctx, player.position);
                     if (nearestEnemy != null)
                     {
                         var enemyActual = nearestEnemy.Value;
 
                         // Calculate direction vector to the enemy
-                        var dx = enemyActual.position.x - entity.position.x;
-                        var dy = enemyActual.position.y - entity.position.y;
-                        
-                        // Normalize the direction
-                        var length = Math.Sqrt(dx * dx + dy * dy);
-                        if (length > 0)
-                        {
-                            return new DbVector2((float)(dx / length), (float)(dy / length));
-                        }
+                        var dx = enemyActual.position.x - player.position.x;
+                        var dy = enemyActual.position.y - player.position.y;
+                        var dirVector = new DbVector2(dx, dy).Normalize();
+                        return dirVector;
                     }
-                    
-                    // If no enemies or calculation issue, use player's direction
-                    return GetNormalizedDirection(entity.direction);
+                    else
+                    {
+                        //If no target, use player's direction
+                        var waypoint = player.waypoint;
+                        var wdx = waypoint.x - player.position.x;
+                        var wdy = waypoint.y - player.position.y;
+                        var wDirVector = new DbVector2(wdx, wdy).Normalize();
+                        return wDirVector;
+                    }
                 }
                 case AttackType.Knives:
                 {
@@ -149,7 +124,7 @@ public static partial class Module
         }
 
         // Find the nearest enemy to a player entity
-        public static Monsters? FindNearestEnemy(ReducerContext ctx, Entity playerEntity)
+        public static Monsters? FindNearestEnemy(ReducerContext ctx, DbVector2 position)
         {
             Monsters? nearestEnemy = null;
             float nearestDistanceSquared = float.MaxValue;
@@ -159,8 +134,8 @@ public static partial class Module
             foreach (var monster in ctx.Db.monsters.Iter())
             {
                 // Calculate squared distance (more efficient than using square root)
-                var dx = monster.position.x - playerEntity.position.x;
-                var dy = monster.position.y - playerEntity.position.y;
+                var dx = monster.position.x - position.x;
+                var dy = monster.position.y - position.y;
                 var distanceSquared = dx * dx + dy * dy;
 
                 // If this monster is closer than the current nearest, update nearest

@@ -7,85 +7,6 @@ public static partial class Module
 {
     static bool errorFlag = false;
 
-    // Table to track which monsters have been hit by which attacks
-    [SpacetimeDB.Table(Name = "monster_damage", Public = true)]
-    public partial struct MonsterDamage
-    {
-        [PrimaryKey, AutoInc]
-        public uint damage_id;
-        
-        [SpacetimeDB.Index.BTree]
-        public uint monster_id;       // The monster that was hit
-
-        [SpacetimeDB.Index.BTree]
-        public uint attack_entity_id; // The attack entity that hit the monster
-    }
-
-    // Scheduled table for monster hit cleanup
-    [SpacetimeDB.Table(Name = "monster_hit_cleanup", 
-                       Scheduled = nameof(CleanupMonsterHitRecord), 
-                       ScheduledAt = nameof(scheduled_at))]
-    public partial struct MonsterHitCleanup
-    {
-        [PrimaryKey, AutoInc]
-        public ulong scheduled_id;
-        
-        public uint damage_id;        // The damage record to clean up
-        public ScheduleAt scheduled_at; // When to clean up the record
-    }
-
-    // Helper function to check if a monster has already been hit by an attack
-    private static bool HasMonsterBeenHitByAttack(ReducerContext ctx, uint monsterId, uint attackEntityId)
-    {
-        // First filter: Use the BTree index to efficiently find all damage records for this attack
-        var attackDamageRecords = ctx.Db.monster_damage.attack_entity_id.Filter(attackEntityId);
-        
-        // Second filter: Check if any of those records match our monster
-        foreach (var damage in attackDamageRecords)
-        {
-            if (damage.monster_id == monsterId)
-            {
-                return true; // Found a record - this monster was hit by this attack
-            }
-        }
-        
-        return false; // No matching record found
-    }
-
-    // Helper function to record a monster being hit by an attack
-    private static void RecordMonsterHitByAttack(ReducerContext ctx, uint monsterId, uint attackEntityId)
-    {
-        // Insert the damage record
-        MonsterDamage? damageRecord = ctx.Db.monster_damage.Insert(new MonsterDamage
-        {
-            monster_id = monsterId,
-            attack_entity_id = attackEntityId
-        });
-        
-        if (damageRecord == null)
-        {
-            Log.Error($"Failed to insert monster damage record for monster {monsterId}, attack {attackEntityId}");
-            return;
-        }
-        
-        // Get cleanup delay from config
-        uint cleanupDelay = 500; // Default to 500ms if config not found
-        var configOpt = ctx.Db.config.id.Find(0);
-        if (configOpt != null)
-        {
-            cleanupDelay = configOpt.Value.monster_hit_cleanup_delay;
-        }
-        
-        // Schedule cleanup after the configured delay
-        ctx.Db.monster_hit_cleanup.Insert(new MonsterHitCleanup
-        {
-            damage_id = damageRecord.Value.damage_id,
-            scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(cleanupDelay))
-        });
-        
-        Log.Info($"Recorded monster {monsterId} hit by attack {attackEntityId}, cleanup scheduled in {cleanupDelay}ms");
-    }
-
     // Helper function to remove all damage records for a given attack entity
     private static void CleanupAttackDamageRecords(ReducerContext ctx, uint attackEntityId)
     {
@@ -317,10 +238,6 @@ public static partial class Module
 
             //Delete the player from the player table
             ctx.Db.player.player_id.Delete(player_id);
-
-            //Delete the entity from the entity table
-            var entity_id = player.entity_id;
-            ctx.Db.entity.entity_id.Delete(entity_id);
             
             // Check if all players are now dead
             if (ctx.Db.player.Count == 0)
@@ -499,91 +416,13 @@ public static partial class Module
 
         ClearCollisionCacheForFrame();
 
-        Log.Info("Processing player movement...");
         ProcessPlayerMovement(ctx, tick_rate, worldSize);
-        Log.Info("Processing monster movements...");
         ProcessMonsterMovements(ctx);
-        Log.Info("Processing attack movements...");
         ProcessAttackMovements(ctx);
-        Log.Info("Maintaining gems...");
         MaintainGems(ctx);
 
-        Log.Info("Processing player monster collisions...");
         ProcessPlayerMonsterCollisionsSpatialHash(ctx);
-        Log.Info("Processing monster attack collisions...");
         ProcessMonsterAttackCollisionsSpatialHash(ctx);
-        Log.Info("Processing gem collisions...");
         ProcessGemCollisionsSpatialHash(ctx);
-    }
-    
-    // Helper function to check if two entities are colliding using circle-based detection
-    private static bool AreEntitiesColliding(Entity entityA, Entity entityB)
-    {
-        // Get the distance between the two entities
-        float dx = entityA.position.x - entityB.position.x;
-        float dy = entityA.position.y - entityB.position.y;
-        float distanceSquared = dx * dx + dy * dy;
-        
-        // Calculate the minimum distance to avoid collision (sum of both radii)
-        float minDistance = entityA.radius + entityB.radius;
-        float minDistanceSquared = minDistance * minDistance;
-        
-        // If distance squared is less than minimum distance squared, they are colliding
-        return distanceSquared < minDistanceSquared;
-    }
-    
-    // Helper function to calculate the overlap between two entities
-    private static float GetEntitiesOverlap(Entity entityA, Entity entityB)
-    {
-        // Get the distance between the two entities
-        float dx = entityA.position.x - entityB.position.x;
-        float dy = entityA.position.y - entityB.position.y;
-        float distance = MathF.Sqrt(dx * dx + dy * dy);
-        
-        // Calculate the minimum distance to avoid collision (sum of both radii)
-        float minDistance = entityA.radius + entityB.radius;
-        
-        // Calculate overlap (positive value means they are overlapping)
-        return minDistance - distance;
-    }
-    
-    // Helper function to get a repulsion vector based on overlap
-    private static DbVector2 GetRepulsionVector(Entity entityA, Entity entityB, float overlap)
-    {
-        // Direction from B to A (the direction to push A away from B)
-        float dx = entityA.position.x - entityB.position.x;
-        float dy = entityA.position.y - entityB.position.y;
-        
-        // Normalize the direction vector
-        float distance = MathF.Sqrt(dx * dx + dy * dy);
-        
-        // Avoid division by zero
-        if (distance < 0.0001f)
-        {
-            // If entities are exactly at the same position, push in a random direction
-            return new DbVector2(0.707f, 0.707f); // 45-degree angle
-        }
-        
-        float nx = dx / distance;
-        float ny = dy / distance;
-        
-        // Scale the repulsion by the overlap amount
-        // The larger the overlap, the stronger the repulsion
-        float repulsionStrength = overlap * 0.5f; // Adjust this factor as needed
-        
-        return new DbVector2(nx * repulsionStrength, ny * repulsionStrength);
-    }
-
-    // Reducer to clean up a monster hit record
-    [Reducer]
-    public static void CleanupMonsterHitRecord(ReducerContext ctx, MonsterHitCleanup cleanup)
-    {
-        if (ctx.Sender != ctx.Identity)
-        {
-            throw new Exception("CleanupMonsterHitRecord may not be invoked by clients, only via scheduling.");
-        }
-        
-        // Delete the damage record
-        ctx.Db.monster_damage.damage_id.Delete(cleanup.damage_id);
     }
 }

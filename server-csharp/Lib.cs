@@ -123,45 +123,6 @@ public static partial class Module
         public Timestamp last_login;
     }
 
-    [SpacetimeDB.Table(Name = "player", Public = true)]
-    public partial struct Player
-    {
-        [PrimaryKey, AutoInc]
-        public uint player_id;
-
-        [Unique]
-        public uint entity_id;
-
-        public string name;
-
-        public uint spawn_grace_period_remaining;
-
-        // New player attributes
-        public PlayerClass player_class;
-        public uint level;
-        public uint exp;
-        public uint exp_for_next_level;
-        public float max_hp;
-        public float hp;
-        public uint hp_regen;
-        public float speed;
-        public uint armor; 
-        public uint unspent_upgrades;
-        public uint rerolls; // Number of upgrade rerolls available (starting at 999 for testing)
-    }
-
-    // Table to store dead players (same structure as Player)
-    [SpacetimeDB.Table(Name = "dead_players", Public = true)]
-    public partial struct DeadPlayer
-    {
-        [PrimaryKey]
-        public uint player_id;
-
-        public string name;
-        
-        public bool is_true_survivor; // Flag to indicate the player defeated the final boss
-    }
-
     // --- Lifecyle Hooks ---
     [Reducer(ReducerKind.Init)]
     public static void Init(ReducerContext ctx)
@@ -328,7 +289,7 @@ public static partial class Module
         account.current_player_id = newPlayer.player_id;
         ctx.Db.account.identity.Update(account);
 
-        Log.Info($"Created new player record for {identity} with class {playerClass} linked to entity {newPlayer.entity_id}.");
+        Log.Info($"Created new player record for {identity} with class {playerClass}");
         
         // Check if this is the first player - if so, schedule boss spawn
         if (ctx.Db.player.Count == 1)
@@ -398,29 +359,7 @@ public static partial class Module
             startingAttackType = classData.StartingAttackType;
         }
         
-        // Calculate initial experience needed for level 2
         uint initialExpNeeded = CalculateExpForLevel(ctx, 1);
-        
-        // 1. Create the Entity for the player with default direction and not moving
-        Entity? newEntityOpt = ctx.Db.entity.Insert(new Entity
-        {
-            position = position,
-            direction = new DbVector2(0, 0), // Default direction
-            is_moving = false, // Not moving by default
-            radius = 48.0f, // Player collision radius
-            waypoint = new DbVector2(0, 0), // Default waypoint
-            has_waypoint = false // Default waypoint status
-        });
-
-        // Check if entity insertion failed
-        if(newEntityOpt is null)
-        {
-            throw new Exception("Failed to insert new entity for {identity}! Insert returned null.");
-        }
-
-        // Insertion succeeded, get the non-nullable value
-        Entity newEntity = newEntityOpt.Value;
-        Log.Info($"Created new entity with ID: {newEntity.entity_id} for Player {name}.");
 
         var configOpt = ctx.Db.config.id.Find(0);
         uint player_spawn_grace_period = 5000;
@@ -435,7 +374,6 @@ public static partial class Module
         {
             player_id = 0,
             name = name,
-            entity_id = newEntity.entity_id,
             spawn_grace_period_remaining = player_spawn_grace_period,
             player_class = playerClass,
             level = 1,
@@ -447,7 +385,9 @@ public static partial class Module
             speed = speed,
             armor = (uint)armor,
             unspent_upgrades = 0,
-            rerolls = 999
+            rerolls = 999,
+            position = position,
+            radius = 48.0f
         });
 
         // Check if player insertion failed
