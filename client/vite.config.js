@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite';
 import path from 'path';
 
-// Check if we're building for GitHub Pages
-const isGitHubPages = process.env.GITHUB_PAGES === 'true';
+// Check if we're in development mode
+const isDev = process.env.NODE_ENV === 'development';
 
 export default defineConfig({
   server: {
@@ -13,16 +13,17 @@ export default defineConfig({
     assetsDir: 'assets',
     rollupOptions: {
       output: {
-        // Ensure assets are properly hashed for caching
         assetFileNames: 'assets/[name].[hash].[ext]'
       }
     }
   },
-  // Set base URL for GitHub Pages deployment
-  base: '/survive_with_friends/',
+  // Set base URL conditionally
+  base: isDev ? '/' : '/survive_with_friends/',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src')
     }
-  }
+  },
+  // Ensure public directory is properly handled
+  publicDir: 'public'
 });
