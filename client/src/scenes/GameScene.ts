@@ -152,62 +152,62 @@ export default class GameScene extends Phaser.Scene {
     preload() {
         console.log("GameScene preload started.");
         // Load assets from the /assets path (copied from public)
-        this.load.image('class_fighter', '/assets/class_fighter_1.png');
-        this.load.image('class_rogue', '/assets/class_rogue_1.png');
-        this.load.image('class_mage', '/assets/class_mage_1.png');
-        this.load.image('class_paladin', '/assets/class_paladin_1.png');
-        this.load.image('class_football', '/assets/class_football_1.png');
-        this.load.image('class_gambler', '/assets/class_gambler_1.png');
-        this.load.image('class_athlete', '/assets/class_athlete_1.png');
-        this.load.image('class_chef', '/assets/class_chef_1.png');
-        this.load.image(GRASS_ASSET_KEY, '/assets/grass.png');
-        this.load.image(SHADOW_ASSET_KEY, '/assets/shadow.png');
+        this.load.image('class_fighter', 'assets/class_fighter_1.png');
+        this.load.image('class_rogue', 'assets/class_rogue_1.png');
+        this.load.image('class_mage', 'assets/class_mage_1.png');
+        this.load.image('class_paladin', 'assets/class_paladin_1.png');
+        this.load.image('class_football', 'assets/class_football_1.png');
+        this.load.image('class_gambler', 'assets/class_gambler_1.png');
+        this.load.image('class_athlete', 'assets/class_athlete_1.png');
+        this.load.image('class_chef', 'assets/class_chef_1.png');
+        this.load.image(GRASS_ASSET_KEY, 'assets/grass.png');
+        this.load.image(SHADOW_ASSET_KEY, 'assets/shadow.png');
         
         // Load monster assets
-        this.load.image('monster_rat', '/assets/monster_rat.png');
-        this.load.image('monster_slime', '/assets/monster_slime.png');
-        this.load.image('monster_orc', '/assets/monster_orc.png');
-        this.load.image('monster_spawn_indicator', '/assets/monster_spawn_indicator.png');
+        this.load.image('monster_rat', 'assets/monster_rat.png');
+        this.load.image('monster_slime', 'assets/monster_slime.png');
+        this.load.image('monster_orc', 'assets/monster_orc.png');
+        this.load.image('monster_spawn_indicator', 'assets/monster_spawn_indicator.png');
         
         // Load boss monster assets
-        this.load.image('final_boss_jorge_phase_1', '/assets/final_boss_jorge_phase_1.png');
-        this.load.image('final_boss_jorge_phase_2', '/assets/final_boss_jorge_phase_2.png');
-        this.load.image('final_boss_bjorn_phase_1', '/assets/final_boss_phase_björn_1.png');
-        this.load.image('final_boss_bjorn_phase_2', '/assets/final_boss_phase_björn_2.png');
-        this.load.image('final_boss_simon_phase_1', '/assets/final_boss_simon_phase_1.png');
-        this.load.image('final_boss_simon_phase_2', '/assets/final_boss_simon_phase_2.png');
+        this.load.image('final_boss_jorge_phase_1', 'assets/final_boss_jorge_phase_1.png');
+        this.load.image('final_boss_jorge_phase_2', 'assets/final_boss_jorge_phase_2.png');
+        this.load.image('final_boss_bjorn_phase_1', 'assets/final_boss_phase_björn_1.png');
+        this.load.image('final_boss_bjorn_phase_2', 'assets/final_boss_phase_björn_2.png');
+        this.load.image('final_boss_simon_phase_1', 'assets/final_boss_simon_phase_1.png');
+        this.load.image('final_boss_simon_phase_2', 'assets/final_boss_simon_phase_2.png');
         
         // Load attack assets
-        this.load.image('attack_sword', '/assets/attack_sword.png');
-        this.load.image('attack_wand', '/assets/attack_wand.png');
-        this.load.image('attack_knife', '/assets/attack_knife.png');
-        this.load.image('attack_shield', '/assets/attack_shield.png');
-        this.load.image('attack_football', '/assets/attack_football.png');
-        this.load.image('attack_cards', '/assets/attack_cards.png');
-        this.load.image('attack_dumbbell', '/assets/attack_dumbbell.png');
-        this.load.image('attack_garlic', '/assets/attack_garlic.png');
-        this.load.image('attack_boss_jorge', '/assets/attack_boss_jorge.png');
-        this.load.image('attack_boss_bjorn', '/assets/attack_boss_björn.png');
-        this.load.image('attack_boss_simon', '/assets/attack_boss_simon.png');
+        this.load.image('attack_sword', 'assets/attack_sword.png');
+        this.load.image('attack_wand', 'assets/attack_wand.png');
+        this.load.image('attack_knife', 'assets/attack_knife.png');
+        this.load.image('attack_shield', 'assets/attack_shield.png');
+        this.load.image('attack_football', 'assets/attack_football.png');
+        this.load.image('attack_cards', 'assets/attack_cards.png');
+        this.load.image('attack_dumbbell', 'assets/attack_dumbbell.png');
+        this.load.image('attack_garlic', 'assets/attack_garlic.png');
+        this.load.image('attack_boss_jorge', 'assets/attack_boss_jorge.png');
+        this.load.image('attack_boss_bjorn', 'assets/attack_boss_björn.png');
+        this.load.image('attack_boss_simon', 'assets/attack_boss_simon.png');
         
         // Load upgrade assets
-        this.load.image('card_blank', '/assets/card_blank.png');
-        this.load.image('upgrade_maxHP', '/assets/upgrade_maxHP.png');
-        this.load.image('upgrade_regenHP', '/assets/upgrade_regenHP.png');
-        this.load.image('upgrade_speed', '/assets/upgrade_speed.png');
-        this.load.image('upgrade_armor', '/assets/upgrade_armor.png');
+        this.load.image('card_blank', 'assets/card_blank.png');
+        this.load.image('upgrade_maxHP', 'assets/upgrade_maxHP.png');
+        this.load.image('upgrade_regenHP', 'assets/upgrade_regenHP.png');
+        this.load.image('upgrade_speed', 'assets/upgrade_speed.png');
+        this.load.image('upgrade_armor', 'assets/upgrade_armor.png');
         
         // Load gem assets
-        this.load.image('gem_1', '/assets/gem_1.png');
-        this.load.image('gem_2', '/assets/gem_2.png');
-        this.load.image('gem_3', '/assets/gem_3.png');
-        this.load.image('gem_4', '/assets/gem_4.png');
+        this.load.image('gem_1', 'assets/gem_1.png');
+        this.load.image('gem_2', 'assets/gem_2.png');
+        this.load.image('gem_3', 'assets/gem_3.png');
+        this.load.image('gem_4', 'assets/gem_4.png');
         
         // Load a white pixel for particle effects
-        this.load.image('white_pixel', '/assets/white_pixel.png');
+        this.load.image('white_pixel', 'assets/white_pixel.png');
         
         // Load attack boss bolt asset
-        this.load.image('attack_boss_bolt', '/assets/attack_boss_bolt.png');
+        this.load.image('attack_boss_bolt', 'assets/attack_boss_bolt.png');
         
         // Add error handling for file loading errors
         this.load.on('loaderror', (fileObj: any) => {

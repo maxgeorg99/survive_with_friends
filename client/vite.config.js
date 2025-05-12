@@ -13,7 +13,13 @@ export default defineConfig({
     assetsDir: 'assets',
     rollupOptions: {
       output: {
-        assetFileNames: 'assets/[name].[hash].[ext]'
+        assetFileNames: (assetInfo) => {
+          // Keep the original path structure for assets
+          const info = assetInfo.name.split('.');
+          const ext = info.pop();
+          const name = info.join('.');
+          return `${name}.${ext}`;
+        }
       }
     }
   },
@@ -24,6 +30,5 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src')
     }
   },
-  // Ensure public directory is properly handled
   publicDir: 'public'
 });

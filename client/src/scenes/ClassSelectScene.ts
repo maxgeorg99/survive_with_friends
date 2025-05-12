@@ -108,29 +108,29 @@ export default class ClassSelectScene extends Phaser.Scene {
 
     preload() {
         // Load character class icons using the correct filenames
-        this.load.image('fighter_icon', '/assets/class_fighter_1.png');
-        this.load.image('rogue_icon', '/assets/class_rogue_1.png');
-        this.load.image('mage_icon', '/assets/class_mage_1.png');
-        this.load.image('paladin_icon', '/assets/class_paladin_1.png');
+        this.load.image('fighter_icon', 'assets/class_fighter_1.png');
+        this.load.image('rogue_icon', 'assets/class_rogue_1.png');
+        this.load.image('mage_icon', 'assets/class_mage_1.png');
+        this.load.image('paladin_icon', 'assets/class_paladin_1.png');
         // Temporarily use fighter sprite as placeholder for new classes
-        this.load.image('football_icon', '/assets/class_football_1.png');
-        this.load.image('gambler_icon', '/assets/class_gambler_1.png');
-        this.load.image('athlete_icon', '/assets/class_athlete_1.png');
-        this.load.image('gourmand_icon', '/assets/class_chef_1.png');
+        this.load.image('football_icon', 'assets/class_football_1.png');
+        this.load.image('gambler_icon', 'assets/class_gambler_1.png');
+        this.load.image('athlete_icon', 'assets/class_athlete_1.png');
+        this.load.image('gourmand_icon', 'assets/class_chef_1.png');
         
         // Load weapon icons
-        this.load.image('attack_sword', '/assets/attack_sword.png');
-        this.load.image('attack_knife', '/assets/attack_knife.png');
-        this.load.image('attack_wand', '/assets/attack_wand.png');
-        this.load.image('attack_shield', '/assets/attack_shield.png');
+        this.load.image('attack_sword', 'assets/attack_sword.png');
+        this.load.image('attack_knife', 'assets/attack_knife.png');
+        this.load.image('attack_wand', 'assets/attack_wand.png');
+        this.load.image('attack_shield', 'assets/attack_shield.png');
         // Temporarily use sword sprite as placeholder for new weapons
-        this.load.image('attack_football', '/assets/attack_football.png');
-        this.load.image('attack_cards', '/assets/attack_cards.png');
-        this.load.image('attack_dumbbell', '/assets/attack_dumbbell.png');
-        this.load.image('attack_garlic', '/assets/attack_garlic.png');
+        this.load.image('attack_football', 'assets/attack_football.png');
+        this.load.image('attack_cards', 'assets/attack_cards.png');
+        this.load.image('attack_dumbbell', 'assets/attack_dumbbell.png');
+        this.load.image('attack_garlic', 'assets/attack_garlic.png');
         
         // Add quest button image if you have one
-        this.load.image('quest_icon', '/assets/white_pixel.png');
+        this.load.image('quest_icon', 'assets/white_pixel.png');
     }
 
     create() {
@@ -314,7 +314,7 @@ export default class ClassSelectScene extends Phaser.Scene {
                 if (this.textures.exists(iconName)) {
                     const icon = document.createElement('img');
                     icon.id = `${name.toLowerCase()}-icon`;
-                    icon.src = '/assets/' + imageFile;
+                    icon.src = 'assets/' + imageFile;
                     icon.style.width = '50px';
                     icon.style.height = '50px';
                     icon.style.marginRight = '10px';
@@ -423,7 +423,7 @@ export default class ClassSelectScene extends Phaser.Scene {
         
         if (iconElement) {
             const iconFile = isAltVersion ? this.getAltClassIcon(info.altClass) : this.getClassIcon(classType.tag);
-            iconElement.src = `/assets/${iconFile}`;
+            iconElement.src = `assets/${iconFile}`;
         }
         
         if (textElement) {
@@ -462,7 +462,7 @@ export default class ClassSelectScene extends Phaser.Scene {
             <p style="margin: 0 0 15px 0;">${localization.getText(`${currentKey}.description`)}</p>
             <h3 style="margin: 0 0 10px 0; font-size: 18px; color:rgb(183, 204, 46);">Weapon</h3>
             <div style="display: flex; align-items: center; margin-bottom: 15px;">
-                <img src="/assets/${weaponImageFile}" style="height: 45px; width: 45px; margin-right: 10px;" 
+                <img src="assets/${weaponImageFile}" style="height: 45px; width: 45px; margin-right: 10px;" 
                     alt="${localization.getText(`${currentKey}.weapon`)} icon" />
                 <p style="margin: 0 0 0 10px;">
                     ${localization.getText(`${currentKey}.weapon`)}
@@ -489,7 +489,7 @@ export default class ClassSelectScene extends Phaser.Scene {
                 // Immediately update button content
                 if (iconElement) {
                     const newIconFile = newIsAlt ? this.getAltClassIcon(info.altClass) : this.getClassIcon(classType.tag);
-                    iconElement.src = `/assets/${newIconFile}`;
+                    iconElement.src = `assets/${newIconFile}`;
                 }
                 
                 if (textElement) {
@@ -535,7 +535,7 @@ export default class ClassSelectScene extends Phaser.Scene {
                     <p style="margin: 0 0 15px 0;">${localization.getText(`${newCurrentKey}.description`)}</p>
                     <h3 style="margin: 0 0 10px 0; font-size: 18px; color:rgb(183, 204, 46);">Weapon</h3>
                     <div style="display: flex; align-items: center; margin-bottom: 15px;">
-                        <img src="/assets/${newWeaponImageFile}" style="height: 45px; width: 45px; margin-right: 10px;" 
+                        <img src="assets/${newWeaponImageFile}" style="height: 45px; width: 45px; margin-right: 10px;" 
                             alt="${localization.getText(`${newCurrentKey}.weapon`)} icon" />
                         <p style="margin: 0 0 0 10px;">
                             ${localization.getText(`${newCurrentKey}.weapon`)}
@@ -691,7 +691,7 @@ export default class ClassSelectScene extends Phaser.Scene {
         
         if (iconElement) {
             const iconFile = isAltVersion ? this.getAltClassIcon(info.altClass) : this.getClassIcon(classType.tag);
-            iconElement.src = `/assets/${iconFile}`;
+            iconElement.src = `assets/${iconFile}`;
         }
         
         if (textElement) {
