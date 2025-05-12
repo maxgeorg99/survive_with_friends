@@ -541,9 +541,33 @@ export class AttackManager {
                 if (attackGraphicData.direction.length() > 0) {
                     const moveDistance = attackGraphicData.speed * deltaTime;
                     
-                    // For boss attacks, ensure we keep the original direction
-                    if (attackGraphicData.attackType.includes('Boss')) {
-                        // Normalize direction to ensure consistent speed
+                    // Special handling for dumbbell - apply gravity
+                    if (attackGraphicData.attackType === 'Dumbbell') {
+                        const gravity = 200; // Keep existing gravity
+                        // Apply gravity to velocity
+                        attackGraphicData.direction.y += gravity * deltaTime;
+                        
+                        // Move based on current direction (which includes gravity)
+                        attackGraphicData.predictedPosition.x += attackGraphicData.direction.x * deltaTime;
+                        attackGraphicData.predictedPosition.y += attackGraphicData.direction.y * deltaTime;
+
+                        // Keep sprite horizontal with no rotation
+                        if (attackGraphicData.sprite) {
+                            
+                            attackGraphicData.sprite.setScale(1.5); // Keep sprite larger
+                            
+                            // Keep shadow effect
+                            const shadowAlpha = Math.min(0.4, 0.1 + (attackGraphicData.direction.y * 0.0005));
+                            attackGraphicData.graphic.clear();
+                            attackGraphicData.graphic.fillStyle(0x000000, shadowAlpha);
+                            attackGraphicData.graphic.fillCircle(
+                                attackGraphicData.predictedPosition.x,
+                                attackGraphicData.predictedPosition.y + attackGraphicData.radius,
+                                attackGraphicData.radius * 0.5
+                            );
+                        }
+                    } else if (attackGraphicData.attackType.includes('Boss')) {
+                        // Boss attack movement
                         const dir = attackGraphicData.direction.normalize();
                         attackGraphicData.predictedPosition.x += dir.x * moveDistance;
                         attackGraphicData.predictedPosition.y += dir.y * moveDistance;
