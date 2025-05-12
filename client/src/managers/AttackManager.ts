@@ -298,7 +298,7 @@ export class AttackManager {
         } else if (attackType === 'Football') {
             sprite.setScale(0.6); // Slightly larger for the football
         } else if (attackType === 'Garlic') {
-            sprite.setScale(0.8); // Larger for the garlic AoE
+            sprite.setScale(0.1); // Small garlic AoE
         } else {
             sprite.setScale(1.0); // Normal scale for other attacks
         }

@@ -142,9 +142,26 @@ public static partial class Module
                 }
                 case AttackType.Football:
                 {
-                    // Football attacks have a direction based on the player's movement
-                    var playerDirection = GetNormalizedDirection(entity.direction);
-                    return new DbVector2(playerDirection.x, playerDirection.y);
+                    // Football attacks now target the nearest enemy like wands
+                    Entity? nearestEnemy = FindNearestEnemy(ctx, entity);
+                    if (nearestEnemy != null)
+                    {
+                        var enemyActual = nearestEnemy.Value;
+
+                        // Calculate direction vector to the enemy
+                        var dx = enemyActual.position.x - entity.position.x;
+                        var dy = enemyActual.position.y - entity.position.y;
+                        
+                        // Normalize the direction
+                        var length = Math.Sqrt(dx * dx + dy * dy);
+                        if (length > 0)
+                        {
+                            return new DbVector2((float)(dx / length), (float)(dy / length));
+                        }
+                    }
+                    
+                    // If no enemies or calculation issue, use player's direction
+                    return GetNormalizedDirection(entity.direction);
                 }
                 case AttackType.Cards:
                 {
@@ -156,10 +173,11 @@ public static partial class Module
                 }
                 case AttackType.Dumbbell:
                 {
-                    // Dumbbells always fall down, with slight random x offset
+                    // Dumbbells fly up and then drop down
                     var random = ctx.Rng;
-                    var xOffset = (random.NextDouble() - 0.5) * 200; // Random offset between -100 and 100
-                    return new DbVector2((float)xOffset / 200, 1); // Normalized direction vector pointing down with slight x variation
+                    var yOffset = -(random.NextDouble()) * 100; // Negative yOffset for upward motion
+                    var xOffset = (random.NextDouble() - 0.5) * 200; // Random x offset between -100 and 100
+                    return new DbVector2((float)xOffset / 200, (float)yOffset / 100); // Normalized direction vector with upward motion
                 }
                 case AttackType.Garlic:
                 {

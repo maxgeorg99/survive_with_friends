@@ -178,8 +178,8 @@ public static partial class Module
             name = "Football Shot",
             cooldown = 800,          // Slower attack speed
             duration = 2500,         // Stays longer
-            projectiles = 3,         // Burst of 3 footballs
-            fire_delay = 100,        // Small delay between shots
+            projectiles = 1,         // Burst of 3 footballs
+            fire_delay = 200,        // Small delay between shots
             speed = 600,             // Medium speed
             piercing = true,         // Goes through enemies
             radius = 24,             // Medium size
@@ -212,7 +212,7 @@ public static partial class Module
             name = "Dumbbell Drop",
             cooldown = 1200,         // Slow attack speed
             duration = 800,          // Quick impact
-            projectiles = 4,         // Multiple dumbbells
+            projectiles = 1,         
             fire_delay = 200,        // Delay between drops
             speed = 800,             // Fast falling speed
             piercing = true,         // Goes through enemies
@@ -819,7 +819,7 @@ public static partial class Module
                             );
                             
                             // Apply knockback
-                            var knockbackStrength = 50f;
+                            var knockbackStrength = 5f;
                             var knockbackPos = monsterEntity.position + (knockbackDirection * knockbackStrength);
                             
                             // Update monster position with knockback
@@ -875,7 +875,7 @@ public static partial class Module
                         if (distanceSquared <= radiusSum * radiusSum)
                         {
                             // Apply strong knockback in the football's direction
-                            var knockbackStrength = 100f;
+                            var knockbackStrength = 10f;
                             var knockbackPos = monsterEntity.position + (entity.direction * knockbackStrength);
                             
                             // Update monster position with knockback
