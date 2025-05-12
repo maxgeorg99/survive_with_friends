@@ -4,14 +4,14 @@ import { RemoteReducers, SetReducerFlags, RemoteTables, DbConnection, ErrorConte
 import { GameEvents } from './constants/GameEvents';
 
 // Define your SpacetimeDB connection details
-const SPACETIMEDB_DB_NAME = "vibesurvivors";
-const SPACETIMEDB_URI = "ws://localhost:3000"; // Use wss for cloud, corrected order
-const REMOTE_SPACETIMEDB_URI = "wss://maincloud.spacetimedb.com";
-const PROXY_SPACETIMEDB_URI = "ws://localhost:3001";
+const SPACETIMEDB_DB_NAME : string = "vibesurvivors";
+const LOCAL_SPACETIMEDB_URI : string = "ws://localhost:3000"; // Use wss for cloud, corrected order
+const REMOTE_SPACETIMEDB_URI : string = "wss://maincloud.spacetimedb.com";
+const PROXY_SPACETIMEDB_URI : string = "ws://localhost:3001";
 
 const URI_TO_USE = REMOTE_SPACETIMEDB_URI;
 
-const TOKEN_TO_USE = (URI_TO_USE == REMOTE_SPACETIMEDB_URI) ? "space_token" : 'local_token';
+const TOKEN_TO_USE = (URI_TO_USE === REMOTE_SPACETIMEDB_URI) ? "space_token" : 'local_token';
 
 class SpacetimeDBClient {
     // Initialize sdkClient to null, it will be set in handleConnect
