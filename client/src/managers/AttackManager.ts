@@ -292,8 +292,10 @@ export class AttackManager {
         sprite.setOrigin(0.5, 0.5); // Center the sprite's pivot point
         sprite.setAlpha(1); // Make sure sprite is fully visible
         
-        // Set an initial scale based on attack type
-        if (attackType === 'BossJorgeBolt' || attackType === 'BossBjornBolt' || attackType === 'BossSimonBolt') {
+        // Set initial rotation and scale based on attack type
+        if (attackType === 'Dumbbell') {
+            sprite.setScale(1.5);
+        } else if (attackType === 'BossJorgeBolt' || attackType === 'BossBjornBolt' || attackType === 'BossSimonBolt') {
             sprite.setScale(0.4); // Smaller scale for boss bolts
         } else if (attackType === 'Football') {
             sprite.setScale(0.6); // Slightly larger for the football
@@ -342,9 +344,12 @@ export class AttackManager {
         if (sprite) {
             sprite.setPosition(predictedPosition.x, predictedPosition.y);
 
-            // Rotate sprite based on direction and attack type
+            // Handle rotations for different attack types
             if (attackGraphicData.attackType === 'BossSimonBolt') {
                 // Simon's bolts use special spiral rotation handled in update()
+                return;
+            } else if (attackGraphicData.attackType === 'Dumbbell') {
+                // Dumbbell maintains fixed horizontal orientation
                 return;
             } else if (!attackGraphicData.isShield) {
                 // For regular projectiles and boss attacks, rotate based on movement direction
@@ -540,8 +545,6 @@ export class AttackManager {
                     if (attackGraphicData.attackType.includes('Boss')) {
                         // Normalize direction to ensure consistent speed
                         const dir = attackGraphicData.direction.normalize();
-                        
-                        // Move in the normalized direction
                         attackGraphicData.predictedPosition.x += dir.x * moveDistance;
                         attackGraphicData.predictedPosition.y += dir.y * moveDistance;
                     } else {

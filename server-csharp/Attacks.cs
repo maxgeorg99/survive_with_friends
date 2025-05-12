@@ -835,7 +835,18 @@ public static partial class Module
                 // Regular projectile movement based on direction and speed
                 float moveSpeed = attackData.speed;
                 
-                // Calculate movement based on direction, speed and time delta
+                // Special handling for Dumbbell - apply gravity
+                if (activeAttack.attack_type == AttackType.Dumbbell)
+                {
+                    float gravity = 4f; // Even lighter gravity for slower fall
+                    // Apply gravity to the vertical component of direction
+                    entity.direction = new DbVector2(
+                        entity.direction.x,
+                        entity.direction.y + (gravity * DELTA_TIME)
+                    );
+                }
+
+                // Calculate movement based on direction and speed
                 float moveDistance = moveSpeed * DELTA_TIME;
                 var moveOffset = entity.direction * moveDistance;
                 

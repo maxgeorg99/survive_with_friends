@@ -173,11 +173,11 @@ public static partial class Module
                 }
                 case AttackType.Dumbbell:
                 {
-                    // Dumbbells fly up and then drop down
+                    // Dumbbells start with a strong upward motion
                     var random = ctx.Rng;
-                    var yOffset = -(random.NextDouble()) * 100; // Negative yOffset for upward motion
-                    var xOffset = (random.NextDouble() - 0.5) * 200; // Random x offset between -100 and 100
-                    return new DbVector2((float)xOffset / 200, (float)yOffset / 100); // Normalized direction vector with upward motion
+                    var yOffset = -4.0f; // Stronger upward initial velocity
+                    var xOffset = (random.NextDouble() - 0.5) * 1.0f; // Reduced horizontal spread
+                    return new DbVector2((float)xOffset, yOffset).Normalize(); // Normalized direction vector with strong upward motion
                 }
                 case AttackType.Garlic:
                 {
