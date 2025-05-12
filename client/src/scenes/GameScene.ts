@@ -206,9 +206,6 @@ export default class GameScene extends Phaser.Scene {
         // Load a white pixel for particle effects
         this.load.image('white_pixel', 'assets/white_pixel.png');
         
-        // Load attack boss bolt asset
-        this.load.image('attack_boss_bolt', 'assets/attack_boss_bolt.png');
-        
         // Add error handling for file loading errors
         this.load.on('loaderror', (fileObj: any) => {
             console.error(`Error loading asset: ${fileObj.key} (${fileObj.url})`, fileObj);
