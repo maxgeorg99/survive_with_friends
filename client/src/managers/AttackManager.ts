@@ -367,23 +367,46 @@ export class AttackManager {
 
     private createGarlicParticles(x: number, y: number) {
         if (!this.scene) return;
-        
-        // Create particles only occasionally
-        if (Math.random() > 0.1) return;
 
+        // Get attack data to scale particles
+        const attackGraphicData = Array.from(this.attackGraphics.values())
+            .find(data => data.attackType === 'Garlic');
+        
+        if (!attackGraphicData) return;
+        
+        // Create particles less frequently based on radius
+        if (Math.random() > 0.1 * (attackGraphicData.radius / attackGraphicData.baseRadius)) return;
+
+        // Scale particle properties based on attack radius
+        const radiusScale = attackGraphicData.radius / attackGraphicData.baseRadius;
+        const baseScale = 0.3 * radiusScale;
+        const speedScale = Math.min(radiusScale * 30, 100);
+
+        // Create the emission zone
+        const emitCircle = new Phaser.Geom.Circle(0, 0, attackGraphicData.radius * 0.8);
+        
         const particles = this.scene.add.particles(x, y, 'white_pixel', {
-            speed: { min: 20, max: 50 },
+            speed: { min: speedScale * 0.5, max: speedScale },
             angle: { min: 0, max: 360 },
-            scale: { start: 0.5, end: 0 },
-            lifespan: 500,
-            tint: 0xccffcc,
+            scale: { start: baseScale, end: 0 },
+            lifespan: 800,
+            tint: [0xccffcc, 0x99ff99, 0x66ff66], // Multiple green tints for variety
             blendMode: 'ADD',
-            gravityY: -50,
-            quantity: 1
+            gravityY: -20 * radiusScale,
+            quantity: Math.ceil(radiusScale), // More particles for larger radius
+            rotate: { min: -180, max: 180 }, // Random rotation
+            alpha: { start: 0.6, end: 0 },
+            frequency: 50, // Emit every 50ms while active
+            emitZone: { 
+                type: 'random',
+                source: emitCircle,
+                quantity: Math.ceil(radiusScale),
+                stepRate: 50
+            }
         });
 
         // Auto-destroy after animation
-        this.scene.time.delayedCall(500, () => {
+        this.scene.time.delayedCall(800, () => {
             particles.destroy();
         });
     }
