@@ -53,7 +53,7 @@ public static partial class Module
             MaxHp = 120,
             Armor = 2,
             Speed = 200.0f,
-            StartingAttackType = AttackType.Football
+            StartingAttackType = AttackType.Sword
         });
         
         // Marc (Rogue class) - Base class uses knives
