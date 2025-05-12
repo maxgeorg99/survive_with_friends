@@ -8,7 +8,7 @@ export default defineConfig({
   build: {
     outDir: 'dist'
   },
-  base: './', // Ensure assets are loaded correctly
+  base: '/survive_with_friends', // Ensure assets are loaded correctly
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src')
