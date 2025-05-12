@@ -14,7 +14,11 @@ public enum UpgradeType
     AttackSword,
     AttackWand,
     AttackKnives,
-    AttackShield
+    AttackShield,
+    AttackFootball,
+    AttackCards,
+    AttackDumbbell,
+    AttackGarlic
 }
 
 [SpacetimeDB.Type]
@@ -86,11 +90,44 @@ public static partial class Module
             return;
         }
 
+        // Get player's class to filter available upgrades
+        var playerOpt = ctx.Db.player.player_id.Find(playerId);
+        if (playerOpt == null)
+        {
+            throw new Exception($"Cannot draw upgrades - player {playerId} not found");
+        }
+        var player = playerOpt.Value;
+
         // Create a list of all upgrade types
         var allUpgradeTypes = new List<UpgradeType>();
         foreach (UpgradeType type in Enum.GetValues(typeof(UpgradeType)))
         {
-            allUpgradeTypes.Add(type);
+            // Filter alt form weapon upgrades based on player class
+            bool shouldAdd = true;
+            switch (type)
+            {
+                case UpgradeType.AttackFootball:
+                    shouldAdd = player.player_class == PlayerClass.Football;
+                    break;
+                case UpgradeType.AttackCards:
+                    shouldAdd = player.player_class == PlayerClass.Gambler;
+                    break;
+                case UpgradeType.AttackDumbbell:
+                    shouldAdd = player.player_class == PlayerClass.Athlete;
+                    break;
+                case UpgradeType.AttackGarlic:
+                    shouldAdd = player.player_class == PlayerClass.Gourmand;
+                    break;
+                default:
+                    // All other upgrade types are available to everyone
+                    shouldAdd = true;
+                    break;
+            }
+
+            if (shouldAdd)
+            {
+                allUpgradeTypes.Add(type);
+            }
         }
         
         // Shuffle the list randomly
@@ -100,7 +137,7 @@ public static partial class Module
         // Pick the first 3 types
         var selectedTypes = allUpgradeTypes.Take(3).ToList();
         
-        Log.Info($"Selected upgrade types for player {playerId}: {string.Join(", ", selectedTypes)}");
+        Log.Info($"Selected upgrade types for player {playerId} (class {player.player_class}): {string.Join(", ", selectedTypes)}");
         
         // Insert upgrade options into database
         for (uint i = 0; i < selectedTypes.Count; i++)
@@ -135,7 +172,11 @@ public static partial class Module
         bool isAttackUpgrade = upgradeType == UpgradeType.AttackSword || 
                             upgradeType == UpgradeType.AttackWand || 
                             upgradeType == UpgradeType.AttackKnives || 
-                            upgradeType == UpgradeType.AttackShield;
+                            upgradeType == UpgradeType.AttackShield ||
+                            upgradeType == UpgradeType.AttackFootball ||
+                            upgradeType == UpgradeType.AttackCards ||
+                            upgradeType == UpgradeType.AttackDumbbell ||
+                            upgradeType == UpgradeType.AttackGarlic;
 
         // If it's an attack upgrade, check if player already has it
         if (isAttackUpgrade)
@@ -260,6 +301,46 @@ public static partial class Module
                     { AttackStat.Speed, 45 }
                 }, upgradeType);
             }   
+            case UpgradeType.AttackFootball:
+            {
+                // Generate football-specific stat upgrade
+                return GenerateAttackUpgrade(5, random, new Dictionary<AttackStat, uint> {
+                    { AttackStat.Damage, 3 },
+                    { AttackStat.CooldownReduction, 20 },
+                    { AttackStat.Speed, 150 },
+                    { AttackStat.Radius, 5 }
+                }, upgradeType);
+            }
+            case UpgradeType.AttackCards:
+            {
+                // Generate cards-specific stat upgrade
+                return GenerateAttackUpgrade(6, random, new Dictionary<AttackStat, uint> {
+                    { AttackStat.Damage, 2 },
+                    { AttackStat.CooldownReduction, 15 },
+                    { AttackStat.Projectiles, 3 },
+                    { AttackStat.Speed, 120 }
+                }, upgradeType);
+            }
+            case UpgradeType.AttackDumbbell:
+            {
+                // Generate dumbbell-specific stat upgrade
+                return GenerateAttackUpgrade(7, random, new Dictionary<AttackStat, uint> {
+                    { AttackStat.Damage, 4 },
+                    { AttackStat.CooldownReduction, 25 },
+                    { AttackStat.Radius, 6 },
+                    { AttackStat.Speed, 80 }
+                }, upgradeType);
+            }
+            case UpgradeType.AttackGarlic:
+            {
+                // Generate garlic-specific stat upgrade
+                return GenerateAttackUpgrade(8, random, new Dictionary<AttackStat, uint> {
+                    { AttackStat.Damage, 2 },
+                    { AttackStat.CooldownReduction, 20 },
+                    { AttackStat.Radius, 8 },
+                    { AttackStat.Speed, 60 }
+                }, upgradeType);
+            }
             default:
             {
                 throw new Exception("Invalid upgrade type");
@@ -611,6 +692,14 @@ public static partial class Module
                 return AttackType.Knives;
             case UpgradeType.AttackShield:
                 return AttackType.Shield;
+            case UpgradeType.AttackFootball:
+                return AttackType.Football;
+            case UpgradeType.AttackCards:
+                return AttackType.Cards;
+            case UpgradeType.AttackDumbbell:
+                return AttackType.Dumbbell;
+            case UpgradeType.AttackGarlic:
+                return AttackType.Garlic;
             default:
                 throw new Exception($"Cannot convert upgrade type {upgradeType} to attack type");
         }
@@ -674,4 +763,4 @@ public static partial class Module
         // Draw new upgrade options
         DrawUpgradeOptions(ctx, playerId);
     }
-} 
+}
