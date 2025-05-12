@@ -56,7 +56,7 @@ public static partial class Module
             StartingAttackType = AttackType.Football
         });
         
-        // Marc (Rogue class) - Yu-Gi-Oh Player
+        // Marc (Rogue class) - Base class uses knives
         ctx.Db.class_data.Insert(new ClassData 
         {
             ClassId = (uint)PlayerClass.Rogue,
@@ -64,10 +64,10 @@ public static partial class Module
             MaxHp = 90,
             Armor = 0,
             Speed = 220.0f,
-            StartingAttackType = AttackType.Cards
+            StartingAttackType = AttackType.Knives
         });
         
-        // Max (Mage class) - Bodybuilder
+        // Max (Mage class) - Base class uses wand
         ctx.Db.class_data.Insert(new ClassData 
         {
             ClassId = (uint)PlayerClass.Mage,
@@ -75,7 +75,7 @@ public static partial class Module
             MaxHp = 150,
             Armor = 3,
             Speed = 180.0f,
-            StartingAttackType = AttackType.Dumbbell
+            StartingAttackType = AttackType.Wand
         });
         
         // Chris (Paladin class) - Chef

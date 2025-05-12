@@ -1003,8 +1003,59 @@ public static partial class Module
 
             // Regular projectile movement based on direction and speed
             float moveSpeed = attackData.speed;
+
+            // For homing projectiles (Björn's attacks with parameter_u == 1), find nearest player and update direction
+            if (activeBossAttack.attack_type == AttackType.BossBjornBolt && activeBossAttack.parameter_u == 1)
+            {
+                // Find nearest player
+                float nearestDistSq = float.MaxValue;
+                DbVector2? nearestPlayerPos = null;
+
+                foreach (var player in ctx.Db.player.Iter())
+                {
+                    var playerEntityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
+                    if (playerEntityOpt != null)
+                    {
+                        var playerEntity = playerEntityOpt.Value;
+                        float dx = playerEntity.position.x - entity.position.x;
+                        float dy = playerEntity.position.y - entity.position.y;
+                        float distSq = dx * dx + dy * dy;
+                        
+                        if (distSq < nearestDistSq)
+                        {
+                            nearestDistSq = distSq;
+                            nearestPlayerPos = playerEntity.position;
+                        }
+                    }
+                }
+
+                // Update direction if we found a player
+                if (nearestPlayerPos.HasValue)
+                {
+                    float dx = nearestPlayerPos.Value.x - entity.position.x;
+                    float dy = nearestPlayerPos.Value.y - entity.position.y;
+                    float dist = (float)Math.Sqrt(dx * dx + dy * dy);
+                    
+                    if (dist > 0)
+                    {
+                        // Smoothly interpolate towards player
+                        var targetDir = new DbVector2(dx / dist, dy / dist);
+                        entity.direction = new DbVector2(
+                            entity.direction.x * 0.9f + targetDir.x * 0.1f,
+                            entity.direction.y * 0.9f + targetDir.y * 0.1f
+                        );
+                        
+                        // Normalize direction after interpolation
+                        float newLen = (float)Math.Sqrt(entity.direction.x * entity.direction.x + entity.direction.y * entity.direction.y);
+                        if (newLen > 0)
+                        {
+                            entity.direction = new DbVector2(entity.direction.x / newLen, entity.direction.y / newLen);
+                        }
+                    }
+                }
+            }
             
-            // Calculate movement based on direction, speed and time delta
+            // Calculate movement based on direction and speed
             float moveDistance = moveSpeed * DELTA_TIME;
             var moveOffset = entity.direction * moveDistance;
 
@@ -1031,11 +1082,30 @@ public static partial class Module
                 worldSize - updatedEntity.radius
             );
             
-            // Update entity position
-            ctx.Db.entity.entity_id.Update(updatedEntity);
+            // Check if projectile hit world boundary
+            bool hitBoundary = 
+                updatedEntity.position.x <= updatedEntity.radius ||
+                updatedEntity.position.x >= worldSize - updatedEntity.radius ||
+                updatedEntity.position.y <= updatedEntity.radius ||
+                updatedEntity.position.y >= worldSize - updatedEntity.radius;
 
-            activeBossAttack.ticks_elapsed += 1; 
-            ctx.Db.active_boss_attacks.active_boss_attack_id.Update(activeBossAttack);
+            if (hitBoundary)
+            {
+                // Delete the attack entity and active attack record
+                ctx.Db.entity.entity_id.Delete(entity.entity_id);
+                ctx.Db.active_boss_attacks.active_boss_attack_id.Delete(activeBossAttack.active_boss_attack_id);
+                
+                // Clean up any damage records
+                CleanupAttackDamageRecords(ctx, entity.entity_id);
+            }
+            else 
+            {
+                // Update entity position
+                ctx.Db.entity.entity_id.Update(updatedEntity);
+
+                activeBossAttack.ticks_elapsed += 1; 
+                ctx.Db.active_boss_attacks.active_boss_attack_id.Update(activeBossAttack);
+            }
         }
     }
 }

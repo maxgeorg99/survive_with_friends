@@ -341,6 +341,27 @@ export class AttackManager {
         graphic.setPosition(predictedPosition.x, predictedPosition.y);
         if (sprite) {
             sprite.setPosition(predictedPosition.x, predictedPosition.y);
+
+            // Rotate sprite based on direction and attack type
+            if (attackGraphicData.attackType === 'BossSimonBolt') {
+                // Simon's bolts use special spiral rotation handled in update()
+                return;
+            } else if (!attackGraphicData.isShield) {
+                // For regular projectiles and boss attacks, rotate based on movement direction
+                if (direction.length() > 0) {
+                    const angle = Math.atan2(direction.y, direction.x);
+                    sprite.setRotation(angle);
+                }
+            } else {
+                // For shields, rotate based on orbital position around player
+                const playerPos = this.getPlayerPosition(attackGraphicData.playerId || 0);
+                if (playerPos) {
+                    const dx = predictedPosition.x - playerPos.x;
+                    const dy = predictedPosition.y - playerPos.y;
+                    const angle = Math.atan2(dy, dx);
+                    sprite.setRotation(angle);
+                }
+            }
         }
     }
 
