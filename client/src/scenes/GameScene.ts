@@ -106,6 +106,7 @@ export default class GameScene extends Phaser.Scene {
         container: Phaser.GameObjects.Container;
         background: Phaser.GameObjects.Rectangle;
         playerDot: Phaser.GameObjects.Arc;
+        otherPlayerDots: Map<number, Phaser.GameObjects.Arc>;
         border: Phaser.GameObjects.Rectangle;
     } | null = null;
     
@@ -1669,15 +1670,18 @@ export default class GameScene extends Phaser.Scene {
         }
     }
 
-    removeOtherPlayer(playerId: number) {
+    // Clean up a player's dot when they disconnect
+    private removeOtherPlayer(playerId: number) {
         const container = this.otherPlayers.get(playerId);
         if (container) {
-            // Stop any active tweens
-            const graceTween = container.getData('graceTween');
-            if (graceTween) {
-                graceTween.stop();
+            // Delete the minimap dot if it exists
+            const dot = this.minimap?.otherPlayerDots.get(playerId);
+            if (dot) {
+                dot.destroy();
+                this.minimap?.otherPlayerDots.delete(playerId);
             }
             
+            // Rest of existing removal code...
             container.destroy();
             this.otherPlayers.delete(playerId);
         }
@@ -1938,7 +1942,7 @@ export default class GameScene extends Phaser.Scene {
         this.updateMinimap();
     }
     
-    // Update the minimap with player's position
+    // Update the minimap with all players' positions
     private updateMinimap() {
         if (!this.minimap || !this.localPlayerSprite) return;
         
@@ -1946,13 +1950,37 @@ export default class GameScene extends Phaser.Scene {
         const worldBounds = this.physics.world.bounds;
         const minimapSize = this.minimap.background.width;
         
-        // Calculate position ratio (player position relative to world size)
+        // Update local player dot
         const ratioX = this.localPlayerSprite.x / worldBounds.width;
         const ratioY = this.localPlayerSprite.y / worldBounds.height;
-        
-        // Position player dot on minimap based on world position
         this.minimap.playerDot.x = ratioX * minimapSize;
         this.minimap.playerDot.y = ratioY * minimapSize;
+
+        // Update other player dots
+        this.otherPlayers.forEach((container, playerId) => {
+            let dot = this.minimap?.otherPlayerDots.get(playerId);
+            
+            // Create dot if it doesn't exist
+            if (!dot && this.minimap) {
+                dot = this.add.circle(
+                    0,
+                    0,
+                    5, // Same size as local player dot
+                    0x00ff00, // green for other players
+                    1
+                );
+                this.minimap.container.add(dot);
+                this.minimap.otherPlayerDots.set(playerId, dot);
+            }
+            
+            // Update dot position if it exists
+            if (dot) {
+                const otherRatioX = container.x / worldBounds.width;
+                const otherRatioY = container.y / worldBounds.height;
+                dot.x = otherRatioX * minimapSize;
+                dot.y = otherRatioY * minimapSize;
+            }
+        });
     }
 
     // Force a synchronization of player entities
@@ -2658,12 +2686,12 @@ export default class GameScene extends Phaser.Scene {
         ).setOrigin(0);
         border.setStrokeStyle(BORDER_SIZE, 0xFFFFFF, 0.5);
         
-        // Create player dot (will be positioned in update)
+        // Create local player dot (will be positioned in update)
         const playerDot = this.add.circle(
             0,
             0,
             PLAYER_DOT_SIZE,
-            0xFFFFFF,
+            0x0000ff, // blue for local player
             1
         );
         
@@ -2681,6 +2709,7 @@ export default class GameScene extends Phaser.Scene {
             container,
             background,
             playerDot,
+            otherPlayerDots: new Map(),
             border
         };
         
