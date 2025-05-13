@@ -564,9 +564,11 @@ public static partial class Module
         ProcessPlayerMovement(ctx, tick_rate, worldSize);
         ProcessMonsterMovements(ctx);
         ProcessAttackMovements(ctx, worldSize);
+        ProcessBossAttackMovements(ctx, worldSize); // Added this line
 
         ProcessPlayerMonsterCollisions(ctx);
         ProcessMonsterAttackCollisions(ctx);
+        ProcessPlayerBossAttackCollisions(ctx); // Added this line
         ProcessGemCollisions(ctx);
     }
 
@@ -707,6 +709,75 @@ public static partial class Module
         }
     }
     
+    // Helper method to process collisions between boss attacks and players
+    private static void ProcessPlayerBossAttackCollisions(ReducerContext ctx)
+    {
+        // Check each active boss attack for collisions with players
+        foreach (var activeBossAttack in ctx.Db.active_boss_attacks.Iter())
+        {
+            // Get the boss attack entity
+            var attackEntityOpt = ctx.Db.entity.entity_id.Find(activeBossAttack.entity_id);
+            if (attackEntityOpt is null)
+            {
+                continue; // Skip if entity not found
+            }
+            var attackEntity = attackEntityOpt.Value;
+            
+            bool attackHitPlayer = false;
+            
+            // Check for collisions with players
+            foreach (var player in ctx.Db.player.Iter())
+            {
+                var playerEntityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
+                if (playerEntityOpt == null)
+                {
+                    continue; // Skip if player has no entity
+                }
+                Entity playerEntity = playerEntityOpt.Value;
+                
+                // Check if the attack is colliding with this player
+                if (AreEntitiesColliding(attackEntity, playerEntity))
+                {
+                    // Apply damage to player using the active boss attack's damage value
+                    bool playerKilled = DamagePlayer(ctx, player.player_id, activeBossAttack.damage);
+                    attackHitPlayer = true;
+                    
+                    Log.Info($"Boss attack {activeBossAttack.active_boss_attack_id} (type: {activeBossAttack.attack_type}) hit player {player.name} (ID: {player.player_id}) for {activeBossAttack.damage} damage.");
+
+                    // For non-piercing attacks, stop checking other players and destroy the attack
+                    if (!activeBossAttack.piercing)
+                    {
+                        break; 
+                    }
+                }
+            }
+            
+            // If the attack hit a player and it's not piercing, remove the attack
+            if (attackHitPlayer && !activeBossAttack.piercing)
+            {
+                // Delete the attack entity
+                ctx.Db.entity.entity_id.Delete(attackEntity.entity_id);
+                
+                // Delete the active boss attack record
+                // Also need to find the corresponding cleanup job and delete it.
+                ActiveBossAttackCleanup? cleanupToDelete = null;
+                foreach (var cleanupEntry in ctx.Db.active_boss_attack_cleanup.active_boss_attack_id.Filter(activeBossAttack.active_boss_attack_id))
+                {
+                    cleanupToDelete = cleanupEntry;
+                    break; // Assuming one cleanup per attack ID
+                }
+
+                if (cleanupToDelete != null) {
+                    ctx.Db.active_boss_attack_cleanup.scheduled_id.Delete(cleanupToDelete.Value.scheduled_id);
+                }
+                ctx.Db.active_boss_attacks.active_boss_attack_id.Delete(activeBossAttack.active_boss_attack_id);
+                
+                // Clean up any damage records for this attack (if we were tracking boss attack damage - currently not)
+                // CleanupAttackDamageRecords(ctx, attackEntity.entity_id); // This function is for player attacks on monsters
+            }
+        }
+    }
+
     // Helper method to process collisions between players and monsters and apply damage
     private static void ProcessPlayerMonsterCollisions(ReducerContext ctx)
     {        

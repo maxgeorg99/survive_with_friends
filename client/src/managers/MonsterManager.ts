@@ -17,6 +17,7 @@ const BASE_DEPTH = 1000; // Base depth to ensure all sprites are above backgroun
 const SHADOW_DEPTH_OFFSET = -1; // Always behind the sprite
 const HEALTH_BG_DEPTH_OFFSET = 1; // Just behind health bar
 const HEALTH_BAR_DEPTH_OFFSET = 1.1; // In front of background
+const BUFF_EFFECT_DEPTH_OFFSET = 0.5; // Between sprite and health bar
 
 export default class MonsterManager {
     // Reference to the scene
@@ -123,6 +124,7 @@ export default class MonsterManager {
                 
                 // Remove from pending after updating
                 this.pendingMonsters.delete(entityData.entityId);
+                this.applySimonBuffEffect(pendingMonster); // Apply buff effect
                 return true;
             } else {
                 // Create the monster with the entity position
@@ -130,6 +132,7 @@ export default class MonsterManager {
                 this.pendingMonsters.delete(entityData.entityId);
                 // Create the monster with the entity data
                 this.createMonsterSprite(pendingMonster, entityData.position);
+                this.applySimonBuffEffect(pendingMonster); // Apply buff effect
                 return true;
             }
         }
@@ -145,7 +148,7 @@ export default class MonsterManager {
                 // Cancel any existing tween to prevent overlapping animations
                 this.scene.tweens.killTweensOf(monsterContainer);
                 
-                const monsterType = monster.bestiaryId.tag;
+                const monsterType = this.getMonsterTypeName(monster.bestiaryId);
                 
                 // Store target position for lerping in update
                 monsterContainer.setData('targetX', entityData.position.x);
@@ -159,43 +162,23 @@ export default class MonsterManager {
                 const distSquared = Math.pow(monsterContainer.x - entityData.position.x, 2) + 
                                    Math.pow(monsterContainer.y - entityData.position.y, 2);
                 
-                if (distSquared > 10000) { // More than 100 units away, teleport
+                if (distSquared > 10000) { // If distance squared is greater than 100^2 (100 pixels)
+                    // Teleport directly
                     monsterContainer.x = entityData.position.x;
                     monsterContainer.y = entityData.position.y;
                 } else if (isMoving) {
-                    // Server tick rate is 50ms
-                    // Use a tween that finishes just before the next server update for smoothest motion
-                    // (49ms tween for a 50ms server tick)
+                    // Tween to new position if moving
                     this.scene.tweens.add({
                         targets: monsterContainer,
                         x: entityData.position.x,
                         y: entityData.position.y,
-                        duration: 49, // Just under the server tick rate of 50ms
-                        ease: 'Linear',
-                        onUpdate: () => {
-                            // Update depth on each tween update
-                            monsterContainer.setDepth(BASE_DEPTH + monsterContainer.y);
-                        }
+                        duration: 100, // Duration of the tween in ms
+                        ease: 'Linear'
                     });
-                    
-                    // Debug log the monster type and movement details for diagnosis
-                    const moveDistance = Math.sqrt(
-                        Math.pow(entityData.position.x - monsterContainer.x, 2) + 
-                        Math.pow(entityData.position.y - monsterContainer.y, 2)
-                    );
-                    
                 } else {
-                    // For non-moving monsters, use a shorter tween duration
-                    this.scene.tweens.add({
-                        targets: monsterContainer,
-                        x: entityData.position.x,
-                        y: entityData.position.y,
-                        duration: 40, // Even faster tween for stopped monsters
-                        ease: 'Power1',
-                        onUpdate: () => {
-                            monsterContainer.setDepth(BASE_DEPTH + monsterContainer.y);
-                        }
-                    });
+                    // If not moving, set position directly (snap to position)
+                    monsterContainer.x = entityData.position.x;
+                    monsterContainer.y = entityData.position.y;
                 }
                 
                 // Store the movement state and monster type
@@ -205,11 +188,12 @@ export default class MonsterManager {
                     x: entityData.direction.x,
                     y: entityData.direction.y
                 });
-                
+                this.applySimonBuffEffect(monster); // Apply buff effect
                 return true;
             } else {
                 // If container doesn't exist yet, try to create it
                 this.createMonsterSprite(monster, entityData.position);
+                this.applySimonBuffEffect(monster); // Apply buff effect
                 return true;
             }
         }
@@ -220,32 +204,10 @@ export default class MonsterManager {
             // Iterate through monsters to find one with this entityId
             for (const iterMonster of ctx.db?.monsters.iter() || []) {
                 if (iterMonster.entityId === entityData.entityId) {
-                    // Update the monster
-                    const monsterContainer = this.monsters.get(iterMonster.monsterId);
-                    if (monsterContainer) {
-                        // Update position
-                        monsterContainer.setData('targetX', entityData.position.x);
-                        monsterContainer.setData('targetY', entityData.position.y);
-                        monsterContainer.setData('lastUpdateTime', Date.now());
-                        
-                        // Use tween for smooth movement
-                        this.scene.tweens.add({
-                            targets: monsterContainer,
-                            x: entityData.position.x,
-                            y: entityData.position.y,
-                            duration: 49,
-                            ease: 'Linear',
-                            onUpdate: () => {
-                                monsterContainer.setDepth(BASE_DEPTH + monsterContainer.y);
-                            }
-                        });
-                        
-                        return true;
-                    } else {
-                        // Create the monster container
-                        this.createMonsterSprite(iterMonster, entityData.position);
-                        return true;
-                    }
+                    // Found a match, call createOrUpdateMonster to handle it
+                    this.createOrUpdateMonster(iterMonster);
+                    // this.applySimonBuffEffect(iterMonster); // applySimonBuffEffect will be called by createOrUpdateMonster
+                    return true; // Exit after handling
                 }
             }
         }
@@ -274,42 +236,35 @@ export default class MonsterManager {
         }
         
         // First check if we already have this monster with a valid position
-        const existingMonster = this.monsters.get(monsterData.monsterId);
-        if (existingMonster && (existingMonster.x !== 0 || existingMonster.y !== 0)) {
+        const existingMonsterContainer = this.monsters.get(monsterData.monsterId);
+        if (existingMonsterContainer && (existingMonsterContainer.x !== 0 || existingMonsterContainer.y !== 0)) {
             
             // Get current HP to compare
-            const currentHp = existingMonster.getData('currentHP') || monsterData.maxHp;
+            const currentHp = existingMonsterContainer.getData('currentHP') || monsterData.maxHp;
             
             // Show damage effect if HP decreased
             if (monsterData.hp < currentHp) {
-                const sprite = existingMonster.getByName('sprite') as Phaser.GameObjects.Sprite;
+                const sprite = existingMonsterContainer.getByName('sprite') as Phaser.GameObjects.Sprite;
                 if (sprite) {
-                    createMonsterDamageEffect(sprite);
+                    // Flash red effect
+                    sprite.setTintFill(0xff0000); // Red tint
+                    this.scene.time.delayedCall(100, () => {
+                        sprite.clearTint(); // Remove tint after 100ms
+                    });
                 }
             }
             
             // Just update health and other properties, but keep the position
-            const children = existingMonster.getAll();
-            for (const child of children) {
-                if (child.name === 'healthBar') {
-                    const healthBar = child as Phaser.GameObjects.Rectangle;
-                    // Use the server-provided max_hp instead of local constants
-                    const maxHP = monsterData.maxHp;
-                    
-                    // Update health bar width based on current HP percentage
-                    const healthPercent = monsterData.hp / maxHP;
-                    healthBar.width = MONSTER_HEALTH_BAR_WIDTH * healthPercent;
-                    
-                    // Update health bar color based on percentage
-                    healthBar.fillColor = this.getHealthBarColor(healthPercent);
-                    
-                    // Update HP data in container
-                    existingMonster.setData('currentHP', monsterData.hp);
-                    existingMonster.setData('maxHP', maxHP);
-                    break;
-                }
+            const healthBar = existingMonsterContainer.getByName('healthBar') as Phaser.GameObjects.Rectangle;
+            if (healthBar) {
+                const healthPercent = monsterData.hp / monsterData.maxHp;
+                // Update the width of the rectangle - no need to call clear() on a Rectangle
+                healthBar.width = MONSTER_HEALTH_BAR_WIDTH * healthPercent;
+                // Update the fill color
+                healthBar.fillColor = this.getHealthBarColor(healthPercent);
             }
-            
+            existingMonsterContainer.setData('currentHP', monsterData.hp);
+            this.applySimonBuffEffect(monsterData); // Apply buff effect
             return;
         }
         
@@ -320,6 +275,7 @@ export default class MonsterManager {
         if (entityData) {
             // We have entity data, so create the sprite at the correct position
             this.createMonsterSprite(monsterData, entityData.position);
+            this.applySimonBuffEffect(monsterData); // Apply buff effect
         } else {
             // No entity data yet, store monster as pending
             
@@ -327,64 +283,71 @@ export default class MonsterManager {
             let existingContainer = this.monsters.get(monsterData.monsterId);
             if (!existingContainer) {
                 // No sprite yet, create a temporary one at origin for now
+                // This helps ensure the container exists if monsterData arrives before entityData
                 this.createMonsterSprite(monsterData, { x: 0, y: 0 });
             }
             
             // Store monster data for later when we get entity data
             this.pendingMonsters.set(monsterData.entityId, monsterData);
+            // Buff effect will be applied in handleEntityUpdate when entity arrives
+        }
+    }
+    
+    // Helper function to apply Simon's buff effect
+    private applySimonBuffEffect(monsterData: Monsters) {
+        const monsterContainer = this.monsters.get(monsterData.monsterId);
+        if (!monsterContainer) {
+            return;
         }
 
         const monsterType = this.getMonsterTypeName(monsterData.bestiaryId);
         if (isSimonType(monsterType)) {
-            // Check for buff: if speed or damage is above base, show effect
-            // (Assume base speed = 120 for phase 1, 150 for phase 2, base atk = 25/40)
             const baseSpeed = monsterType === "FinalBossSimonPhase1" ? 120 : 150;
             const baseAtk = monsterType === "FinalBossSimonPhase1" ? 25 : 40;
-            const isBuffed = (monsterData as any).speed > baseSpeed || (monsterData as any).atk > baseAtk;
-            const container = this.monsters.get(monsterData.monsterId);
-            if (container) {
-                // Remove any existing buff effects
-                const existing = container.getByName('simonBuffEffect');
-                if (existing) existing.destroy();
-                if (isBuffed) {
-                    // Create multiple buff sprites in a circular pattern
-                    const numSprites = 4; // Number of sprites to show
-                    const radius = 30; // Radius of the circle
-                    
-                    for (let i = 0; i < numSprites; i++) {
-                        const angle = (i / numSprites) * Math.PI * 2;
-                        const x = Math.cos(angle) * radius;
-                        const y = Math.sin(angle) * radius;
-                        
-                        const buffSprite = this.scene.add.sprite(x, y, 'attack_boss_simon');
-                        buffSprite.setAlpha(0.7);
-                        buffSprite.setScale(1.5);
-                        buffSprite.setDepth(2); // Above boss
-                        buffSprite.name = 'simonBuffEffect';
-                        container.add(buffSprite);
-                        
-                        // Animate each sprite with a slight delay
-                        this.scene.tweens.add({
-                            targets: buffSprite,
-                            alpha: 0,
-                            duration: 2000,
-                            delay: i * 200, // Stagger the animations
-                            onComplete: () => buffSprite.destroy()
-                        });
-                        
-                        // Add rotation animation
-                        this.scene.tweens.add({
-                            targets: buffSprite,
-                            angle: 360,
-                            duration: 2000,
-                            ease: 'Linear'
-                        });
+            
+            // MonsterData from the server already contains buffed stats
+            const isBuffed = monsterData.speed > baseSpeed || monsterData.atk > baseAtk;
+
+            // First remove any existing buff sprite
+            const existingSprite = monsterContainer.getByName('simonBuffEffect');
+            if (existingSprite) {
+                existingSprite.destroy();
+            }
+
+            // Also clean up any existing tweens
+            this.scene.tweens.killTweensOf(monsterContainer.getData('simonBuffTween'));
+
+            if (isBuffed) {
+                // Create a single buff sprite above the boss
+                const buffSprite = this.scene.add.sprite(0, -50, 'attack_boss_simon');
+                buffSprite.setOrigin(0.5, 0.5);
+                buffSprite.setScale(0.7);
+                buffSprite.setAlpha(0.9);
+                buffSprite.setName('simonBuffEffect');
+                monsterContainer.add(buffSprite);
+                
+                // Store reference for later cleanup
+                monsterContainer.setData('simonBuffTween', buffSprite);
+                
+                // Simple pulse animation
+                this.scene.tweens.add({
+                    targets: buffSprite,
+                    scale: 0.9,
+                    duration: 500,
+                    yoyo: true,
+                    repeat: 3,
+                    ease: 'Sine.easeInOut',
+                    onComplete: () => {
+                        // Automatically remove after the animation completes
+                        if (buffSprite) {
+                            buffSprite.destroy();
+                        }
                     }
-                }
+                });
             }
         }
     }
-    
+
     // Helper function to create monster sprite at a given position
     createMonsterSprite(monsterData: Monsters, position: { x: number, y: number }) {
         // Get monster type from bestiaryId
@@ -950,4 +913,4 @@ function isBossType(monsterType: string): boolean {
 
 function isSimonType(monsterType: string): boolean {
     return ["FinalBossSimonPhase1", "FinalBossSimonPhase2"].includes(monsterType);
-} 
+}

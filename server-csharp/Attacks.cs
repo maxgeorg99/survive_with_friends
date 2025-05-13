@@ -305,13 +305,32 @@ public static partial class Module
             damage = 4,             
             armor_piercing = 10       
         });
+
+        // Boss Standard Bolt - for Simon's spread attack
+        // Assumes AttackType.BossBolt is defined in the AttackType enum
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 5, // Using an available ID
+            attack_type = AttackType.BossBolt, 
+            name = "Boss Standard Bolt",
+            cooldown = 10000,      // Example cooldown for Simon's attack sequence
+            duration = 1000,      // How long each bolt lasts
+            projectiles = 1,      // This AttackData defines a single bolt
+            fire_delay = 0,       
+            speed = 850,          // Speed of the bolt
+            piercing = false,
+            radius = 10,          // Radius of the bolt
+            damage = 0,           // Damage per bolt
+            armor_piercing = 3
+        });
+
         // Boss Jorge Bolt - unique projectile for Jorge
         ctx.Db.attack_data.Insert(new AttackData
         {
             attack_id = 6,
             attack_type = AttackType.BossJorgeBolt,
             name = "Jorge Bolt",
-            cooldown = 1200,           // Faster fire rate
+            cooldown = 1000,           // Faster fire rate
             duration = 2000,           // Flies longer
             projectiles = 1,
             fire_delay = 0,
@@ -435,6 +454,166 @@ public static partial class Module
         {
             active_attack_id = activeAttack.active_attack_id,
             scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(duration))
+        });
+    }
+
+    // Helper method to find the nearest player position
+    private static DbVector2? FindNearestPlayerPosition(ReducerContext ctx, DbVector2 fromPosition)
+    {
+        float nearestDistSq = float.MaxValue;
+        DbVector2? nearestPlayerPos = null;
+
+        foreach (var player in ctx.Db.player.Iter())
+        {
+            var playerEntityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
+            if (playerEntityOpt != null)
+            {
+                var playerEntity = playerEntityOpt.Value;
+                float dx = playerEntity.position.x - fromPosition.x;
+                float dy = playerEntity.position.y - fromPosition.y;
+                float distSq = dx * dx + dy * dy;
+                
+                if (distSq < nearestDistSq)
+                {
+                    nearestDistSq = distSq;
+                    nearestPlayerPos = playerEntity.position;
+                }
+            }
+        }
+
+        return nearestPlayerPos;
+    }
+
+    // Helper method to calculate direction vector toward a target
+    private static DbVector2 CalculateDirectionTowardTarget(DbVector2 fromPosition, DbVector2? targetPosition)
+    {
+        if (!targetPosition.HasValue)
+        {
+            return new DbVector2(1, 0); // Default direction if no target
+        }
+
+        float dx = targetPosition.Value.x - fromPosition.x;
+        float dy = targetPosition.Value.y - fromPosition.y;
+        float length = (float)Math.Sqrt(dx * dx + dy * dy);
+        
+        if (length > 0)
+        {
+            return new DbVector2(dx / length, dy / length);
+        }
+        return new DbVector2(1, 0); // Default direction if same position
+    }
+
+    // Boss attack trigger method - similar to TriggerAttackProjectile but for bosses
+    private static void TriggerBossAttackProjectile(ReducerContext ctx, uint bossId, AttackType attackType, uint idWithinBurst = 0, uint parameterU = 0, int parameterI = 0)
+    {
+        // Get attack data
+        var attackDataOpt = FindAttackDataByType(ctx, attackType);
+        if (attackDataOpt == null)
+        {
+            Log.Error($"Attack data not found for type {attackType}");
+            return;
+        }
+
+        var attackData = attackDataOpt.Value;
+        
+        // Get boss monster data
+        var bossOpt = ctx.Db.monsters.monster_id.Find(bossId);
+        if (bossOpt == null)
+        {
+            Log.Error($"Boss {bossId} not found");
+            return;
+        }
+        
+        var boss = bossOpt.Value;
+        
+        // Get boss's entity data to determine position
+        var entityOpt = ctx.Db.entity.entity_id.Find(boss.entity_id);
+        if (entityOpt == null)
+        {
+            Log.Error($"Entity {boss.entity_id} not found for boss {bossId}");
+            return;
+        }
+        
+        var entity = entityOpt.Value; // Boss's entity
+        
+        DbVector2 direction;
+        // Calculate base direction towards the nearest player for all attack types first
+        var nearestPlayerPos = FindNearestPlayerPosition(ctx, entity.position);
+        var baseDirectionToTarget = CalculateDirectionTowardTarget(entity.position, nearestPlayerPos);
+
+        if (attackType == AttackType.BossBolt) // Simon's spread attack
+        {
+            // idWithinBurst: 0, 1, 2 for Simon's 3 projectiles (from BossSystem.cs loop)
+            const float spreadAngleDegrees = 15.0f; // Angle for the outer projectiles
+            float angleOffsetDegrees = 0;
+
+            if (idWithinBurst == 0) // Left projectile relative to boss facing player
+            {
+                angleOffsetDegrees = -spreadAngleDegrees;
+            }
+            else if (idWithinBurst == 2) // Right projectile
+            {
+                angleOffsetDegrees = spreadAngleDegrees;
+            }
+            // else if (idWithinBurst == 1), angleOffsetDegrees = 0; // Center projectile, no offset
+
+            if (angleOffsetDegrees != 0.0f && !(baseDirectionToTarget.x == 0 && baseDirectionToTarget.y == 0))
+            {
+                float angleOffsetRadians = angleOffsetDegrees * (float)Math.PI / 180.0f;
+                direction = new DbVector2(
+                    baseDirectionToTarget.x * (float)Math.Cos(angleOffsetRadians) - baseDirectionToTarget.y * (float)Math.Sin(angleOffsetRadians),
+                    baseDirectionToTarget.x * (float)Math.Sin(angleOffsetRadians) + baseDirectionToTarget.y * (float)Math.Cos(angleOffsetRadians)
+                );
+                
+                // Normalize the direction vector
+                float len = (float)Math.Sqrt(direction.x * direction.x + direction.y * direction.y);
+                if (len > 0)
+                {
+                    direction.x /= len;
+                    direction.y /= len;
+                }
+                else
+                {
+                    // Fallback if length is zero (should not happen if baseDirectionToTarget was not zero)
+                    direction = baseDirectionToTarget; 
+                }
+            }
+            else
+            {
+                direction = baseDirectionToTarget; // Center projectile or if baseDirectionToTarget is zero (boss on player)
+            }
+        }
+        else // Standard boss projectile (e.g., Jorge, or Bjorn's initial homing vector)
+        {
+            direction = baseDirectionToTarget;
+        }
+        
+        // Create a new entity for the projectile and get its ID
+        var projectileEntity = ctx.Db.entity.Insert(new Entity
+        {
+            position = entity.position,
+            direction = direction, // Use the calculated direction
+            radius = attackData.radius
+        });
+
+        // Create active boss attack
+        var activeBossAttack = ctx.Db.active_boss_attacks.Insert(new ActiveBossAttack
+        {
+            entity_id = projectileEntity.entity_id,
+            boss_monster_id = bossId,
+            attack_type = attackType,
+            id_within_burst = idWithinBurst,
+            parameter_u = parameterU, // Used for Bjorn's homing flag, etc.
+            damage = attackData.damage,
+            radius = attackData.radius,
+            piercing = attackData.piercing
+        });
+
+        // Schedule cleanup
+        ctx.Db.active_boss_attack_cleanup.Insert(new ActiveBossAttackCleanup
+        {
+            active_boss_attack_id = activeBossAttack.active_boss_attack_id,
+            scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(attackData.duration))
         });
     }
 

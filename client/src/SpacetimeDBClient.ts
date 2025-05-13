@@ -8,7 +8,7 @@ const SPACETIMEDB_DB_NAME = "vibesurvivors-with-friends";
 const SPACETIMEDB_URI = "ws://localhost:3000"; // Use wss for cloud, corrected order
 const REMOTE_SPACETIMEDB_URI = "wss://maincloud.spacetimedb.com";
 
-const URI_TO_USE = REMOTE_SPACETIMEDB_URI;
+const URI_TO_USE = SPACETIMEDB_URI;
 
 class SpacetimeDBClient {
     // Initialize sdkClient to null, it will be set in handleConnect

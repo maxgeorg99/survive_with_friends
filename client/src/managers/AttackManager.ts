@@ -296,7 +296,7 @@ export class AttackManager {
         if (attackType === 'Dumbbell') {
             sprite.setScale(1.5);
         } else if (attackType === 'BossJorgeBolt' || attackType === 'BossBjornBolt' || attackType === 'BossSimonBolt') {
-            sprite.setScale(0.4); // Smaller scale for boss bolts
+            sprite.setScale(1); // Smaller scale for boss bolts
         } else if (attackType === 'Football') {
             sprite.setScale(0.6); // Slightly larger for the football
         } else if (attackType === 'Garlic') {

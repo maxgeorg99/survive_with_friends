@@ -471,197 +471,39 @@ public static partial class Module
             Log.Info("BossFireProjectile: No active boss found");
             return;
         }
-        var bossMonsterOpt = ctx.Db.monsters.monster_id.Find(gameStateOpt.Value.boss_monster_id);
-        if (bossMonsterOpt == null)
+
+        var bossMonster = ctx.Db.monsters.monster_id.Find(gameStateOpt.Value.boss_monster_id);
+        if (bossMonster == null)
         {
             Log.Info("BossFireProjectile: Boss monster not found");
             return;
         }
-        var bossMonster = bossMonsterOpt.Value;
-        var bossEntityOpt = ctx.Db.entity.entity_id.Find(bossMonster.entity_id);
-        if (bossEntityOpt == null)
-        {
-            Log.Info("BossFireProjectile: Boss entity not found");
-            return;
-        }
-        var bossEntity = bossEntityOpt.Value;
 
-        Log.Info($"BossFireProjectile: Processing boss {bossMonster.monster_id} of type {bossMonster.bestiary_id}");
-
-        // Find the nearest player
-        uint nearestPlayerId = 0;
-        float nearestDistance = float.MaxValue;
-        DbVector2? nearestPlayerPos = null;
-        foreach (var player in ctx.Db.player.Iter())
-        {
-            var playerEntityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
-            if (playerEntityOpt != null)
-            {
-                var playerEntity = playerEntityOpt.Value;
-                float dx = playerEntity.position.x - bossEntity.position.x;
-                float dy = playerEntity.position.y - bossEntity.position.y;
-                float distSq = dx * dx + dy * dy;
-                if (distSq < nearestDistance)
-                {
-                    nearestDistance = distSq;
-                    nearestPlayerId = player.player_id;
-                    nearestPlayerPos = playerEntity.position;
-                }
-            }
-        }
-        if (nearestPlayerId == 0 || nearestPlayerPos == null)
-        {
-            Log.Info("BossFireProjectile: No players found to target");
-            ctx.Db.boss_attack_timer.Insert(new BossAttackTimer
-            {
-                scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(600))
-            });
-            return;
-        }
-
-        Log.Info($"BossFireProjectile: Targeting player {nearestPlayerId} at distance {Math.Sqrt(nearestDistance)}");
-
-        // Determine boss type
-        var bossType = bossMonster.bestiary_id;
+        // Determine boss type and attack pattern
+        var bossType = bossMonster.Value.bestiary_id;
         if (bossType == MonsterType.FinalBossJorgePhase1 || bossType == MonsterType.FinalBossJorgePhase2)
         {
-            Log.Info("BossFireProjectile: Creating Jorge projectile");
-            // Jorge: Calculate direction to nearest player
-            var dirX = nearestPlayerPos.Value.x - bossEntity.position.x;
-            var dirY = nearestPlayerPos.Value.y - bossEntity.position.y;
-            var length = Math.Sqrt(dirX * dirX + dirY * dirY);
-            DbVector2 direction = new DbVector2((float)(dirX / length), (float)(dirY / length));
-            
-            Log.Info($"Boss position: ({bossEntity.position.x}, {bossEntity.position.y})");
-            Log.Info($"Player position: ({nearestPlayerPos.Value.x}, {nearestPlayerPos.Value.y})");
-            Log.Info($"Calculated direction vector: ({direction.x}, {direction.y})");
-
-            // Create projectile at boss position
-            var projectileEntity = ctx.Db.entity.Insert(new Entity
-            {
-                position = bossEntity.position,
-                direction = direction,
-                radius = 10
-            });
-
-            Log.Info($"Created projectile entity {projectileEntity.entity_id} with direction ({projectileEntity.direction.x}, {projectileEntity.direction.y})");
-
-            var activeBossAttack = ctx.Db.active_boss_attacks.Insert(new ActiveBossAttack
-            {
-                entity_id = projectileEntity.entity_id,
-                boss_monster_id = bossMonster.monster_id,
-                attack_type = AttackType.BossJorgeBolt,
-                id_within_burst = 0,
-                parameter_u = 0,
-                damage = 7,
-                radius = 10,
-                piercing = false
-            });
-
-            Log.Info($"BossFireProjectile: Created boss attack {activeBossAttack.active_boss_attack_id}");
-
-            ctx.Db.active_boss_attack_cleanup.Insert(new ActiveBossAttackCleanup
-            {
-                active_boss_attack_id = activeBossAttack.active_boss_attack_id,
-                scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(2000))
-            });
-
-            Log.Info("BossFireProjectile: Scheduled cleanup for boss attack");
+            // Jorge: Single fast projectile
+            Module.TriggerBossAttackProjectile(ctx, bossMonster.Value.monster_id, AttackType.BossJorgeBolt);
         }
         else if (bossType == MonsterType.FinalBossBjornPhase1 || bossType == MonsterType.FinalBossBjornPhase2)
         {
-            // Björn: Homing, undodgeable projectile
-            var dirX = nearestPlayerPos.Value.x - bossEntity.position.x;
-            var dirY = nearestPlayerPos.Value.y - bossEntity.position.y;
-            var length = Math.Sqrt(dirX * dirX + dirY * dirY);
-            DbVector2 direction = length > 0 ? new DbVector2((float)(dirX / length), (float)(dirY / length)) : new DbVector2(1, 0);
-
-            var projectileEntity = ctx.Db.entity.Insert(new Entity
-            {
-                position = bossEntity.position,
-                direction = direction,
-                radius = 12
-            });
-
-            var activeBossAttack = ctx.Db.active_boss_attacks.Insert(new ActiveBossAttack
-            {
-                entity_id = projectileEntity.entity_id,
-                boss_monster_id = bossMonster.monster_id,
-                attack_type = AttackType.BossBjornBolt,
-                id_within_burst = 0,
-                parameter_u = 1, // Mark as homing for client
-                damage = 8,
-                radius = 12,
-                piercing = false
-            });
-
-            ctx.Db.active_boss_attack_cleanup.Insert(new ActiveBossAttackCleanup
-            {
-                active_boss_attack_id = activeBossAttack.active_boss_attack_id,
-                scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(2500))
-            });
+            // Björn: Homing projectile
+            Module.TriggerBossAttackProjectile(ctx, bossMonster.Value.monster_id, AttackType.BossBjornBolt, 0, 1); // parameterU = 1 marks it as homing
         }
         else if (bossType == MonsterType.FinalBossSimonPhase1 || bossType == MonsterType.FinalBossSimonPhase2)
         {
-            // Simon: Buff self and fire projectiles
-            ApplySimonBuff(ctx, bossMonster.monster_id, bossEntity.entity_id);
-
-            // Fire multiple projectiles in a spread pattern
-            const int NUM_PROJECTILES = 3;
-            const float SPREAD_ANGLE = 30f; // degrees
-
-            // Calculate base direction to target
-            float baseDirX = nearestPlayerPos.Value.x - bossEntity.position.x;
-            float baseDirY = nearestPlayerPos.Value.y - bossEntity.position.y;
-            float baseLength = (float)Math.Sqrt(baseDirX * baseDirX + baseDirY * baseDirY);
-            if (baseLength > 0)
+            // Simon: Multiple spread projectiles
+            ApplySimonBuff(ctx, bossMonster.Value.monster_id, bossMonster.Value.entity_id);
+            
+            // Fire 3 projectiles in a spread pattern
+            for (uint i = 0; i < 3; i++)
             {
-                baseDirX /= baseLength;
-                baseDirY /= baseLength;
-            }
-
-            for (int i = 0; i < NUM_PROJECTILES; i++)
-            {
-                // Calculate spread angle for this projectile
-                float angleOffset = (i - (NUM_PROJECTILES - 1) / 2f) * SPREAD_ANGLE;
-                float angleRad = (float)(Math.Atan2(baseDirY, baseDirX) + angleOffset * Math.PI / 180f);
-                
-                // Calculate direction vector for this projectile
-                float spreadDirX = (float)Math.Cos(angleRad);
-                float spreadDirY = (float)Math.Sin(angleRad);
-                DbVector2 spreadDirection = new DbVector2(spreadDirX, spreadDirY);
-
-                // Create projectile entity
-                var projectileEntity = ctx.Db.entity.Insert(new Entity
-                {
-                    position = bossEntity.position,
-                    direction = spreadDirection,
-                    radius = 10
-                });
-
-                // Create the boss attack
-                var activeBossAttack = ctx.Db.active_boss_attacks.Insert(new ActiveBossAttack
-                {
-                    entity_id = projectileEntity.entity_id,
-                    boss_monster_id = bossMonster.monster_id,
-                    attack_type = AttackType.BossBolt,
-                    id_within_burst = (uint)i,
-                    parameter_u = 0,
-                    damage = 6,
-                    radius = 10,
-                    piercing = false
-                });
-
-                // Schedule cleanup
-                ctx.Db.active_boss_attack_cleanup.Insert(new ActiveBossAttackCleanup
-                {
-                    active_boss_attack_id = activeBossAttack.active_boss_attack_id,
-                    scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(2000))
-                });
+                Module.TriggerBossAttackProjectile(ctx, bossMonster.Value.monster_id, AttackType.BossBolt, i);
             }
         }
 
-        // Reschedule the next boss attack
+        // Schedule next attack
         ctx.Db.boss_attack_timer.Insert(new BossAttackTimer
         {
             scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(600))
@@ -680,9 +522,6 @@ public static partial class Module
         monster.speed *= 1.1f; // Increase speed
         monster.atk *= 1.1f;   // Increase damage
         ctx.Db.monsters.monster_id.Update(monster);
-        // Optionally: schedule a debuff after duration to revert stats
-        // Optionally: create a visual effect entity or flag for the client
-        // (Client will show attack_boss_simon.png around the boss when buffed)
     }
 
     // DEBUG/DEV ONLY: Reducer to spawn a specific boss for testing

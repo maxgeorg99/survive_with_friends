@@ -167,9 +167,9 @@ public static partial class Module
             bestiary_id = (uint)MonsterType.FinalBossSimonPhase2,
             monster_type = MonsterType.FinalBossSimonPhase2,
             max_hp = 500,
-            speed = 150.0f,
+            speed = 50.0f,
             exp = 500,
-            atk = 40.0f,
+            atk = 10.0f,
             radius = 245.0f
         });
 

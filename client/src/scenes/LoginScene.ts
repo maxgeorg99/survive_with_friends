@@ -49,7 +49,7 @@ export default class LoginScene extends Phaser.Scene {
         this.loginContainer = this.add.container(width/2, height/2);
         
         // Add game title
-        const titleText = this.add.text(0, -150, 'VIBE SURVIVORS', {
+        const titleText = this.add.text(0, -150, 'SURVIVE WITH FRIENDS', {
             fontFamily: 'Arial Black',
             fontSize: '64px',
             color: '#ffffff',
