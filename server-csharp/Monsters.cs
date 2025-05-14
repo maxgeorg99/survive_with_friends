@@ -8,7 +8,8 @@ public static partial class Module
     {
         MonsterType.Rat,
         MonsterType.Slime,
-        MonsterType.Orc
+        MonsterType.Orc,
+        MonsterType.Wolf
         // Add new normal monster types here as they are created
         // Bosses are excluded from this list to prevent them from spawning randomly
     };

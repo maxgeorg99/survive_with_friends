@@ -165,7 +165,52 @@ public static partial class Module
                 }
                 case AttackType.Cards:
                 {
-                    // Cards works like knives, attacking in a circle pattern
+                    // Find the nearest enemy for card targeting
+                    Entity? nearestEnemy = FindNearestEnemy(ctx, entity);
+                    if (nearestEnemy != null)
+                    {
+                        var enemyActual = nearestEnemy.Value;
+                        
+                        // Calculate base direction vector to the enemy
+                        var dx = enemyActual.position.x - entity.position.x;
+                        var dy = enemyActual.position.y - entity.position.y;
+                        
+                        // Normalize the direction
+                        var length = Math.Sqrt(dx * dx + dy * dy);
+                        if (length > 0)
+                        {
+                            // Normalize base direction
+                            var baseDirX = dx / length;
+                            var baseDirY = dy / length;
+                            
+                            // For multiple cards, spread them in a fan pattern toward the enemy
+                            // The spread angle depends on the number of projectiles
+                            double fanAngleRange = 45.0; // degrees total spread
+                            
+                            // Calculate the angle for this specific card within the fan
+                            double fanAngle;
+                            if (attackData.Value.projectiles > 1)
+                            {
+                                // Calculate angle offset for this projectile in the fan
+                                fanAngle = -fanAngleRange / 2.0 + (fanAngleRange * idWithinBurst / (attackData.Value.projectiles - 1));
+                            }
+                            else
+                            {
+                                fanAngle = 0;
+                            }
+                            
+                            // Convert angle to radians
+                            var fanAngleRad = fanAngle * Math.PI / 180.0;
+                            
+                            // Rotate the base vector by the fan angle
+                            var rotatedX = baseDirX * Math.Cos(fanAngleRad) - baseDirY * Math.Sin(fanAngleRad);
+                            var rotatedY = baseDirX * Math.Sin(fanAngleRad) + baseDirY * Math.Cos(fanAngleRad);
+                            
+                            return new DbVector2((float)rotatedX, (float)rotatedY);
+                        }
+                    }
+                    
+                    // If no enemies found, fall back to the original pattern
                     var startAngle = (double)parameterU * Math.PI / 180.0;                       
                     var angleStep = 360.0 / (double)attackData.Value.projectiles;
                     var attackAngle = startAngle + (angleStep * (double)idWithinBurst);

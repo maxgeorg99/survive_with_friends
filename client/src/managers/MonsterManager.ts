@@ -578,6 +578,8 @@ export default class MonsterManager {
                 return 24;
             case 'Slime':
                 return 30;
+            case 'Wolf':
+                return 34;
             case 'Orc':
                 return 40;
             default:

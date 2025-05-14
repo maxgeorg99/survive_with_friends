@@ -8,6 +8,7 @@ public static partial class Module
         Rat,
         Slime,
         Orc,
+        Wolf,
         FinalBossPhase1,
         FinalBossPhase2,
         FinalBossJorgePhase1,
@@ -80,6 +81,18 @@ public static partial class Module
             exp = 5,
             atk = 2.0f,
             radius = 40.0f
+        });
+
+        // Insert Wolf stats
+        ctx.Db.bestiary.Insert(new Bestiary
+        {
+            bestiary_id = (uint)MonsterType.Wolf,
+            monster_type = MonsterType.Wolf,
+            max_hp = 35,
+            speed = 175.0f,  // Faster than slime and orc
+            exp = 3,
+            atk = 1.8f,      // Stronger than slime but weaker than orc
+            radius = 34.0f    // Slightly smaller than orc
         });
         
         // Insert Final Boss Phase 1 stats
