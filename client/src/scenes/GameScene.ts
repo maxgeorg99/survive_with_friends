@@ -168,6 +168,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('monster_rat', 'assets/monster_rat.png');
         this.load.image('monster_slime', 'assets/monster_slime.png');
         this.load.image('monster_orc', 'assets/monster_orc.png');
+        this.load.image('monster_worm', 'assets/monster_worm.png');
         this.load.image('monster_wolf', 'assets/monster_wolf.png');
         this.load.image('monster_spawn_indicator', 'assets/monster_spawn_indicator.png');
         
@@ -191,6 +192,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('attack_boss_jorge', 'assets/attack_boss_jorge.png');
         this.load.image('attack_boss_bjorn', 'assets/attack_boss_björn.png');
         this.load.image('attack_boss_simon', 'assets/attack_boss_simon.png');
+        this.load.image('attack_spit', 'assets/attack_spit.png');
         
         // Load upgrade assets
         this.load.image('card_blank', 'assets/card_blank.png');
@@ -225,6 +227,7 @@ export default class GameScene extends Phaser.Scene {
             console.log("monster_slime:", this.textures.exists('monster_slime'));
             console.log("monster_orc:", this.textures.exists('monster_orc'));
             console.log("monster_wolf:", this.textures.exists('monster_wolf'));
+            console.log("monster_worm:", this.textures.exists('monster_worm'));
             console.log("attack_sword:", this.textures.exists('attack_sword'));
             console.log("attack_wand:", this.textures.exists('attack_wand'));
             console.log("attack_knife:", this.textures.exists('attack_knife'));

@@ -15,7 +15,8 @@ public enum AttackType
     Garlic,
     BossBolt,
     BossJorgeBolt,
-    BossBjornBolt
+    BossBjornBolt,
+    WormSpit
 }
 
 public static partial class Module
@@ -356,6 +357,23 @@ public static partial class Module
             radius = 12,               // Medium size
             damage = 8,                // More damage
             armor_piercing = 5
+        });
+
+        // Worm Spit - weak projectile attack
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 8,
+            attack_type = AttackType.WormSpit,
+            name = "Worm Spit",
+            cooldown = 3000,           // Slow attack speed (3 seconds)
+            duration = 1500,           // How long the projectile stays active
+            projectiles = 1,           // One projectile at a time
+            fire_delay = 0,
+            speed = 500,               // Medium speed
+            piercing = false,          // Doesn't pierce through targets
+            radius = 12,               // Small size
+            damage = 2,                // Very low damage
+            armor_piercing = 0         // No armor piercing
         });
 
         Log.Info("Attack data initialized successfully.");

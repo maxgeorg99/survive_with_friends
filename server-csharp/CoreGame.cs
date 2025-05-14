@@ -563,12 +563,13 @@ public static partial class Module
 
         ProcessPlayerMovement(ctx, tick_rate, worldSize);
         ProcessMonsterMovements(ctx);
+        ProcessMonsterBehavior(ctx); // New - process special monster behaviors like Worm's projectile attack
         ProcessAttackMovements(ctx, worldSize);
-        ProcessBossAttackMovements(ctx, worldSize); // Added this line
+        ProcessBossAttackMovements(ctx, worldSize);
 
         ProcessPlayerMonsterCollisions(ctx);
         ProcessMonsterAttackCollisions(ctx);
-        ProcessPlayerBossAttackCollisions(ctx); // Added this line
+        ProcessPlayerBossAttackCollisions(ctx);
         ProcessGemCollisions(ctx);
     }
 

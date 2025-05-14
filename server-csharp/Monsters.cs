@@ -9,7 +9,8 @@ public static partial class Module
         MonsterType.Rat,
         MonsterType.Slime,
         MonsterType.Orc,
-        MonsterType.Wolf
+        MonsterType.Wolf,
+        MonsterType.Worm
         // Add new normal monster types here as they are created
         // Bosses are excluded from this list to prevent them from spawning randomly
     };
@@ -444,5 +445,91 @@ public static partial class Module
         var updatedMonster = monster;
         updatedMonster.target_entity_id = newTarget.entity_id;
         ctx.Db.monsters.monster_id.Update(updatedMonster);
+    }
+
+    // Helper method to process monster behavior (attacks, etc.)
+    public static void ProcessMonsterBehavior(ReducerContext ctx)
+    {
+        // Process behavior for each monster
+        foreach (var monster in ctx.Db.monsters.Iter())
+        {
+            // Get monster entity
+            var monsterEntityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
+            if (monsterEntityOpt == null) continue;
+            
+            var monsterEntity = monsterEntityOpt.Value;
+            
+            // Handle special monster behaviors based on type
+            if (monster.bestiary_id == MonsterType.Worm)
+            {
+                // Worms have a chance to spit at the nearest player
+                // Add a random factor so not all worms attack at once
+                var random = ctx.Rng;
+                if (random.NextDouble() < 0.015) // ~1.5% chance per tick (approx every ~3 seconds)
+                {
+                    // Find the nearest player
+                    var nearestPlayerPos = FindNearestPlayerPosition(ctx, monsterEntity.position);
+                    if (nearestPlayerPos.HasValue)
+                    {
+                        // Calculate direction to player
+                        var direction = CalculateDirectionToTarget(monsterEntity.position, nearestPlayerPos);
+                        
+                        // Get attack data
+                        var attackData = FindAttackDataByType(ctx, AttackType.WormSpit);
+                        if (attackData != null)
+                        {
+                            // Create a projectile entity
+                            var projectileEntity = ctx.Db.entity.Insert(new Entity
+                            {
+                                position = monsterEntity.position,
+                                direction = direction,
+                                radius = attackData.Value.radius
+                            });
+
+                            // Create active boss attack (reusing the boss attack mechanism)
+                            var activeBossAttack = ctx.Db.active_boss_attacks.Insert(new ActiveBossAttack
+                            {
+                                entity_id = projectileEntity.entity_id,
+                                boss_monster_id = monster.monster_id, // Using monster ID instead of boss ID
+                                attack_type = AttackType.WormSpit,
+                                id_within_burst = 0,
+                                parameter_u = 0,
+                                damage = attackData.Value.damage,
+                                radius = attackData.Value.radius,
+                                piercing = attackData.Value.piercing
+                            });
+
+                            // Schedule cleanup
+                            ctx.Db.active_boss_attack_cleanup.Insert(new ActiveBossAttackCleanup
+                            {
+                                active_boss_attack_id = activeBossAttack.active_boss_attack_id,
+                                scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(attackData.Value.duration))
+                            });
+                            
+                            Log.Info($"Worm {monster.monster_id} fired spit attack at nearest player");
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Helper method to calculate direction vector toward a target
+    private static DbVector2 CalculateDirectionToTarget(DbVector2 fromPosition, DbVector2? targetPosition)
+    {
+        if (!targetPosition.HasValue)
+        {
+            return new DbVector2(1, 0); // Default direction if no target
+        }
+
+        float dx = targetPosition.Value.x - fromPosition.x;
+        float dy = targetPosition.Value.y - fromPosition.y;
+        float length = (float)Math.Sqrt(dx * dx + dy * dy);
+        
+        if (length > 0)
+        {
+            return new DbVector2(dx / length, dy / length);
+        }
+        return new DbVector2(1, 0); // Default direction if same position
     }
 }

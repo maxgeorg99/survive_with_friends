@@ -580,6 +580,8 @@ export default class MonsterManager {
                 return 30;
             case 'Wolf':
                 return 34;
+            case 'Worm':
+                return 28;
             case 'Orc':
                 return 40;
             default:

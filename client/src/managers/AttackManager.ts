@@ -281,6 +281,9 @@ export class AttackManager {
             case 'BossSimonBolt':
                 spriteKey = 'attack_boss_simon';
                 break;
+            case 'WormSpit':
+                spriteKey = 'attack_spit'; // Using the dedicated spit sprite
+                break;
             default:
                 console.warn(`Unknown attack type: ${attackType}, using default sprite`);
                 return null;
@@ -351,11 +354,57 @@ export class AttackManager {
             } else if (attackGraphicData.attackType === 'Dumbbell') {
                 // Dumbbell maintains fixed horizontal orientation
                 return;
+            } else if (attackGraphicData.attackType === 'WormSpit') {
+                // Special handling for worm spit - make it look slimy
+                sprite.setScale(1.0); // Use normal size since we have a dedicated sprite
+                
+                // Add rotation based on direction with a slight wobble effect for more organic movement
+                if (direction.length() > 0) {
+                    const angle = Math.atan2(direction.y, direction.x);
+                    const wobble = Math.sin(this.gameTime * 0.01) * 0.2;
+                    
+                    // Fix the upside-down issue when sprite is moving left
+                    // For left-facing sprites, flip the sprite vertically instead of rotating it past 90 degrees
+                    if (Math.abs(angle) > Math.PI/2) {
+                        // Left-facing: set a base angle of 0 and flip the sprite
+                        sprite.setRotation(0);
+                        sprite.setFlipX(true);
+                        sprite.setFlipY(false);
+                    } else {
+                        // Right-facing: use normal rotation and no flipping
+                        sprite.setRotation(angle + wobble);
+                        sprite.setFlipX(false);
+                        sprite.setFlipY(false);
+                    }
+                }
+                
+                // Add some particle effects for slime trail
+                if (Math.random() < 0.2) { // Only do this occasionally to avoid performance issues
+                    this.createWormSpitParticles(predictedPosition.x, predictedPosition.y);
+                }
             } else if (!attackGraphicData.isShield) {
                 // For regular projectiles and boss attacks, rotate based on movement direction
                 if (direction.length() > 0) {
                     const angle = Math.atan2(direction.y, direction.x);
-                    sprite.setRotation(angle);
+                    
+                    // Fix upside-down issue for all projectiles moving left
+                    if (attackGraphicData.attackType === 'Sword' || attackGraphicData.attackType === 'Knives') {
+                        // For weapons that look wrong when flipped upside down
+                        if (Math.abs(angle) > Math.PI/2) {
+                            // Left-facing: set a base angle of 0 and flip the sprite horizontally
+                            sprite.setRotation(0);
+                            sprite.setFlipX(true);
+                            sprite.setFlipY(false);
+                        } else {
+                            // Right-facing: use normal rotation without flipping
+                            sprite.setRotation(angle);
+                            sprite.setFlipX(false);
+                            sprite.setFlipY(false);
+                        }
+                    } else {
+                        // For other attack types, use standard rotation
+                        sprite.setRotation(angle);
+                    }
                 }
             } else {
                 // For shields, rotate based on orbital position around player
@@ -412,6 +461,32 @@ export class AttackManager {
 
         // Auto-destroy after animation
         this.scene.time.delayedCall(800, () => {
+            particles.destroy();
+        });
+    }
+
+    // Create particles for worm spit projectile
+    private createWormSpitParticles(x: number, y: number) {
+        if (!this.scene) return;
+        
+        // Create a small trail of slime particles
+        const particles = this.scene.add.particles(x, y, 'white_pixel', {
+            speed: { min: 10, max: 30 },
+            angle: { min: 0, max: 360 },
+            scale: { start: 0.5, end: 0.1 },
+            lifespan: 300,
+            tint: 0x88ff88, // Green tint matching the projectile
+            alpha: { start: 0.7, end: 0 },
+            quantity: 1,
+            frequency: -1, // Only emit once
+            blendMode: 'ADD'
+        });
+        
+        // Emit a small burst
+        particles.explode(3, x, y);
+        
+        // Auto-destroy after animation
+        this.scene.time.delayedCall(300, () => {
             particles.destroy();
         });
     }
