@@ -8,7 +8,7 @@ const SPACETIMEDB_DB_NAME = "vibesurvivors-with-friends";
 const SPACETIMEDB_URI = "ws://localhost:3000"; // Use wss for cloud, corrected order
 const REMOTE_SPACETIMEDB_URI = "wss://maincloud.spacetimedb.com";
 
-const URI_TO_USE = REMOTE_SPACETIMEDB_URI;
+const URI_TO_USE = SPACETIMEDB_URI;
 
 class SpacetimeDBClient {
     // Initialize sdkClient to null, it will be set in handleConnect
@@ -93,7 +93,8 @@ class SpacetimeDBClient {
                 "SELECT * FROM monster_spawners",
                 "SELECT * FROM game_state",
                 "SELECT * FROM boss_spawn_timer",
-                "SELECT * FROM boss_attack_timer"
+                "SELECT * FROM boss_attack_timer",
+                "SELECT * FROM player_poison_effect"
             ]);
 
         // Register table event callbacks
@@ -305,4 +306,4 @@ class SpacetimeDBClient {
     }
 }
 
-export default SpacetimeDBClient; 
+export default SpacetimeDBClient;

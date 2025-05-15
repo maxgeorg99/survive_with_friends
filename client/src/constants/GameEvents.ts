@@ -16,6 +16,7 @@ export enum GameEvents {
     PLAYER_UPDATED = 'player:updated',
     PLAYER_DELETED = 'player:deleted',
     PLAYER_DIED = 'player_died',
+    PLAYER_POISONED = 'player:poisoned',
     
     // Entity events
     ENTITY_CREATED = 'entity:created',
@@ -63,5 +64,9 @@ export enum GameEvents {
     ACTIVE_BOSS_ATTACK_CLEANUP_CREATED = 'ACTIVE_BOSS_ATTACK_CLEANUP_CREATED',
     ACTIVE_BOSS_ATTACK_CLEANUP_DELETED = 'ACTIVE_BOSS_ATTACK_CLEANUP_DELETED',
     ATTACK_DATA_CREATED = 'ATTACK_DATA_CREATED',
-    ATTACK_DATA_UPDATED = 'ATTACK_DATA_UPDATED'
-} 
+    ATTACK_DATA_UPDATED = 'ATTACK_DATA_UPDATED',
+    
+    // Poison effect events
+    POISON_EFFECT_CREATED = 'poison_effect:created',
+    POISON_EFFECT_DELETED = 'poison_effect:deleted'
+}

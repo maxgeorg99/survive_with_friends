@@ -271,7 +271,7 @@ export default class ClassSelectScene extends Phaser.Scene {
         });
         
         bestiaryButton.addEventListener('click', () => {
-            this.scene.start('BestaryScene');
+            this.scene.start('BestaryScene', { spacetimeDBClient: this.spacetimeDBClient });
         });
         
         document.body.appendChild(bestiaryButton);
@@ -815,6 +815,10 @@ export default class ClassSelectScene extends Phaser.Scene {
 
             if (this.questButton && this.questButton.parentNode) {
                 this.questButton.remove();
+            }
+
+            if (this.bestiaryButton && this.bestiaryButton.parentNode) {
+                this.bestiaryButton.remove();
             }
             
             // Method 2: Query by ID and class

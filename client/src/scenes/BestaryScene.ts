@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { localization } from '../utils/localization';
 import { MonsterType } from '../autobindings/monster_type_type';
+import { Bestiary } from '../autobindings/bestiary_type';
+import SpacetimeDBClient from '../SpacetimeDBClient';
 
 export default class BestaryScene extends Phaser.Scene {
     // UI elements
@@ -9,9 +11,19 @@ export default class BestaryScene extends Phaser.Scene {
     private monstersList!: HTMLDivElement;
     private monsterDetailsPanel!: HTMLDivElement;
     private backButton!: HTMLButtonElement;
+    private commonMonstersTab!: HTMLButtonElement;
+    private bossesTab!: HTMLButtonElement;
+    private phaseToggleButton!: HTMLButtonElement;
     
-    // Track current selected monster
+    // SpacetimeDB client
+    private spacetimeDBClient!: SpacetimeDBClient;
+    // Cache of monster data from the bestiary table
+    private monsterDataCache: Map<string, Bestiary> = new Map();
+    
+    // Track current selected monster and view state
     private selectedMonster: MonsterType | null = null;
+    private selectedMonsterPhase: number = 1; // Default to phase 1
+    private currentTab: 'common' | 'bosses' = 'common'; // Track active tab
 
     // Monster image mapping
     private monsterImageMapping: Record<string, string> = {
@@ -20,6 +32,7 @@ export default class BestaryScene extends Phaser.Scene {
         "Orc": 'monster_orc.png',
         "Wolf": 'monster_wolf.png',
         "Worm": 'monster_worm.png',
+        "Scorpion": 'monster_scorpion.png',
         "FinalBossPhase1": 'final_boss_phase_1.png',
         "FinalBossPhase2": 'final_boss_phase_2.png',
         "FinalBossJorgePhase1": 'final_boss_jorge_phase_1.png',
@@ -34,6 +47,38 @@ export default class BestaryScene extends Phaser.Scene {
         super('BestaryScene');
     }
 
+    init(data: any) {
+        // Store reference to the SpacetimeDB client if provided
+        if (data && data.spacetimeDBClient) {
+            console.log("BestaryScene: SpacetimeDBClient received!", data.spacetimeDBClient);
+            this.spacetimeDBClient = data.spacetimeDBClient;
+            
+            // Check if the client has valid connection
+            if (this.spacetimeDBClient.sdkConnection) {
+                console.log("BestaryScene: SpacetimeDBClient has valid SDK connection");
+                if (this.spacetimeDBClient.sdkConnection.db) {
+                    console.log("BestaryScene: SpacetimeDBClient has valid db object");
+                    // Debug database tables
+                    const tables = Object.keys(this.spacetimeDBClient.sdkConnection.db);
+                    console.log(`BestaryScene: Available database tables: ${tables.join(', ')}`);
+                    
+                    // Check if bestiary table exists
+                    if (this.spacetimeDBClient.sdkConnection.db.bestiary) {
+                        console.log("BestaryScene: Bestiary table exists in database");
+                    } else {
+                        console.error("BestaryScene: Bestiary table not found in database!");
+                    }
+                } else {
+                    console.error("BestaryScene: SpacetimeDBClient has no db object!");
+                }
+            } else {
+                console.error("BestaryScene: SpacetimeDBClient has no SDK connection!");
+            }
+        } else {
+            console.error("BestaryScene: No SpacetimeDBClient provided in scene data!", data);
+        }
+    }
+
     preload() {
         // Load monster images if not already loaded
         this.load.image('monster_rat', 'assets/monster_rat.png');
@@ -41,6 +86,7 @@ export default class BestaryScene extends Phaser.Scene {
         this.load.image('monster_orc', 'assets/monster_orc.png');
         this.load.image('monster_wolf', 'assets/monster_wolf.png');
         this.load.image('monster_worm', 'assets/monster_worm.png');
+        this.load.image('monster_scorpion', 'assets/monster_scorpion.png');
         this.load.image('final_boss_jorge_phase_1', 'assets/final_boss_jorge_phase_1.png');
         this.load.image('final_boss_jorge_phase_2', 'assets/final_boss_jorge_phase_2.png');
         this.load.image('final_boss_phase_bjorn_1', 'assets/final_boss_phase_björn_1.png');
@@ -87,11 +133,17 @@ export default class BestaryScene extends Phaser.Scene {
             wordWrap: { width: width * 0.8 }
         }).setOrigin(0.5);
         
-        // Create the monsters list panel
+        // Create the tab buttons for monster categories
+        this.createTabButtons();
+        
+        // Create the monsters list panel (default to common monsters)
         this.createMonstersList();
         
         // Create the monster details panel
         this.createMonsterDetailsPanel();
+        
+        // Create the phase toggle button (hidden initially)
+        this.createPhaseToggleButton();
         
         // Create back button
         this.createBackButton();
@@ -115,6 +167,7 @@ export default class BestaryScene extends Phaser.Scene {
         this.monstersList = document.createElement('div');
         this.monstersList.id = 'bestiary-monsters-list';
         this.monstersList.style.position = 'absolute';
+        this.monstersList.style.overflow = 'auto';
         this.monstersList.style.width = '220px';
         this.monstersList.style.maxHeight = '500px';
         this.monstersList.style.backgroundColor = 'rgba(44, 62, 80, 0.95)';
@@ -122,100 +175,91 @@ export default class BestaryScene extends Phaser.Scene {
         this.monstersList.style.borderRadius = '8px';
         this.monstersList.style.padding = '10px';
         
-        // Define the monster categories and their members
-        const monsterCategories = [
-            {
-                name: localization.getText('bestiary.category.common'),
-                types: [MonsterType.Rat, MonsterType.Slime, MonsterType.Orc, MonsterType.Wolf, MonsterType.Worm]
-            },
-            {
-                name: localization.getText('bestiary.category.bosses'),
-                types: [
-                    MonsterType.FinalBossJorgePhase1, 
-                    MonsterType.FinalBossBjornPhase1, 
-                    MonsterType.FinalBossSimonPhase1
-                ]
-            }
-        ];
+        // Define the monster types to show based on current tab
+        let monstersToShow: MonsterType[] = [];
+        if (this.currentTab === 'common') {
+            monstersToShow = [
+                MonsterType.Rat, 
+                MonsterType.Slime, 
+                MonsterType.Orc, 
+                MonsterType.Wolf, 
+                MonsterType.Worm, 
+                MonsterType.Scorpion
+            ];
+        } else {
+            // Only show Phase 1 bosses in the list
+            monstersToShow = [
+                MonsterType.FinalBossJorgePhase1, 
+                MonsterType.FinalBossBjornPhase1, 
+                MonsterType.FinalBossSimonPhase1
+            ];
+        }
         
         // Populate the monsters list
-        monsterCategories.forEach(category => {
-            // Add category header
-            const categoryHeader = document.createElement('h3');
-            categoryHeader.textContent = category.name;
-            categoryHeader.style.color = '#3498db';
-            categoryHeader.style.borderBottom = '1px solid #3498db';
-            categoryHeader.style.paddingBottom = '5px';
-            categoryHeader.style.marginBottom = '10px';
-            categoryHeader.style.marginTop = '15px';
-            this.monstersList.appendChild(categoryHeader);
+        monstersToShow.forEach(monsterType => {
+            const monsterButton = document.createElement('button');
+            monsterButton.className = 'bestiary-monster-button';
+            monsterButton.setAttribute('data-monster-type', monsterType.toString());
+            monsterButton.style.display = 'flex';
+            monsterButton.style.alignItems = 'center';
+            monsterButton.style.width = '100%';
+            monsterButton.style.padding = '8px';
+            monsterButton.style.marginBottom = '5px';
+            monsterButton.style.backgroundColor = '#2c3e50';
+            monsterButton.style.border = '1px solid #34495e';
+            monsterButton.style.borderRadius = '4px';
+            monsterButton.style.cursor = 'pointer';
+            monsterButton.style.color = 'white';
+            monsterButton.style.textAlign = 'left';
+            monsterButton.style.transition = 'background-color 0.2s';
             
-            // Add monsters in this category
-            category.types.forEach(monsterType => {
-                const monsterButton = document.createElement('button');
-                monsterButton.className = 'bestiary-monster-button';
-                monsterButton.setAttribute('data-monster-type', monsterType.toString());
-                monsterButton.style.display = 'flex';
-                monsterButton.style.alignItems = 'center';
-                monsterButton.style.width = '100%';
-                monsterButton.style.padding = '8px';
-                monsterButton.style.marginBottom = '5px';
-                monsterButton.style.backgroundColor = '#2c3e50';
-                monsterButton.style.border = '1px solid #34495e';
-                monsterButton.style.borderRadius = '4px';
-                monsterButton.style.cursor = 'pointer';
-                monsterButton.style.color = 'white';
-                monsterButton.style.textAlign = 'left';
-                monsterButton.style.transition = 'background-color 0.2s';
-                
-                // Add monster icon if available
-                try {
-                    const iconFile = this.monsterImageMapping[monsterType.tag];
-                    if (iconFile) {
-                        const icon = document.createElement('img');
-                        icon.src = 'assets/' + iconFile;
-                        icon.style.width = '40px';
-                        icon.style.height = '40px';
-                        icon.style.marginRight = '10px';
-                        icon.style.objectFit = 'contain';
-                        monsterButton.appendChild(icon);
-                    }
-                } catch (error) {
-                    console.error(`Error adding icon for monster type ${monsterType.tag}:`, error);
+            // Add monster icon if available
+            try {
+                const iconFile = this.monsterImageMapping[monsterType.tag];
+                if (iconFile) {
+                    const icon = document.createElement('img');
+                    icon.src = 'assets/' + iconFile;
+                    icon.style.width = '40px';
+                    icon.style.height = '40px';
+                    icon.style.marginRight = '10px';
+                    icon.style.objectFit = 'contain';
+                    monsterButton.appendChild(icon);
                 }
+            } catch (error) {
+                console.error(`Error adding icon for monster type ${monsterType.tag}:`, error);
+            }
+            
+            // Add monster name
+            const textSpan = document.createElement('span');
+            textSpan.textContent = localization.getText(`bestiary.monster.${monsterType.tag}.name`);
+            monsterButton.appendChild(textSpan);
+            
+            // Add event listener
+            monsterButton.addEventListener('click', () => {
+                // Using type assertion to ensure TypeScript accepts this as a valid MonsterType
+                this.selectMonster(monsterType as MonsterType);
                 
-                // Add monster name
-                const textSpan = document.createElement('span');
-                textSpan.textContent = localization.getText(`bestiary.monster.${monsterType.tag}.name`);
-                monsterButton.appendChild(textSpan);
-                
-                // Add event listener
-                monsterButton.addEventListener('click', () => {
-                    // Using type assertion to ensure TypeScript accepts this as a valid MonsterType
-                    this.selectMonster(monsterType as MonsterType);
-                    
-                    // Highlight the selected button
-                    document.querySelectorAll('.bestiary-monster-button').forEach(btn => {
-                        (btn as HTMLButtonElement).style.backgroundColor = '#2c3e50';
-                    });
-                    monsterButton.style.backgroundColor = '#3498db';
+                // Highlight the selected button
+                document.querySelectorAll('.bestiary-monster-button').forEach(btn => {
+                    (btn as HTMLButtonElement).style.backgroundColor = '#2c3e50';
                 });
-                
-                // Add hover effects
-                monsterButton.addEventListener('mouseover', () => {
-                    if (this.selectedMonster !== monsterType) {
-                        monsterButton.style.backgroundColor = '#34495e';
-                    }
-                });
-                
-                monsterButton.addEventListener('mouseout', () => {
-                    if (this.selectedMonster !== monsterType) {
-                        monsterButton.style.backgroundColor = '#2c3e50';
-                    }
-                });
-                
-                this.monstersList.appendChild(monsterButton);
+                monsterButton.style.backgroundColor = '#3498db';
             });
+            
+            // Add hover effects
+            monsterButton.addEventListener('mouseover', () => {
+                if (this.selectedMonster !== monsterType) {
+                    monsterButton.style.backgroundColor = '#34495e';
+                }
+            });
+            
+            monsterButton.addEventListener('mouseout', () => {
+                if (this.selectedMonster !== monsterType) {
+                    monsterButton.style.backgroundColor = '#2c3e50';
+                }
+            });
+            
+            this.monstersList.appendChild(monsterButton);
         });
         
         document.body.appendChild(this.monstersList);
@@ -295,20 +339,35 @@ export default class BestaryScene extends Phaser.Scene {
         const panelSpacing = 30; // Space between panels
         const totalContentWidth = 220 + panelSpacing + 450; // monsters list width + spacing + details panel width
         const leftOffset = (width - totalContentWidth) / 2; // Center the entire content area
+        const tabHeight = 45; // Estimated height of the tab buttons
+        const verticalSpacing = 20; // Additional spacing between tabs and content
         
-        // Position monsters list in the center-left
+        // Position tab container
+        const tabContainer = document.getElementById('bestiary-tabs-container');
+        if (tabContainer) {
+            tabContainer.style.left = `${leftOffset}px`;
+            tabContainer.style.top = `${height * 0.22 - tabHeight}px`; // Position tabs closer to 22% height
+            tabContainer.style.width = `${totalContentWidth}px`; // Match content width exactly
+        }
+        
+        // Position monsters list in the center-left, below the tabs
         this.monstersList.style.left = `${leftOffset}px`;
-        this.monstersList.style.top = `${height * 0.20}px`;
-        this.monstersList.style.maxHeight = `${height * 0.65}px`;
+        this.monstersList.style.top = `${height * 0.22 + verticalSpacing}px`; // Position below tabs + spacing
+        this.monstersList.style.maxHeight = `${height * 0.60}px`; // Adjusted height to avoid overlap
         
-        // Position monster details panel in the center-right
+        // Position monster details panel in the center-right, aligned with the monster list
         this.monsterDetailsPanel.style.left = `${leftOffset + 220 + panelSpacing}px`;
-        this.monsterDetailsPanel.style.top = `${height * 0.20}px`;
-        this.monsterDetailsPanel.style.maxHeight = `${height * 0.65}px`;
+        this.monsterDetailsPanel.style.top = `${height * 0.22 + verticalSpacing}px`; // Same vertical position as monster list
+        this.monsterDetailsPanel.style.maxHeight = `${height * 0.60}px`; // Adjusted height to avoid overlap
         
         // Position back button at the bottom center
         this.backButton.style.left = `${width * 0.5 - 50}px`;
-        this.backButton.style.top = `${height - 80}px`;
+        this.backButton.style.top = `${height - 70}px`; // Moved up slightly to avoid edges
+        
+        // Position phase toggle button on the right side of the details panel
+        const detailsPanelRight = leftOffset + 220 + panelSpacing + 450; // Left position + width of the panel
+        this.phaseToggleButton.style.left = `${detailsPanelRight - 120}px`; // Align to the right with some margin
+        this.phaseToggleButton.style.top = `${height * 0.22 + verticalSpacing + 15}px`; // Align near the top of the details panel
     }
     
     private handleResize() {
@@ -321,72 +380,16 @@ export default class BestaryScene extends Phaser.Scene {
         // Show the details panel
         this.monsterDetailsPanel.style.display = 'block';
         
-        // Get monster stats
-        const monsterName = localization.getText(`bestiary.monster.${monsterType.tag}.name`);
-        const monsterDescription = localization.getText(`bestiary.monster.${monsterType.tag}.description`);
-        const monsterTips = localization.getText(`bestiary.monster.${monsterType.tag}.tips`);
-        const monsterImageFile = this.monsterImageMapping[monsterType.tag];
-        
-        // Get general stats based on monster type (these would ideally come from the server)
-        const statsByType: Record<string, {hp: number, speed: number, damage: number}> = {
-            "Rat": { hp: 10, speed: 160, damage: 1 },
-            "Slime": { hp: 25, speed: 100, damage: 1.5 },
-            "Orc": { hp: 50, speed: 140, damage: 2.0 },
-            "Wolf": { hp: 35, speed: 175, damage: 1.8 },
-            "Worm": { hp: 20, speed: 80, damage: 0.8 },
-            "FinalBossPhase1": { hp: 500, speed: 120, damage: 25 },
-            "FinalBossPhase2": { hp: 500, speed: 150, damage: 40 },
-            "FinalBossJorgePhase1": { hp: 500, speed: 120, damage: 25 },
-            "FinalBossJorgePhase2": { hp: 500, speed: 150, damage: 40 },
-            "FinalBossBjornPhase1": { hp: 500, speed: 120, damage: 25 },
-            "FinalBossBjornPhase2": { hp: 500, speed: 150, damage: 40 },
-            "FinalBossSimonPhase1": { hp: 500, speed: 120, damage: 25 },
-            "FinalBossSimonPhase2": { hp: 500, speed: 50, damage: 10 }
-        };
-        
-        const stats = statsByType[monsterType.tag] || { hp: '?', speed: '?', damage: '?' };
-        
-        // Update the details panel content
-        this.monsterDetailsPanel.innerHTML = `
-            <div style="display: flex; flex-direction: column; gap: 15px;">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-                    <h2 style="margin: 0; font-size: 24px; color: #3498db;">${monsterName}</h2>
-                </div>
-                
-                <div style="display: flex; gap: 20px; margin-bottom: 15px;">
-                    <div style="flex-shrink: 0; width: 120px; height: 120px; display: flex; align-items: center; justify-content: center; background-color: rgba(0, 0, 0, 0.3); border-radius: 4px;">
-                        <img src="assets/${monsterImageFile}" style="max-width: 100px; max-height: 100px; object-fit: contain;" alt="${monsterName}">
-                    </div>
-                    
-                    <div style="flex-grow: 1;">
-                        <p style="margin: 0 0 15px 0; line-height: 1.5;">${monsterDescription}</p>
-                    </div>
-                </div>
-                
-                <div style="background-color: rgba(0, 0, 0, 0.2); border-radius: 4px; padding: 15px; margin-bottom: 15px;">
-                    <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #f39c12;">Stats</h3>
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
-                        <div>
-                            <div style="color: #e74c3c; font-weight: bold;">HP</div>
-                            <div>${stats.hp}</div>
-                        </div>
-                        <div>
-                            <div style="color: #3498db; font-weight: bold;">Speed</div>
-                            <div>${stats.speed}</div>
-                        </div>
-                        <div>
-                            <div style="color: #e67e22; font-weight: bold;">Damage</div>
-                            <div>${stats.damage}</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div>
-                    <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #2ecc71;">Tips</h3>
-                    <div style="white-space: pre-line; line-height: 1.5;">${monsterTips}</div>
-                </div>
-            </div>
-        `;
+        // Update the display with the selected monster
+        this.updateMonsterDisplay(monsterType);
+
+        // Show phase toggle button for bosses
+        if (this.currentTab === 'bosses') {
+            this.phaseToggleButton.style.display = 'block';
+            this.phaseToggleButton.textContent = this.selectedMonsterPhase === 1 ? 'Show Phase 2' : 'Show Phase 1';
+        } else {
+            this.phaseToggleButton.style.display = 'none';
+        }
     }
     
     shutdown() {
@@ -405,6 +408,18 @@ export default class BestaryScene extends Phaser.Scene {
             this.backButton.remove();
         }
         
+        if (this.commonMonstersTab && this.commonMonstersTab.parentNode) {
+            this.commonMonstersTab.remove();
+        }
+        
+        if (this.bossesTab && this.bossesTab.parentNode) {
+            this.bossesTab.remove();
+        }
+        
+        if (this.phaseToggleButton && this.phaseToggleButton.parentNode) {
+            this.phaseToggleButton.remove();
+        }
+        
         // Remove any other elements by ID
         const listElement = document.getElementById('bestiary-monsters-list');
         if (listElement && listElement.parentNode) {
@@ -421,7 +436,385 @@ export default class BestaryScene extends Phaser.Scene {
             backButtonElement.remove();
         }
         
+        const tabContainerElement = document.getElementById('bestiary-tabs-container');
+        if (tabContainerElement && tabContainerElement.parentNode) {
+            tabContainerElement.remove();
+        }
+        
+        const phaseToggleElement = document.getElementById('bestiary-phase-toggle');
+        if (phaseToggleElement && phaseToggleElement.parentNode) {
+            phaseToggleElement.remove();
+        }
+        
         // Remove resize listener
         this.scale.off('resize', this.handleResize);
+    }
+
+    private createTabButtons() {
+        // Remove any existing tab buttons
+        const existingCommonTab = document.getElementById('bestiary-common-tab');
+        if (existingCommonTab) existingCommonTab.remove();
+        
+        const existingBossesTab = document.getElementById('bestiary-bosses-tab');
+        if (existingBossesTab) existingBossesTab.remove();
+        
+        // Create tab container
+        const tabContainer = document.createElement('div');
+        tabContainer.id = 'bestiary-tabs-container';
+        tabContainer.style.position = 'absolute';
+        tabContainer.style.display = 'flex';
+        tabContainer.style.gap = '5px';
+        tabContainer.style.justifyContent = 'center'; // Center the tabs
+        tabContainer.style.width = '700px'; // Same width as content area
+        
+        // Common monsters tab - increased size and padding
+        this.commonMonstersTab = document.createElement('button');
+        this.commonMonstersTab.id = 'bestiary-common-tab';
+        this.commonMonstersTab.textContent = localization.getText('bestiary.category.common');
+        this.commonMonstersTab.style.padding = '12px 25px'; // Increased padding
+        this.commonMonstersTab.style.backgroundColor = '#3498db'; // Active by default
+        this.commonMonstersTab.style.color = 'white';
+        this.commonMonstersTab.style.border = '2px solid #34495e';
+        this.commonMonstersTab.style.borderRadius = '5px 5px 0 0';
+        this.commonMonstersTab.style.cursor = 'pointer';
+        this.commonMonstersTab.style.fontSize = '16px'; // Larger font
+        this.commonMonstersTab.style.fontWeight = 'bold';
+        this.commonMonstersTab.style.width = '50%'; // Make tabs equal width
+        this.commonMonstersTab.style.textAlign = 'center';
+        
+        // Bosses tab - increased size and padding
+        this.bossesTab = document.createElement('button');
+        this.bossesTab.id = 'bestiary-bosses-tab';
+        this.bossesTab.textContent = localization.getText('bestiary.category.bosses');
+        this.bossesTab.style.padding = '12px 25px'; // Increased padding
+        this.bossesTab.style.backgroundColor = '#2c3e50'; // Inactive
+        this.bossesTab.style.color = 'white';
+        this.bossesTab.style.border = '2px solid #34495e';
+        this.bossesTab.style.borderRadius = '5px 5px 0 0';
+        this.bossesTab.style.cursor = 'pointer';
+        this.bossesTab.style.fontSize = '16px'; // Larger font
+        this.bossesTab.style.fontWeight = 'bold';
+        this.bossesTab.style.width = '50%'; // Make tabs equal width
+        this.bossesTab.style.textAlign = 'center';
+        
+        // Add click handlers
+        this.commonMonstersTab.addEventListener('click', () => {
+            if (this.currentTab !== 'common') {
+                this.currentTab = 'common';
+                this.updateTabAppearance();
+                this.refreshMonstersList();
+                this.phaseToggleButton.style.display = 'none'; // Hide phase toggle for common monsters
+            }
+        });
+        
+        this.bossesTab.addEventListener('click', () => {
+            if (this.currentTab !== 'bosses') {
+                this.currentTab = 'bosses';
+                this.updateTabAppearance();
+                this.refreshMonstersList();
+                // Don't show phase toggle button yet - wait until a boss is selected
+            }
+        });
+        
+        // Add tabs to container
+        tabContainer.appendChild(this.commonMonstersTab);
+        tabContainer.appendChild(this.bossesTab);
+        
+        // Add to document
+        document.body.appendChild(tabContainer);
+        
+        // Position the tabs
+        const width = this.cameras.main.width;
+        const height = this.cameras.main.height;
+        const panelSpacing = 30;
+        const totalContentWidth = 220 + panelSpacing + 450;
+        const leftOffset = (width - totalContentWidth) / 2;
+        
+        tabContainer.style.left = `${leftOffset}px`;
+        tabContainer.style.top = `${height * 0.20 - this.commonMonstersTab.offsetHeight}px`;
+    }
+    
+    private updateTabAppearance() {
+        if (this.currentTab === 'common') {
+            this.commonMonstersTab.style.backgroundColor = '#3498db'; // Active
+            this.bossesTab.style.backgroundColor = '#2c3e50'; // Inactive
+        } else {
+            this.commonMonstersTab.style.backgroundColor = '#2c3e50'; // Inactive
+            this.bossesTab.style.backgroundColor = '#3498db'; // Active
+        }
+    }
+    
+    private refreshMonstersList() {
+        // Clear selection
+        this.selectedMonster = null;
+        this.selectedMonsterPhase = 1;
+        this.monsterDetailsPanel.style.display = 'none';
+        
+        // Recreate the list with the appropriate monsters
+        this.createMonstersList();
+        this.positionHTMLElements();
+    }
+
+    private createPhaseToggleButton() {
+        // Remove any existing button
+        const existingButton = document.getElementById('bestiary-phase-toggle');
+        if (existingButton) existingButton.remove();
+        
+        // Create phase toggle button
+        this.phaseToggleButton = document.createElement('button');
+        this.phaseToggleButton.id = 'bestiary-phase-toggle';
+        this.phaseToggleButton.textContent = 'Show Phase 2';
+        this.phaseToggleButton.style.position = 'absolute';
+        this.phaseToggleButton.style.padding = '8px 12px';
+        this.phaseToggleButton.style.backgroundColor = '#e67e22';
+        this.phaseToggleButton.style.color = 'white';
+        this.phaseToggleButton.style.border = '2px solid #d35400';
+        this.phaseToggleButton.style.borderRadius = '4px';
+        this.phaseToggleButton.style.cursor = 'pointer';
+        this.phaseToggleButton.style.fontSize = '14px';
+        this.phaseToggleButton.style.fontWeight = 'bold';
+        this.phaseToggleButton.style.display = 'none'; // Hidden by default
+        
+        // Add hover effects
+        this.phaseToggleButton.addEventListener('mouseover', () => {
+            this.phaseToggleButton.style.backgroundColor = '#d35400';
+        });
+        
+        this.phaseToggleButton.addEventListener('mouseout', () => {
+            this.phaseToggleButton.style.backgroundColor = '#e67e22';
+        });
+        
+        // Add click handler
+        this.phaseToggleButton.addEventListener('click', () => {
+            this.toggleBossPhase();
+        });
+        
+        document.body.appendChild(this.phaseToggleButton);
+    }
+    
+    private toggleBossPhase() {
+        // Only applicable for boss monsters
+        if (!this.selectedMonster || this.currentTab !== 'bosses') return;
+        
+        // Toggle phase and update display
+        this.selectedMonsterPhase = this.selectedMonsterPhase === 1 ? 2 : 1;
+        
+        // Update button text
+        this.phaseToggleButton.textContent = this.selectedMonsterPhase === 1 ? 'Show Phase 2' : 'Show Phase 1';
+        
+        // Get the corresponding monster type for the selected boss and phase
+        const currentBossBase = this.selectedMonster.tag.replace('Phase1', '').replace('Phase2', '');
+        const newMonsterTypeTag = `${currentBossBase}Phase${this.selectedMonsterPhase}`;
+        
+        // Find the MonsterType that matches this tag
+        let newMonsterType: MonsterType | null = null;
+        for (const key in MonsterType) {
+            if (typeof MonsterType[key] === 'object' && (MonsterType[key] as any).tag === newMonsterTypeTag) {
+                newMonsterType = MonsterType[key] as MonsterType;
+                break;
+            }
+        }
+        
+        if (newMonsterType) {
+            // Update the display with the new phase
+            this.updateMonsterDisplay(newMonsterType);
+        } else {
+            console.error(`Could not find MonsterType for tag: ${newMonsterTypeTag}`);
+        }
+    }
+    
+    private updateMonsterDisplay(monsterType: MonsterType) {
+        // Get monster details from localization
+        const monsterName = localization.getText(`bestiary.monster.${monsterType.tag}.name`);
+        const monsterDescription = localization.getText(`bestiary.monster.${monsterType.tag}.description`);
+        const monsterTips = localization.getText(`bestiary.monster.${monsterType.tag}.tips`);
+        const monsterImageFile = this.monsterImageMapping[monsterType.tag];
+        
+        // Get monster stats directly from SpacetimeDB bestiary table - no caching
+        let stats = { hp: '?', speed: '?', damage: '?', radius: '?', exp: '?' };
+        
+        if (this.spacetimeDBClient?.sdkConnection?.db?.bestiary) {
+            try {
+                // Directly access the database and run a query
+                const db = this.spacetimeDBClient.sdkConnection.db;
+                
+                // Get monster_type enum value based on the tag
+                let monsterTypeValue = -1;
+                // Map tag strings to enum numbers based on the SQL table
+                const monsterTypeMap: Record<string, number> = {
+                    "Rat": 0,
+                    "Slime": 1,
+                    "Orc": 2,
+                    "Wolf": 3,
+                    "Worm": 4,
+                    "Scorpion": 5,
+                    "FinalBossPhase1": 6,
+                    "FinalBossPhase2": 7,
+                    "FinalBossJorgePhase1": 8,
+                    "FinalBossJorgePhase2": 9,
+                    "FinalBossBjornPhase1": 10,
+                    "FinalBossBjornPhase2": 11,
+                    "FinalBossSimonPhase1": 12,
+                    "FinalBossSimonPhase2": 13
+                };
+                
+                monsterTypeValue = monsterTypeMap[monsterType.tag] ?? -1;
+                console.log(`Looking for monster type: ${monsterType.tag} (value: ${monsterTypeValue})`);
+                
+                if (monsterTypeValue >= 0) {
+                    // In the bestiary table, the bestiary_id field equals the monster_type enum value
+                    // So we can directly query using the bestiaryId index
+                    const monsterData = db.bestiary.bestiaryId.find(monsterTypeValue);
+                    
+                    if (monsterData) {
+                        console.log(`Found bestiary entry for monster type ${monsterType.tag}`);
+                        
+                        stats = {
+                            hp: monsterData.max_hp,
+                            speed: monsterData.speed,
+                            damage: monsterData.atk,
+                            radius: monsterData.radius,
+                            exp: monsterData.exp
+                        };
+                        console.log(`Found stats for ${monsterType.tag}: HP=${stats.hp}, Speed=${stats.speed}, Damage=${stats.damage}, Radius=${stats.radius}, Exp=${stats.exp}`);
+                    } else {
+                        console.log(`No data found with bestiaryId for monster type: ${monsterType.tag} (value: ${monsterTypeValue})`);
+                        
+                        // Try iterating through all entries as a fallback
+                        const allEntries = Array.from(db.bestiary.iter());
+                        console.log(`Total bestiary entries: ${allEntries.length}`);
+                        
+                        if (allEntries.length > 0) {
+                            console.log(`First entry: monster_type=${allEntries[0].monster_type}, max_hp=${allEntries[0].max_hp}`);
+                            
+                            // Try to find by monster_type field
+                            const foundEntry = allEntries.find(entry => entry.monster_type === monsterTypeValue);
+                            if (foundEntry) {
+                                stats = {
+                                    hp: foundEntry.max_hp,
+                                    speed: foundEntry.speed,
+                                    damage: foundEntry.atk,
+                                    radius: foundEntry.radius,
+                                    exp: foundEntry.exp
+                                };
+                                console.log(`Found stats by iteration for ${monsterType.tag}: HP=${stats.hp}, Speed=${stats.speed}`);
+                            } else {
+                                // Use fallback data
+                                const fallbackData = this.getFallbackMonsterData(monsterType.tag);
+                                if (fallbackData) {
+                                    stats = fallbackData;
+                                }
+                            }
+                        } else {
+                            // Use fallback data
+                            const fallbackData = this.getFallbackMonsterData(monsterType.tag);
+                            if (fallbackData) {
+                                stats = fallbackData;
+                            }
+                        }
+                    }
+                } else {
+                    console.error(`Unknown monster type tag: ${monsterType.tag}`);
+                    // Use fallback data
+                    const fallbackData = this.getFallbackMonsterData(monsterType.tag);
+                    if (fallbackData) {
+                        stats = fallbackData;
+                    }
+                }
+            } catch (error) {
+                console.error(`Error fetching data for ${monsterType.tag}:`, error);
+                // Use fallback data for this monster
+                const fallbackData = this.getFallbackMonsterData(monsterType.tag);
+                if (fallbackData) {
+                    stats = fallbackData;
+                }
+            }
+        } else {
+            console.warn("Database connection not available, using fallback data");
+            // Use fallback data for this monster
+            const fallbackData = this.getFallbackMonsterData(monsterType.tag);
+            if (fallbackData) {
+                stats = fallbackData;
+            }
+        }
+        
+        // Phase indicator for boss monsters
+        const phaseIndicator = this.currentTab === 'bosses' ? 
+            `<div style="color: #e67e22; font-weight: bold; margin-top: 5px;">Phase ${this.selectedMonsterPhase}</div>` : '';
+        
+        // Update the details panel content with the stats
+        this.monsterDetailsPanel.innerHTML = `
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                    <div>
+                        <h2 style="margin: 0; font-size: 24px; color: #3498db;">${monsterName}</h2>
+                        ${phaseIndicator}
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 20px; margin-bottom: 15px;">
+                    <div style="flex-shrink: 0; width: 120px; height: 120px; display: flex; align-items: center; justify-content: center; background-color: rgba(0, 0, 0, 0.3); border-radius: 4px;">
+                        <img src="assets/${monsterImageFile}" style="max-width: 100px; max-height: 100px; object-fit: contain;" alt="${monsterName}">
+                    </div>
+                    
+                    <div style="flex-grow: 1;">
+                        <p style="margin: 0 0 15px 0; line-height: 1.5;">${monsterDescription}</p>
+                    </div>
+                </div>
+                
+                <div style="background-color: rgba(0, 0, 0, 0.2); border-radius: 4px; padding: 15px; margin-bottom: 15px;">
+                    <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #f39c12;">Stats</h3>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px;">
+                        <div>
+                            <div style="color: #e74c3c; font-weight: bold;">HP</div>
+                            <div>${stats.hp}</div>
+                        </div>
+                        <div>
+                            <div style="color: #3498db; font-weight: bold;">Speed</div>
+                            <div>${stats.speed}</div>
+                        </div>
+                        <div>
+                            <div style="color: #e67e22; font-weight: bold;">Damage</div>
+                            <div>${stats.damage}</div>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                        <div>
+                            <div style="color: #9b59b6; font-weight: bold;">Size</div>
+                            <div>${stats.radius}</div>
+                        </div>
+                        <div>
+                            <div style="color: #2ecc71; font-weight: bold;">XP Value</div>
+                            <div>${stats.exp}</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div>
+                    <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #2ecc71;">Tips</h3>
+                    <div style="white-space: pre-line; line-height: 1.5;">${monsterTips}</div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Get fallback data for a monster if database query fails
+    private getFallbackMonsterData(monsterType: string): { hp: any, speed: any, damage: any, radius: any, exp: any } | null {
+        const fallbackData: Record<string, any> = {
+            "Rat": { hp: 10, speed: 160, damage: 1, radius: 16, exp: 5 },
+            "Slime": { hp: 25, speed: 100, damage: 1.5, radius: 20, exp: 10 },
+            "Orc": { hp: 50, speed: 140, damage: 2.0, radius: 24, exp: 20 },
+            "Wolf": { hp: 35, speed: 175, damage: 1.8, radius: 20, exp: 15 },
+            "Worm": { hp: 20, speed: 80, damage: 0.8, radius: 16, exp: 8 },
+            "Scorpion": { hp: 40, speed: 130, damage: 2.2, radius: 22, exp: 18 },
+            "FinalBossJorgePhase1": { hp: 500, speed: 120, damage: 25, radius: 32, exp: 100 },
+            "FinalBossJorgePhase2": { hp: 750, speed: 150, damage: 40, radius: 40, exp: 200 },
+            "FinalBossBjornPhase1": { hp: 500, speed: 120, damage: 25, radius: 32, exp: 100 },
+            "FinalBossBjornPhase2": { hp: 750, speed: 150, damage: 40, radius: 40, exp: 200 },
+            "FinalBossSimonPhase1": { hp: 500, speed: 120, damage: 25, radius: 32, exp: 100 },
+            "FinalBossSimonPhase2": { hp: 750, speed: 150, damage: 40, radius: 40, exp: 200 }
+        };
+        
+        return fallbackData[monsterType] || null;
     }
 }

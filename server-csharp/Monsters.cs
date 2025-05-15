@@ -10,7 +10,8 @@ public static partial class Module
         MonsterType.Slime,
         MonsterType.Orc,
         MonsterType.Wolf,
-        MonsterType.Worm
+        MonsterType.Worm,
+        MonsterType.Scorpion
         // Add new normal monster types here as they are created
         // Bosses are excluded from this list to prevent them from spawning randomly
     };
@@ -507,6 +508,66 @@ public static partial class Module
                             });
                             
                             Log.Info($"Worm {monster.monster_id} fired spit attack at nearest player");
+                        }
+                    }
+                }
+            }
+            else if (monster.bestiary_id == MonsterType.Scorpion)
+            {
+                // Scorpions have a chance to use their sting attack on nearby players
+                var random = ctx.Rng;
+                if (random.NextDouble() < 0.02) // 2% chance per tick (slightly more frequent than worm)
+                {
+                    // Find the nearest player
+                    var nearestPlayerPos = FindNearestPlayerPosition(ctx, monsterEntity.position);
+                    if (nearestPlayerPos.HasValue)
+                    {
+                        // Calculate distance to nearest player
+                        float dx = nearestPlayerPos.Value.x - monsterEntity.position.x;
+                        float dy = nearestPlayerPos.Value.y - monsterEntity.position.y;
+                        float distanceSquared = dx * dx + dy * dy;
+                        
+                        // Only attack if player is within close range (200 pixels)
+                        const float STING_RANGE = 200.0f; 
+                        if (distanceSquared <= STING_RANGE * STING_RANGE)
+                        {
+                            // Calculate direction to player
+                            var direction = CalculateDirectionToTarget(monsterEntity.position, nearestPlayerPos);
+                            
+                            // Get attack data
+                            var attackData = FindAttackDataByType(ctx, AttackType.ScorpionSting);
+                            if (attackData != null)
+                            {
+                                // Create a projectile entity
+                                var projectileEntity = ctx.Db.entity.Insert(new Entity
+                                {
+                                    position = monsterEntity.position,
+                                    direction = direction,
+                                    radius = attackData.Value.radius
+                                });
+
+                                // Create active boss attack (reusing the boss attack mechanism)
+                                var activeBossAttack = ctx.Db.active_boss_attacks.Insert(new ActiveBossAttack
+                                {
+                                    entity_id = projectileEntity.entity_id,
+                                    boss_monster_id = monster.monster_id,
+                                    attack_type = AttackType.ScorpionSting,
+                                    id_within_burst = 0,
+                                    parameter_u = 1, // Using parameter_u = 1 to indicate this causes a poison effect
+                                    damage = attackData.Value.damage,
+                                    radius = attackData.Value.radius,
+                                    piercing = attackData.Value.piercing
+                                });
+
+                                // Schedule cleanup
+                                ctx.Db.active_boss_attack_cleanup.Insert(new ActiveBossAttackCleanup
+                                {
+                                    active_boss_attack_id = activeBossAttack.active_boss_attack_id,
+                                    scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(attackData.Value.duration))
+                                });
+                                
+                                Log.Info($"Scorpion {monster.monster_id} fired sting attack at nearby player");
+                            }
                         }
                     }
                 }

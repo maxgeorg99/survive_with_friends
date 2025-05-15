@@ -16,7 +16,8 @@ public enum AttackType
     BossBolt,
     BossJorgeBolt,
     BossBjornBolt,
-    WormSpit
+    WormSpit,
+    ScorpionSting
 }
 
 public static partial class Module
@@ -365,7 +366,7 @@ public static partial class Module
             attack_id = 8,
             attack_type = AttackType.WormSpit,
             name = "Worm Spit",
-            cooldown = 3000,           // Slow attack speed (3 seconds)
+            cooldown = 8000,           // Slow attack speed (8 seconds)
             duration = 1500,           // How long the projectile stays active
             projectiles = 1,           // One projectile at a time
             fire_delay = 0,
@@ -373,6 +374,23 @@ public static partial class Module
             piercing = false,          // Doesn't pierce through targets
             radius = 12,               // Small size
             damage = 2,                // Very low damage
+            armor_piercing = 0         // No armor piercing
+        });
+
+        // Scorpion Sting - short range projectile with poison effect
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 9,
+            attack_type = AttackType.ScorpionSting,
+            name = "Scorpion Sting",
+            cooldown = 3500,           // Slower than worm spit
+            duration = 800,            // Shorter duration than worm spit
+            projectiles = 1,           // One projectile at a time
+            fire_delay = 0,
+            speed = 400,               // Slower than worm spit
+            piercing = false,          // Doesn't pierce through targets
+            radius = 10,               // Smaller size
+            damage = 1,                // Lower damage (poison effect is the main threat)
             armor_piercing = 0         // No armor piercing
         });
 

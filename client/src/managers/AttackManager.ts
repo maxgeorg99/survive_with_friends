@@ -284,7 +284,7 @@ export class AttackManager {
             case 'WormSpit':
                 spriteKey = 'attack_spit'; // Using the dedicated spit sprite
                 break;
-            default:
+                        default:
                 console.warn(`Unknown attack type: ${attackType}, using default sprite`);
                 return null;
         }
@@ -304,7 +304,7 @@ export class AttackManager {
             sprite.setScale(0.6); // Slightly larger for the football
         } else if (attackType === 'Garlic') {
             sprite.setScale(0.1); // Small garlic AoE
-        } else {
+                } else {
             sprite.setScale(1.0); // Normal scale for other attacks
         }
         
@@ -381,6 +381,35 @@ export class AttackManager {
                 // Add some particle effects for slime trail
                 if (Math.random() < 0.2) { // Only do this occasionally to avoid performance issues
                     this.createWormSpitParticles(predictedPosition.x, predictedPosition.y);
+                }
+            } else if (attackGraphicData.attackType === 'ScorpionSting') {
+                // Special handling for scorpion sting - make it look poisonous
+                
+                // Add rotation based on direction with a pulsing effect
+                if (direction.length() > 0) {
+                    const angle = Math.atan2(direction.y, direction.x);
+                    
+                    // Fix the upside-down issue when sprite is moving left
+                    if (Math.abs(angle) > Math.PI/2) {
+                        // Left-facing: set a base angle of 0 and flip the sprite
+                        sprite.setRotation(0);
+                        sprite.setFlipX(true);
+                        sprite.setFlipY(false);
+                    } else {
+                        // Right-facing: use normal rotation and no flipping
+                        sprite.setRotation(angle);
+                        sprite.setFlipX(false);
+                        sprite.setFlipY(false);
+                    }
+                }
+                
+                // Add a subtle pulsing effect to the green tint
+                const pulse = 0.8 + Math.sin(this.gameTime * 0.01) * 0.2;
+                sprite.setAlpha(pulse);
+                
+                // Add more prominent poison particle effects
+                if (Math.random() < 0.3) { // Higher chance than worm spit for more visible effect
+                    this.createScorpionStingParticles(predictedPosition.x, predictedPosition.y);
                 }
             } else if (!attackGraphicData.isShield) {
                 // For regular projectiles and boss attacks, rotate based on movement direction
@@ -487,6 +516,32 @@ export class AttackManager {
         
         // Auto-destroy after animation
         this.scene.time.delayedCall(300, () => {
+            particles.destroy();
+        });
+    }
+
+    // Create particles for scorpion sting projectile (poisonous)
+    private createScorpionStingParticles(x: number, y: number) {
+        if (!this.scene) return;
+        
+        // Create a more prominent poison particle effect
+        const particles = this.scene.add.particles(x, y, 'white_pixel', {
+            speed: { min: 10, max: 40 },
+            angle: { min: 0, max: 360 },
+            scale: { start: 0.6, end: 0.1 },
+            lifespan: 400,
+            tint: [0x66ff66, 0x33cc33], // Bright poison green colors
+            alpha: { start: 0.8, end: 0 },
+            quantity: 2,
+            frequency: -1, // Only emit once
+            blendMode: 'ADD'
+        });
+        
+        // Emit a burst of particles
+        particles.explode(4, x, y);
+        
+        // Auto-destroy after animation
+        this.scene.time.delayedCall(400, () => {
             particles.destroy();
         });
     }

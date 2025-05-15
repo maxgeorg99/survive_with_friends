@@ -8,7 +8,7 @@ import MonsterSpawnerManager from '../managers/MonsterSpawnerManager';
 import { GameEvents } from '../constants/GameEvents';
 import { AttackManager } from '../managers/AttackManager';
 import GemManager from '../managers/GemManager';
-import { createPlayerDamageEffect, createMonsterDamageEffect } from '../utils/DamageEffects';
+import { createPlayerDamageEffect, createMonsterDamageEffect, createScorpionPoisonEffect } from '../utils/DamageEffects';
 import UpgradeUI from '../ui/UpgradeUI';
 import PlayerHUD from '../ui/PlayerHUD';
 import BossTimerUI from '../ui/BossTimerUI';
@@ -170,6 +170,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('monster_orc', 'assets/monster_orc.png');
         this.load.image('monster_worm', 'assets/monster_worm.png');
         this.load.image('monster_wolf', 'assets/monster_wolf.png');
+        this.load.image('monster_scorpion', 'assets/monster_scorpion.png');
         this.load.image('monster_spawn_indicator', 'assets/monster_spawn_indicator.png');
         
         // Load boss monster assets
@@ -857,6 +858,9 @@ export default class GameScene extends Phaser.Scene {
                 // If HP decreased, show damage effect
                 if (currentHp !== undefined && player.hp < currentHp) {
                     createPlayerDamageEffect(this.localPlayerSprite);
+                    
+                    // Check if the damage came from a scorpion
+                    this.checkForScorpionDamage(this.localPlayerSprite);
                 }
                 
                 // Update stored values
@@ -1519,6 +1523,9 @@ export default class GameScene extends Phaser.Scene {
                             const sprite = container.getByName('sprite') as Phaser.GameObjects.Sprite;
                             if (sprite) {
                                 createPlayerDamageEffect(sprite);
+                                
+                                // Check if the damage came from a scorpion
+                                this.checkForOtherPlayerScorpionDamage(sprite, container);
                             }
                         }
                         
@@ -2831,5 +2838,124 @@ export default class GameScene extends Phaser.Scene {
             confetti.destroy();
             stars.destroy();
         });
+    }
+
+    /**
+     * Check if the player was damaged by a scorpion and apply poison effect if needed
+     * @param playerSprite The player sprite to check and apply effect to
+     */
+    private checkForScorpionDamage(playerSprite: Phaser.Physics.Arcade.Sprite): void {
+        // Skip if player is already poisoned
+        if (playerSprite.getData('isPoisoned')) {
+            return;
+        }
+        
+        if (!this.monsterManager || !this.spacetimeDBClient?.sdkConnection?.db) {
+            return;
+        }
+        
+        try {
+            // Check for nearby scorpions
+            const monsters = Array.from(this.spacetimeDBClient.sdkConnection.db.monsters.iter())
+                .filter(monster => monster.bestiaryId === MonsterType.Scorpion);
+                
+            if (monsters.length === 0) {
+                return; // No scorpions present
+            }
+                
+            // Get the player position
+            const playerX = playerSprite.x;
+            const playerY = playerSprite.y;
+            
+            // Check if any scorpion is close enough to have caused the damage
+            let scorpionHit = false;
+            for (const scorpion of monsters) {
+                const scorpionEntity = this.spacetimeDBClient.sdkConnection.db.entity.entityId.find(scorpion.entityId);
+                if (scorpionEntity) {
+                    // Calculate distance between player and scorpion
+                    const dx = playerX - scorpionEntity.position.x;
+                    const dy = playerY - scorpionEntity.position.y;
+                    const distanceSquared = dx * dx + dy * dy;
+                    
+                    // Use a slightly larger range than the actual monster radius to account for lag
+                    const hitRange = scorpionEntity.radius * 1.5;
+                    
+                    if (distanceSquared <= hitRange * hitRange) {
+                        scorpionHit = true;
+                        break;
+                    }
+                }
+            }
+            
+            // If a scorpion hit the player, apply poison effect
+            if (scorpionHit) {
+                // Apply poison effect
+                createScorpionPoisonEffect(playerSprite, this);
+                
+                console.log("Player poisoned by scorpion!");
+            }
+        } catch (error) {
+            console.error("Error checking for scorpion damage:", error);
+        }
+    }
+
+    /**
+     * Check if another player was damaged by a scorpion and apply poison effect if needed
+     * @param playerSprite The player sprite to check and apply effect to
+     * @param container The container holding the player sprite
+     */
+    private checkForOtherPlayerScorpionDamage(playerSprite: Phaser.GameObjects.Sprite, container: Phaser.GameObjects.Container): void {
+        // Skip if player is already poisoned
+        if (container.getData('isPoisoned')) {
+            return;
+        }
+        
+        if (!this.monsterManager || !this.spacetimeDBClient?.sdkConnection?.db) {
+            return;
+        }
+        
+        try {
+            // Check for nearby scorpions
+            const monsters = Array.from(this.spacetimeDBClient.sdkConnection.db.monsters.iter())
+                .filter(monster => monster.bestiaryId === MonsterType.Scorpion);
+                
+            if (monsters.length === 0) {
+                return; // No scorpions present
+            }
+                
+            // Get the player position
+            const playerX = playerSprite.x;
+            const playerY = playerSprite.y;
+            
+            // Check if any scorpion is close enough to have caused the damage
+            let scorpionHit = false;
+            for (const scorpion of monsters) {
+                const scorpionEntity = this.spacetimeDBClient.sdkConnection.db.entity.entityId.find(scorpion.entityId);
+                if (scorpionEntity) {
+                    // Calculate distance between player and scorpion
+                    const dx = playerX - scorpionEntity.position.x;
+                    const dy = playerY - scorpionEntity.position.y;
+                    const distanceSquared = dx * dx + dy * dy;
+                    
+                    // Use a slightly larger range than the actual monster radius to account for lag
+                    const hitRange = scorpionEntity.radius * 1.5;
+                    
+                    if (distanceSquared <= hitRange * hitRange) {
+                        scorpionHit = true;
+                        break;
+                    }
+                }
+            }
+            
+            // If a scorpion hit the player, apply poison effect
+            if (scorpionHit) {
+                // Apply poison effect
+                createScorpionPoisonEffect(playerSprite, this);
+                
+                console.log("Other player poisoned by scorpion!");
+            }
+        } catch (error) {
+            console.error("Error checking for scorpion damage:", error);
+        }
     }
 }
