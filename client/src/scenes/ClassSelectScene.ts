@@ -85,6 +85,7 @@ export default class ClassSelectScene extends Phaser.Scene {
     private gamblerButton!: HTMLButtonElement;
     private athleteButton!: HTMLButtonElement;
     private gourmandButton!: HTMLButtonElement;
+    private bestiaryButton!: HTMLButtonElement;
     
     // State tracking
     private selectedClass: PlayerClass | null = null;
@@ -236,6 +237,47 @@ export default class ClassSelectScene extends Phaser.Scene {
         
         // Store reference for cleanup
         this.questButton = questButton;
+        
+        // Add bestiary button below quest button
+        const bestiaryButton = document.createElement('button');
+        bestiaryButton.style.position = 'absolute';
+        bestiaryButton.style.top = '110px'; // Position below quest button
+        bestiaryButton.style.right = '50px';
+        bestiaryButton.style.width = '180px';
+        bestiaryButton.style.height = '50px';
+        bestiaryButton.style.padding = '10px';
+        bestiaryButton.style.backgroundColor = '#2c3e50';
+        bestiaryButton.style.color = 'white';
+        bestiaryButton.style.border = '2px solid #34495e';
+        bestiaryButton.style.borderRadius = '5px';
+        bestiaryButton.style.cursor = 'pointer';
+        bestiaryButton.style.fontFamily = 'Arial';
+        bestiaryButton.style.fontSize = '18px';
+        bestiaryButton.style.transition = 'background-color 0.2s, border-color 0.2s';
+        bestiaryButton.style.display = 'flex';
+        bestiaryButton.style.alignItems = 'center';
+        bestiaryButton.style.justifyContent = 'center';
+        bestiaryButton.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+        bestiaryButton.textContent = '🐺 Bestiary';
+        
+        bestiaryButton.addEventListener('mouseover', () => {
+            bestiaryButton.style.backgroundColor = '#3498db';
+            bestiaryButton.style.borderColor = '#2980b9';
+        });
+        
+        bestiaryButton.addEventListener('mouseout', () => {
+            bestiaryButton.style.backgroundColor = '#2c3e50';
+            bestiaryButton.style.borderColor = '#34495e';
+        });
+        
+        bestiaryButton.addEventListener('click', () => {
+            this.scene.start('BestaryScene');
+        });
+        
+        document.body.appendChild(bestiaryButton);
+        
+        // Store reference for cleanup
+        this.bestiaryButton = bestiaryButton;
     }
     
     private createConfirmButton() {
