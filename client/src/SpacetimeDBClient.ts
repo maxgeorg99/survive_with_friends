@@ -5,10 +5,26 @@ import { GameEvents } from './constants/GameEvents';
 
 // Define your SpacetimeDB connection details
 const SPACETIMEDB_DB_NAME = "vibesurvivors-with-friends";
-const SPACETIMEDB_URI = "ws://localhost:3000"; // Use wss for cloud, corrected order
-const REMOTE_SPACETIMEDB_URI = "wss://maincloud.spacetimedb.com";
+const SPACETIMEDB_URI = "ws://localhost:3000"; // Local development server
+const REMOTE_SPACETIMEDB_URI = "wss://maincloud.spacetimedb.com"; // Production server
 
-const URI_TO_USE = SPACETIMEDB_URI;
+// Check if we're running in production mode based on the URL
+// If the URL includes 'localhost' or is a dev-specific domain, use local URI
+function isDevEnvironment() {
+    // In browser environment
+    if (typeof window !== 'undefined') {
+        return window.location.hostname === 'localhost' || 
+               window.location.port === '8080';
+    }
+    return false;
+}
+
+// Use the appropriate URI based on environment
+const URI_TO_USE = isDevEnvironment() ? SPACETIMEDB_URI : REMOTE_SPACETIMEDB_URI;
+
+// Log the current environment and chosen URI
+console.log(`Environment: ${isDevEnvironment() ? 'Development' : 'Production'}`);
+console.log(`Using SpacetimeDB URI: ${URI_TO_USE}`);
 
 class SpacetimeDBClient {
     // Initialize sdkClient to null, it will be set in handleConnect
