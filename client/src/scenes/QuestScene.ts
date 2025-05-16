@@ -15,7 +15,7 @@ export default class QuestScene extends Phaser.Scene {
     }
 
     preload() {
-        this.load.image('title_bg', '/assets/title_bg.png');
+        this.load.image('title_bg', 'assets/title_bg.png');
     }
 
     create() {

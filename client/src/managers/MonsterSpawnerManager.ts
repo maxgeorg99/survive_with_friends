@@ -35,7 +35,7 @@ export default class MonsterSpawnerManager {
 
     // Handle when a new monster spawner is inserted
     private handleSpawnerInsert(ctx: EventContext, spawner: MonsterSpawners) {
-        console.log(`New monster spawner at position (${spawner.position.x}, ${spawner.position.y}) for monster type: ${spawner.monsterType}`);
+        console.log(`New monster spawner at position (${spawner.position.x}, ${spawner.position.y}) for monster type: ${spawner.monsterType.tag}`);
         this.createSpawnerIndicator(spawner);
     }
 
@@ -70,6 +70,11 @@ export default class MonsterSpawnerManager {
         indicator.setScale(0.1);
         indicator.setAlpha(ALPHA_VALUE);
         indicator.setDepth(BASE_DEPTH + spawner.position.y);
+        
+        // Apply visual indicators based on monster type
+        if (spawner.monsterType.tag.includes('Boss')) {
+            indicator.setTint(0xff5555); // Reddish tint for bosses
+        }
         
         // Store the indicator
         this.spawnerIndicators.set(spawnerIdKey, indicator);
@@ -118,4 +123,4 @@ export default class MonsterSpawnerManager {
         this.spawnerIndicators.forEach(indicator => indicator.destroy());
         this.spawnerIndicators.clear();
     }
-} 
+}

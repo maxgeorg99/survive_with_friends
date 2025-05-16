@@ -8,7 +8,16 @@ public enum AttackType
     Sword,
     Wand,
     Knives,
-    Shield
+    Shield,
+    Football,
+    Cards,
+    Dumbbell,
+    Garlic,
+    BossBolt,
+    BossJorgeBolt,
+    BossBjornBolt,
+    WormSpit,
+    ScorpionSting
 }
 
 public static partial class Module
@@ -117,6 +126,40 @@ public static partial class Module
         public ScheduleAt scheduled_at; // When to trigger the attack
     }
 
+    // Active boss attacks - tracks currently active boss attacks in the game
+    [SpacetimeDB.Table(Name = "active_boss_attacks", Public = true)]
+    public partial struct ActiveBossAttack
+    {
+        [PrimaryKey, AutoInc]
+        public uint active_boss_attack_id;
+        
+        public uint entity_id;        // The projectile entity ID
+        [SpacetimeDB.Index.BTree]
+        public uint boss_monster_id;  // The boss monster that created this attack
+        public AttackType attack_type; // The type of attack
+        public uint id_within_burst;   // Position within a burst (0-based index)
+        public uint parameter_u;       // Parameter used for special attacks
+        public uint ticks_elapsed;    // Number of ticks since the attack was created
+        public uint damage;           // Damage of this specific attack instance
+        public float radius;          // Radius of this attack (for area effects)
+        public bool piercing;         // Whether this attack pierces through enemies
+    }
+
+    //Scheduled cleanup of active boss attacks
+    [SpacetimeDB.Table(Name = "active_boss_attack_cleanup", 
+                      Scheduled = nameof(CleanupActiveBossAttack), 
+                      ScheduledAt = nameof(scheduled_at))]
+    public partial struct ActiveBossAttackCleanup
+    {
+        [PrimaryKey, AutoInc]   
+        public ulong scheduled_id;
+
+        public ScheduleAt scheduled_at; // When to cleanup the active boss attack
+
+        [SpacetimeDB.Index.BTree]
+        public uint active_boss_attack_id; // The active boss attack to cleanup
+    }
+
     // Initialization of attack data
     [Reducer]
     public static void InitAttackData(ReducerContext ctx)
@@ -128,6 +171,74 @@ public static partial class Module
         }
 
         Log.Info("Initializing attack data...");
+
+        // Football - bouncing projectile with knockback
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 11,
+            attack_type = AttackType.Football,
+            name = "Football Shot",
+            cooldown = 800,          // Slower attack speed
+            duration = 2500,         // Stays longer
+            projectiles = 1,         // Burst of 3 footballs
+            fire_delay = 200,        // Small delay between shots
+            speed = 600,             // Medium speed
+            piercing = true,         // Goes through enemies
+            radius = 24,             // Medium size
+            damage = 4,              // Moderate damage
+            armor_piercing = 2       
+        });
+
+        // Cards - spread attack
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 12,
+            attack_type = AttackType.Cards,
+            name = "Card Throw",
+            cooldown = 600,          
+            duration = 800,          
+            projectiles = 3,         // Multiple cards
+            fire_delay = 50,         
+            speed = 700,             
+            piercing = false,        
+            radius = 16,             
+            damage = 3,              
+            armor_piercing = 2       
+        });
+
+        // Dumbbell - falling aerial attack
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 13,
+            attack_type = AttackType.Dumbbell,
+            name = "Dumbbell Drop",
+            cooldown = 1200,         // Slow attack speed
+            duration = 800,          // Quick impact
+            projectiles = 1,         
+            fire_delay = 200,        // Delay between drops
+            speed = 800,             // Fast falling speed
+            piercing = true,         // Goes through enemies
+            radius = 40,             // Large impact radius
+            damage = 8,              // High damage
+            armor_piercing = 4       
+        });
+
+        // Garlic - aura attack
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 14,
+            attack_type = AttackType.Garlic,
+            name = "Garlic Aura",
+            cooldown = 800,          // Frequent ticks
+            duration = 800,          // Duration of each pulse
+            projectiles = 1,         // Single aura
+            fire_delay = 0,          // Continuous
+            speed = 0,               // Stationary
+            piercing = true,         // Hits all enemies in range
+            radius = 100,            // Large aura radius
+            damage = 2,              // Low damage but constant
+            armor_piercing = 1       
+        });
 
         // Sword - melee attack
         ctx.Db.attack_data.Insert(new AttackData
@@ -195,6 +306,92 @@ public static partial class Module
             radius = 32,             
             damage = 4,             
             armor_piercing = 10       
+        });
+
+        // Boss Standard Bolt - for Simon's spread attack
+        // Assumes AttackType.BossBolt is defined in the AttackType enum
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 5, // Using an available ID
+            attack_type = AttackType.BossBolt, 
+            name = "Boss Standard Bolt",
+            cooldown = 10000,      // Example cooldown for Simon's attack sequence
+            duration = 1000,      // How long each bolt lasts
+            projectiles = 1,      // This AttackData defines a single bolt
+            fire_delay = 0,       
+            speed = 850,          // Speed of the bolt
+            piercing = false,
+            radius = 10,          // Radius of the bolt
+            damage = 0,           // Damage per bolt
+            armor_piercing = 3
+        });
+
+        // Boss Jorge Bolt - unique projectile for Jorge
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 6,
+            attack_type = AttackType.BossJorgeBolt,
+            name = "Jorge Bolt",
+            cooldown = 1000,           // Faster fire rate
+            duration = 2000,           // Flies longer
+            projectiles = 1,
+            fire_delay = 0,
+            speed = 950,               // Slightly faster
+            piercing = false,
+            radius = 10,               // Smaller
+            damage = 7,                // Slightly more damage
+            armor_piercing = 5
+        });
+
+        // Boss Björn Bolt - unique homing projectile for Björn
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 7,
+            attack_type = AttackType.BossBjornBolt,
+            name = "Björn Homing Bolt",
+            cooldown = 1800,           // Medium fire rate
+            duration = 2500,           // Flies longer
+            projectiles = 1,
+            fire_delay = 0,
+            speed = 800,               // Homing, so a bit slower
+            piercing = false,
+            radius = 12,               // Medium size
+            damage = 8,                // More damage
+            armor_piercing = 5
+        });
+
+        // Worm Spit - weak projectile attack
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 8,
+            attack_type = AttackType.WormSpit,
+            name = "Worm Spit",
+            cooldown = 8000,           // Slow attack speed (8 seconds)
+            duration = 1500,           // How long the projectile stays active
+            projectiles = 1,           // One projectile at a time
+            fire_delay = 0,
+            speed = 500,               // Medium speed
+            piercing = false,          // Doesn't pierce through targets
+            radius = 12,               // Small size
+            damage = 2,                // Very low damage
+            armor_piercing = 0         // No armor piercing
+        });
+
+        // Scorpion Sting - short range projectile with poison effect
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 9,
+            attack_type = AttackType.ScorpionSting,
+            name = "Scorpion Sting",
+            cooldown = 4000,           // Slower
+            duration = 800,            // Shorter duration than worm spit
+            projectiles = 1,           // One projectile at a time
+            fire_delay = 0,
+            speed = 400,               // Slower
+            piercing = false,          // Doesn't pierce through targets
+            radius = 10,               // Smaller size
+            damage = 1,                // Lower damage (poison effect is the main threat)
+            armor_piercing = 0         // No armor piercing
         });
 
         Log.Info("Attack data initialized successfully.");
@@ -293,6 +490,166 @@ public static partial class Module
         {
             active_attack_id = activeAttack.active_attack_id,
             scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(duration))
+        });
+    }
+
+    // Helper method to find the nearest player position
+    private static DbVector2? FindNearestPlayerPosition(ReducerContext ctx, DbVector2 fromPosition)
+    {
+        float nearestDistSq = float.MaxValue;
+        DbVector2? nearestPlayerPos = null;
+
+        foreach (var player in ctx.Db.player.Iter())
+        {
+            var playerEntityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
+            if (playerEntityOpt != null)
+            {
+                var playerEntity = playerEntityOpt.Value;
+                float dx = playerEntity.position.x - fromPosition.x;
+                float dy = playerEntity.position.y - fromPosition.y;
+                float distSq = dx * dx + dy * dy;
+                
+                if (distSq < nearestDistSq)
+                {
+                    nearestDistSq = distSq;
+                    nearestPlayerPos = playerEntity.position;
+                }
+            }
+        }
+
+        return nearestPlayerPos;
+    }
+
+    // Helper method to calculate direction vector toward a target
+    private static DbVector2 CalculateDirectionTowardTarget(DbVector2 fromPosition, DbVector2? targetPosition)
+    {
+        if (!targetPosition.HasValue)
+        {
+            return new DbVector2(1, 0); // Default direction if no target
+        }
+
+        float dx = targetPosition.Value.x - fromPosition.x;
+        float dy = targetPosition.Value.y - fromPosition.y;
+        float length = (float)Math.Sqrt(dx * dx + dy * dy);
+        
+        if (length > 0)
+        {
+            return new DbVector2(dx / length, dy / length);
+        }
+        return new DbVector2(1, 0); // Default direction if same position
+    }
+
+    // Boss attack trigger method - similar to TriggerAttackProjectile but for bosses
+    private static void TriggerBossAttackProjectile(ReducerContext ctx, uint bossId, AttackType attackType, uint idWithinBurst = 0, uint parameterU = 0, int parameterI = 0)
+    {
+        // Get attack data
+        var attackDataOpt = FindAttackDataByType(ctx, attackType);
+        if (attackDataOpt == null)
+        {
+            Log.Error($"Attack data not found for type {attackType}");
+            return;
+        }
+
+        var attackData = attackDataOpt.Value;
+        
+        // Get boss monster data
+        var bossOpt = ctx.Db.monsters.monster_id.Find(bossId);
+        if (bossOpt == null)
+        {
+            Log.Error($"Boss {bossId} not found");
+            return;
+        }
+        
+        var boss = bossOpt.Value;
+        
+        // Get boss's entity data to determine position
+        var entityOpt = ctx.Db.entity.entity_id.Find(boss.entity_id);
+        if (entityOpt == null)
+        {
+            Log.Error($"Entity {boss.entity_id} not found for boss {bossId}");
+            return;
+        }
+        
+        var entity = entityOpt.Value; // Boss's entity
+        
+        DbVector2 direction;
+        // Calculate base direction towards the nearest player for all attack types first
+        var nearestPlayerPos = FindNearestPlayerPosition(ctx, entity.position);
+        var baseDirectionToTarget = CalculateDirectionTowardTarget(entity.position, nearestPlayerPos);
+
+        if (attackType == AttackType.BossBolt) // Simon's spread attack
+        {
+            // idWithinBurst: 0, 1, 2 for Simon's 3 projectiles (from BossSystem.cs loop)
+            const float spreadAngleDegrees = 15.0f; // Angle for the outer projectiles
+            float angleOffsetDegrees = 0;
+
+            if (idWithinBurst == 0) // Left projectile relative to boss facing player
+            {
+                angleOffsetDegrees = -spreadAngleDegrees;
+            }
+            else if (idWithinBurst == 2) // Right projectile
+            {
+                angleOffsetDegrees = spreadAngleDegrees;
+            }
+            // else if (idWithinBurst == 1), angleOffsetDegrees = 0; // Center projectile, no offset
+
+            if (angleOffsetDegrees != 0.0f && !(baseDirectionToTarget.x == 0 && baseDirectionToTarget.y == 0))
+            {
+                float angleOffsetRadians = angleOffsetDegrees * (float)Math.PI / 180.0f;
+                direction = new DbVector2(
+                    baseDirectionToTarget.x * (float)Math.Cos(angleOffsetRadians) - baseDirectionToTarget.y * (float)Math.Sin(angleOffsetRadians),
+                    baseDirectionToTarget.x * (float)Math.Sin(angleOffsetRadians) + baseDirectionToTarget.y * (float)Math.Cos(angleOffsetRadians)
+                );
+                
+                // Normalize the direction vector
+                float len = (float)Math.Sqrt(direction.x * direction.x + direction.y * direction.y);
+                if (len > 0)
+                {
+                    direction.x /= len;
+                    direction.y /= len;
+                }
+                else
+                {
+                    // Fallback if length is zero (should not happen if baseDirectionToTarget was not zero)
+                    direction = baseDirectionToTarget; 
+                }
+            }
+            else
+            {
+                direction = baseDirectionToTarget; // Center projectile or if baseDirectionToTarget is zero (boss on player)
+            }
+        }
+        else // Standard boss projectile (e.g., Jorge, or Bjorn's initial homing vector)
+        {
+            direction = baseDirectionToTarget;
+        }
+        
+        // Create a new entity for the projectile and get its ID
+        var projectileEntity = ctx.Db.entity.Insert(new Entity
+        {
+            position = entity.position,
+            direction = direction, // Use the calculated direction
+            radius = attackData.radius
+        });
+
+        // Create active boss attack
+        var activeBossAttack = ctx.Db.active_boss_attacks.Insert(new ActiveBossAttack
+        {
+            entity_id = projectileEntity.entity_id,
+            boss_monster_id = bossId,
+            attack_type = attackType,
+            id_within_burst = idWithinBurst,
+            parameter_u = parameterU, // Used for Bjorn's homing flag, etc.
+            damage = attackData.damage,
+            radius = attackData.radius,
+            piercing = attackData.piercing
+        });
+
+        // Schedule cleanup
+        ctx.Db.active_boss_attack_cleanup.Insert(new ActiveBossAttackCleanup
+        {
+            active_boss_attack_id = activeBossAttack.active_boss_attack_id,
+            scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(attackData.duration))
         });
     }
 
@@ -466,34 +823,55 @@ public static partial class Module
             throw new Exception("CleanupActiveAttack may not be invoked by clients, only via scheduling.");
         }
 
-        // Get the active attack to cleanup
-        var activeAttackOpt = ctx.Db.active_attacks.active_attack_id.Find(cleanup.active_attack_id);
-        if (activeAttackOpt == null)
+        try
         {
-            //This isn't an error, it just means the attack has already been cleaned up
-            return;
+            // Get the active attack to cleanup
+            var activeAttackOpt = ctx.Db.active_attacks.active_attack_id.Find(cleanup.active_attack_id);
+            if (activeAttackOpt == null)
+            {
+                // Attack already cleaned up, just delete the cleanup record
+                ctx.Db.active_attack_cleanup.scheduled_id.Delete(cleanup.scheduled_id);
+                return;
+            }
+
+            var activeAttack = activeAttackOpt.Value;
+
+            // Get the entity to cleanup
+            var entityOpt = ctx.Db.entity.entity_id.Find(activeAttack.entity_id);
+            if (entityOpt == null)
+            {
+                // Entity already cleaned up, just clean up the attack record
+                ctx.Db.active_attacks.active_attack_id.Delete(cleanup.active_attack_id);
+                ctx.Db.active_attack_cleanup.scheduled_id.Delete(cleanup.scheduled_id);
+                return;
+            }
+
+            // Clean up any damage records associated with this attack
+            CleanupAttackDamageRecords(ctx, entityOpt.Value.entity_id);
+            
+            // Delete the entity
+            ctx.Db.entity.entity_id.Delete(entityOpt.Value.entity_id);
+
+            // Delete the active attack
+            ctx.Db.active_attacks.active_attack_id.Delete(cleanup.active_attack_id);
+            
+            // Finally delete the cleanup record
+            ctx.Db.active_attack_cleanup.scheduled_id.Delete(cleanup.scheduled_id);
         }
-
-        var activeAttack = activeAttackOpt.Value;
-
-        // Get the entity to cleanup
-        var entityOpt = ctx.Db.entity.entity_id.Find(activeAttack.entity_id);
-        if (entityOpt == null)
+        catch (Exception ex)
         {
-            //This isn't an error, it just means the entity has already been cleaned up
-            return;
+            Log.Error($"Error in CleanupActiveAttack: {ex.Message}");
+            // Try to clean up the cleanup record even if other cleanup fails
+            try
+            {
+                ctx.Db.active_attack_cleanup.scheduled_id.Delete(cleanup.scheduled_id);
+            }
+            catch
+            {
+                // If this fails too, just log it
+                Log.Error("Failed to delete cleanup record after error");
+            }
         }
-
-        var entity = entityOpt.Value;
-
-        // Clean up any damage records associated with this attack
-        CleanupAttackDamageRecords(ctx, entity.entity_id);
-        
-        // Delete the entity
-        ctx.Db.entity.entity_id.Delete(entity.entity_id);
-
-        // Delete the active attack
-        ctx.Db.active_attacks.active_attack_id.Delete(cleanup.active_attack_id);
     }   
 
     // Call this from the existing Init method
@@ -606,12 +984,84 @@ public static partial class Module
                 
                 ctx.Db.entity.entity_id.Update(updatedEntity);
             }
+            else if (activeAttack.attack_type == AttackType.Garlic)
+            {
+                // Garlic aura stays with player
+                var playerOpt = ctx.Db.player.player_id.Find(activeAttack.player_id);
+                if (playerOpt is null)
+                {
+                    continue;
+                }
+                
+                var player = playerOpt.Value;
+                var playerEntityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
+                if (playerEntityOpt is null)
+                {
+                    continue;
+                }
+                
+                var playerEntity = playerEntityOpt.Value;
+                
+                // Update garlic aura position to player position
+                var updatedEntity = entity;
+                updatedEntity.position = playerEntity.position;
+                ctx.Db.entity.entity_id.Update(updatedEntity);
+
+                // Apply knockback to nearby monsters
+                foreach (var monster in ctx.Db.monsters.Iter())
+                {
+                    var monsterEntityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
+                    if (monsterEntityOpt is null) continue;
+                    
+                    var monsterEntity = monsterEntityOpt.Value;
+                    
+                    // Calculate distance to monster
+                    var dx = monsterEntity.position.x - playerEntity.position.x;
+                    var dy = monsterEntity.position.y - playerEntity.position.y;
+                    var distanceSquared = dx * dx + dy * dy;
+                    var radiusSum = entity.radius + monsterEntity.radius;
+                    
+                    // If monster is within garlic radius
+                    if (distanceSquared <= radiusSum * radiusSum)
+                    {
+                        // Calculate normalized direction for knockback
+                        var distance = Math.Sqrt(distanceSquared);
+                        if (distance > 0)
+                        {
+                            var knockbackDirection = new DbVector2(
+                                (float)(dx / distance),
+                                (float)(dy / distance)
+                            );
+                            
+                            // Apply knockback
+                            var knockbackStrength = 5f;
+                            var knockbackPos = monsterEntity.position + (knockbackDirection * knockbackStrength);
+                            
+                            // Update monster position with knockback
+                            var updatedMonster = monsterEntity;
+                            updatedMonster.position = knockbackPos;
+                            ctx.Db.entity.entity_id.Update(updatedMonster);
+                        }
+                    }
+                }
+            }
             else
             {
                 // Regular projectile movement based on direction and speed
                 float moveSpeed = attackData.speed;
                 
-                // Calculate movement based on direction, speed and time delta
+                // Special handling for Dumbbell - apply gravity
+                if (activeAttack.attack_type == AttackType.Dumbbell)
+                {
+                    float gravity = 4f; // Even lighter gravity for slower fall
+                    // Apply gravity to the vertical component of direction
+                    entity.direction = new DbVector2(
+                        entity.direction.x,
+                        entity.direction.y + (gravity * DELTA_TIME)
+                    );
+                }
+
+                // Calculate movement based on direction and speed
                 float moveDistance = moveSpeed * DELTA_TIME;
                 var moveOffset = entity.direction * moveDistance;
                 
@@ -631,7 +1081,38 @@ public static partial class Module
                     worldSize - updatedEntity.radius
                 );
                 
-                // Check if entity hit the world boundary, if so mark for deletion
+                // For Football attacks, apply knockback to hit monsters
+                if (activeAttack.attack_type == AttackType.Football)
+                {
+                    foreach (var monster in ctx.Db.monsters.Iter())
+                    {
+                        var monsterEntityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
+                        if (monsterEntityOpt is null) continue;
+                        
+                        var monsterEntity = monsterEntityOpt.Value;
+                        
+                        // Calculate distance to monster
+                        var dx = monsterEntity.position.x - updatedEntity.position.x;
+                        var dy = monsterEntity.position.y - updatedEntity.position.y;
+                        var distanceSquared = dx * dx + dy * dy;
+                        var radiusSum = updatedEntity.radius + monsterEntity.radius;
+                        
+                        // If monster is hit by football
+                        if (distanceSquared <= radiusSum * radiusSum)
+                        {
+                            // Apply strong knockback in the football's direction
+                            var knockbackStrength = 10f;
+                            var knockbackPos = monsterEntity.position + (entity.direction * knockbackStrength);
+                            
+                            // Update monster position with knockback
+                            var updatedMonster = monsterEntity;
+                            updatedMonster.position = knockbackPos;
+                            ctx.Db.entity.entity_id.Update(updatedMonster);
+                        }
+                    }
+                }
+                
+                // Check if entity hit the world boundary
                 bool hitBoundary = 
                     updatedEntity.position.x <= updatedEntity.radius ||
                     updatedEntity.position.x >= worldSize - updatedEntity.radius ||
@@ -655,4 +1136,202 @@ public static partial class Module
             }
         }
     }
-} 
+
+    // Cleanup active boss attacks
+    [Reducer]
+    public static void CleanupActiveBossAttack(ReducerContext ctx, ActiveBossAttackCleanup cleanup)
+    {
+        if (ctx.Sender != ctx.Identity)
+        {
+            throw new Exception("CleanupActiveBossAttack may not be invoked by clients, only via scheduling.");
+        }
+
+        try
+        {
+            // Get the active boss attack to cleanup
+            var activeBossAttackOpt = ctx.Db.active_boss_attacks.active_boss_attack_id.Find(cleanup.active_boss_attack_id);
+            if (activeBossAttackOpt == null)
+            {
+                // Attack already cleaned up, just delete the cleanup record
+                ctx.Db.active_boss_attack_cleanup.scheduled_id.Delete(cleanup.scheduled_id);
+                return;
+            }
+
+            var activeBossAttack = activeBossAttackOpt.Value;
+
+            // Get the entity to cleanup
+            var entityOpt = ctx.Db.entity.entity_id.Find(activeBossAttack.entity_id);
+            if (entityOpt == null)
+            {
+                // Entity already cleaned up, just clean up the attack record
+                ctx.Db.active_boss_attacks.active_boss_attack_id.Delete(cleanup.active_boss_attack_id);
+                ctx.Db.active_boss_attack_cleanup.scheduled_id.Delete(cleanup.scheduled_id);
+                return;
+            }
+
+            // Clean up any damage records associated with this attack
+            CleanupAttackDamageRecords(ctx, entityOpt.Value.entity_id);
+            
+            // Delete the entity
+            ctx.Db.entity.entity_id.Delete(entityOpt.Value.entity_id);
+
+            // Delete the active boss attack
+            ctx.Db.active_boss_attacks.active_boss_attack_id.Delete(cleanup.active_boss_attack_id);
+            
+            // Finally delete the cleanup record
+            ctx.Db.active_boss_attack_cleanup.scheduled_id.Delete(cleanup.scheduled_id);
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"Error in CleanupActiveBossAttack: {ex.Message}");
+            // Try to clean up the cleanup record even if other cleanup fails
+            try
+            {
+                ctx.Db.active_boss_attack_cleanup.scheduled_id.Delete(cleanup.scheduled_id);
+            }
+            catch
+            {
+                // If this fails too, just log it
+                Log.Error("Failed to delete cleanup record after error");
+            }
+        }
+    }
+
+    // Helper method to process boss attack movements
+    public static void ProcessBossAttackMovements(ReducerContext ctx, uint worldSize)
+    {
+        // Process each active boss attack
+        foreach (var rawActiveBossAttack in ctx.Db.active_boss_attacks.Iter())
+        {
+            var activeBossAttackOpt = ctx.Db.active_boss_attacks.active_boss_attack_id.Find(rawActiveBossAttack.active_boss_attack_id);
+            if (activeBossAttackOpt == null)
+            {
+                continue; // Skip if active boss attack not found
+            }
+
+            var activeBossAttack = activeBossAttackOpt.Value;
+            var entityOpt = ctx.Db.entity.entity_id.Find(activeBossAttack.entity_id);
+            if (entityOpt is null)
+            {
+                continue; // Skip if entity not found
+            }
+            
+            var entity = entityOpt.Value;
+            
+            // Get attack data
+            var attackDataOpt = FindAttackDataByType(ctx, activeBossAttack.attack_type);
+            if (attackDataOpt is null)
+            {
+                continue; // Skip if attack data not found
+            }
+            
+            var attackData = attackDataOpt.Value;
+
+            // Regular projectile movement based on direction and speed
+            float moveSpeed = attackData.speed;
+
+            // For homing projectiles (Björn's attacks with parameter_u == 1), find nearest player and update direction
+            if (activeBossAttack.attack_type == AttackType.BossBjornBolt && activeBossAttack.parameter_u == 1)
+            {
+                // Find nearest player
+                float nearestDistSq = float.MaxValue;
+                DbVector2? nearestPlayerPos = null;
+
+                foreach (var player in ctx.Db.player.Iter())
+                {
+                    var playerEntityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
+                    if (playerEntityOpt != null)
+                    {
+                        var playerEntity = playerEntityOpt.Value;
+                        float dx = playerEntity.position.x - entity.position.x;
+                        float dy = playerEntity.position.y - entity.position.y;
+                        float distSq = dx * dx + dy * dy;
+                        
+                        if (distSq < nearestDistSq)
+                        {
+                            nearestDistSq = distSq;
+                            nearestPlayerPos = playerEntity.position;
+                        }
+                    }
+                }
+
+                // Update direction if we found a player
+                if (nearestPlayerPos.HasValue)
+                {
+                    float dx = nearestPlayerPos.Value.x - entity.position.x;
+                    float dy = nearestPlayerPos.Value.y - entity.position.y;
+                    float dist = (float)Math.Sqrt(dx * dx + dy * dy);
+                    
+                    if (dist > 0)
+                    {
+                        // Smoothly interpolate towards player
+                        var targetDir = new DbVector2(dx / dist, dy / dist);
+                        entity.direction = new DbVector2(
+                            entity.direction.x * 0.9f + targetDir.x * 0.1f,
+                            entity.direction.y * 0.9f + targetDir.y * 0.1f
+                        );
+                        
+                        // Normalize direction after interpolation
+                        float newLen = (float)Math.Sqrt(entity.direction.x * entity.direction.x + entity.direction.y * entity.direction.y);
+                        if (newLen > 0)
+                        {
+                            entity.direction = new DbVector2(entity.direction.x / newLen, entity.direction.y / newLen);
+                        }
+                    }
+                }
+            }
+            
+            // Calculate movement based on direction and speed
+            float moveDistance = moveSpeed * DELTA_TIME;
+            var moveOffset = entity.direction * moveDistance;
+
+            Log.Info($"Boss attack {activeBossAttack.active_boss_attack_id} movement:");
+            Log.Info($"  Current pos: ({entity.position.x}, {entity.position.y})");
+            Log.Info($"  Direction: ({entity.direction.x}, {entity.direction.y})");
+            Log.Info($"  Move offset: ({moveOffset.x}, {moveOffset.y})");
+            
+            // Update entity with new position
+            var updatedEntity = entity;
+            updatedEntity.position = entity.position + moveOffset;
+            
+            Log.Info($"  New pos: ({updatedEntity.position.x}, {updatedEntity.position.y})");
+
+            // Apply world boundary clamping
+            updatedEntity.position.x = Math.Clamp(
+                updatedEntity.position.x, 
+                updatedEntity.radius, 
+                worldSize - updatedEntity.radius
+            );
+            updatedEntity.position.y = Math.Clamp(
+                updatedEntity.position.y, 
+                updatedEntity.radius, 
+                worldSize - updatedEntity.radius
+            );
+            
+            // Check if projectile hit world boundary
+            bool hitBoundary = 
+                updatedEntity.position.x <= updatedEntity.radius ||
+                updatedEntity.position.x >= worldSize - updatedEntity.radius ||
+                updatedEntity.position.y <= updatedEntity.radius ||
+                updatedEntity.position.y >= worldSize - updatedEntity.radius;
+
+            if (hitBoundary)
+            {
+                // Delete the attack entity and active attack record
+                ctx.Db.entity.entity_id.Delete(entity.entity_id);
+                ctx.Db.active_boss_attacks.active_boss_attack_id.Delete(activeBossAttack.active_boss_attack_id);
+                
+                // Clean up any damage records
+                CleanupAttackDamageRecords(ctx, entity.entity_id);
+            }
+            else 
+            {
+                // Update entity position
+                ctx.Db.entity.entity_id.Update(updatedEntity);
+
+                activeBossAttack.ticks_elapsed += 1; 
+                ctx.Db.active_boss_attacks.active_boss_attack_id.Update(activeBossAttack);
+            }
+        }
+    }
+}

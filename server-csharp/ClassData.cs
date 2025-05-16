@@ -45,48 +45,92 @@ public static partial class Module
             ctx.Db.class_data.ClassId.Delete(classData.ClassId);
         }
         
-        // Insert Fighter class data
+        // Til (Fighter class) - Football Player
         ctx.Db.class_data.Insert(new ClassData 
         {
             ClassId = (uint)PlayerClass.Fighter,
             PlayerClass = PlayerClass.Fighter,
-            MaxHp = 100,
-            Armor = 0,
+            MaxHp = 120,
+            Armor = 2,
             Speed = 200.0f,
             StartingAttackType = AttackType.Sword
         });
         
-        // Insert Rogue class data
+        // Marc (Rogue class) - Base class uses knives
         ctx.Db.class_data.Insert(new ClassData 
         {
             ClassId = (uint)PlayerClass.Rogue,
             PlayerClass = PlayerClass.Rogue,
-            MaxHp = 100,
+            MaxHp = 90,
             Armor = 0,
-            Speed = 200.0f,
+            Speed = 220.0f,
             StartingAttackType = AttackType.Knives
         });
         
-        // Insert Mage class data
+        // Max (Mage class) - Base class uses wand
         ctx.Db.class_data.Insert(new ClassData 
         {
             ClassId = (uint)PlayerClass.Mage,
             PlayerClass = PlayerClass.Mage,
-            MaxHp = 100,
-            Armor = 0,
-            Speed = 200.0f,
+            MaxHp = 150,
+            Armor = 3,
+            Speed = 180.0f,
             StartingAttackType = AttackType.Wand
         });
         
-        // Insert Paladin class data
+        // Chris (Paladin class) - Chef
         ctx.Db.class_data.Insert(new ClassData 
         {
             ClassId = (uint)PlayerClass.Paladin,
             PlayerClass = PlayerClass.Paladin,
             MaxHp = 100,
-            Armor = 0,
+            Armor = 1,
             Speed = 200.0f,
             StartingAttackType = AttackType.Shield
+        });
+
+        // Til (Football class)
+        ctx.Db.class_data.Insert(new ClassData 
+        {
+            ClassId = (uint)PlayerClass.Football,
+            PlayerClass = PlayerClass.Football,
+            MaxHp = 130,
+            Armor = 3,
+            Speed = 210.0f,
+            StartingAttackType = AttackType.Football
+        });
+
+        // Yu-gi-oh Marc (Gambler class)
+        ctx.Db.class_data.Insert(new ClassData 
+        {
+            ClassId = (uint)PlayerClass.Gambler,
+            PlayerClass = PlayerClass.Gambler,
+            MaxHp = 90,
+            Armor = 0,
+            Speed = 220.0f,
+            StartingAttackType = AttackType.Cards
+        });
+
+        // Gym Max (Athlete class)
+        ctx.Db.class_data.Insert(new ClassData 
+        {
+            ClassId = (uint)PlayerClass.Athlete,
+            PlayerClass = PlayerClass.Athlete,
+            MaxHp = 110,
+            Armor = 1,
+            Speed = 230.0f,
+            StartingAttackType = AttackType.Dumbbell
+        });
+
+        // Chef Chris (Gourmand class)
+        ctx.Db.class_data.Insert(new ClassData 
+        {
+            ClassId = (uint)PlayerClass.Gourmand,
+            PlayerClass = PlayerClass.Gourmand,
+            MaxHp = 120,
+            Armor = 2,
+            Speed = 200.0f,
+            StartingAttackType = AttackType.Garlic
         });
         
         Log.Info("Class data initialization complete.");
@@ -100,4 +144,4 @@ public static partial class Module
         // Call the existing ScheduleNewPlayerAttack method from Attacks.cs
         ScheduleNewPlayerAttack(ctx, playerId, attackType);
     }
-} 
+}

@@ -4,12 +4,15 @@ public enum MonsterType
     Rat = 0,
     Slime = 1,
     Orc = 2,
-    FinalBossPhase1 = 3,
-    FinalBossPhase2 = 4,
-    FinalBossJorgePhase1 = 5,
-    FinalBossJorgePhase2 = 6,
-    FinalBossBjornPhase1 = 7,
-    FinalBossBjornPhase2 = 8,
-    FinalBossSimonPhase1 = 9,
-    FinalBossSimonPhase2 = 10
-} 
+    Wolf = 3,
+    Worm = 4,
+    Scorpion = 5,
+    FinalBossPhase1 = 6,
+    FinalBossPhase2 = 7,
+    FinalBossJorgePhase1 = 8,
+    FinalBossJorgePhase2 = 9,
+    FinalBossBjornPhase1 = 10,
+    FinalBossBjornPhase2 = 11,
+    FinalBossSimonPhase1 = 12,
+    FinalBossSimonPhase2 = 13
+}

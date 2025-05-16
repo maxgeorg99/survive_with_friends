@@ -8,7 +8,7 @@ import MonsterSpawnerManager from '../managers/MonsterSpawnerManager';
 import { GameEvents } from '../constants/GameEvents';
 import { AttackManager } from '../managers/AttackManager';
 import GemManager from '../managers/GemManager';
-import { createPlayerDamageEffect, createMonsterDamageEffect } from '../utils/DamageEffects';
+import { createPlayerDamageEffect, createMonsterDamageEffect, createScorpionPoisonEffect } from '../utils/DamageEffects';
 import UpgradeUI from '../ui/UpgradeUI';
 import PlayerHUD from '../ui/PlayerHUD';
 import BossTimerUI from '../ui/BossTimerUI';
@@ -59,10 +59,14 @@ const POSITION_CORRECTION_THRESHOLD = 49; // Distance squared threshold for posi
 
 // Asset keys for different player classes
 const CLASS_ASSET_KEYS: Record<string, string> = {
-    "Fighter": 'player_fighter',  // These should match the keys used in preload()
+    "Fighter": 'player_fighter',
     "Rogue": 'player_rogue',
     "Mage": 'player_mage',
-    "Paladin": 'player_paladin'
+    "Paladin": 'player_paladin',
+    "Football": 'class_football',
+    "Gambler": 'class_gambler',
+    "Athlete": 'class_athlete',
+    "Gourmand": 'class_chef'
 };
 
 export default class GameScene extends Phaser.Scene {
@@ -102,6 +106,7 @@ export default class GameScene extends Phaser.Scene {
         container: Phaser.GameObjects.Container;
         background: Phaser.GameObjects.Rectangle;
         playerDot: Phaser.GameObjects.Arc;
+        otherPlayerDots: Map<number, Phaser.GameObjects.Arc>;
         border: Phaser.GameObjects.Rectangle;
     } | null = null;
     
@@ -148,48 +153,64 @@ export default class GameScene extends Phaser.Scene {
     preload() {
         console.log("GameScene preload started.");
         // Load assets from the /assets path (copied from public)
-        this.load.image('player_fighter', '/assets/class_fighter_1.png');
-        this.load.image('player_rogue', '/assets/class_rogue_1.png');
-        this.load.image('player_mage', '/assets/class_mage_1.png');
-        this.load.image('player_paladin', '/assets/class_paladin_1.png');
-        this.load.image(GRASS_ASSET_KEY, '/assets/grass.png');
-        this.load.image(SHADOW_ASSET_KEY, '/assets/shadow.png');
+        this.load.image('class_fighter', 'assets/class_fighter_1.png');
+        this.load.image('class_rogue', 'assets/class_rogue_1.png');
+        this.load.image('class_mage', 'assets/class_mage_1.png');
+        this.load.image('class_paladin', 'assets/class_paladin_1.png');
+        this.load.image('class_football', 'assets/class_football_1.png');
+        this.load.image('class_gambler', 'assets/class_gambler_1.png');
+        this.load.image('class_athlete', 'assets/class_athlete_1.png');
+        this.load.image('class_chef', 'assets/class_chef_1.png');
+        this.load.image(GRASS_ASSET_KEY, 'assets/grass.png');
+        this.load.image(SHADOW_ASSET_KEY, 'assets/shadow.png');
         
         // Load monster assets
-        this.load.image('monster_rat', '/assets/monster_rat.png');
-        this.load.image('monster_slime', '/assets/monster_slime.png');
-        this.load.image('monster_orc', '/assets/monster_orc.png');
-        this.load.image('monster_spawn_indicator', '/assets/monster_spawn_indicator.png');
+        this.load.image('monster_rat', 'assets/monster_rat.png');
+        this.load.image('monster_slime', 'assets/monster_slime.png');
+        this.load.image('monster_orc', 'assets/monster_orc.png');
+        this.load.image('monster_worm', 'assets/monster_worm.png');
+        this.load.image('monster_wolf', 'assets/monster_wolf.png');
+        this.load.image('monster_scorpion', 'assets/monster_scorpion.png');
+        this.load.image('monster_spawn_indicator', 'assets/monster_spawn_indicator.png');
         
         // Load boss monster assets
-        this.load.image('final_boss_jorge_phase_1', '/assets/final_boss_jorge_phase_1.png');
-        this.load.image('final_boss_jorge_phase_2', '/assets/final_boss_jorge_phase_2.png');
-        this.load.image('final_boss_bjorn_phase_1', '/assets/final_boss_phase_björn_1.png');
-        this.load.image('final_boss_bjorn_phase_2', '/assets/final_boss_phase_björn_2.png');
-        this.load.image('final_boss_simon_phase_1', '/assets/final_boss_simon_phase_1.png');
-        this.load.image('final_boss_simon_phase_2', '/assets/final_boss_simon_phase_2.png');
+        this.load.image('final_boss_jorge_phase_1', 'assets/final_boss_jorge_phase_1.png');
+        this.load.image('final_boss_jorge_phase_2', 'assets/final_boss_jorge_phase_2.png');
+        this.load.image('final_boss_bjorn_phase_1', 'assets/final_boss_phase_björn_1.png');
+        this.load.image('final_boss_bjorn_phase_2', 'assets/final_boss_phase_björn_2.png');
+        this.load.image('final_boss_simon_phase_1', 'assets/final_boss_simon_phase_1.png');
+        this.load.image('final_boss_simon_phase_2', 'assets/final_boss_simon_phase_2.png');
         
         // Load attack assets
-        this.load.image('attack_sword', '/assets/attack_sword.png');
-        this.load.image('attack_wand', '/assets/attack_wand.png');
-        this.load.image('attack_knife', '/assets/attack_knife.png');
-        this.load.image('attack_shield', '/assets/attack_shield.png');
+        this.load.image('attack_sword', 'assets/attack_sword.png');
+        this.load.image('attack_wand', 'assets/attack_wand.png');
+        this.load.image('attack_knife', 'assets/attack_knife.png');
+        this.load.image('attack_shield', 'assets/attack_shield.png');
+        this.load.image('attack_football', 'assets/attack_football.png');
+        this.load.image('attack_cards', 'assets/attack_cards.png');
+        this.load.image('attack_dumbbell', 'assets/attack_dumbbell.png');
+        this.load.image('attack_garlic', 'assets/attack_garlic.png');
+        this.load.image('attack_boss_jorge', 'assets/attack_boss_jorge.png');
+        this.load.image('attack_boss_bjorn', 'assets/attack_boss_björn.png');
+        this.load.image('attack_boss_simon', 'assets/attack_boss_simon.png');
+        this.load.image('attack_spit', 'assets/attack_spit.png');
+        this.load.image('attack_sting', 'assets/attack_sting.png');
         
         // Load upgrade assets
-        this.load.image('card_blank', '/assets/card_blank.png');
-        this.load.image('upgrade_maxHP', '/assets/upgrade_maxHP.png');
-        this.load.image('upgrade_regenHP', '/assets/upgrade_regenHP.png');
-        this.load.image('upgrade_speed', '/assets/upgrade_speed.png');
-        this.load.image('upgrade_armor', '/assets/upgrade_armor.png');
+        this.load.image('card_blank', 'assets/card_blank.png');
+        this.load.image('upgrade_maxHP', 'assets/upgrade_maxHP.png');
+        this.load.image('upgrade_regenHP', 'assets/upgrade_regenHP.png');
+        this.load.image('upgrade_speed', 'assets/upgrade_speed.png');
+        this.load.image('upgrade_armor', 'assets/upgrade_armor.png');
         
         // Load gem assets
-        this.load.image('gem_1', '/assets/gem_1.png');
-        this.load.image('gem_2', '/assets/gem_2.png');
-        this.load.image('gem_3', '/assets/gem_3.png');
-        this.load.image('gem_4', '/assets/gem_4.png');
+        this.load.image('gem_1', 'assets/gem_1.png');
+        this.load.image('gem_2', 'assets/gem_2.png');
+        this.load.image('gem_3', 'assets/gem_3.png');
+        this.load.image('gem_4', 'assets/gem_4.png');
         
         // Load a white pixel for particle effects
-        this.load.image('white_pixel', '/assets/white_pixel.png');
+        this.load.image('white_pixel', 'assets/white_pixel.png');
         
         // Add error handling for file loading errors
         this.load.on('loaderror', (fileObj: any) => {
@@ -207,6 +228,8 @@ export default class GameScene extends Phaser.Scene {
             console.log("monster_rat:", this.textures.exists('monster_rat'));
             console.log("monster_slime:", this.textures.exists('monster_slime'));
             console.log("monster_orc:", this.textures.exists('monster_orc'));
+            console.log("monster_wolf:", this.textures.exists('monster_wolf'));
+            console.log("monster_worm:", this.textures.exists('monster_worm'));
             console.log("attack_sword:", this.textures.exists('attack_sword'));
             console.log("attack_wand:", this.textures.exists('attack_wand'));
             console.log("attack_knife:", this.textures.exists('attack_knife'));
@@ -748,7 +771,7 @@ export default class GameScene extends Phaser.Scene {
                 expBar.x = entityData.position.x - (EXP_BAR_WIDTH / 2);
                 expBar.y = entityData.position.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
                 
-                // Calculate exp progress percentage
+                // Calculate progress percentage
                 const expProgress = player.expForNextLevel > 0 
                     ? Math.min(1, player.exp / player.expForNextLevel) 
                     : 0;
@@ -836,6 +859,9 @@ export default class GameScene extends Phaser.Scene {
                 // If HP decreased, show damage effect
                 if (currentHp !== undefined && player.hp < currentHp) {
                     createPlayerDamageEffect(this.localPlayerSprite);
+                    
+                    // Check if the damage came from a scorpion
+                    this.checkForScorpionDamage(this.localPlayerSprite);
                 }
                 
                 // Update stored values
@@ -1261,34 +1287,58 @@ export default class GameScene extends Phaser.Scene {
 
     // Get class-specific sprite key
     getClassSpriteKey(playerClass: any): string {
-        
-        // Handle case when playerClass is a simple object with a tag property
-        if (playerClass && typeof playerClass === 'object' && 'tag' in playerClass) {
-            const className = playerClass.tag;
-            const spriteKey = CLASS_ASSET_KEYS[className] || 'player_fighter';
-            return spriteKey;
-        } 
-        
-        // Handle case when playerClass is just a string
-        if (typeof playerClass === 'string') {
-            const spriteKey = CLASS_ASSET_KEYS[playerClass] || 'player_fighter';
-            return spriteKey;
-        }
-        
-        // Handle case when playerClass is a number (enum value)
-        if (typeof playerClass === 'number') {
-            // Map numeric enum values to class names
-            const classNames = ["Fighter", "Rogue", "Mage", "Paladin"];
-            const className = classNames[playerClass] || "Fighter";
-            const spriteKey = CLASS_ASSET_KEYS[className] || 'player_fighter';
-            return spriteKey;
-        }
-        
-        // Default fallback
-        console.log("Using default fighter class");
-        return 'player_fighter';
+    // Handle case when playerClass is a simple object with a tag property
+    if (playerClass && typeof playerClass === 'object' && 'tag' in playerClass) {
+        const className = playerClass.tag;
+        const iconMap: Record<string, string> = {
+            'Fighter': 'class_fighter',
+            'Rogue': 'class_rogue',
+            'Mage': 'class_mage',
+            'Paladin': 'class_paladin',
+            'Football': 'class_football',
+            'Gambler': 'class_gambler',
+            'Athlete': 'class_athlete',
+            'Gourmand': 'class_chef'
+        };
+        return iconMap[className] || 'class_fighter';
+    } 
+    
+    // Handle case when playerClass is just a string
+    if (typeof playerClass === 'string') {
+        const iconMap: Record<string, string> = {
+            'Fighter': 'class_fighter',
+            'Rogue': 'class_rogue',
+            'Mage': 'class_mage',
+            'Paladin': 'class_paladin',
+            'Football': 'class_football',
+            'Gambler': 'class_gambler',
+            'Athlete': 'class_athlete',
+            'Gourmand': 'class_chef'
+        };
+        return iconMap[playerClass] || 'class_fighter';
     }
     
+    // Handle case when playerClass is a number (enum value)
+    if (typeof playerClass === 'number') {
+        // Map numeric enum values to class names
+        const classNames = [
+            'class_fighter',  // 0 - Fighter
+            'class_rogue',    // 1 - Rogue
+            'class_mage',     // 2 - Mage
+            'class_paladin',  // 3 - Paladin
+            'class_football', // 4 - Football
+            'class_gambler',  // 5 - Gambler
+            'class_athlete',  // 6 - Athlete
+            'class_chef'      // 7 - Gourmand
+        ];
+        return classNames[playerClass] || 'class_fighter';
+    }
+    
+    // Default fallback
+    console.log("Using default fighter class");
+    return 'class_fighter_1';
+}
+
     // Update the function to properly use the player's playerId
     createOtherPlayerSprite(playerData: Player, entityData: Entity) {
         // Check if we already have this player
@@ -1474,6 +1524,9 @@ export default class GameScene extends Phaser.Scene {
                             const sprite = container.getByName('sprite') as Phaser.GameObjects.Sprite;
                             if (sprite) {
                                 createPlayerDamageEffect(sprite);
+                                
+                                // Check if the damage came from a scorpion
+                                this.checkForOtherPlayerScorpionDamage(sprite, container);
                             }
                         }
                         
@@ -1630,15 +1683,18 @@ export default class GameScene extends Phaser.Scene {
         }
     }
 
-    removeOtherPlayer(playerId: number) {
+    // Clean up a player's dot when they disconnect
+    private removeOtherPlayer(playerId: number) {
         const container = this.otherPlayers.get(playerId);
         if (container) {
-            // Stop any active tweens
-            const graceTween = container.getData('graceTween');
-            if (graceTween) {
-                graceTween.stop();
+            // Delete the minimap dot if it exists
+            const dot = this.minimap?.otherPlayerDots.get(playerId);
+            if (dot) {
+                dot.destroy();
+                this.minimap?.otherPlayerDots.delete(playerId);
             }
             
+            // Rest of existing removal code...
             container.destroy();
             this.otherPlayers.delete(playerId);
         }
@@ -1719,6 +1775,7 @@ export default class GameScene extends Phaser.Scene {
         
         if (directionChanged || (hasDirection && timeForUpdate)) {
             // Update current direction
+           
             this.currentDirection.set(dirX, dirY);
             this.isMoving = hasDirection;
 
@@ -1899,7 +1956,7 @@ export default class GameScene extends Phaser.Scene {
         this.updateMinimap();
     }
     
-    // Update the minimap with player's position
+    // Update the minimap with all players' positions
     private updateMinimap() {
         if (!this.minimap || !this.localPlayerSprite) return;
         
@@ -1907,13 +1964,37 @@ export default class GameScene extends Phaser.Scene {
         const worldBounds = this.physics.world.bounds;
         const minimapSize = this.minimap.background.width;
         
-        // Calculate position ratio (player position relative to world size)
+        // Update local player dot
         const ratioX = this.localPlayerSprite.x / worldBounds.width;
         const ratioY = this.localPlayerSprite.y / worldBounds.height;
-        
-        // Position player dot on minimap based on world position
         this.minimap.playerDot.x = ratioX * minimapSize;
         this.minimap.playerDot.y = ratioY * minimapSize;
+
+        // Update other player dots
+        this.otherPlayers.forEach((container, playerId) => {
+            let dot = this.minimap?.otherPlayerDots.get(playerId);
+            
+            // Create dot if it doesn't exist
+            if (!dot && this.minimap) {
+                dot = this.add.circle(
+                    0,
+                    0,
+                    5, // Same size as local player dot
+                    0x00ff00, // green for other players
+                    1
+                );
+                this.minimap.container.add(dot);
+                this.minimap.otherPlayerDots.set(playerId, dot);
+            }
+            
+            // Update dot position if it exists
+            if (dot) {
+                const otherRatioX = container.x / worldBounds.width;
+                const otherRatioY = container.y / worldBounds.height;
+                dot.x = otherRatioX * minimapSize;
+                dot.y = otherRatioY * minimapSize;
+            }
+        });
     }
 
     // Force a synchronization of player entities
@@ -2619,12 +2700,12 @@ export default class GameScene extends Phaser.Scene {
         ).setOrigin(0);
         border.setStrokeStyle(BORDER_SIZE, 0xFFFFFF, 0.5);
         
-        // Create player dot (will be positioned in update)
+        // Create local player dot (will be positioned in update)
         const playerDot = this.add.circle(
             0,
             0,
             PLAYER_DOT_SIZE,
-            0xFFFFFF,
+            0x0000ff, // blue for local player
             1
         );
         
@@ -2642,6 +2723,7 @@ export default class GameScene extends Phaser.Scene {
             container,
             background,
             playerDot,
+            otherPlayerDots: new Map(),
             border
         };
         
@@ -2758,5 +2840,124 @@ export default class GameScene extends Phaser.Scene {
             confetti.destroy();
             stars.destroy();
         });
+    }
+
+    /**
+     * Check if the player was damaged by a scorpion and apply poison effect if needed
+     * @param playerSprite The player sprite to check and apply effect to
+     */
+    private checkForScorpionDamage(playerSprite: Phaser.Physics.Arcade.Sprite): void {
+        // Skip if player is already poisoned
+        if (playerSprite.getData('isPoisoned')) {
+            return;
+        }
+        
+        if (!this.monsterManager || !this.spacetimeDBClient?.sdkConnection?.db) {
+            return;
+        }
+        
+        try {
+            // Check for nearby scorpions
+            const monsters = Array.from(this.spacetimeDBClient.sdkConnection.db.monsters.iter())
+                .filter(monster => monster.bestiaryId === MonsterType.Scorpion);
+                
+            if (monsters.length === 0) {
+                return; // No scorpions present
+            }
+                
+            // Get the player position
+            const playerX = playerSprite.x;
+            const playerY = playerSprite.y;
+            
+            // Check if any scorpion is close enough to have caused the damage
+            let scorpionHit = false;
+            for (const scorpion of monsters) {
+                const scorpionEntity = this.spacetimeDBClient.sdkConnection.db.entity.entityId.find(scorpion.entityId);
+                if (scorpionEntity) {
+                    // Calculate distance between player and scorpion
+                    const dx = playerX - scorpionEntity.position.x;
+                    const dy = playerY - scorpionEntity.position.y;
+                    const distanceSquared = dx * dx + dy * dy;
+                    
+                    // Use a slightly larger range than the actual monster radius to account for lag
+                    const hitRange = scorpionEntity.radius * 1.5;
+                    
+                    if (distanceSquared <= hitRange * hitRange) {
+                        scorpionHit = true;
+                        break;
+                    }
+                }
+            }
+            
+            // If a scorpion hit the player, apply poison effect
+            if (scorpionHit) {
+                // Apply poison effect
+                createScorpionPoisonEffect(playerSprite, this);
+                
+                console.log("Player poisoned by scorpion!");
+            }
+        } catch (error) {
+            console.error("Error checking for scorpion damage:", error);
+        }
+    }
+
+    /**
+     * Check if another player was damaged by a scorpion and apply poison effect if needed
+     * @param playerSprite The player sprite to check and apply effect to
+     * @param container The container holding the player sprite
+     */
+    private checkForOtherPlayerScorpionDamage(playerSprite: Phaser.GameObjects.Sprite, container: Phaser.GameObjects.Container): void {
+        // Skip if player is already poisoned
+        if (container.getData('isPoisoned')) {
+            return;
+        }
+        
+        if (!this.monsterManager || !this.spacetimeDBClient?.sdkConnection?.db) {
+            return;
+        }
+        
+        try {
+            // Check for nearby scorpions
+            const monsters = Array.from(this.spacetimeDBClient.sdkConnection.db.monsters.iter())
+                .filter(monster => monster.bestiaryId === MonsterType.Scorpion);
+                
+            if (monsters.length === 0) {
+                return; // No scorpions present
+            }
+                
+            // Get the player position
+            const playerX = playerSprite.x;
+            const playerY = playerSprite.y;
+            
+            // Check if any scorpion is close enough to have caused the damage
+            let scorpionHit = false;
+            for (const scorpion of monsters) {
+                const scorpionEntity = this.spacetimeDBClient.sdkConnection.db.entity.entityId.find(scorpion.entityId);
+                if (scorpionEntity) {
+                    // Calculate distance between player and scorpion
+                    const dx = playerX - scorpionEntity.position.x;
+                    const dy = playerY - scorpionEntity.position.y;
+                    const distanceSquared = dx * dx + dy * dy;
+                    
+                    // Use a slightly larger range than the actual monster radius to account for lag
+                    const hitRange = scorpionEntity.radius * 1.5;
+                    
+                    if (distanceSquared <= hitRange * hitRange) {
+                        scorpionHit = true;
+                        break;
+                    }
+                }
+            }
+            
+            // If a scorpion hit the player, apply poison effect
+            if (scorpionHit) {
+                // Apply poison effect
+                createScorpionPoisonEffect(playerSprite, this);
+                
+                console.log("Other player poisoned by scorpion!");
+            }
+        } catch (error) {
+            console.error("Error checking for scorpion damage:", error);
+        }
     }
 }

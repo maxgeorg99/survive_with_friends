@@ -29,7 +29,7 @@ export default class LoadingScene extends Phaser.Scene {
 
     preload() {
         // Load title background
-        this.load.image('title_bg', '/assets/title_bg.png');
+        this.load.image('title_bg', 'assets/title_bg.png');
     }
 
     create() {

@@ -140,6 +140,95 @@ public static partial class Module
                     // Shield attacks have rotation motion
                     return new DbVector2(0, 0);
                 }
+                case AttackType.Football:
+                {
+                    // Football attacks now target the nearest enemy like wands
+                    Entity? nearestEnemy = FindNearestEnemy(ctx, entity);
+                    if (nearestEnemy != null)
+                    {
+                        var enemyActual = nearestEnemy.Value;
+
+                        // Calculate direction vector to the enemy
+                        var dx = enemyActual.position.x - entity.position.x;
+                        var dy = enemyActual.position.y - entity.position.y;
+                        
+                        // Normalize the direction
+                        var length = Math.Sqrt(dx * dx + dy * dy);
+                        if (length > 0)
+                        {
+                            return new DbVector2((float)(dx / length), (float)(dy / length));
+                        }
+                    }
+                    
+                    // If no enemies or calculation issue, use player's direction
+                    return GetNormalizedDirection(entity.direction);
+                }
+                case AttackType.Cards:
+                {
+                    // Find the nearest enemy for card targeting
+                    Entity? nearestEnemy = FindNearestEnemy(ctx, entity);
+                    if (nearestEnemy != null)
+                    {
+                        var enemyActual = nearestEnemy.Value;
+                        
+                        // Calculate base direction vector to the enemy
+                        var dx = enemyActual.position.x - entity.position.x;
+                        var dy = enemyActual.position.y - entity.position.y;
+                        
+                        // Normalize the direction
+                        var length = Math.Sqrt(dx * dx + dy * dy);
+                        if (length > 0)
+                        {
+                            // Normalize base direction
+                            var baseDirX = dx / length;
+                            var baseDirY = dy / length;
+                            
+                            // For multiple cards, spread them in a fan pattern toward the enemy
+                            // The spread angle depends on the number of projectiles
+                            double fanAngleRange = 45.0; // degrees total spread
+                            
+                            // Calculate the angle for this specific card within the fan
+                            double fanAngle;
+                            if (attackData.Value.projectiles > 1)
+                            {
+                                // Calculate angle offset for this projectile in the fan
+                                fanAngle = -fanAngleRange / 2.0 + (fanAngleRange * idWithinBurst / (attackData.Value.projectiles - 1));
+                            }
+                            else
+                            {
+                                fanAngle = 0;
+                            }
+                            
+                            // Convert angle to radians
+                            var fanAngleRad = fanAngle * Math.PI / 180.0;
+                            
+                            // Rotate the base vector by the fan angle
+                            var rotatedX = baseDirX * Math.Cos(fanAngleRad) - baseDirY * Math.Sin(fanAngleRad);
+                            var rotatedY = baseDirX * Math.Sin(fanAngleRad) + baseDirY * Math.Cos(fanAngleRad);
+                            
+                            return new DbVector2((float)rotatedX, (float)rotatedY);
+                        }
+                    }
+                    
+                    // If no enemies found, fall back to the original pattern
+                    var startAngle = (double)parameterU * Math.PI / 180.0;                       
+                    var angleStep = 360.0 / (double)attackData.Value.projectiles;
+                    var attackAngle = startAngle + (angleStep * (double)idWithinBurst);
+                    return new DbVector2((float)Math.Cos(attackAngle), (float)Math.Sin(attackAngle));
+                }
+                case AttackType.Dumbbell:
+                {
+                    // Dumbbells start with a strong upward motion
+                    var random = ctx.Rng;
+                    var yOffset = -4.0f; // Stronger upward initial velocity
+                    var xOffset = (random.NextDouble() - 0.5) * 1.0f; // Reduced horizontal spread
+                    return new DbVector2((float)xOffset, yOffset).Normalize(); // Normalized direction vector with strong upward motion
+                }
+                case AttackType.Garlic:
+                {
+                    // Garlic stays with player, no movement needed
+                    return new DbVector2(0, 0);
+                }
                 default:
                 {
                     throw new Exception($"DetermineAttackDirection: Unknown attack type {attackType}");
@@ -205,4 +294,4 @@ public static partial class Module
             }
         }
     }
-} 
+}

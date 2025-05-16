@@ -10,34 +10,56 @@ const CLASS_ID_MAP = {
     "Fighter": 0,
     "Rogue": 1,
     "Mage": 2,
-    "Paladin": 3
+    "Paladin": 3,
+    "Football": 4,
+    "Gambler": 5,
+    "Athlete": 6,
+    "Gourmand": 7
 };
 
+const CLASS_NAME_MAP = {
+    'Fighter': "Til",
+    'Rogue': "Marc",
+    'Mage': "Max",
+    'Paladin': "Chris",
+    'Football': "Dominik",
+    'Gambler': "Robin",
+    'Athlete': "David",
+    'Gourmand': "Benni"
+} as const;
 
 const CLASS_INFO = {
     "Til": {
         description: "class.til.description",
         weapon: "class.til.weapon",
         strengths: "class.til.strengths",
-        weaknesses: "class.til.weaknesses"
+        weaknesses: "class.til.weaknesses",
+        altName: "Football Til",
+        altClass: "Football"
     },
     "Marc": {
         description: "class.marc.description",
         weapon: "class.marc.weapon",
         strengths: "class.marc.strengths",
-        weaknesses: "class.marc.weaknesses"
+        weaknesses: "class.marc.weaknesses",
+        altName: "Yu-gi-oh Marc",
+        altClass: "Gambler"
     },
     "Max": {
         description: "class.max.description",
         weapon: "class.max.weapon",
         strengths: "class.max.strengths",
-        weaknesses: "class.max.weaknesses"
+        weaknesses: "class.max.weaknesses",
+        altName: "Gym Rat Max",
+        altClass: "Athlete"
     },
     "Chris": {
         description: "class.chris.description",
         weapon: "class.chris.weapon",
         strengths: "class.chris.strengths",
-        weaknesses: "class.chris.weaknesses"
+        weaknesses: "class.chris.weaknesses",
+        altName: "Chef Chris",
+        altClass: "Gourmand"
     }
 } as const;
 
@@ -59,12 +81,24 @@ export default class ClassSelectScene extends Phaser.Scene {
     private confirmButton!: HTMLButtonElement;
     private errorText!: Phaser.GameObjects.Text;
     private questButton!: HTMLButtonElement;
+    private footballButton!: HTMLButtonElement;
+    private gamblerButton!: HTMLButtonElement;
+    private athleteButton!: HTMLButtonElement;
+    private gourmandButton!: HTMLButtonElement;
+    private bestiaryButton!: HTMLButtonElement;
     
     // State tracking
     private selectedClass: PlayerClass | null = null;
     private isLoading: boolean = false;
     private titleElement: HTMLDivElement | null = null;
     private subtitleElement: HTMLDivElement | null = null;
+    private selectedAltVersion: boolean = false;
+    private selectedAltVersions: Record<string, boolean> = {
+        'Til': false,
+        'Marc': false,
+        'Max': false,
+        'Chris': false
+    };
 
     constructor() {
         super('ClassSelectScene');
@@ -75,17 +109,29 @@ export default class ClassSelectScene extends Phaser.Scene {
 
     preload() {
         // Load character class icons using the correct filenames
-        this.load.image('fighter_icon', '/assets/class_fighter_1.png');
-        this.load.image('rogue_icon', '/assets/class_rogue_1.png');
-        this.load.image('mage_icon', '/assets/class_mage_1.png');
-        this.load.image('paladin_icon', '/assets/class_paladin_1.png');
-        this.load.image('attack_sword', '/assets/attack_sword.png');
-        this.load.image('attack_knife', '/assets/attack_knife.png');
-        this.load.image('attack_wand', '/assets/attack_wand.png');
-        this.load.image('attack_shield', '/assets/attack_shield.png');
+        this.load.image('fighter_icon', 'assets/class_fighter_1.png');
+        this.load.image('rogue_icon', 'assets/class_rogue_1.png');
+        this.load.image('mage_icon', 'assets/class_mage_1.png');
+        this.load.image('paladin_icon', 'assets/class_paladin_1.png');
+        // Temporarily use fighter sprite as placeholder for new classes
+        this.load.image('football_icon', 'assets/class_football_1.png');
+        this.load.image('gambler_icon', 'assets/class_gambler_1.png');
+        this.load.image('athlete_icon', 'assets/class_athlete_1.png');
+        this.load.image('gourmand_icon', 'assets/class_chef_1.png');
+        
+        // Load weapon icons
+        this.load.image('attack_sword', 'assets/attack_sword.png');
+        this.load.image('attack_knife', 'assets/attack_knife.png');
+        this.load.image('attack_wand', 'assets/attack_wand.png');
+        this.load.image('attack_shield', 'assets/attack_shield.png');
+        // Temporarily use sword sprite as placeholder for new weapons
+        this.load.image('attack_football', 'assets/attack_football.png');
+        this.load.image('attack_cards', 'assets/attack_cards.png');
+        this.load.image('attack_dumbbell', 'assets/attack_dumbbell.png');
+        this.load.image('attack_garlic', 'assets/attack_garlic.png');
         
         // Add quest button image if you have one
-        this.load.image('quest_icon', '/assets/white_pixel.png');
+        this.load.image('quest_icon', 'assets/white_pixel.png');
     }
 
     create() {
@@ -191,6 +237,47 @@ export default class ClassSelectScene extends Phaser.Scene {
         
         // Store reference for cleanup
         this.questButton = questButton;
+        
+        // Add bestiary button below quest button
+        const bestiaryButton = document.createElement('button');
+        bestiaryButton.style.position = 'absolute';
+        bestiaryButton.style.top = '110px'; // Position below quest button
+        bestiaryButton.style.right = '50px';
+        bestiaryButton.style.width = '180px';
+        bestiaryButton.style.height = '50px';
+        bestiaryButton.style.padding = '10px';
+        bestiaryButton.style.backgroundColor = '#2c3e50';
+        bestiaryButton.style.color = 'white';
+        bestiaryButton.style.border = '2px solid #34495e';
+        bestiaryButton.style.borderRadius = '5px';
+        bestiaryButton.style.cursor = 'pointer';
+        bestiaryButton.style.fontFamily = 'Arial';
+        bestiaryButton.style.fontSize = '18px';
+        bestiaryButton.style.transition = 'background-color 0.2s, border-color 0.2s';
+        bestiaryButton.style.display = 'flex';
+        bestiaryButton.style.alignItems = 'center';
+        bestiaryButton.style.justifyContent = 'center';
+        bestiaryButton.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+        bestiaryButton.textContent = '🐺 Bestiary';
+        
+        bestiaryButton.addEventListener('mouseover', () => {
+            bestiaryButton.style.backgroundColor = '#3498db';
+            bestiaryButton.style.borderColor = '#2980b9';
+        });
+        
+        bestiaryButton.addEventListener('mouseout', () => {
+            bestiaryButton.style.backgroundColor = '#2c3e50';
+            bestiaryButton.style.borderColor = '#34495e';
+        });
+        
+        bestiaryButton.addEventListener('click', () => {
+            this.scene.start('BestaryScene', { spacetimeDBClient: this.spacetimeDBClient });
+        });
+        
+        document.body.appendChild(bestiaryButton);
+        
+        // Store reference for cleanup
+        this.bestiaryButton = bestiaryButton;
     }
     
     private createConfirmButton() {
@@ -241,13 +328,13 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.classButtonsContainer.style.gap = '20px';
         this.classButtonsContainer.style.width = '250px';
         this.classButtonsContainer.style.transform = 'translate(-50%, -50%)';
-        // Set a fixed height that accounts for all buttons + confirm button
-        this.classButtonsContainer.style.height = '400px'; // Adjust this value as needed
+        this.classButtonsContainer.style.height = '400px';
         document.body.appendChild(this.classButtonsContainer);
         
         const createClassButton = (name: string, classType: PlayerClass, iconName: string, imageFile: string) => {
             const button = document.createElement('button');
             button.className = 'class-select-button';
+            button.setAttribute('data-class-type', classType.tag);
             button.style.position = 'relative';
             button.style.width = '250px';
             button.style.height = '70px';
@@ -264,11 +351,12 @@ export default class ClassSelectScene extends Phaser.Scene {
             button.style.display = 'flex';
             button.style.alignItems = 'center';
             
-            // Add icon if available
+            // Add icon if available and give it an ID for later updates
             try {
                 if (this.textures.exists(iconName)) {
                     const icon = document.createElement('img');
-                    icon.src = '/assets/' + imageFile;
+                    icon.id = `${name.toLowerCase()}-icon`;
+                    icon.src = 'assets/' + imageFile;
                     icon.style.width = '50px';
                     icon.style.height = '50px';
                     icon.style.marginRight = '10px';
@@ -278,12 +366,12 @@ export default class ClassSelectScene extends Phaser.Scene {
                 console.error(`Error adding icon for ${name}:`, error);
             }
             
-            // Add text
+            // Add text span with an ID
             const textSpan = document.createElement('span');
+            textSpan.id = `${name.toLowerCase()}-text`;
             textSpan.textContent = name;
             button.appendChild(textSpan);
             
-            // Add event listener
             button.addEventListener('click', () => {
                 this.selectClass(classType, button);
             });
@@ -291,7 +379,7 @@ export default class ClassSelectScene extends Phaser.Scene {
             return button;
         };
         
-        // Create all class buttons using the correct PlayerClass types
+        // Create only the original 4 class buttons
         this.fighterButton = createClassButton('Til', PlayerClass.Fighter as PlayerClass, 'fighter_icon', 'class_fighter_1.png');
         this.rogueButton = createClassButton('Marc', PlayerClass.Rogue as PlayerClass, 'rogue_icon', 'class_rogue_1.png');
         this.mageButton = createClassButton('Max', PlayerClass.Mage as PlayerClass, 'mage_icon', 'class_mage_1.png');
@@ -325,6 +413,222 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.classInfoPanel.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
 
         document.body.appendChild(this.classInfoPanel);
+    }
+
+    private getAltVersionKey(characterName: string): string {
+        const keyMap: Record<string, string> = {
+            'Til': 'football_til',
+            'Marc': 'yugioh_marc',
+            'Max': 'gym_max',
+            'Chris': 'chef_chris'
+        };
+        return keyMap[characterName] || characterName.toLowerCase();
+    }
+
+    private getOriginalCharacterName(classType: PlayerClass | string): string {
+        // If it's already a base character name, return it
+        if (['Til', 'Marc', 'Max', 'Chris'].includes(classType as string)) {
+            return classType as string;
+        }
+
+        // Map alt classes back to their original character
+        const altToOriginal: Record<string, string> = {
+            'Football': 'Til',
+            'Gambler': 'Marc',
+            'Athlete': 'Max',
+            'Gourmand': 'Chris'
+        };
+
+        // If it's a PlayerClass, use its tag
+        const classTag = typeof classType === 'string' ? classType : classType.tag;
+        return altToOriginal[classTag] || classTag;
+    }
+
+    private updateClassInfoPanel(characterName: string, classType: PlayerClass, info: any) {
+        if (!info) return;
+
+        const originalCharName = this.getOriginalCharacterName(characterName);
+        const isAltVersion = this.selectedAltVersions[originalCharName] || false;
+        const currentName = isAltVersion ? info.altName : originalCharName;
+        const currentClass = isAltVersion ? info.altClass : classType.tag;
+
+        // Get localization keys
+        const baseKey = `class.${originalCharName.toLowerCase()}`;
+        const altKey = `class.${this.getAltVersionKey(originalCharName)}`;
+        const currentKey = isAltVersion ? altKey : baseKey;
+
+        const weaponImageFile = this.getWeaponImageFile(currentClass);
+
+        // Update button content first
+        const iconElement = document.getElementById(`${originalCharName.toLowerCase()}-icon`) as HTMLImageElement;
+        const textElement = document.getElementById(`${originalCharName.toLowerCase()}-text`);
+        
+        if (iconElement) {
+            const iconFile = isAltVersion ? this.getAltClassIcon(info.altClass) : this.getClassIcon(classType.tag);
+            iconElement.src = `assets/${iconFile}`;
+        }
+        
+        if (textElement) {
+            textElement.textContent = currentName;
+        }
+
+        // Create toggle button
+        const toggleHtml = info.altClass ? `
+            <button id="version-toggle" style="
+                position: absolute;
+                right: 20px;
+                background-color: #3498db;
+                border: none;
+                border-radius: 15px;
+                padding: 6px 12px;
+                color: white;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-size: 14px;
+                transition: background-color 0.2s;
+            ">
+            <span style="font-size: 18px;">🔒</span>
+            <span>${isAltVersion ? originalCharName : info.altName}</span>
+            </button>
+        ` : '';
+
+        this.classInfoPanel.innerHTML = `
+            <div style="position: relative; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+                <h2 style="margin: 0; font-size: 24px; color: #3498db;">
+                    ${currentName}
+                </h2>
+                ${toggleHtml}
+            </div>
+            <p style="margin: 0 0 15px 0;">${localization.getText(`${currentKey}.description`)}</p>
+            <h3 style="margin: 0 0 10px 0; font-size: 18px; color:rgb(183, 204, 46);">Weapon</h3>
+            <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                <img src="assets/${weaponImageFile}" style="height: 45px; width: 45px; margin-right: 10px;" 
+                    alt="${localization.getText(`${currentKey}.weapon`)} icon" />
+                <p style="margin: 0 0 0 10px;">
+                    ${localization.getText(`${currentKey}.weapon`)}
+                </p>
+            </div>
+            <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #2ecc71;">Strengths 💪</h3>
+            <p style="margin: 0 0 15px 0;">
+                ${localization.getText(`${currentKey}.strengths`)}
+            </p>
+            <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #e74c3c;">Weaknesses 👎</h3>
+            <p style="margin: 0;">
+                ${localization.getText(`${currentKey}.weaknesses`)}
+            </p>
+        `;
+
+        // Add event listener to toggle button with immediate content update
+        const toggleButton = document.getElementById('version-toggle');
+        if (toggleButton) {
+            toggleButton.addEventListener('click', () => {
+                // Update the alt version state
+                this.selectedAltVersions[originalCharName] = !this.selectedAltVersions[originalCharName];
+                const newIsAlt = this.selectedAltVersions[originalCharName];
+
+                // Immediately update button content
+                if (iconElement) {
+                    const newIconFile = newIsAlt ? this.getAltClassIcon(info.altClass) : this.getClassIcon(classType.tag);
+                    iconElement.src = `assets/${newIconFile}`;
+                }
+                
+                if (textElement) {
+                    textElement.textContent = newIsAlt ? info.altName : originalCharName;
+                }
+
+                // Update class info panel content with new version information
+                const newCurrentName = newIsAlt ? info.altName : originalCharName;
+                const newCurrentClass = newIsAlt ? info.altClass : classType.tag;
+                const newCurrentKey = newIsAlt ? altKey : baseKey;
+                const newWeaponImageFile = this.getWeaponImageFile(newCurrentClass);
+
+                // Create new toggle button HTML
+                const newToggleHtml = info.altClass ? `
+                    <button id="version-toggle" style="
+                        position: absolute;
+                        right: 20px;
+                        background-color: #3498db;
+                        border: none;
+                        border-radius: 15px;
+                        padding: 6px 12px;
+                        color: white;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        font-size: 14px;
+                        transition: background-color 0.2s;
+                    ">
+                    <span style="font-size: 18px;">🔒</span>
+                    <span>Switch to ${newIsAlt ? originalCharName : info.altName}</span>
+                    </button>
+                ` : '';
+
+                // Update the panel content
+                this.classInfoPanel.innerHTML = `
+                    <div style="position: relative; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+                        <h2 style="margin: 0; font-size: 24px; color: #3498db;">
+                            ${newCurrentName}
+                        </h2>
+                        ${newToggleHtml}
+                    </div>
+                    <p style="margin: 0 0 15px 0;">${localization.getText(`${newCurrentKey}.description`)}</p>
+                    <h3 style="margin: 0 0 10px 0; font-size: 18px; color:rgb(183, 204, 46);">Weapon</h3>
+                    <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                        <img src="assets/${newWeaponImageFile}" style="height: 45px; width: 45px; margin-right: 10px;" 
+                            alt="${localization.getText(`${newCurrentKey}.weapon`)} icon" />
+                        <p style="margin: 0 0 0 10px;">
+                            ${localization.getText(`${newCurrentKey}.weapon`)}
+                        </p>
+                    </div>
+                    <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #2ecc71;">Strengths 💪</h3>
+                    <p style="margin: 0 0 15px 0;">
+                        ${localization.getText(`${newCurrentKey}.strengths`)}
+                    </p>
+                    <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #e74c3c;">Weaknesses 👎</h3>
+                    <p style="margin: 0;">
+                        ${localization.getText(`${newCurrentKey}.weaknesses`)}
+                    </p>
+                `;
+
+                // Get the current button and handle class selection
+                const button = this.getButtonForClass(classType);
+                if (button) {
+                    if (newIsAlt && info.altClass) {
+                        const altClassEnum = PlayerClass[info.altClass as keyof typeof PlayerClass] as PlayerClass;
+                        this.selectClass(altClassEnum, button);
+                    } else {
+                        this.selectClass(classType, button);
+                    }
+                }
+
+                // Re-attach event listener to new toggle button
+                const newToggleButton = document.getElementById('version-toggle');
+                if (newToggleButton) {
+                    newToggleButton.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        toggleButton.click();
+                    });
+                }
+            });
+        }
+    }
+
+    private getWeaponImageFile(classTag: string): string {
+        const weaponMap: Record<string, string> = {
+            'Fighter': 'attack_sword.png',
+            'Rogue': 'attack_knife.png',
+            'Mage': 'attack_wand.png',
+            'Paladin': 'attack_shield.png',
+            'Football': 'attack_football.png',
+            'Gambler': 'attack_cards.png',
+            'Athlete': 'attack_dumbbell.png',
+            'Gourmand': 'attack_garlic.png'
+        };
+        return weaponMap[classTag] || 'attack_sword.png';
     }
     
     private positionHTMLElements() {
@@ -392,7 +696,8 @@ export default class ClassSelectScene extends Phaser.Scene {
     
     private selectClass(classType: PlayerClass, button: HTMLButtonElement) {
         // Reset all button styles
-        [this.fighterButton, this.rogueButton, this.mageButton, this.paladinButton].forEach(btn => {
+        const allButtons = [this.fighterButton, this.rogueButton, this.mageButton, this.paladinButton];
+        allButtons.forEach(btn => {
             if (btn) {
                 btn.style.backgroundColor = '#2c3e50';
                 btn.style.borderColor = '#34495e';
@@ -405,7 +710,6 @@ export default class ClassSelectScene extends Phaser.Scene {
         
         // Set selected class
         this.selectedClass = classType;
-        console.log(`Selected class: ${classType.tag}`);
         
         // Show confirm button
         this.confirmButton.style.display = 'block';
@@ -413,41 +717,44 @@ export default class ClassSelectScene extends Phaser.Scene {
         // Hide any error message
         this.errorText.setVisible(false);
 
-        // Update class info panel content
-        const classNameMap: Record<string, string> = {
-            'Fighter': "Til",
-            'Rogue': "Marc",
-            'Mage': "Max",
-            'Paladin': "Chris"
-        };
-        const characterName = classNameMap[classType.tag];
-        const info = CLASS_INFO[characterName as ClassNames];
+        // Get class info based on the original character name
+        const baseClassName = CLASS_NAME_MAP[classType.tag as keyof typeof CLASS_NAME_MAP];
+        const info = CLASS_INFO[baseClassName as ClassNames];
 
-        const weaponImageFile = classType.tag === 'Fighter' ? 'attack_sword.png' : 
-                          classType.tag === 'Rogue' ? 'attack_knife.png' : 
-                          classType.tag === 'Mage' ? 'attack_wand.png' : 
-                          classType.tag === 'Paladin' ? 'attack_shield.png' : '';
-
-        // Show and position the panel
+        // Show and update the info panel
         this.classInfoPanel.style.display = 'block';
         
-        // Update panel content
-        this.classInfoPanel.innerHTML = `
-            <h2 style="margin: 0 0 15px 0; font-size: 24px; color: #3498db;">${characterName}</h2>
-            <p style="margin: 0 0 15px 0;">${localization.getText(info.description)}</p>
-            <h3 style="margin: 0 0 10px 0; font-size: 18px; color:rgb(183, 204, 46);">Weapon</h3>
-            <div style="display: flex; align-items: center; margin-bottom: 15px;">
-                <img src="/assets/${weaponImageFile}" style="height: 45px; width: 45px; margin-right: 10px;" alt="${localization.getText(info.weapon)} icon" />
-                <p style="margin: 0 0 0 10px;">${localization.getText(info.weapon)}</p>
-            </div>
-            <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #2ecc71;">Strengths 💪</h3>
-            <p style="margin: 0 0 15px 0;">${localization.getText(info.strengths)}</p>
-            <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #e74c3c;">Weaknesses 👎</h3>
-            <p style="margin: 0;">${localization.getText(info.weaknesses)}</p>
-        `;
+        // Update button content before updating panel
+        const originalCharName = this.getOriginalCharacterName(baseClassName);
+        const isAltVersion = this.selectedAltVersions[originalCharName] || false;
+        
+        const iconElement = document.getElementById(`${originalCharName.toLowerCase()}-icon`) as HTMLImageElement;
+        const textElement = document.getElementById(`${originalCharName.toLowerCase()}-text`);
+        
+        if (iconElement) {
+            const iconFile = isAltVersion ? this.getAltClassIcon(info.altClass) : this.getClassIcon(classType.tag);
+            iconElement.src = `assets/${iconFile}`;
+        }
+        
+        if (textElement) {
+            textElement.textContent = isAltVersion ? info.altName : originalCharName;
+        }
+        
+        // Update the info panel
+        this.updateClassInfoPanel(baseClassName, classType, info);
         
         // Update positions to maintain alignment
         this.positionHTMLElements();
+    }
+
+    private getButtonForClass(classType: PlayerClass): HTMLButtonElement | null {
+        const buttonMap: Record<string, HTMLButtonElement> = {
+            'Fighter': this.fighterButton,
+            'Rogue': this.rogueButton,
+            'Mage': this.mageButton,
+            'Paladin': this.paladinButton
+        };
+        return buttonMap[classType.tag] || null;
     }
     
     private spawnPlayer() 
@@ -480,8 +787,6 @@ export default class ClassSelectScene extends Phaser.Scene {
                 
                 // Call the spawnPlayer reducer with the numeric class ID
                 this.spacetimeDBClient.sdkConnection.reducers.spawnPlayer(classId);
-                
-                // No need for timeout logic here as that's handled by LoadingScene
             } 
             else 
             {
@@ -494,7 +799,7 @@ export default class ClassSelectScene extends Phaser.Scene {
             this.showError('An error occurred while spawning your player');
         }
     }
-    
+
     // Add a dedicated cleanup method for HTML elements
     private cleanupHTMLElements() {
         console.log("Cleaning up ClassSelectScene HTML elements");
@@ -503,7 +808,7 @@ export default class ClassSelectScene extends Phaser.Scene {
             if (this.classButtonsContainer && this.classButtonsContainer.parentNode) {
                 this.classButtonsContainer.remove();
             }
-            
+
             if (this.classInfoPanel && this.classInfoPanel.parentNode) {
                 this.classInfoPanel.remove();
             }
@@ -511,25 +816,29 @@ export default class ClassSelectScene extends Phaser.Scene {
             if (this.questButton && this.questButton.parentNode) {
                 this.questButton.remove();
             }
+
+            if (this.bestiaryButton && this.bestiaryButton.parentNode) {
+                this.bestiaryButton.remove();
+            }
             
             // Method 2: Query by ID and class
             const container = document.getElementById('class-select-container');
             if (container && container.parentNode) {
                 container.remove();
             }
-            
+
             const infoPanel = document.getElementById('class-info-panel');
             if (infoPanel && infoPanel.parentNode) {
                 infoPanel.remove();
             }
-            
+
             // Method 3: Query by class
             document.querySelectorAll('.class-select-button').forEach(el => {
                 if (el && el.parentNode) {
                     el.remove();
                 }
             });
-            
+
             // Method 4: Look for any buttons that might be ours
             document.querySelectorAll('button').forEach(el => {
                 if ((el as HTMLElement).textContent?.includes('Fighter') || 
@@ -544,7 +853,7 @@ export default class ClassSelectScene extends Phaser.Scene {
                     }
                 }
             });
-            
+
             // Look for the container div and info panel
             document.querySelectorAll('div').forEach(el => {
                 if (el.id === 'class-select-container' || 
@@ -567,7 +876,7 @@ export default class ClassSelectScene extends Phaser.Scene {
             console.error("Error in cleanupHTMLElements:", e);
         }
     }
-    
+
     private showError(message: string) {
         this.errorText.setText(message);
         this.errorText.setVisible(true);
@@ -628,26 +937,48 @@ export default class ClassSelectScene extends Phaser.Scene {
         document.body.appendChild(languageSelector);
     }
 
-    private getButtonForClass(classType: PlayerClass): HTMLButtonElement | null {
-        switch (classType.tag) {
-            case 'Fighter':
-                return this.fighterButton;
-            case 'Rogue':
-                return this.rogueButton;
-            case 'Mage':
-                return this.mageButton;
-            case 'Paladin':
-                return this.paladinButton;
-            default:
-                return null;
-        }
+    private getClassIcon(classType: string): string {
+        const iconMap: Record<string, string> = {
+            'Fighter': 'class_fighter_1.png',
+            'Rogue': 'class_rogue_1.png',
+            'Mage': 'class_mage_1.png',
+            'Paladin': 'class_paladin_1.png',
+            'Football': 'class_football_1.png',
+            'Gambler': 'class_gambler_1.png',
+            'Athlete': 'class_athlete_1.png',
+            'Gourmand': 'class_chef_1.png'
+        };
+        return iconMap[classType] || 'class_fighter_1.png';
     }
-    
+
+    private getClassIconKey(classType: string): string {
+        const iconKeyMap: Record<string, string> = {
+            'Fighter': 'fighter_icon',
+            'Rogue': 'rogue_icon',
+            'Mage': 'mage_icon',
+            'Paladin': 'paladin_icon',
+            'Football': 'football_icon',
+            'Gambler': 'gambler_icon',
+            'Athlete': 'athlete_icon',
+            'Gourmand': 'gourmand_icon'
+        };
+        return iconKeyMap[classType] || 'fighter_icon';
+    }
+
+    private getAltClassIcon(classType: string): string {
+        const altIconMap: Record<string, string> = {
+            'Football': 'class_football_1.png',
+            'Gambler': 'class_gambler_1.png',
+            'Athlete': 'class_athlete_1.png',
+            'Gourmand': 'class_chef_1.png'
+        };
+        return altIconMap[classType] || 'class_fighter_1.png';
+    }
+
     shutdown() {
         console.log("ClassSelectScene shutdown called");
         
         // Remove event listeners
-        this.events.off("shutdown", this.shutdown, this);
         this.gameEvents.off(GameEvents.PLAYER_CREATED, this.handlePlayerCreated, this);
         this.gameEvents.off(GameEvents.PLAYER_DIED, this.handlePlayerDied, this);
         this.gameEvents.off(GameEvents.NAME_SET, this.handleNameSet, this);

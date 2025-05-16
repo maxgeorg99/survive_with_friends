@@ -9,7 +9,11 @@ public static partial class Module
         Fighter,
         Rogue,
         Mage,
-        Paladin
+        Paladin,
+        Football,
+        Gambler,
+        Athlete,
+        Gourmand
     }
 
     [SpacetimeDB.Type]

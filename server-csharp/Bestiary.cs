@@ -8,6 +8,9 @@ public static partial class Module
         Rat,
         Slime,
         Orc,
+        Wolf,
+        Worm,
+        Scorpion,
         FinalBossPhase1,
         FinalBossPhase2,
         FinalBossJorgePhase1,
@@ -80,6 +83,42 @@ public static partial class Module
             exp = 5,
             atk = 2.0f,
             radius = 40.0f
+        });
+
+        // Insert Wolf stats
+        ctx.Db.bestiary.Insert(new Bestiary
+        {
+            bestiary_id = (uint)MonsterType.Wolf,
+            monster_type = MonsterType.Wolf,
+            max_hp = 35,
+            speed = 175.0f,  // Faster than slime and orc
+            exp = 3,
+            atk = 1.8f,      // Stronger than slime but weaker than orc
+            radius = 34.0f    // Slightly smaller than orc
+        });
+        
+        // Insert Worm stats
+        ctx.Db.bestiary.Insert(new Bestiary
+        {
+            bestiary_id = (uint)MonsterType.Worm,
+            monster_type = MonsterType.Worm,
+            max_hp = 20,
+            speed = 80.0f,   // Slow movement speed
+            exp = 4,
+            atk = 0.8f,      // Low direct attack power (projectiles will be handled separately)
+            radius = 28.0f    // Small hitbox
+        });
+        
+        // Insert Scorpion stats
+        ctx.Db.bestiary.Insert(new Bestiary
+        {
+            bestiary_id = (uint)MonsterType.Scorpion,
+            monster_type = MonsterType.Scorpion,
+            max_hp = 15,             // Stronger than rat (10)
+            speed = 150.0f,          // Slightly slower than rat (160)
+            exp = 2,                 // More exp than rat (1)
+            atk = 1.2f,              // More attack than rat (1.0)
+            radius = 26.0f           // Slightly larger than rat (24)
         });
         
         // Insert Final Boss Phase 1 stats
@@ -167,9 +206,9 @@ public static partial class Module
             bestiary_id = (uint)MonsterType.FinalBossSimonPhase2,
             monster_type = MonsterType.FinalBossSimonPhase2,
             max_hp = 500,
-            speed = 150.0f,
+            speed = 50.0f,
             exp = 500,
-            atk = 40.0f,
+            atk = 10.0f,
             radius = 245.0f
         });
 

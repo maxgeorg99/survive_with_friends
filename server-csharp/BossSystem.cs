@@ -27,6 +27,15 @@ public static partial class Module
         public ScheduleAt scheduled_at;
     }
     
+    // Scheduled table for boss projectile attacks
+    [SpacetimeDB.Table(Name = "boss_attack_timer", Scheduled = nameof(BossFireProjectile), ScheduledAt = nameof(scheduled_at), Public = true)]
+    public partial struct BossAttackTimer
+    {
+        [PrimaryKey, AutoInc]
+        public ulong scheduled_id;
+        public ScheduleAt scheduled_at;
+    }
+    
     // Initialize the game state
     public static void InitGameState(ReducerContext ctx)
     {
@@ -110,20 +119,16 @@ public static partial class Module
         var rng = ctx.Rng;
         int bossIndex = rng.Next(0, 3); // 0 = Jorge, 1 = Björn, 2 = Simon
         MonsterType phase1Type;
-        MonsterType phase2Type;
         switch (bossIndex)
         {
             case 0:
                 phase1Type = MonsterType.FinalBossJorgePhase1;
-                phase2Type = MonsterType.FinalBossJorgePhase2;
                 break;
             case 1:
                 phase1Type = MonsterType.FinalBossBjornPhase1;
-                phase2Type = MonsterType.FinalBossBjornPhase2;
                 break;
             default:
                 phase1Type = MonsterType.FinalBossSimonPhase1;
-                phase2Type = MonsterType.FinalBossSimonPhase2;
                 break;
         }
         
@@ -168,6 +173,12 @@ public static partial class Module
         
         // Schedule the boss to spawn using the existing monster spawning system
         ScheduleBossSpawning(ctx, centerPosition, closestPlayerId, targetPlayerName, phase1Type);
+
+        // Schedule the first boss attack timer (projectile)
+        ctx.Db.boss_attack_timer.Insert(new BossAttackTimer
+        {
+            scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(1000))
+        });
     }
     
     // Schedule boss spawning using the existing monster spawning system
@@ -212,7 +223,7 @@ public static partial class Module
         Log.Info($"Game state before update - Phase: {gameStateOpt.Value.boss_phase}, BossActive: {gameStateOpt.Value.boss_active}, BossMonsterID: {gameStateOpt.Value.boss_monster_id}");
         
         // Determine which boss phase 2 to spawn based on the phase 1 boss type
-        var oldBossOpt = ctx.Db.monsters.monster_id.Find(oldBossEntityId);
+        var oldBossOpt = ctx.Db.monsters.entity_id.Find(oldBossEntityId);
         if (oldBossOpt == null)
         {
             throw new Exception("SpawnBossPhaseTwo: Could not find old boss monster!");
@@ -306,6 +317,8 @@ public static partial class Module
                 bestiary_id = phase2Type,
                 hp = bestiaryEntry.Value.max_hp,
                 max_hp = bestiaryEntry.Value.max_hp,
+                atk = bestiaryEntry.Value.atk,
+                speed = bestiaryEntry.Value.speed,
                 target_entity_id = closestPlayerId
             });
             
@@ -315,6 +328,12 @@ public static partial class Module
             }
             
             Log.Info($"Created phase 2 boss monster with ID: {monsterOpt.Value.monster_id}");
+            
+            // Schedule the first boss attack timer (projectile) for phase 2
+            ctx.Db.boss_attack_timer.Insert(new BossAttackTimer
+            {
+                scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(600))
+            });
             
             // Update game state with new boss monster ID
             gameState.boss_monster_id = monsterOpt.Value.monster_id;
@@ -409,18 +428,6 @@ public static partial class Module
         }
     }
     
-    // Test/debug utility to manually spawn the boss for testing
-    [Reducer]
-    public static void SpawnBossForTesting(ReducerContext ctx)
-    {
-        Log.Info("DEVELOPER TEST: Manually triggering boss spawn...");
-        
-        // Call the boss spawn method directly
-        // This bypasses the scheduling system for testing purposes
-        SpawnBossPhaseOne(ctx, new BossSpawnTimer { scheduled_id = 0 });
-        
-        Log.Info("DEVELOPER TEST: Boss spawn triggered manually");
-    }
     public static void UpdateBossMonsterID(ReducerContext ctx, uint monster_id)
     {
         if (ctx.Sender != ctx.Identity)
@@ -451,4 +458,220 @@ public static partial class Module
             }
         }
     }
-} 
+
+    // Reducer to fire a boss projectile at the nearest player
+    [Reducer]
+    public static void BossFireProjectile(ReducerContext ctx, BossAttackTimer timer)
+    {
+        Log.Info("BossFireProjectile triggered!");
+        
+        var gameStateOpt = ctx.Db.game_state.id.Find(0);
+        if (gameStateOpt == null || !gameStateOpt.Value.boss_active || gameStateOpt.Value.boss_monster_id == 0)
+        {
+            Log.Info("BossFireProjectile: No active boss found");
+            return;
+        }
+
+        var bossMonster = ctx.Db.monsters.monster_id.Find(gameStateOpt.Value.boss_monster_id);
+        if (bossMonster == null)
+        {
+            Log.Info("BossFireProjectile: Boss monster not found");
+            return;
+        }
+
+        // Determine boss type and attack pattern
+        var bossType = bossMonster.Value.bestiary_id;
+        if (bossType == MonsterType.FinalBossJorgePhase1 || bossType == MonsterType.FinalBossJorgePhase2)
+        {
+            // Jorge: Single fast projectile
+            Module.TriggerBossAttackProjectile(ctx, bossMonster.Value.monster_id, AttackType.BossJorgeBolt);
+        }
+        else if (bossType == MonsterType.FinalBossBjornPhase1 || bossType == MonsterType.FinalBossBjornPhase2)
+        {
+            // Björn: Homing projectile
+            Module.TriggerBossAttackProjectile(ctx, bossMonster.Value.monster_id, AttackType.BossBjornBolt, 0, 1); // parameterU = 1 marks it as homing
+        }
+        else if (bossType == MonsterType.FinalBossSimonPhase1 || bossType == MonsterType.FinalBossSimonPhase2)
+        {
+            // Simon: Multiple spread projectiles
+            ApplySimonBuff(ctx, bossMonster.Value.monster_id, bossMonster.Value.entity_id);
+            
+            // Fire 3 projectiles in a spread pattern
+            for (uint i = 0; i < 3; i++)
+            {
+                Module.TriggerBossAttackProjectile(ctx, bossMonster.Value.monster_id, AttackType.BossBolt, i);
+            }
+        }
+
+        // Schedule next attack
+        ctx.Db.boss_attack_timer.Insert(new BossAttackTimer
+        {
+            scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(600))
+        });
+        
+        Log.Info("BossFireProjectile: Scheduled next attack");
+    }
+
+    // Helper to apply Simon's buff
+    private static void ApplySimonBuff(ReducerContext ctx, uint monsterId, uint entityId)
+    {
+        // Increase speed and damage for a duration (e.g., 3 seconds)
+        var monsterOpt = ctx.Db.monsters.monster_id.Find(monsterId);
+        if (monsterOpt == null) return;
+        var monster = monsterOpt.Value;
+        monster.speed *= 1.1f; // Increase speed
+        monster.atk *= 1.1f;   // Increase damage
+        ctx.Db.monsters.monster_id.Update(monster);
+    }
+
+    // DEBUG/DEV ONLY: Reducer to spawn a specific boss for testing
+    // bossTypeIndex: 0 = Jorge, 1 = Björn, 2 = Simon
+    [Reducer]
+    public static void DebugSpawnBoss(ReducerContext ctx, int bossTypeIndex, bool spawnPhaseTwo = false)
+    {
+        // SECURITY: Only allow in dev mode or for admin users!
+        // (Add your own security check here if needed)
+
+        // Check if there are any players online
+        var playerCount = ctx.Db.player.Count;
+        if (playerCount == 0)
+        {
+            Log.Info("No players online, not spawning boss.");
+            return;
+        }
+
+        // Get game configuration for world size
+        var configOpt = ctx.Db.config.id.Find(0);
+        if (configOpt == null)
+        {
+            throw new Exception("DebugSpawnBoss: Could not find game configuration!");
+        }
+        var config = configOpt.Value;
+
+        // Get game state to update boss status
+        var gameStateOpt = ctx.Db.game_state.id.Find(0);
+        if (gameStateOpt == null)
+        {
+            throw new Exception("DebugSpawnBoss: Could not find game state!");
+        }
+
+        // Select boss type based on argument
+        MonsterType phase1Type;
+        MonsterType phase2Type;
+        switch (bossTypeIndex)
+        {
+            case 0:
+                phase1Type = MonsterType.FinalBossJorgePhase1;
+                phase2Type = MonsterType.FinalBossJorgePhase2;
+                break;
+            case 1:
+                phase1Type = MonsterType.FinalBossBjornPhase1;
+                phase2Type = MonsterType.FinalBossBjornPhase2;
+                break;
+            default:
+                phase1Type = MonsterType.FinalBossSimonPhase1;
+                phase2Type = MonsterType.FinalBossSimonPhase2;
+                break;
+        }
+
+        // Calculate position at center of map
+        float centerX = config.world_size / 2;
+        float centerY = config.world_size / 2;
+        DbVector2 centerPosition = new DbVector2(centerX, centerY);
+
+        // Find the closest player to target
+        uint closestPlayerId = 0;
+        float closestDistance = float.MaxValue;
+        string targetPlayerName = "unknown";
+        foreach (var player in ctx.Db.player.Iter())
+        {
+            var playerEntityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
+            if (playerEntityOpt != null)
+            {
+                var playerEntity = playerEntityOpt.Value;
+                float dx = playerEntity.position.x - centerPosition.x;
+                float dy = playerEntity.position.y - centerPosition.y;
+                float distanceSquared = dx * dx + dy * dy;
+                if (distanceSquared < closestDistance)
+                {
+                    closestDistance = distanceSquared;
+                    closestPlayerId = player.entity_id;
+                    targetPlayerName = player.name;
+                }
+            }
+        }
+
+        if (!spawnPhaseTwo)
+        {
+            // --- PHASE 1 ---
+            // Update game state to indicate boss is active and store selected boss type
+            var gameState = gameStateOpt.Value;
+            gameState.boss_active = true;
+            gameState.boss_phase = 1;
+            gameState.normal_spawning_paused = true;
+            ctx.Db.game_state.id.Update(gameState);
+
+            // Schedule the boss to spawn using the existing monster spawning system
+            ScheduleBossSpawning(ctx, centerPosition, closestPlayerId, targetPlayerName, phase1Type);
+
+            // Schedule the first boss attack timer (projectile)
+            ctx.Db.boss_attack_timer.Insert(new BossAttackTimer
+            {
+                scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(600))
+            });
+        }
+        else
+        {
+            // --- PHASE 2 ---
+            // Use the same logic as SpawnBossPhaseTwo, but directly
+            var bestiaryEntry = ctx.Db.bestiary.bestiary_id.Find((uint)phase2Type);
+            if (bestiaryEntry == null)
+            {
+                throw new Exception($"DebugSpawnBoss: Could not find bestiary entry for boss phase 2!");
+            }
+
+            // Create boss entity at the center
+            Entity? entityOpt = ctx.Db.entity.Insert(new Entity
+            {
+                position = centerPosition,
+                direction = new DbVector2(0, 0),
+                is_moving = false,
+                radius = bestiaryEntry.Value.radius
+            });
+            if (entityOpt == null)
+            {
+                throw new Exception("DebugSpawnBoss: Failed to create entity for phase 2 boss!");
+            }
+
+            // Create the boss monster
+            Monsters? monsterOpt = ctx.Db.monsters.Insert(new Monsters
+            {
+                entity_id = entityOpt.Value.entity_id,
+                bestiary_id = phase2Type,
+                hp = bestiaryEntry.Value.max_hp,
+                max_hp = bestiaryEntry.Value.max_hp,
+                atk = bestiaryEntry.Value.atk,
+                speed = bestiaryEntry.Value.speed,
+                target_entity_id = closestPlayerId
+            });
+            if (monsterOpt == null)
+            {
+                throw new Exception("DebugSpawnBoss: Failed to create phase 2 boss monster!");
+            }
+
+            // Update game state for phase 2
+            var gameState = gameStateOpt.Value;
+            gameState.boss_active = true;
+            gameState.boss_phase = 2;
+            gameState.boss_monster_id = monsterOpt.Value.monster_id;
+            gameState.normal_spawning_paused = true;
+            ctx.Db.game_state.id.Update(gameState);
+
+            // Schedule the first boss attack timer (projectile)
+            ctx.Db.boss_attack_timer.Insert(new BossAttackTimer
+            {
+                scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(600))
+            });
+        }
+    }
+}

@@ -1,12 +1,15 @@
 {
   "name": "vibe_survivors_client",
+  "homepage": "https://maxgeorg99.github.io/survive_with_friends/",
   "version": "1.0.0",
   "description": "Phaser client for Vibe Survivors",
   "main": "src/main.ts",
   "scripts": {
-    "start": "vite",
+    "start": "vite --host",
     "build": "vite build",
     "serve": "vite preview",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist",
     "generate-bindings": "spacetimedb generate --lang typescript --out-dir ./src/autobindings"
   },
   "author": "",
@@ -19,4 +22,4 @@
     "typescript": "^5.3.3",
     "vite": "^5.0.11"
   }
-} 
+}

@@ -34,6 +34,23 @@ public static partial class Module
         public ScheduleAt scheduled_at; // When to clean up the record
     }
 
+    // Table to track which players are poisoned by scorpions
+    [SpacetimeDB.Table(Name = "player_poison_effect", Public = true, 
+                      Scheduled = nameof(RemovePoisonEffect), 
+                      ScheduledAt = nameof(scheduled_at))]
+    public partial struct PlayerPoisonEffect
+    {
+        [PrimaryKey, AutoInc]
+        public ulong poison_id;
+        
+        [SpacetimeDB.Index.BTree]
+        public uint player_id;       // The player that is poisoned
+        
+        public float original_speed;  // The player's original speed before poison
+        public float poisoned_speed;  // The player's reduced speed while poisoned
+        public ScheduleAt scheduled_at; // When the poison effect will expire
+    }
+
     // Helper function to check if a monster has already been hit by an attack
     private static bool HasMonsterBeenHitByAttack(ReducerContext ctx, uint monsterId, uint attackEntityId)
     {
@@ -563,10 +580,13 @@ public static partial class Module
 
         ProcessPlayerMovement(ctx, tick_rate, worldSize);
         ProcessMonsterMovements(ctx);
+        ProcessMonsterBehavior(ctx); // New - process special monster behaviors like Worm's projectile attack
         ProcessAttackMovements(ctx, worldSize);
+        ProcessBossAttackMovements(ctx, worldSize);
 
         ProcessPlayerMonsterCollisions(ctx);
         ProcessMonsterAttackCollisions(ctx);
+        ProcessPlayerBossAttackCollisions(ctx);
         ProcessGemCollisions(ctx);
     }
 
@@ -707,6 +727,83 @@ public static partial class Module
         }
     }
     
+    // Helper method to process collisions between boss attacks and players
+    private static void ProcessPlayerBossAttackCollisions(ReducerContext ctx)
+    {
+        // Check each active boss attack for collisions with players
+        foreach (var activeBossAttack in ctx.Db.active_boss_attacks.Iter())
+        {
+            // Get the boss attack entity
+            var attackEntityOpt = ctx.Db.entity.entity_id.Find(activeBossAttack.entity_id);
+            if (attackEntityOpt is null)
+            {
+                continue; // Skip if entity not found
+            }
+            var attackEntity = attackEntityOpt.Value;
+            
+            bool attackHitPlayer = false;
+            
+            // Check for collisions with players
+            foreach (var player in ctx.Db.player.Iter())
+            {
+                var playerEntityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
+                if (playerEntityOpt == null)
+                {
+                    continue; // Skip if player has no entity
+                }
+                Entity playerEntity = playerEntityOpt.Value;
+                
+                // Check if the attack is colliding with this player
+                if (AreEntitiesColliding(attackEntity, playerEntity))
+                {
+                    // Apply damage to player using the active boss attack's damage value
+                    bool playerKilled = DamagePlayer(ctx, player.player_id, activeBossAttack.damage);
+                    attackHitPlayer = true;
+                    
+                    Log.Info($"Boss attack {activeBossAttack.active_boss_attack_id} (type: {activeBossAttack.attack_type}) hit player {player.name} (ID: {player.player_id}) for {activeBossAttack.damage} damage.");
+
+                    // Check if this is a scorpion sting attack that causes poison
+                    if (activeBossAttack.attack_type == AttackType.ScorpionSting && activeBossAttack.parameter_u == 1)
+                    {
+                        // Apply poison effect to the player
+                        ApplyPoisonToPlayer(ctx, player.player_id);
+                        Log.Info($"Scorpion sting poisoned player {player.name} (ID: {player.player_id})");
+                    }
+
+                    // For non-piercing attacks, stop checking other players and destroy the attack
+                    if (!activeBossAttack.piercing)
+                    {
+                        break; 
+                    }
+                }
+            }
+            
+            // If the attack hit a player and it's not piercing, remove the attack
+            if (attackHitPlayer && !activeBossAttack.piercing)
+            {
+                // Delete the attack entity
+                ctx.Db.entity.entity_id.Delete(attackEntity.entity_id);
+                
+                // Delete the active boss attack record
+                // Also need to find the corresponding cleanup job and delete it.
+                ActiveBossAttackCleanup? cleanupToDelete = null;
+                foreach (var cleanupEntry in ctx.Db.active_boss_attack_cleanup.active_boss_attack_id.Filter(activeBossAttack.active_boss_attack_id))
+                {
+                    cleanupToDelete = cleanupEntry;
+                    break; // Assuming one cleanup per attack ID
+                }
+
+                if (cleanupToDelete != null) {
+                    ctx.Db.active_boss_attack_cleanup.scheduled_id.Delete(cleanupToDelete.Value.scheduled_id);
+                }
+                ctx.Db.active_boss_attacks.active_boss_attack_id.Delete(activeBossAttack.active_boss_attack_id);
+                
+                // Clean up any damage records for this attack (if we were tracking boss attack damage - currently not)
+                // CleanupAttackDamageRecords(ctx, attackEntity.entity_id); // This function is for player attacks on monsters
+            }
+        }
+    }
+
     // Helper method to process collisions between players and monsters and apply damage
     private static void ProcessPlayerMonsterCollisions(ReducerContext ctx)
     {        
@@ -812,6 +909,97 @@ public static partial class Module
         float repulsionStrength = overlap * 0.5f; // Adjust this factor as needed
         
         return new DbVector2(nx * repulsionStrength, ny * repulsionStrength);
+    }
+
+    // Helper method to apply the scorpion poison effect to a player
+    private static void ApplyPoisonToPlayer(ReducerContext ctx, uint playerId)
+    {
+        // First check if player is already poisoned
+        bool alreadyPoisoned = false;
+        foreach (var poisonEffect in ctx.Db.player_poison_effect.player_id.Filter(playerId))
+        {
+            alreadyPoisoned = true;
+            break;
+        }
+        
+        // If already poisoned, just refresh the duration but don't stack the effect
+        if (alreadyPoisoned)
+        {
+            // Find the poison effect and update its scheduled time
+            foreach (var poisonEffect in ctx.Db.player_poison_effect.player_id.Filter(playerId))
+            {
+                var updatedEffect = poisonEffect;
+                // Refresh the timer for 1 second
+                updatedEffect.scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(1000));
+                ctx.Db.player_poison_effect.poison_id.Update(updatedEffect);
+                
+                Log.Info($"Refreshed poison effect on player {playerId}, will expire in 1000ms");
+                return;
+            }
+        }
+        
+        // Get the player to apply the poison effect
+        var playerOpt = ctx.Db.player.player_id.Find(playerId);
+        if (playerOpt == null)
+        {
+            Log.Error($"Cannot apply poison effect: Player {playerId} not found");
+            return;
+        }
+        
+        var player = playerOpt.Value;
+        
+        // Calculate the reduced speed (60% of original)
+        float originalSpeed = player.speed;
+        float poisonedSpeed = originalSpeed * 0.6f;
+        
+        // Apply the slower speed
+        player.speed = poisonedSpeed;
+        ctx.Db.player.player_id.Update(player);
+        
+        // Create a poison effect record that will restore the speed when it expires
+        ctx.Db.player_poison_effect.Insert(new PlayerPoisonEffect
+        {
+            player_id = playerId,
+            original_speed = originalSpeed,
+            poisoned_speed = poisonedSpeed,
+            scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(1000)) // 1 second duration
+        });
+        
+        Log.Info($"Applied poison effect to player {playerId}: Speed reduced from {originalSpeed} to {poisonedSpeed}, will expire in 1000ms");
+    }
+
+    // Reducer method to remove poison effect when it expires
+    [Reducer]
+    public static void RemovePoisonEffect(ReducerContext ctx, PlayerPoisonEffect poisonEffect)
+    {
+        if (ctx.Sender != ctx.Identity)
+        {
+            throw new Exception("RemovePoisonEffect may not be invoked by clients, only via scheduling.");
+        }
+        
+        // Get the player
+        var playerOpt = ctx.Db.player.player_id.Find(poisonEffect.player_id);
+        if (playerOpt == null)
+        {
+            // Player may have died or otherwise been removed
+            ctx.Db.player_poison_effect.poison_id.Delete(poisonEffect.poison_id);
+            return;
+        }
+        
+        var player = playerOpt.Value;
+        
+        // Make sure the player still has the reduced speed (might have been changed by other effects)
+        if (Math.Abs(player.speed - poisonEffect.poisoned_speed) < 0.001f)
+        {
+            // Restore original speed
+            player.speed = poisonEffect.original_speed;
+            ctx.Db.player.player_id.Update(player);
+            
+            Log.Info($"Removed poison effect from player {player.player_id}: Speed restored from {poisonEffect.poisoned_speed} to {poisonEffect.original_speed}");
+        }
+        
+        // Delete the poison effect record
+        ctx.Db.player_poison_effect.poison_id.Delete(poisonEffect.poison_id);
     }
 
     // Reducer to clean up a monster hit record
