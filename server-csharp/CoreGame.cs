@@ -441,26 +441,78 @@ public static partial class Module
             return;
         }
 
+        // Get current timestamp for timing measurements
+        var currentTimestamp = ctx.Timestamp;
+
+        // Get world configuration
+        uint tick_rate = 50;
+        var configOpt = ctx.Db.config.id.Find(0);
+        if (configOpt != null)
+        {
+            tick_rate = configOpt.Value.game_tick_rate;
+        }
+
         var worldOpt = ctx.Db.world.world_id.Find(0);
         if (worldOpt != null)
         {
             var world = worldOpt.Value;
             world.tick_count += 1;
+            
+            // Calculate time since last tick using Timestamp
+            double timeSinceLastTickMs = tick_rate; // Default to config tick rate
+            
+            if (world.timing_samples_collected > 0) 
+            {
+                // Get the last tick timestamp from world data
+                var lastTickTimestamp = world.last_tick_time;
+                
+                if (lastTickTimestamp.MicrosecondsSinceUnixEpoch > 0)
+                {
+                    // Calculate time difference using TimeDuration
+                    var timeDuration = currentTimestamp.TimeDurationSince(lastTickTimestamp);
+                    timeSinceLastTickMs = timeDuration.Microseconds / 1000.0; // Convert to milliseconds
+                    
+                    // Update timing stats
+                    if (world.timing_samples_collected == 1) // First real measurement
+                    {
+                        world.min_tick_ms = timeSinceLastTickMs;
+                        world.max_tick_ms = timeSinceLastTickMs;
+                        world.average_tick_ms = timeSinceLastTickMs;
+                    }
+                    else
+                    {
+                        // Update min/max if needed
+                        if (timeSinceLastTickMs < world.min_tick_ms)
+                            world.min_tick_ms = timeSinceLastTickMs;
+                        if (timeSinceLastTickMs > world.max_tick_ms)
+                            world.max_tick_ms = timeSinceLastTickMs;
+                        
+                        // Calculate rolling average (weighted toward more recent samples)
+                        // Use a weight of 0.1 for new samples to smooth out the average
+                        world.average_tick_ms = (world.average_tick_ms * 0.9) + (timeSinceLastTickMs * 0.1);
+                    }
+                }
+            }
+            
+            // Update timestamp for next tick
+            world.last_tick_time = currentTimestamp;
+            world.timing_samples_collected++;
+            
+            // Log timing information every 20 ticks
             if(world.tick_count % 20 == 0)
             {
-                Log.Info($"Game tick: {world.tick_count}");
+                Log.Info($"Game tick: {world.tick_count} | Avg: {world.average_tick_ms:F2}ms | Current: {timeSinceLastTickMs:F2}ms | Min: {world.min_tick_ms:F2}ms | Max: {world.max_tick_ms:F2}ms");
             }
+            
             ctx.Db.world.world_id.Update(world);
         }
 
         // Get world size from config
         uint worldSize = 20000; // Default fallback (10x larger)
-        uint tick_rate = 50;
-        var configOpt = ctx.Db.config.id.Find(0);
+        
         if (configOpt != null)
         {
             worldSize = configOpt.Value.world_size;
-            tick_rate = configOpt.Value.game_tick_rate;
         }
 
         // Schedule the next game tick as a one-off event
@@ -470,6 +522,7 @@ public static partial class Module
         });
 
         ClearCollisionCacheForFrame();
+        //BuildDirectionLookupTable();
 
         ProcessPlayerMovement(ctx, tick_rate, worldSize);
         ProcessMonsterMovements(ctx);

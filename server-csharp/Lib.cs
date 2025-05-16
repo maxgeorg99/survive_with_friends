@@ -107,6 +107,13 @@ public static partial class Module
         public uint world_id;
 
         public uint tick_count;
+        
+        // Fields for tracking game tick timing
+        public Timestamp last_tick_time;      // Last timestamp when a game tick occurred
+        public double average_tick_ms;        // Rolling average of tick intervals in milliseconds
+        public double min_tick_ms;            // Minimum tick interval observed
+        public double max_tick_ms;            // Maximum tick interval observed
+        public uint timing_samples_collected; // Number of timing samples collected
     }
 
     [SpacetimeDB.Table(Name = "account", Public = true)]
@@ -136,9 +143,16 @@ public static partial class Module
             ctx.Db.world.Insert(new World
             {
                 world_id = 0,
-                tick_count = 0
+                tick_count = 0,
+                last_tick_time = ctx.Timestamp,
+                average_tick_ms = 0,
+                min_tick_ms = 0,
+                max_tick_ms = 0,
+                timing_samples_collected = 0
             });
         }
+
+        BuildDirectionLookupTable();
         
         // Initialize game configuration first
         InitGameConfig(ctx);

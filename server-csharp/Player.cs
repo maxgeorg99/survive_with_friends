@@ -239,6 +239,7 @@ public static partial class Module
             RadiusPlayer[CachedCountPlayers] = modifiedPlayer.radius;
 
             ushort gridCellKey = GetWorldCellFromPosition(modifiedPlayer.position.x, modifiedPlayer.position.y);
+            CellPlayer[CachedCountPlayers] = gridCellKey;
             NextsPlayer[CachedCountPlayers] = HeadsPlayer[gridCellKey];
             HeadsPlayer[gridCellKey] = (int)CachedCountPlayers;
 

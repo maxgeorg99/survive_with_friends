@@ -1,10 +1,12 @@
 using SpacetimeDB;
 using System;
+using System.Runtime.CompilerServices;
 
 public static partial class Module
 {  
     // --- Player Collision ---
     private static readonly uint[] KeysPlayer = new uint[MAX_PLAYERS];
+    private static readonly int[] CellPlayer = new int[MAX_PLAYERS];
     private static readonly int[] HeadsPlayer = new int[NUM_WORLD_CELLS];
     private static readonly int[] NextsPlayer = new int[MAX_PLAYERS];
     private static readonly float[] PosXPlayer = new float[MAX_PLAYERS];
@@ -14,11 +16,14 @@ public static partial class Module
 
     // --- Monster Collision ---
     private static readonly uint[] KeysMonster = new uint[MAX_MONSTERS];
+    private static readonly int[] CachedTargetPlayerOrdinalIndex = new int[MAX_MONSTERS];
     private static readonly int[] HeadsMonster = new int[NUM_WORLD_CELLS];
     private static readonly int[] NextsMonster = new int[MAX_MONSTERS];
+    private static readonly int[] CellMonster = new int[MAX_MONSTERS];
     private static readonly float[] PosXMonster = new float[MAX_MONSTERS];
     private static readonly float[] PosYMonster = new float[MAX_MONSTERS];
     private static readonly float[] RadiusMonster = new float[MAX_MONSTERS];
+    private static readonly float[] SpeedMonster = new float[MAX_MONSTERS];
     private static int CachedCountMonsters = 0;
 
     // --- Gem Collision ---
@@ -47,6 +52,7 @@ public static partial class Module
         CachedCountAttacks = 0;
 
         Array.Fill(KeysPlayer, (uint)0);
+        Array.Fill(CellPlayer, 0);
         Array.Fill(HeadsPlayer, -1);
         Array.Fill(NextsPlayer, -1);
         Array.Fill(PosXPlayer, 0);
@@ -54,6 +60,8 @@ public static partial class Module
         Array.Fill(RadiusPlayer, 0);
 
         Array.Fill(KeysMonster, (uint)0);
+        Array.Fill(CachedTargetPlayerOrdinalIndex, -1);
+        Array.Fill(CellMonster, 0);
         Array.Fill(HeadsMonster, -1);
         Array.Fill(NextsMonster, -1);
         Array.Fill(PosXMonster, 0);
@@ -75,6 +83,7 @@ public static partial class Module
         Array.Fill(RadiusAttack, 0);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ushort GetWorldCellFromPosition(float x, float y)
     {
         // 1. Convert world-space to *integer* cell coordinates
@@ -86,6 +95,7 @@ public static partial class Module
         return (ushort)((cellY << WORLD_CELL_BIT_SHIFT) | (cellX & WORLD_CELL_MASK));
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool SpatialHashCollisionChecker(float ax, float ay, float ar, float bx, float by, float br)
     {
         // Get the distance between the two entities
@@ -101,6 +111,7 @@ public static partial class Module
         return distanceSquared < minDistanceSquared;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float FastInvSqrt(float x)
     {
         unsafe
