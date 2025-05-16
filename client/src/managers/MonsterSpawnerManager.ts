@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { MonsterSpawners, EventContext, Bestiary, MonsterType } from "../autobindings";
+import { MonsterSpawners, EventContext } from "../autobindings";
 import SpacetimeDBClient from '../SpacetimeDBClient';
 
 // Constants for visual appearance and animation
@@ -17,8 +17,6 @@ export default class MonsterSpawnerManager {
     private spacetimeDBClient: SpacetimeDBClient;
     // Map to store indicator sprites (keyed by spawner ID stringified)
     private spawnerIndicators: Map<string, Phaser.GameObjects.Sprite> = new Map();
-    // Map to store monster data from bestiary (keyed by monster type)
-    private monsterDataCache: Map<string, Bestiary> = new Map();
 
     constructor(scene: Phaser.Scene, client: SpacetimeDBClient) {
         this.scene = scene;
@@ -30,61 +28,9 @@ export default class MonsterSpawnerManager {
         if (db) {
             db.monsterSpawners?.onInsert(this.handleSpawnerInsert.bind(this));
             db.monsterSpawners?.onDelete(this.handleSpawnerDelete.bind(this));
-            
-            // Also set up event handlers for bestiary updates
-            db.bestiary?.onInsert(this.handleBestiaryInsert.bind(this));
-            db.bestiary?.onUpdate(this.handleBestiaryUpdate.bind(this));
-            
-            // Initialize monster data cache from bestiary
-            this.initMonsterDataCache();
         } else {
             console.error("Could not set up MonsterSpawnerManager database listeners (database not connected)");
         }
-    }
-
-    // Initialize monster data cache by fetching all entries from the bestiary table
-    private initMonsterDataCache() {
-        const db = this.spacetimeDBClient.sdkConnection?.db;
-        if (!db) {
-            console.error("Database not connected, cannot initialize monster data cache");
-            return;
-        }
-
-        try {
-            // Fetch all monster data from the bestiary table
-            const bestiaryEntries = db.bestiary.iter();
-            if (!bestiaryEntries) {
-                console.error("Failed to fetch bestiary entries");
-                return;
-            }
-
-            // Populate the cache with monster data
-            for (const entry of bestiaryEntries) {
-                this.monsterDataCache.set(entry.monsterType.tag, entry);
-                console.log(`Cached monster data for ${entry.monsterType.tag}: HP=${entry.maxHp}, Speed=${entry.speed}, Attack=${entry.atk}`);
-            }
-            
-            console.log(`Initialized monster data cache with ${this.monsterDataCache.size} entries`);
-        } catch (error) {
-            console.error("Error initializing monster data cache:", error);
-        }
-    }
-
-    // Get monster data from cache by monster type
-    public getMonsterData(monsterType: MonsterType): Bestiary | undefined {
-        return this.monsterDataCache.get(monsterType.tag);
-    }
-
-    // Handle when a new entry is added to the bestiary
-    private handleBestiaryInsert(ctx: EventContext, bestiaryEntry: Bestiary) {
-        console.log(`New bestiary entry for monster type: ${bestiaryEntry.monsterType.tag}`);
-        this.monsterDataCache.set(bestiaryEntry.monsterType.tag, bestiaryEntry);
-    }
-
-    // Handle when a bestiary entry is updated
-    private handleBestiaryUpdate(ctx: EventContext, oldEntry: Bestiary, newEntry: Bestiary) {
-        console.log(`Updated bestiary entry for monster type: ${newEntry.monsterType.tag}`);
-        this.monsterDataCache.set(newEntry.monsterType.tag, newEntry);
     }
 
     // Handle when a new monster spawner is inserted
@@ -125,19 +71,9 @@ export default class MonsterSpawnerManager {
         indicator.setAlpha(ALPHA_VALUE);
         indicator.setDepth(BASE_DEPTH + spawner.position.y);
         
-        // Get monster data for this spawner if available
-        const monsterData = this.monsterDataCache.get(spawner.monsterType.tag);
-        if (monsterData) {
-            // Add a tooltip or visual indicator for monster type/stats if desired
-            console.log(`Spawner for ${spawner.monsterType.tag} - HP: ${monsterData.maxHp}, ATK: ${monsterData.atk}`);
-            
-            // Could add a text label or tint the indicator based on monster type
-            // For example, tint more dangerous monsters with a reddish hue
-            if (monsterData.atk > 2.0) {
-                indicator.setTint(0xff5555); // Reddish tint for stronger monsters
-            } else if (monsterData.maxHp > 30) {
-                indicator.setTint(0xffaa55); // Orange tint for tankier monsters
-            }
+        // Apply visual indicators based on monster type
+        if (spawner.monsterType.tag.includes('Boss')) {
+            indicator.setTint(0xff5555); // Reddish tint for bosses
         }
         
         // Store the indicator
@@ -182,15 +118,9 @@ export default class MonsterSpawnerManager {
         }
     }
 
-    // Get all monster data (useful for other components like the bestiary)
-    public getAllMonsterData(): Map<string, Bestiary> {
-        return new Map(this.monsterDataCache);
-    }
-
     // Clean up all indicators (call this when scene is shut down)
     public destroy() {
         this.spawnerIndicators.forEach(indicator => indicator.destroy());
         this.spawnerIndicators.clear();
-        this.monsterDataCache.clear();
     }
 }

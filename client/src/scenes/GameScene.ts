@@ -194,6 +194,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('attack_boss_bjorn', 'assets/attack_boss_björn.png');
         this.load.image('attack_boss_simon', 'assets/attack_boss_simon.png');
         this.load.image('attack_spit', 'assets/attack_spit.png');
+        this.load.image('attack_sting', 'assets/attack_sting.png');
         
         // Load upgrade assets
         this.load.image('card_blank', 'assets/card_blank.png');
@@ -1774,6 +1775,7 @@ export default class GameScene extends Phaser.Scene {
         
         if (directionChanged || (hasDirection && timeForUpdate)) {
             // Update current direction
+           
             this.currentDirection.set(dirX, dirY);
             this.isMoving = hasDirection;
 

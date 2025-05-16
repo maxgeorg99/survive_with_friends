@@ -284,7 +284,10 @@ export class AttackManager {
             case 'WormSpit':
                 spriteKey = 'attack_spit'; // Using the dedicated spit sprite
                 break;
-                        default:
+            case 'ScorpionSting':
+                spriteKey = 'attack_sting'; // Using the dedicated sting sprite
+                break;
+            default:
                 console.warn(`Unknown attack type: ${attackType}, using default sprite`);
                 return null;
         }
@@ -304,7 +307,9 @@ export class AttackManager {
             sprite.setScale(0.6); // Slightly larger for the football
         } else if (attackType === 'Garlic') {
             sprite.setScale(0.1); // Small garlic AoE
-                } else {
+        } else if (attackType === 'ScorpionSting') {
+            sprite.setScale(0.8); // Slightly smaller scale for scorpion sting
+        } else {
             sprite.setScale(1.0); // Normal scale for other attacks
         }
         
@@ -391,15 +396,29 @@ export class AttackManager {
                     
                     // Fix the upside-down issue when sprite is moving left
                     if (Math.abs(angle) > Math.PI/2) {
-                        // Left-facing: set a base angle of 0 and flip the sprite
+                        // Left-facing: set a base angle of 0 and flip the sprite horizontally
                         sprite.setRotation(0);
                         sprite.setFlipX(true);
                         sprite.setFlipY(false);
                     } else {
-                        // Right-facing: use normal rotation and no flipping
+                        // Right-facing: use normal rotation without flipping
                         sprite.setRotation(angle);
                         sprite.setFlipX(false);
                         sprite.setFlipY(false);
+                    }
+                    
+                    // Ensure the scorpion sting is pointing in the correct direction of movement
+                    const velocityAngle = Math.atan2(direction.y, direction.x);
+                    if (Math.abs(velocityAngle) > Math.PI/2) {
+                        // When moving left, make sure the sting points left
+                        if (!sprite.flipX) {
+                            sprite.setFlipX(true);
+                        }
+                    } else {
+                        // When moving right, make sure the sting points right
+                        if (sprite.flipX) {
+                            sprite.setFlipX(false);
+                        }
                     }
                 }
                 

@@ -1,8 +1,6 @@
 import Phaser from 'phaser';
 import { localization } from '../utils/localization';
 import { MonsterType } from '../autobindings/monster_type_type';
-import { Bestiary } from '../autobindings/bestiary_type';
-import SpacetimeDBClient from '../SpacetimeDBClient';
 
 export default class BestaryScene extends Phaser.Scene {
     // UI elements
@@ -14,11 +12,6 @@ export default class BestaryScene extends Phaser.Scene {
     private commonMonstersTab!: HTMLButtonElement;
     private bossesTab!: HTMLButtonElement;
     private phaseToggleButton!: HTMLButtonElement;
-    
-    // SpacetimeDB client
-    private spacetimeDBClient!: SpacetimeDBClient;
-    // Cache of monster data from the bestiary table
-    private monsterDataCache: Map<string, Bestiary> = new Map();
     
     // Track current selected monster and view state
     private selectedMonster: MonsterType | null = null;
@@ -47,36 +40,8 @@ export default class BestaryScene extends Phaser.Scene {
         super('BestaryScene');
     }
 
-    init(data: any) {
-        // Store reference to the SpacetimeDB client if provided
-        if (data && data.spacetimeDBClient) {
-            console.log("BestaryScene: SpacetimeDBClient received!", data.spacetimeDBClient);
-            this.spacetimeDBClient = data.spacetimeDBClient;
-            
-            // Check if the client has valid connection
-            if (this.spacetimeDBClient.sdkConnection) {
-                console.log("BestaryScene: SpacetimeDBClient has valid SDK connection");
-                if (this.spacetimeDBClient.sdkConnection.db) {
-                    console.log("BestaryScene: SpacetimeDBClient has valid db object");
-                    // Debug database tables
-                    const tables = Object.keys(this.spacetimeDBClient.sdkConnection.db);
-                    console.log(`BestaryScene: Available database tables: ${tables.join(', ')}`);
-                    
-                    // Check if bestiary table exists
-                    if (this.spacetimeDBClient.sdkConnection.db.bestiary) {
-                        console.log("BestaryScene: Bestiary table exists in database");
-                    } else {
-                        console.error("BestaryScene: Bestiary table not found in database!");
-                    }
-                } else {
-                    console.error("BestaryScene: SpacetimeDBClient has no db object!");
-                }
-            } else {
-                console.error("BestaryScene: SpacetimeDBClient has no SDK connection!");
-            }
-        } else {
-            console.error("BestaryScene: No SpacetimeDBClient provided in scene data!", data);
-        }
+    init() {
+        // No initialization needed - using static data
     }
 
     preload() {
@@ -630,113 +595,9 @@ export default class BestaryScene extends Phaser.Scene {
         const monsterTips = localization.getText(`bestiary.monster.${monsterType.tag}.tips`);
         const monsterImageFile = this.monsterImageMapping[monsterType.tag];
         
-        // Get monster stats directly from SpacetimeDB bestiary table - no caching
-        let stats = { hp: '?', speed: '?', damage: '?', radius: '?', exp: '?' };
-        
-        if (this.spacetimeDBClient?.sdkConnection?.db?.bestiary) {
-            try {
-                // Directly access the database and run a query
-                const db = this.spacetimeDBClient.sdkConnection.db;
-                
-                // Get monster_type enum value based on the tag
-                let monsterTypeValue = -1;
-                // Map tag strings to enum numbers based on the SQL table
-                const monsterTypeMap: Record<string, number> = {
-                    "Rat": 0,
-                    "Slime": 1,
-                    "Orc": 2,
-                    "Wolf": 3,
-                    "Worm": 4,
-                    "Scorpion": 5,
-                    "FinalBossPhase1": 6,
-                    "FinalBossPhase2": 7,
-                    "FinalBossJorgePhase1": 8,
-                    "FinalBossJorgePhase2": 9,
-                    "FinalBossBjornPhase1": 10,
-                    "FinalBossBjornPhase2": 11,
-                    "FinalBossSimonPhase1": 12,
-                    "FinalBossSimonPhase2": 13
-                };
-                
-                monsterTypeValue = monsterTypeMap[monsterType.tag] ?? -1;
-                console.log(`Looking for monster type: ${monsterType.tag} (value: ${monsterTypeValue})`);
-                
-                if (monsterTypeValue >= 0) {
-                    // In the bestiary table, the bestiary_id field equals the monster_type enum value
-                    // So we can directly query using the bestiaryId index
-                    const monsterData = db.bestiary.bestiaryId.find(monsterTypeValue);
-                    
-                    if (monsterData) {
-                        console.log(`Found bestiary entry for monster type ${monsterType.tag}`);
-                        
-                        stats = {
-                            hp: monsterData.max_hp,
-                            speed: monsterData.speed,
-                            damage: monsterData.atk,
-                            radius: monsterData.radius,
-                            exp: monsterData.exp
-                        };
-                        console.log(`Found stats for ${monsterType.tag}: HP=${stats.hp}, Speed=${stats.speed}, Damage=${stats.damage}, Radius=${stats.radius}, Exp=${stats.exp}`);
-                    } else {
-                        console.log(`No data found with bestiaryId for monster type: ${monsterType.tag} (value: ${monsterTypeValue})`);
-                        
-                        // Try iterating through all entries as a fallback
-                        const allEntries = Array.from(db.bestiary.iter());
-                        console.log(`Total bestiary entries: ${allEntries.length}`);
-                        
-                        if (allEntries.length > 0) {
-                            console.log(`First entry: monster_type=${allEntries[0].monster_type}, max_hp=${allEntries[0].max_hp}`);
-                            
-                            // Try to find by monster_type field
-                            const foundEntry = allEntries.find(entry => entry.monster_type === monsterTypeValue);
-                            if (foundEntry) {
-                                stats = {
-                                    hp: foundEntry.max_hp,
-                                    speed: foundEntry.speed,
-                                    damage: foundEntry.atk,
-                                    radius: foundEntry.radius,
-                                    exp: foundEntry.exp
-                                };
-                                console.log(`Found stats by iteration for ${monsterType.tag}: HP=${stats.hp}, Speed=${stats.speed}`);
-                            } else {
-                                // Use fallback data
-                                const fallbackData = this.getFallbackMonsterData(monsterType.tag);
-                                if (fallbackData) {
-                                    stats = fallbackData;
-                                }
-                            }
-                        } else {
-                            // Use fallback data
-                            const fallbackData = this.getFallbackMonsterData(monsterType.tag);
-                            if (fallbackData) {
-                                stats = fallbackData;
-                            }
-                        }
-                    }
-                } else {
-                    console.error(`Unknown monster type tag: ${monsterType.tag}`);
-                    // Use fallback data
-                    const fallbackData = this.getFallbackMonsterData(monsterType.tag);
-                    if (fallbackData) {
-                        stats = fallbackData;
-                    }
-                }
-            } catch (error) {
-                console.error(`Error fetching data for ${monsterType.tag}:`, error);
-                // Use fallback data for this monster
-                const fallbackData = this.getFallbackMonsterData(monsterType.tag);
-                if (fallbackData) {
-                    stats = fallbackData;
-                }
-            }
-        } else {
-            console.warn("Database connection not available, using fallback data");
-            // Use fallback data for this monster
-            const fallbackData = this.getFallbackMonsterData(monsterType.tag);
-            if (fallbackData) {
-                stats = fallbackData;
-            }
-        }
+        // Get monster stats from hardcoded data
+        // Note: These values should be updated manually if monster stats change in the backend
+        const stats = this.getMonsterStats(monsterType.tag);
         
         // Phase indicator for boss monsters
         const phaseIndicator = this.currentTab === 'bosses' ? 
@@ -798,23 +659,25 @@ export default class BestaryScene extends Phaser.Scene {
         `;
     }
 
-    // Get fallback data for a monster if database query fails
-    private getFallbackMonsterData(monsterType: string): { hp: any, speed: any, damage: any, radius: any, exp: any } | null {
-        const fallbackData: Record<string, any> = {
-            "Rat": { hp: 10, speed: 160, damage: 1, radius: 16, exp: 5 },
-            "Slime": { hp: 25, speed: 100, damage: 1.5, radius: 20, exp: 10 },
-            "Orc": { hp: 50, speed: 140, damage: 2.0, radius: 24, exp: 20 },
-            "Wolf": { hp: 35, speed: 175, damage: 1.8, radius: 20, exp: 15 },
-            "Worm": { hp: 20, speed: 80, damage: 0.8, radius: 16, exp: 8 },
-            "Scorpion": { hp: 40, speed: 130, damage: 2.2, radius: 22, exp: 18 },
-            "FinalBossJorgePhase1": { hp: 500, speed: 120, damage: 25, radius: 32, exp: 100 },
-            "FinalBossJorgePhase2": { hp: 750, speed: 150, damage: 40, radius: 40, exp: 200 },
-            "FinalBossBjornPhase1": { hp: 500, speed: 120, damage: 25, radius: 32, exp: 100 },
-            "FinalBossBjornPhase2": { hp: 750, speed: 150, damage: 40, radius: 40, exp: 200 },
-            "FinalBossSimonPhase1": { hp: 500, speed: 120, damage: 25, radius: 32, exp: 100 },
-            "FinalBossSimonPhase2": { hp: 750, speed: 150, damage: 40, radius: 40, exp: 200 }
+    // Get hardcoded monster stats - update these values manually if monster stats change in the backend
+    private getMonsterStats(monsterType: string): { hp: number, speed: number, damage: number, radius: number, exp: number } {
+        const monsterStats: Record<string, any> = {
+            "Rat": { hp: 10, speed: 160, damage: 1.0, radius: 24, exp: 1 },
+            "Slime": { hp: 25, speed: 100, damage: 1.5, radius: 30, exp: 2 },
+            "Orc": { hp: 50, speed: 140, damage: 2.0, radius: 40, exp: 5 },
+            "Wolf": { hp: 35, speed: 175, damage: 1.8, radius: 34, exp: 3 },
+            "Worm": { hp: 20, speed: 80, damage: 0.8, radius: 28, exp: 4 },
+            "Scorpion": { hp: 15, speed: 150, damage: 1.2, radius: 26, exp: 2 },
+            "FinalBossPhase1": { hp: 500, speed: 120, damage: 25, radius: 92, exp: 100 },
+            "FinalBossPhase2": { hp: 500, speed: 150, damage: 40, radius: 245, exp: 500 },
+            "FinalBossJorgePhase1": { hp: 500, speed: 120, damage: 25, radius: 92, exp: 100 },
+            "FinalBossJorgePhase2": { hp: 500, speed: 150, damage: 40, radius: 245, exp: 500 },
+            "FinalBossBjornPhase1": { hp: 500, speed: 120, damage: 25, radius: 92, exp: 100 },
+            "FinalBossBjornPhase2": { hp: 500, speed: 150, damage: 40, radius: 245, exp: 500 },
+            "FinalBossSimonPhase1": { hp: 500, speed: 120, damage: 25, radius: 92, exp: 100 },
+            "FinalBossSimonPhase2": { hp: 500, speed: 50, damage: 10, radius: 245, exp: 500 }
         };
         
-        return fallbackData[monsterType] || null;
+        return monsterStats[monsterType] || { hp: 0, speed: 0, damage: 0, radius: 0, exp: 0 };
     }
 }

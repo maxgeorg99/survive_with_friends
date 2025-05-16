@@ -383,11 +383,11 @@ public static partial class Module
             attack_id = 9,
             attack_type = AttackType.ScorpionSting,
             name = "Scorpion Sting",
-            cooldown = 3500,           // Slower than worm spit
+            cooldown = 4000,           // Slower
             duration = 800,            // Shorter duration than worm spit
             projectiles = 1,           // One projectile at a time
             fire_delay = 0,
-            speed = 400,               // Slower than worm spit
+            speed = 400,               // Slower
             piercing = false,          // Doesn't pierce through targets
             radius = 10,               // Smaller size
             damage = 1,                // Lower damage (poison effect is the main threat)
