@@ -397,24 +397,42 @@ export default class GameScene extends Phaser.Scene {
 
         if (this.spacetimeDBClient.identity && newAccount.identity.isEqual(this.spacetimeDBClient.identity)) 
         {
-            console.log("GameScene: Local account updated");
-            //Check if the login time was updated
-            if (oldAccount.lastLogin.microsSinceUnixEpoch !== newAccount.lastLogin.microsSinceUnixEpoch) {
-                //If we're getting this, then that means we sent the updateLastLogin reducer
-                //in the create, and are now getting the response.
-                //So we should initialize the game world at this point since
-                //hopefully all the data is ready.
-                console.log("New login detected, initializing game world: " + oldAccount.lastLogin.microsSinceUnixEpoch + " -> " + newAccount.lastLogin.microsSinceUnixEpoch);
-                this.initializeGameWorld(ctx);  
+            // Reset game state on rejoin
+            if (this.gameOver) {
+                console.log("Resetting game state after death when rejoining");
+                this.gameOver = false;
+                this.playerInitialized = false;
+                this.isPlayerDataReady = false;
+                
+                // Clear any direction and movement state
+                this.currentDirection.x = 0;
+                this.currentDirection.y = 0;
+                this.isMoving = false;
+                
+                // Reset server position to prevent interpolation issues
+                this.serverPosition = null;
+                
+                // Clear any tap targets
+                this.tapTarget = null;
+                if (this.tapMarker) {
+                    this.tapMarker.visible = false;
+                }
             }
-            else
-            {
-                console.log("GameScene: Local account updated, but no new login detected");
+            
+            // Continue with normal initialization
+            console.log("Local account updated: ", newAccount);
+            
+            // Initialize game world if not already initialized
+            if (!this.playerInitialized) {
+                this.initializeGameWorld(ctx);
+            } else {
+                console.log("Game world already initialized, not reinitializing");
             }
         }
         else
         {
-            console.log("GameScene: Another user has logged on: " + newAccount.identity.toString());
+            //not local player
+            console.log("Other account updated: ", newAccount);
         }
     }
 

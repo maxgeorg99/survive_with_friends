@@ -588,14 +588,29 @@ export default class ClassSelectScene extends Phaser.Scene {
 
         const originalCharName = this.getOriginalCharacterName(characterName);
         const isAltVersion = this.selectedAltVersions[originalCharName] || false;
-        const currentName = isAltVersion ? info.altName : originalCharName;
+        
+        // Determine actual class to use based on the alt toggle state
         const currentClass = isAltVersion ? info.altClass : classType.tag;
+        const currentName = isAltVersion ? info.altName : originalCharName;
+        
+        // Get the PlayerClass object corresponding to the selected class
+        let actualClassType = classType;
+        if (isAltVersion && info.altClass) {
+            // Find the alt class PlayerClass object
+            for (const key in PlayerClass) {
+                if (typeof PlayerClass[key] === 'object' && (PlayerClass[key] as any).tag === info.altClass) {
+                    actualClassType = PlayerClass[key] as PlayerClass;
+                    break;
+                }
+            }
+        }
 
         // Get localization keys
         const baseKey = `class.${originalCharName.toLowerCase()}`;
         const altKey = `class.${this.getAltVersionKey(originalCharName)}`;
         const currentKey = isAltVersion ? altKey : baseKey;
 
+        // Get the correct weapon image file based on the selected class variant
         const weaponImageFile = this.getWeaponImageFile(currentClass);
 
         // Update button content first
@@ -611,7 +626,7 @@ export default class ClassSelectScene extends Phaser.Scene {
             textElement.textContent = currentName;
         }
 
-        // Create toggle button
+        // Create toggle button - with lock/unlock icon based on state
         const toggleHtml = info.altClass ? `
             <button id="version-toggle" style="
                 position: absolute;
@@ -628,11 +643,12 @@ export default class ClassSelectScene extends Phaser.Scene {
                 font-size: 14px;
                 transition: background-color 0.2s;
             ">
-            <span style="font-size: 18px;">🔒</span>
-            <span>${isAltVersion ? originalCharName : info.altName}</span>
+            <span style="font-size: 18px;">${isAltVersion ? '🔓' : '🔒'}</span>
+            <span>${isAltVersion ? 'Switch to Original' : 'Unlock Alt Class'}</span>
             </button>
         ` : '';
 
+        // Update the actual panel content
         this.classInfoPanel.innerHTML = `
             <div style="position: relative; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
                 <h2 style="margin: 0; font-size: 24px; color: #3498db;">
@@ -659,98 +675,41 @@ export default class ClassSelectScene extends Phaser.Scene {
             </p>
         `;
 
-        // Add event listener to toggle button with immediate content update
+        // Add event listener to toggle button
         const toggleButton = document.getElementById('version-toggle');
         if (toggleButton) {
             toggleButton.addEventListener('click', () => {
-                // Update the alt version state
+                // Toggle the alt version state for this character
                 this.selectedAltVersions[originalCharName] = !this.selectedAltVersions[originalCharName];
-                const newIsAlt = this.selectedAltVersions[originalCharName];
-
-                // Immediately update button content
-                if (iconElement) {
-                    const newIconFile = newIsAlt ? this.getAltClassIcon(info.altClass) : this.getClassIcon(classType.tag);
-                    iconElement.src = `assets/${newIconFile}`;
-                }
                 
-                if (textElement) {
-                    textElement.textContent = newIsAlt ? info.altName : originalCharName;
-                }
-
-                // Update class info panel content with new version information
-                const newCurrentName = newIsAlt ? info.altName : originalCharName;
-                const newCurrentClass = newIsAlt ? info.altClass : classType.tag;
-                const newCurrentKey = newIsAlt ? altKey : baseKey;
-                const newWeaponImageFile = this.getWeaponImageFile(newCurrentClass);
-
-                // Create new toggle button HTML
-                const newToggleHtml = info.altClass ? `
-                    <button id="version-toggle" style="
-                        position: absolute;
-                        right: 20px;
-                        background-color: #3498db;
-                        border: none;
-                        border-radius: 15px;
-                        padding: 6px 12px;
-                        color: white;
-                        cursor: pointer;
-                        display: flex;
-                        align-items: center;
-                        gap: 8px;
-                        font-size: 14px;
-                        transition: background-color 0.2s;
-                    ">
-                    <span style="font-size: 18px;">🔒</span>
-                    <span>Switch to ${newIsAlt ? originalCharName : info.altName}</span>
-                    </button>
-                ` : '';
-
-                // Update the panel content
-                this.classInfoPanel.innerHTML = `
-                    <div style="position: relative; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
-                        <h2 style="margin: 0; font-size: 24px; color: #3498db;">
-                            ${newCurrentName}
-                        </h2>
-                        ${newToggleHtml}
-                    </div>
-                    <p style="margin: 0 0 15px 0;">${localization.getText(`${newCurrentKey}.description`)}</p>
-                    <h3 style="margin: 0 0 10px 0; font-size: 18px; color:rgb(183, 204, 46);">Weapon</h3>
-                    <div style="display: flex; align-items: center; margin-bottom: 15px;">
-                        <img src="assets/${newWeaponImageFile}" style="height: 45px; width: 45px; margin-right: 10px;" 
-                            alt="${localization.getText(`${newCurrentKey}.weapon`)} icon" />
-                        <p style="margin: 0 0 0 10px;">
-                            ${localization.getText(`${newCurrentKey}.weapon`)}
-                        </p>
-                    </div>
-                    <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #2ecc71;">Strengths 💪</h3>
-                    <p style="margin: 0 0 15px 0;">
-                        ${localization.getText(`${newCurrentKey}.strengths`)}
-                    </p>
-                    <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #e74c3c;">Weaknesses 👎</h3>
-                    <p style="margin: 0;">
-                        ${localization.getText(`${newCurrentKey}.weaknesses`)}
-                    </p>
-                `;
-
-                // Get the current button and handle class selection
-                const button = this.getButtonForClass(classType);
-                if (button) {
-                    if (newIsAlt && info.altClass) {
-                        const altClassEnum = PlayerClass[info.altClass as keyof typeof PlayerClass] as PlayerClass;
-                        this.selectClass(altClassEnum, button);
-                    } else {
-                        this.selectClass(classType, button);
+                // Update the selected class to the appropriate one
+                if (this.selectedAltVersions[originalCharName] && info.altClass) {
+                    // Find the alt class PlayerClass object
+                    for (const key in PlayerClass) {
+                        if (typeof PlayerClass[key] === 'object' && (PlayerClass[key] as any).tag === info.altClass) {
+                            this.selectedClass = PlayerClass[key] as PlayerClass;
+                            break;
+                        }
+                    }
+                } else {
+                    // Switch back to original class
+                    for (const key in PlayerClass) {
+                        if (typeof PlayerClass[key] === 'object' && (PlayerClass[key] as any).tag === classType.tag) {
+                            this.selectedClass = PlayerClass[key] as PlayerClass;
+                            break;
+                        }
                     }
                 }
-
-                // Re-attach event listener to new toggle button
-                const newToggleButton = document.getElementById('version-toggle');
-                if (newToggleButton) {
-                    newToggleButton.addEventListener('click', (event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        toggleButton.click();
-                    });
+                
+                // Update the UI to reflect the change
+                this.updateClassInfoPanel(originalCharName, classType, info);
+                
+                // Update the button style to show it's been toggled
+                if (this.selectedClass) {
+                    const button = this.getButtonForClass(this.selectedClass);
+                    if (button) {
+                        this.selectClass(this.selectedClass, button);
+                    }
                 }
             });
         }

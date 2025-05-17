@@ -83,8 +83,19 @@ export default class PrologScene extends Phaser.Scene {
         languageSelector.addEventListener('change', (e) => {
             const target = e.target as HTMLSelectElement;
             localization.setLanguage(target.value);
-            // Refresh current text
-            this.displayNextText();
+            
+            // Stop the current typing animation
+            if (this.typingTimer) {
+                this.typingTimer.remove();
+            }
+            this.isTyping = false;
+            this.isSkipping = false;
+            
+            // Refresh current text immediately
+            const key = this.storyKeys[this.storyIndex];
+            const text = localization.getText(key);
+            this.storyText.setText(text);
+            this.nextIndicator.visible = true;
         });
 
         document.body.appendChild(languageSelector);
