@@ -286,234 +286,113 @@ public static partial class Module
     private static void ProcessMonsterMovements(ReducerContext ctx)
     {
         PopulateMonsterCache(ctx);
-        //MoveMonsters(ctx);
-        //MoveMonstersWithLookupTable(ctx);
-        MoveMonstersVectorized(ctx);
-        //MoveMonstersSimple(ctx);
+        MoveMonsters(ctx);
         CalculateMonsterSpatialHashGrid(ctx);
         SolveMonsterRepulsionSpatialHash(ctx);
         CalculateMonsterSpatialHashGrid(ctx);
         CommitMonsterMotion(ctx);
     }
 
-    // Helper method to process monster movements
     private static void MoveMonsters(ReducerContext ctx)
     {
-        // Constants for monster behavior
-        const float MIN_DISTANCE_TO_MOVE = 20.0f;  // Minimum distance before monster starts moving
-        const float MIN_DISTANCE_TO_REACH = 5.0f;  // Distance considered "reached" the target
-
-        const float MIN_DISTANCE_TO_MOVE_SQUARED = MIN_DISTANCE_TO_MOVE * MIN_DISTANCE_TO_MOVE;
-        const float MIN_DISTANCE_TO_REACH_SQUARED = MIN_DISTANCE_TO_REACH * MIN_DISTANCE_TO_REACH;
-
-
-        // Get world size from config
-        uint worldSize = 20000; // Default fallback (10x larger)
-        var configOpt = ctx.Db.config.id.Find(0);
-        if (configOpt != null)
+        for (int i = 0; i < CachedCountMonsters; ++i)
         {
-            worldSize = configOpt.Value.world_size;
+            var dist_x = TargetXMonster[i] - PosXMonster[i];
+            var dist_y = TargetYMonster[i] - PosYMonster[i];
+
+            var dist_squared = dist_x * dist_x + dist_y * dist_y;
+            var inv_dist = 1.0f / MathF.Sqrt(dist_squared); 
+
+            var norm_x = dist_x * inv_dist;
+            var norm_y = dist_y * inv_dist;
+
+            var speed = SpeedMonster[i];
+            var move_x = norm_x * speed * DELTA_TIME;
+            var move_y = norm_y * speed * DELTA_TIME;
+
+            PosXMonster[i] += move_x;
+            PosYMonster[i] += move_y;
+
+            PosXMonster[i] = Math.Clamp(PosXMonster[i], RadiusMonster[i], WORLD_SIZE - RadiusMonster[i]);
+            PosYMonster[i] = Math.Clamp(PosYMonster[i], RadiusMonster[i], WORLD_SIZE - RadiusMonster[i]);
         }
 
-        // Now process each monster's movement with collision avoidance
-        foreach (var monster in ctx.Db.monsters.Iter())
+        // Clean up monster status
+        for(int i = 0; i < CachedCountMonsters; i += 1)
         {
-            // Populate the monster cache
-            KeysMonster[CachedCountMonsters] = monster.monster_id;
-            PosXMonster[CachedCountMonsters] = monster.position.x;
-            PosYMonster[CachedCountMonsters] = monster.position.y;
-            RadiusMonster[CachedCountMonsters] = monster.radius;
-
-            int targetPlayerOrdinalIndex = monster.target_player_ordinal_index;
-
-            // Move the monster to the target player
-            if (targetPlayerOrdinalIndex != -1)
+            if(CachedTargetPlayerOrdinalIndex[i] == -1)
             {
-                float dx = PosXPlayer[targetPlayerOrdinalIndex] - monster.position.x;
-                float dy = PosYPlayer[targetPlayerOrdinalIndex] - monster.position.y;
-                
-                // Calculate distance to target
-                float distanceToTargetSquared = dx * dx + dy * dy;
-                
-                // If we're too close to the target, stop moving
-                if (distanceToTargetSquared > MIN_DISTANCE_TO_REACH_SQUARED && distanceToTargetSquared > MIN_DISTANCE_TO_MOVE_SQUARED)
+                var monster = ctx.Db.monsters.monster_id.Find(KeysMonster[i]);
+                if(monster is not null)
                 {
-                    float approxLength = FastInvSqrt(distanceToTargetSquared);
-
-                    float normX = dx * approxLength;
-                    float normY = dy * approxLength;
-                    
-                    // Get monster speed from bestiary
-                    float monsterSpeed = monster.speed;
-                    
-                    // Calculate new position based on direction, speed and time delta
-                    float moveDistance = monsterSpeed * DELTA_TIME;
-                    var moveX = normX * moveDistance;
-                    var moveY = normY * moveDistance;
-
-                    PosXMonster[CachedCountMonsters] += moveX;
-                    PosYMonster[CachedCountMonsters] += moveY;
-
-                    // Apply world boundary clamping using entity radius
-                    PosXMonster[CachedCountMonsters] = Math.Clamp(
-                        PosXMonster[CachedCountMonsters], 
-                        monster.radius, 
-                        worldSize - monster.radius
-                    );
-                    PosYMonster[CachedCountMonsters] = Math.Clamp(
-                        PosYMonster[CachedCountMonsters], 
-                        monster.radius, 
-                        worldSize - monster.radius
-                    );
+                    ReassignMonsterTarget(ctx, monster.Value);
                 }
             }
-            else
-            {
-                // Target entity no longer exists - find a new target
-                ReassignMonsterTarget(ctx, monster);
-            }
-    
-            CachedCountMonsters++;
-        }
-    }
-
-    private static void MoveMonstersWithLookupTable(ReducerContext ctx)
-    {
-        // Constants for monster behavior
-        const float MIN_DISTANCE_TO_MOVE = 20.0f;  // Minimum distance before monster starts moving
-        const float MIN_DISTANCE_TO_REACH = 5.0f;  // Distance considered "reached" the target
-
-        const float MIN_DISTANCE_TO_MOVE_SQUARED = MIN_DISTANCE_TO_MOVE * MIN_DISTANCE_TO_MOVE;
-        const float MIN_DISTANCE_TO_REACH_SQUARED = MIN_DISTANCE_TO_REACH * MIN_DISTANCE_TO_REACH;
-
-
-        // Get world size from config
-        uint worldSize = 20000; // Default fallback (10x larger)
-        var configOpt = ctx.Db.config.id.Find(0);
-        if (configOpt != null)
-        {
-            worldSize = configOpt.Value.world_size;
-        }
-
-        // Now process each monster's movement with collision avoidance
-        foreach (var monster in ctx.Db.monsters.Iter())
-        {
-            // Populate the monster cache
-            KeysMonster[CachedCountMonsters] = monster.monster_id;
-            PosXMonster[CachedCountMonsters] = monster.position.x;
-            PosYMonster[CachedCountMonsters] = monster.position.y;
-            RadiusMonster[CachedCountMonsters] = monster.radius;
-
-            int targetPlayerOrdinalIndex = monster.target_player_ordinal_index;
-
-            int myCell = GetWorldCellFromPosition(monster.position.x, monster.position.y);
-
-            // Move the monster to the target player
-            if (targetPlayerOrdinalIndex != -1)
-            {
-                int targetCell = GetWorldCellFromPosition(PosXPlayer[targetPlayerOrdinalIndex], PosYPlayer[targetPlayerOrdinalIndex]);
-
-                //If not in same cell, use the vector field to move the monster
-                if (myCell != targetCell)
-                {
-                    //lookup the direction to the target cell
-                    
-                    int _x_cell = myCell & WORLD_CELL_MASK;
-                    int _y_cell = myCell >> WORLD_CELL_BIT_SHIFT;
-
-                    int _x_target_cell = targetCell & WORLD_CELL_MASK;
-                    int _y_target_cell = targetCell >> WORLD_CELL_BIT_SHIFT;
-
-                    int _dx = _x_target_cell - _x_cell + LookupTableRange;
-                    int _dy = _y_target_cell - _y_cell + LookupTableRange;
-
-                    //Log.Info($"lookup direction for {_dx },{_dy}");
-                    var dir_x = LookupTableX[_dy, _dx];
-                    var dir_y = LookupTableY[_dy, _dx];
-
-                    //move the monster in the direction of the target cell
-                    PosXMonster[CachedCountMonsters] += dir_x * monster.speed * DELTA_TIME;
-                    PosYMonster[CachedCountMonsters] += dir_y * monster.speed * DELTA_TIME;
-                }
-                else
-                {
-                    //If in same cell, move more precisely towards the target
-                    float dx = PosXPlayer[targetPlayerOrdinalIndex] - monster.position.x;
-                    float dy = PosYPlayer[targetPlayerOrdinalIndex] - monster.position.y;
-
-                    float distanceToTargetSquared = dx * dx + dy * dy;
-                    
-                    // If we're too close to the target, stop moving
-                    if (distanceToTargetSquared > MIN_DISTANCE_TO_REACH_SQUARED && distanceToTargetSquared > MIN_DISTANCE_TO_MOVE_SQUARED)
-                    {
-                        float approxLength = FastInvSqrt(distanceToTargetSquared);
-
-                        float normX = dx * approxLength;
-                        float normY = dy * approxLength;
-                        
-                        // Get monster speed from bestiary
-                        float monsterSpeed = monster.speed;
-                        
-                        // Calculate new position based on direction, speed and time delta
-                        float moveDistance = monsterSpeed * DELTA_TIME;
-                        var moveX = normX * moveDistance;
-                        var moveY = normY * moveDistance;
-
-                        PosXMonster[CachedCountMonsters] += moveX;
-                        PosYMonster[CachedCountMonsters] += moveY;
-
-                        // Apply world boundary clamping using entity radius
-                        PosXMonster[CachedCountMonsters] = Math.Clamp(
-                            PosXMonster[CachedCountMonsters], 
-                            monster.radius, 
-                            worldSize - monster.radius
-                        );
-                        PosYMonster[CachedCountMonsters] = Math.Clamp(
-                            PosYMonster[CachedCountMonsters], 
-                            monster.radius, 
-                            worldSize - monster.radius
-                        );
-                    }
-                }
-            }
-            else
-            {
-                // Target entity no longer exists - find a new target
-                ReassignMonsterTarget(ctx, monster);
-            }
-    
-            CachedCountMonsters++;
         }
     }
 
     private static void MoveMonstersVectorized(ReducerContext ctx)
     {
-        for(int i = 0; i < CachedCountMonsters; i += 1)
+        //Note: Doesn't work for some reason, and is slower than the non-vectorized version.
+        //TODO: revisit this.
+        int laneCount = Vector<float>.Count;       // SIMD lane width
+        int i;
+
+        for (i = 0; i <= CachedCountMonsters - laneCount; i += laneCount)
         {
-            int myCell = CellMonster[i];
-            int tpoi = CachedTargetPlayerOrdinalIndex[i];
-            int targetCell = (tpoi != -1) ? CellPlayer[tpoi] : 0;
+            var monster_xs = new Vector<float>(PosXMonster, i);
+            var monster_ys = new Vector<float>(PosYMonster, i);
 
-            int _x_cell = myCell & WORLD_CELL_MASK;
-            int _y_cell = myCell >> WORLD_CELL_BIT_SHIFT;
+            var target_xs = new Vector<float>(TargetXMonster, i);
+            var target_ys = new Vector<float>(TargetYMonster, i);
 
-            int _x_target_cell = targetCell & WORLD_CELL_MASK;
-            int _y_target_cell = targetCell >> WORLD_CELL_BIT_SHIFT;
+            var dist_xs = target_xs - monster_xs;
+            var dist_ys = target_ys - monster_ys;
 
-            int _dx = _x_target_cell - _x_cell + LookupTableRange;
-            int _dy = _y_target_cell - _y_cell + LookupTableRange;
+            var dist_squareds = dist_xs * dist_xs + dist_ys * dist_ys;
+            var inv_dists = Vector.SquareRoot(dist_squareds);
 
-            //Log.Info($"lookup direction for {_dx },{_dy}");
-            var dir_x = LookupTableX[_dy, _dx];
-            var dir_y = LookupTableY[_dy, _dx];
+            var norm_xs = dist_xs * inv_dists;
+            var norm_ys = dist_ys * inv_dists;
 
-            //move the monster in the direction of the target cell
-            PosXMonster[i] += dir_x * SpeedMonster[i] * DELTA_TIME;
-            PosYMonster[i] += dir_y * SpeedMonster[i] * DELTA_TIME;
+            var speed_vecs = new Vector<float>(SpeedMonster, i);
+            var move_xs = norm_xs * speed_vecs * DELTA_TIME;
+            var move_ys = norm_ys * speed_vecs * DELTA_TIME;
+
+            var new_xs = monster_xs + move_xs;
+            var new_ys = monster_ys + move_ys;
+
+            new_xs.CopyTo(PosXMonster, i);
+            new_ys.CopyTo(PosYMonster, i);                 // store
+        }
+        // tail-process leftovers
+        for (; i < CachedCountMonsters; ++i)
+        {
+            var dist_x = TargetXMonster[i] - PosXMonster[i];
+            var dist_y = TargetYMonster[i] - PosYMonster[i];
+
+            var dist_squared = dist_x * dist_x + dist_y * dist_y;
+            var inv_dist = 1.0f / MathF.Sqrt(dist_squared); 
+
+            var norm_x = dist_x * inv_dist;
+            var norm_y = dist_y * inv_dist;
+
+            var speed = SpeedMonster[i];
+            var move_x = norm_x * speed * DELTA_TIME;
+            var move_y = norm_y * speed * DELTA_TIME;
+
+            PosXMonster[i] += move_x;
+            PosYMonster[i] += move_y;
         }
 
-        for(int i = 0; i < CachedCountMonsters; i += 1)
+        // Clean up monster status
+        for(i = 0; i < CachedCountMonsters; i += 1)
         {
+            if(i == 0)
+            {
+                Log.Info($"Monster {KeysMonster[i]} position: {PosXMonster[i]}, {PosYMonster[i]}");
+            }
+
             if(CachedTargetPlayerOrdinalIndex[i] == -1)
             {
                 var monster = ctx.Db.monsters.monster_id.Find(KeysMonster[i]);
@@ -567,6 +446,17 @@ public static partial class Module
             RadiusMonster[CachedCountMonsters] = monster.radius;
             SpeedMonster[CachedCountMonsters] = monster.speed;
 
+            if(monster.target_player_ordinal_index != -1)
+            {
+                TargetXMonster[CachedCountMonsters] = PosXPlayer[monster.target_player_ordinal_index];
+                TargetYMonster[CachedCountMonsters] = PosYPlayer[monster.target_player_ordinal_index];
+            }
+            else
+            {
+                TargetXMonster[CachedCountMonsters] = PosXMonster[CachedCountMonsters];
+                TargetYMonster[CachedCountMonsters] = PosYMonster[CachedCountMonsters];
+            }
+
             ushort gridCellKey = GetWorldCellFromPosition(monster.position.x, monster.position.y);
             CellMonster[CachedCountMonsters] = gridCellKey;
             NextsMonster[CachedCountMonsters] = HeadsMonster[gridCellKey];
@@ -581,19 +471,10 @@ public static partial class Module
         uint monsterCacheIdx = 0;
         foreach (var monster in ctx.Db.monsters.Iter())
         {
-            var monsterUpdated = MonsterUpdatePool[monsterCacheIdx];
-
-            monsterUpdated.monster_id = monster.monster_id;
-            monsterUpdated.bestiary_id = monster.bestiary_id;
-            monsterUpdated.hp = monster.hp;
-            monsterUpdated.max_hp = monster.max_hp;
-            monsterUpdated.atk = monster.atk;
-            monsterUpdated.speed = monster.speed;
-            monsterUpdated.target_player_id = monster.target_player_id;
-            monsterUpdated.target_player_ordinal_index = monster.target_player_ordinal_index;
-            monsterUpdated.position.x = PosXMonster[monsterCacheIdx];
-            monsterUpdated.position.y = PosYMonster[monsterCacheIdx];
-            monsterUpdated.radius = monster.radius;
+            //var monsterUpdated = MonsterUpdatePool[monsterCacheIdx];
+            var monsterUpdated = monster;
+            monsterUpdated.position.x = Math.Clamp(PosXMonster[monsterCacheIdx], RadiusMonster[monsterCacheIdx], WORLD_SIZE - RadiusMonster[monsterCacheIdx]);
+            monsterUpdated.position.y = Math.Clamp(PosYMonster[monsterCacheIdx], RadiusMonster[monsterCacheIdx], WORLD_SIZE - RadiusMonster[monsterCacheIdx]);
 
             ctx.Db.monsters.monster_id.Update(monsterUpdated);
             monsterCacheIdx++;
@@ -771,7 +652,7 @@ public static partial class Module
                         if (d2 >= rSum2) continue;       // no overlap
 
                         // ---- penetration & normal (inv-sqrt) -----------------
-                        float invLen      = FastInvSqrt(d2);
+                        float invLen      = 1.0f / MathF.Sqrt(d2);
                         float penetration = rSum - (1.0f * invLen);   // rSum − √d2
                         float nxAB        = dxAB * invLen;
                         float nyAB        = dyAB * invLen;
@@ -781,7 +662,7 @@ public static partial class Module
                         float wA = RadiusMonster[iB] / rSum;
                         float wB = rA / rSum;
 
-                        float pushFactor = 0.75f;
+                        float pushFactor = 0.1f;
 
                         PosXMonster[iA] += nxAB * penetration * wA * pushFactor;
                         PosYMonster[iA] += nyAB * penetration * wA * pushFactor;

@@ -151,8 +151,6 @@ public static partial class Module
                 timing_samples_collected = 0
             });
         }
-
-        BuildDirectionLookupTable();
         
         // Initialize game configuration first
         InitGameConfig(ctx);

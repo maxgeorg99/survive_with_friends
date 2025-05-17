@@ -22,6 +22,8 @@ public static partial class Module
     private static readonly int[] CellMonster = new int[MAX_MONSTERS];
     private static readonly float[] PosXMonster = new float[MAX_MONSTERS];
     private static readonly float[] PosYMonster = new float[MAX_MONSTERS];
+    private static readonly float[] TargetXMonster = new float[MAX_MONSTERS];
+    private static readonly float[] TargetYMonster = new float[MAX_MONSTERS];
     private static readonly float[] RadiusMonster = new float[MAX_MONSTERS];
     private static readonly float[] SpeedMonster = new float[MAX_MONSTERS];
     private static int CachedCountMonsters = 0;
@@ -66,6 +68,8 @@ public static partial class Module
         Array.Fill(NextsMonster, -1);
         Array.Fill(PosXMonster, 0);
         Array.Fill(PosYMonster, 0);
+        Array.Fill(TargetXMonster, 0);
+        Array.Fill(TargetYMonster, 0);
         Array.Fill(RadiusMonster, 0);
 
         Array.Fill(KeysGem, (uint)0);
