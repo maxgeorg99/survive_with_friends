@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { GameEvents } from '../constants/GameEvents';
+import { localization } from '../utils/localization';
+import { isMobileDevice, getResponsiveFontSize, applyResponsiveStyles, getResponsiveDimensions } from '../utils/responsive';
 
 export default class QuestScene extends Phaser.Scene {
     private spacetimeDBClient: SpacetimeDBClient;
@@ -57,6 +59,7 @@ export default class QuestScene extends Phaser.Scene {
     }
 
     private createQuestList() {
+        const isMobile = isMobileDevice();
         // Remove any existing quest container
         const existingContainer = document.getElementById('quest-container');
         if (existingContainer) existingContainer.remove();
@@ -68,8 +71,20 @@ export default class QuestScene extends Phaser.Scene {
         this.questContainer.style.left = '50%';
         this.questContainer.style.top = '50%';
         this.questContainer.style.transform = 'translate(-50%, -50%)';
-        this.questContainer.style.width = '600px';
-        this.questContainer.style.maxHeight = '500px';
+        
+        if (isMobile) {
+            // Mobile-friendly styles
+            this.questContainer.style.width = '90%';
+            this.questContainer.style.maxWidth = '450px';
+            this.questContainer.style.maxHeight = '60vh';
+            this.questContainer.style.fontSize = getResponsiveFontSize(14);
+        } else {
+            // Desktop styles
+            this.questContainer.style.width = '600px';
+            this.questContainer.style.maxHeight = '500px';
+            this.questContainer.style.fontSize = '16px';
+        }
+        
         this.questContainer.style.overflowY = 'auto';
         this.questContainer.style.backgroundColor = 'rgba(44, 62, 80, 0.95)';
         this.questContainer.style.borderRadius = '8px';
@@ -88,16 +103,20 @@ export default class QuestScene extends Phaser.Scene {
             const questElement = document.createElement('div');
             questElement.style.backgroundColor = 'rgba(52, 73, 94, 0.7)';
             questElement.style.margin = '10px 0';
-            questElement.style.padding = '15px';
+            questElement.style.padding = isMobile ? '12px' : '15px';
             questElement.style.borderRadius = '5px';
             questElement.style.border = '1px solid #2980b9';
             questElement.style.color = 'white';
             questElement.style.fontFamily = 'Arial';
 
+            // Responsive font sizes for quest elements
+            const titleSize = isMobile ? getResponsiveFontSize(18) : '20px';
+            const textSize = isMobile ? getResponsiveFontSize(14) : '16px';
+
             questElement.innerHTML = `
-                <h3 style="margin: 0 0 10px 0; font-size: 20px; color: #3498db;">${quest.title}</h3>
-                <p style="margin: 0 0 10px 0; color: #ecf0f1;">${quest.description}</p>
-                <p style="margin: 0; color: #2ecc71;">Reward: ${quest.reward}</p>
+                <h3 style="margin: 0 0 10px 0; font-size: ${titleSize}; color: #3498db;">${quest.title}</h3>
+                <p style="margin: 0 0 10px 0; color: #ecf0f1; font-size: ${textSize};">${quest.description}</p>
+                <p style="margin: 0; color: #2ecc71; font-size: ${textSize};">Reward: ${quest.reward}</p>
             `;
 
             this.questContainer.appendChild(questElement);
@@ -107,17 +126,33 @@ export default class QuestScene extends Phaser.Scene {
     }
 
     private createBackButton() {
+        const isMobile = isMobileDevice();
+        
         this.backButton = document.createElement('button');
         this.backButton.textContent = '← Back';
         this.backButton.style.position = 'absolute';
-        this.backButton.style.top = '20px';
-        this.backButton.style.left = '20px';
-        this.backButton.style.padding = '10px 20px';
+        
+        if (isMobile) {
+            // Mobile-friendly styles
+            this.backButton.style.top = '10px';
+            this.backButton.style.left = '10px';
+            this.backButton.style.padding = '12px 15px';
+            this.backButton.style.fontSize = getResponsiveFontSize(16);
+            // Increase touch target size for mobile
+            this.backButton.style.minWidth = '80px';
+            this.backButton.style.minHeight = '44px';
+        } else {
+            // Desktop styles
+            this.backButton.style.top = '20px';
+            this.backButton.style.left = '20px';
+            this.backButton.style.padding = '10px 20px';
+            this.backButton.style.fontSize = '18px';
+        }
+        
         this.backButton.style.backgroundColor = '#2c3e50';
         this.backButton.style.color = 'white';
         this.backButton.style.border = '2px solid #34495e';
         this.backButton.style.borderRadius = '5px';
-        this.backButton.style.fontSize = '18px';
         this.backButton.style.cursor = 'pointer';
         this.backButton.style.fontFamily = 'Arial';
         this.backButton.style.transition = 'background-color 0.2s, border-color 0.2s';
@@ -140,10 +175,20 @@ export default class QuestScene extends Phaser.Scene {
     }
 
     private handleResize() {
-        if (this.questContainer) {
-            const { width, height } = this.scale;
-            this.questContainer.style.maxHeight = `${Math.min(500, height * 0.7)}px`;
-        }
+        // Recreate elements with appropriate sizing for the current screen
+        this.createQuestList();
+        this.createBackButton();
+        
+        // Adjust title text size based on screen
+        const { width, height } = this.scale;
+        const isMobile = isMobileDevice();
+        
+        // Find the title text and update its font size
+        this.children.list.forEach(child => {
+            if (child instanceof Phaser.GameObjects.Text && child.text === 'QUESTS') {
+                child.setFontSize(isMobile ? parseInt(getResponsiveFontSize(36)) : 48);
+            }
+        });
     }
 
     private cleanupHTMLElements() {

@@ -4,6 +4,7 @@ import { Account } from '../autobindings';
 import PlayerClass from '../autobindings/player_class_type';
 import { GameEvents } from '../constants/GameEvents';
 import { localization } from '../utils/localization';
+import { isMobileDevice, getResponsiveFontSize, applyResponsiveStyles, getResponsiveCenteredPosition } from '../utils/responsive';
 
 // Map player class to numeric class ID
 const CLASS_ID_MAP = {
@@ -150,26 +151,43 @@ export default class ClassSelectScene extends Phaser.Scene {
         } catch (error) {
             console.error("Error loading background:", error);
         }
-              
-        // Add title - centered on screen
-        this.titleText = this.add.text(width/2, height/4, localization.getText('ui.select_class.title'), {
-            fontFamily: 'Arial Black',
-            fontSize: '48px',
-            color: '#ffffff',
-            align: 'center',
-            stroke: '#000000',
-            strokeThickness: 6
-        }).setOrigin(0.5);
         
-        // Add subtitle - centered on screen below title
-        this.subtitleText = this.add.text(width/2, height/4 + 60, localization.getText('ui.select_class.subtitle'), {
-            fontFamily: 'Arial',
-            fontSize: '24px',
-            color: '#ffffff',
-            align: 'center',
-            stroke: '#000000',
-            strokeThickness: 3
-        }).setOrigin(0.5);
+        // Check if we're on mobile
+        const isMobile = isMobileDevice();
+              
+        // Add title - centered on screen (only on desktop)
+        if (!isMobile) {
+            this.titleText = this.add.text(width/2, height/4, localization.getText('ui.select_class.title'), {
+                fontFamily: 'Arial Black',
+                fontSize: '48px',
+                color: '#ffffff',
+                align: 'center',
+                stroke: '#000000',
+                strokeThickness: 6
+            }).setOrigin(0.5);
+            
+            // Add subtitle - centered on screen below title
+            this.subtitleText = this.add.text(width/2, height/4 + 60, localization.getText('ui.select_class.subtitle'), {
+                fontFamily: 'Arial',
+                fontSize: '24px',
+                color: '#ffffff',
+                align: 'center',
+                stroke: '#000000',
+                strokeThickness: 3
+            }).setOrigin(0.5);
+        } else {
+            // On mobile, create empty text objects to avoid null references
+            // but position them off-screen
+            this.titleText = this.add.text(-1000, -1000, '', {
+                fontFamily: 'Arial Black',
+                fontSize: '1px'
+            }).setVisible(false);
+            
+            this.subtitleText = this.add.text(-1000, -1000, '', {
+                fontFamily: 'Arial',
+                fontSize: '1px'
+            }).setVisible(false);
+        }
         
         // Create HTML elements for class selection
         this.createClassButtons();
@@ -284,8 +302,6 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.confirmButton = document.createElement('button');
         this.confirmButton.textContent = localization.getText('ui.confirm_selection');
         this.confirmButton.style.position = 'absolute';
-        this.confirmButton.style.bottom = '0';
-        this.confirmButton.style.left = '0';
         this.confirmButton.style.padding = '12px 24px';
         this.confirmButton.style.backgroundColor = '#27ae60';
         this.confirmButton.style.color = 'white';
@@ -295,7 +311,12 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.confirmButton.style.cursor = 'pointer';
         this.confirmButton.style.transition = 'background-color 0.2s';
         this.confirmButton.style.display = 'none';
-        this.confirmButton.style.width = '250px';  // Match the width of class buttons
+        
+        // Remove the fixed left position, let it be centered by the container
+        this.confirmButton.style.bottom = '0';
+        this.confirmButton.style.width = '100%'; // Use full width of the container
+        this.confirmButton.style.transform = 'translateX(0)'; // Reset any transforms
+        this.confirmButton.style.margin = '15px 0 0 0'; // Add some margin at the top
         
         this.confirmButton.addEventListener('mouseover', () => {
             this.confirmButton.style.backgroundColor = '#219a52';  // Darker shade for hover
@@ -330,6 +351,8 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.classButtonsContainer.style.transform = 'translate(-50%, -50%)';
         this.classButtonsContainer.style.height = '400px';
         document.body.appendChild(this.classButtonsContainer);
+        
+        const isMobile = isMobileDevice();
         
         const createClassButton = (name: string, classType: PlayerClass, iconName: string, imageFile: string) => {
             const button = document.createElement('button');
@@ -371,9 +394,42 @@ export default class ClassSelectScene extends Phaser.Scene {
             textSpan.id = `${name.toLowerCase()}-text`;
             textSpan.textContent = name;
             button.appendChild(textSpan);
+
+            // Add info button for mobile view
+            if (isMobile) {
+                const infoBtn = document.createElement('button');
+                infoBtn.className = 'class-info-button';
+                infoBtn.innerHTML = '<span style="font-size: 20px">ℹ️</span>';
+                infoBtn.style.position = 'absolute';
+                infoBtn.style.right = '10px';
+                infoBtn.style.backgroundColor = 'transparent';
+                infoBtn.style.border = 'none';
+                infoBtn.style.cursor = 'pointer';
+                infoBtn.style.width = '36px';
+                infoBtn.style.height = '36px';
+                infoBtn.style.borderRadius = '50%';
+                infoBtn.style.display = 'flex';
+                infoBtn.style.alignItems = 'center';
+                infoBtn.style.justifyContent = 'center';
+                infoBtn.style.padding = '0';
+                
+                infoBtn.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent triggering the parent button click
+                    this.selectClass(classType, button);
+                    this.showClassInfoModal(classType);
+                });
+                
+                button.appendChild(infoBtn);
+            }
             
             button.addEventListener('click', () => {
                 this.selectClass(classType, button);
+                
+                // On mobile, don't automatically show the info panel when clicking the button
+                // This is handled by the info button instead
+                if (!isMobile && this.classInfoPanel) {
+                    this.classInfoPanel.style.display = 'block';
+                }
             });
             
             return button;
@@ -409,10 +465,85 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.classInfoPanel.style.border = '2px solid #34495e';
         this.classInfoPanel.style.fontFamily = 'Arial';
         this.classInfoPanel.style.fontSize = '16px';
-        this.classInfoPanel.style.display = 'none';
+        this.classInfoPanel.style.display = 'none'; // Initially hidden
         this.classInfoPanel.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+        
+        // For mobile, add a close button
+        if (isMobileDevice()) {
+            const closeButton = document.createElement('button');
+            closeButton.textContent = '✕';
+            closeButton.style.position = 'absolute';
+            closeButton.style.top = '10px';
+            closeButton.style.right = '10px';
+            closeButton.style.background = 'transparent';
+            closeButton.style.border = 'none';
+            closeButton.style.color = 'white';
+            closeButton.style.fontSize = '20px';
+            closeButton.style.cursor = 'pointer';
+            closeButton.style.padding = '5px 10px';
+            closeButton.addEventListener('click', () => {
+                this.hideClassInfoModal();
+            });
+            this.classInfoPanel.appendChild(closeButton);
+        }
 
         document.body.appendChild(this.classInfoPanel);
+        
+        // Create modal overlay for mobile
+        if (isMobileDevice()) {
+            const overlay = document.createElement('div');
+            overlay.id = 'modal-overlay';
+            overlay.style.position = 'fixed';
+            overlay.style.top = '0';
+            overlay.style.left = '0';
+            overlay.style.width = '100%';
+            overlay.style.height = '100%';
+            overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+            overlay.style.zIndex = '1000';
+            overlay.style.display = 'none';
+            
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    this.hideClassInfoModal();
+                }
+            });
+            
+            document.body.appendChild(overlay);
+        }
+    }
+    
+    private showClassInfoModal(classType: PlayerClass) {
+        if (!isMobileDevice() || !this.classInfoPanel) return;
+        
+        const overlay = document.getElementById('modal-overlay');
+        if (!overlay) return;
+        
+        // Position the panel in the center of the screen
+        this.classInfoPanel.style.left = '50%';
+        this.classInfoPanel.style.top = '50%';
+        this.classInfoPanel.style.transform = 'translate(-50%, -50%)';
+        this.classInfoPanel.style.zIndex = '1001';
+        this.classInfoPanel.style.width = '85%';
+        this.classInfoPanel.style.maxWidth = '400px';
+        this.classInfoPanel.style.maxHeight = '80%';
+        this.classInfoPanel.style.overflowY = 'auto';
+        
+        // Show the overlay and panel
+        overlay.style.display = 'block';
+        this.classInfoPanel.style.display = 'block';
+    }
+    
+    private hideClassInfoModal() {
+        if (!isMobileDevice()) return;
+        
+        const overlay = document.getElementById('modal-overlay');
+        if (overlay) {
+            overlay.style.display = 'none';
+        }
+        
+        if (this.classInfoPanel) {
+            this.classInfoPanel.style.display = 'none';
+        }
     }
 
     private getAltVersionKey(characterName: string): string {
@@ -632,18 +763,77 @@ export default class ClassSelectScene extends Phaser.Scene {
     }
     
     private positionHTMLElements() {
-        // Position class select container in the exact center
-        this.classButtonsContainer.style.left = '50%';
-        this.classButtonsContainer.style.top = '60%';
+        const isMobile = isMobileDevice();
         
-        // Position info panel to the right of the centered container
-        if (this.classInfoPanel) {
-            const containerWidth = 250;
-            const spacing = 30;
-            this.classInfoPanel.style.left = '50%';
-            this.classInfoPanel.style.top = '60%';
-            this.classInfoPanel.style.transform = `translate(calc(${(containerWidth/2 + spacing)}px), -55%)`;
-            this.classInfoPanel.style.right = 'auto';
+        // Position class select container
+        if (isMobile) {
+            // On mobile, position the class buttons container in the center
+            // with a mobile-friendly layout
+            this.classButtonsContainer.style.left = '50%';
+            this.classButtonsContainer.style.top = '50%';
+            this.classButtonsContainer.style.width = '90%';
+            this.classButtonsContainer.style.maxWidth = '300px';
+            
+            // Show info panel below class buttons on mobile
+            if (this.classInfoPanel && this.classInfoPanel.style.display !== 'none') {
+                this.classInfoPanel.style.left = '50%';
+                this.classInfoPanel.style.top = 'calc(50% + 220px)';
+                this.classInfoPanel.style.transform = 'translate(-50%, 0)';
+                this.classInfoPanel.style.width = '90%';
+                this.classInfoPanel.style.maxWidth = '300px';
+                this.classInfoPanel.style.maxHeight = 'calc(100% - 450px)';
+                this.classInfoPanel.style.overflowY = 'auto';
+            }
+            
+            // Adjust quest and bestiary buttons for mobile
+            if (this.questButton) {
+                this.questButton.style.top = '20px';
+                this.questButton.style.right = '20px';
+                this.questButton.style.width = '120px';
+                this.questButton.style.height = '40px';
+                this.questButton.style.fontSize = getResponsiveFontSize(16);
+            }
+            
+            if (this.bestiaryButton) {
+                this.bestiaryButton.style.top = '70px';
+                this.bestiaryButton.style.right = '20px';
+                this.bestiaryButton.style.width = '120px';
+                this.bestiaryButton.style.height = '40px';
+                this.bestiaryButton.style.fontSize = getResponsiveFontSize(16);
+            }
+        } else {
+            // Desktop layout - horizontal arrangement
+            this.classButtonsContainer.style.left = '50%';
+            this.classButtonsContainer.style.top = '60%';
+            this.classButtonsContainer.style.width = '250px';
+            
+            // Position info panel to the right of the centered container
+            if (this.classInfoPanel && this.classInfoPanel.style.display !== 'none') {
+                const containerWidth = 250;
+                const spacing = 30;
+                this.classInfoPanel.style.left = '50%';
+                this.classInfoPanel.style.top = '60%';
+                this.classInfoPanel.style.transform = `translate(calc(${(containerWidth/2 + spacing)}px), -55%)`;
+                this.classInfoPanel.style.width = '300px';
+                this.classInfoPanel.style.maxHeight = '450px';
+            }
+            
+            // Standard position for quest and bestiary buttons
+            if (this.questButton) {
+                this.questButton.style.top = '50px';
+                this.questButton.style.right = '50px';
+                this.questButton.style.width = '180px';
+                this.questButton.style.height = '50px';
+                this.questButton.style.fontSize = '18px';
+            }
+            
+            if (this.bestiaryButton) {
+                this.bestiaryButton.style.top = '110px';
+                this.bestiaryButton.style.right = '50px';
+                this.bestiaryButton.style.width = '180px';
+                this.bestiaryButton.style.height = '50px';
+                this.bestiaryButton.style.fontSize = '18px';
+            }
         }
     }
     
@@ -721,8 +911,10 @@ export default class ClassSelectScene extends Phaser.Scene {
         const baseClassName = CLASS_NAME_MAP[classType.tag as keyof typeof CLASS_NAME_MAP];
         const info = CLASS_INFO[baseClassName as ClassNames];
 
-        // Show and update the info panel
-        this.classInfoPanel.style.display = 'block';
+        // On desktop, show and update the info panel
+        if (!isMobileDevice()) {
+            this.classInfoPanel.style.display = 'block';
+        }
         
         // Update button content before updating panel
         const originalCharName = this.getOriginalCharacterName(baseClassName);
@@ -742,9 +934,6 @@ export default class ClassSelectScene extends Phaser.Scene {
         
         // Update the info panel
         this.updateClassInfoPanel(baseClassName, classType, info);
-        
-        // Update positions to maintain alignment
-        this.positionHTMLElements();
     }
 
     private getButtonForClass(classType: PlayerClass): HTMLButtonElement | null {

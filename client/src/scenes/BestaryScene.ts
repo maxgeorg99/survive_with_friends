@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { localization } from '../utils/localization';
 import { MonsterType } from '../autobindings/monster_type_type';
+import { isMobileDevice, getResponsiveFontSize, applyResponsiveStyles, getResponsiveDimensions } from '../utils/responsive';
 
 export default class BestaryScene extends Phaser.Scene {
     // UI elements
@@ -140,6 +141,8 @@ export default class BestaryScene extends Phaser.Scene {
         this.monstersList.style.borderRadius = '8px';
         this.monstersList.style.padding = '10px';
         
+        const isMobile = isMobileDevice();
+        
         // Define the monster types to show based on current tab
         let monstersToShow: MonsterType[] = [];
         if (this.currentTab === 'common') {
@@ -209,6 +212,11 @@ export default class BestaryScene extends Phaser.Scene {
                     (btn as HTMLButtonElement).style.backgroundColor = '#2c3e50';
                 });
                 monsterButton.style.backgroundColor = '#3498db';
+                
+                // On mobile, show the details panel in a modal
+                if (isMobile) {
+                    this.showMonsterDetailsModal();
+                }
             });
             
             // Add hover effects
@@ -235,6 +243,8 @@ export default class BestaryScene extends Phaser.Scene {
         const existingPanel = document.getElementById('bestiary-details-panel');
         if (existingPanel) existingPanel.remove();
         
+        const isMobile = isMobileDevice();
+        
         // Create monster details panel
         this.monsterDetailsPanel = document.createElement('div');
         this.monsterDetailsPanel.id = 'bestiary-details-panel';
@@ -246,7 +256,7 @@ export default class BestaryScene extends Phaser.Scene {
         this.monsterDetailsPanel.style.padding = '20px';
         this.monsterDetailsPanel.style.color = 'white';
         this.monsterDetailsPanel.style.display = 'none'; // Initially hidden
-        
+                
         // Add default content
         this.monsterDetailsPanel.innerHTML = `
             <div style="text-align: center; padding: 40px 0;">
@@ -257,88 +267,84 @@ export default class BestaryScene extends Phaser.Scene {
         `;
         
         document.body.appendChild(this.monsterDetailsPanel);
+        
+        // Create modal overlay for mobile
+        if (isMobile) {
+            const overlay = document.createElement('div');
+            overlay.id = 'bestiary-modal-overlay';
+            overlay.style.position = 'fixed';
+            overlay.style.top = '0';
+            overlay.style.left = '0';
+            overlay.style.width = '100%';
+            overlay.style.height = '100%';
+            overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+            overlay.style.zIndex = '1000';
+            overlay.style.display = 'none';
+            
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    this.hideMonsterDetailsModal();
+                }
+            });
+            
+            document.body.appendChild(overlay);
+        }
     }
     
-    private createBackButton() {
-        // Remove any existing button
-        const existingButton = document.getElementById('bestiary-back-button');
-        if (existingButton) existingButton.remove();
+    private showMonsterDetailsModal() {
+        if (!isMobileDevice()) return;
         
-        // Create back button
-        this.backButton = document.createElement('button');
-        this.backButton.id = 'bestiary-back-button';
-        this.backButton.textContent = localization.getText('ui.back');
-        this.backButton.style.position = 'absolute';
-        this.backButton.style.padding = '10px 20px';
-        this.backButton.style.backgroundColor = '#2c3e50';
-        this.backButton.style.color = 'white';
-        this.backButton.style.border = '2px solid #34495e';
-        this.backButton.style.borderRadius = '5px';
-        this.backButton.style.cursor = 'pointer';
-        this.backButton.style.fontSize = '16px';
+        const overlay = document.getElementById('bestiary-modal-overlay');
+        if (!overlay) return;
         
-        // Add hover effects
-        this.backButton.addEventListener('mouseover', () => {
-            this.backButton.style.backgroundColor = '#3498db';
-            this.backButton.style.borderColor = '#2980b9';
-        });
+        // Position the panel in the center of the screen
+        this.monsterDetailsPanel.style.left = '50%';
+        this.monsterDetailsPanel.style.top = '50%';
+        this.monsterDetailsPanel.style.transform = 'translate(-50%, -50%)';
+        this.monsterDetailsPanel.style.zIndex = '1001';
+        this.monsterDetailsPanel.style.width = '85%';
+        this.monsterDetailsPanel.style.maxWidth = '380px';
+        this.monsterDetailsPanel.style.maxHeight = '80%';
+        this.monsterDetailsPanel.style.overflowY = 'auto';
+        this.monsterDetailsPanel.style.position = 'fixed'; // Ensure fixed positioning
         
-        this.backButton.addEventListener('mouseout', () => {
-            this.backButton.style.backgroundColor = '#2c3e50';
-            this.backButton.style.borderColor = '#34495e';
-        });
+        // Show the overlay and panel
+        overlay.style.display = 'block';
+        this.monsterDetailsPanel.style.display = 'block';
         
-        // Add click handler
-        this.backButton.addEventListener('click', () => {
-            this.scene.start('ClassSelectScene');
-        });
-        
-        document.body.appendChild(this.backButton);
+        // Show phase toggle button for bosses if needed
+        if (this.currentTab === 'bosses' && this.phaseToggleButton) {
+            // Position phase toggle in the top right corner of the panel
+            // First get the panel's bounding rectangle
+            const panelRect = this.monsterDetailsPanel.getBoundingClientRect();
+            
+            this.phaseToggleButton.style.position = 'fixed';
+            this.phaseToggleButton.style.top = `${panelRect.top + 10}px`;
+            this.phaseToggleButton.style.right = `${window.innerWidth - panelRect.right + 10}px`;
+            this.phaseToggleButton.style.left = 'auto';
+            this.phaseToggleButton.style.zIndex = '1002';
+            this.phaseToggleButton.style.display = 'block';
+        }
     }
     
-    private positionHTMLElements() {
-        const width = this.cameras.main.width;
-        const height = this.cameras.main.height;
+    private hideMonsterDetailsModal() {
+        if (!isMobileDevice()) return;
         
-        // Calculate positions for a centered layout
-        const panelSpacing = 30; // Space between panels
-        const totalContentWidth = 220 + panelSpacing + 450; // monsters list width + spacing + details panel width
-        const leftOffset = (width - totalContentWidth) / 2; // Center the entire content area
-        const tabHeight = 45; // Estimated height of the tab buttons
-        const verticalSpacing = 20; // Additional spacing between tabs and content
-        
-        // Position tab container
-        const tabContainer = document.getElementById('bestiary-tabs-container');
-        if (tabContainer) {
-            tabContainer.style.left = `${leftOffset}px`;
-            tabContainer.style.top = `${height * 0.22 - tabHeight}px`; // Position tabs closer to 22% height
-            tabContainer.style.width = `${totalContentWidth}px`; // Match content width exactly
+        const overlay = document.getElementById('bestiary-modal-overlay');
+        if (overlay) {
+            overlay.style.display = 'none';
         }
         
-        // Position monsters list in the center-left, below the tabs
-        this.monstersList.style.left = `${leftOffset}px`;
-        this.monstersList.style.top = `${height * 0.22 + verticalSpacing}px`; // Position below tabs + spacing
-        this.monstersList.style.maxHeight = `${height * 0.60}px`; // Adjusted height to avoid overlap
+        if (this.monsterDetailsPanel) {
+            this.monsterDetailsPanel.style.display = 'none';
+        }
         
-        // Position monster details panel in the center-right, aligned with the monster list
-        this.monsterDetailsPanel.style.left = `${leftOffset + 220 + panelSpacing}px`;
-        this.monsterDetailsPanel.style.top = `${height * 0.22 + verticalSpacing}px`; // Same vertical position as monster list
-        this.monsterDetailsPanel.style.maxHeight = `${height * 0.60}px`; // Adjusted height to avoid overlap
-        
-        // Position back button at the bottom center
-        this.backButton.style.left = `${width * 0.5 - 50}px`;
-        this.backButton.style.top = `${height - 70}px`; // Moved up slightly to avoid edges
-        
-        // Position phase toggle button on the right side of the details panel
-        const detailsPanelRight = leftOffset + 220 + panelSpacing + 450; // Left position + width of the panel
-        this.phaseToggleButton.style.left = `${detailsPanelRight - 120}px`; // Align to the right with some margin
-        this.phaseToggleButton.style.top = `${height * 0.22 + verticalSpacing + 15}px`; // Align near the top of the details panel
+        // Hide phase toggle button when closing modal
+        if (this.phaseToggleButton) {
+            this.phaseToggleButton.style.display = 'none';
+        }
     }
-    
-    private handleResize() {
-        this.positionHTMLElements();
-    }
-    
+
     private selectMonster(monsterType: MonsterType) {
         this.selectedMonster = monsterType;
         
@@ -352,6 +358,16 @@ export default class BestaryScene extends Phaser.Scene {
         if (this.currentTab === 'bosses') {
             this.phaseToggleButton.style.display = 'block';
             this.phaseToggleButton.textContent = this.selectedMonsterPhase === 1 ? 'Show Phase 2' : 'Show Phase 1';
+            
+            // On mobile, position the phase toggle button correctly in the modal
+            if (isMobileDevice()) {
+                const panelRect = this.monsterDetailsPanel.getBoundingClientRect();
+                this.phaseToggleButton.style.position = 'fixed';
+                this.phaseToggleButton.style.top = `${panelRect.top + 10}px`;
+                this.phaseToggleButton.style.right = `${window.innerWidth - panelRect.right + 10}px`;
+                this.phaseToggleButton.style.left = 'auto';
+                this.phaseToggleButton.style.zIndex = '1002';
+            }
         } else {
             this.phaseToggleButton.style.display = 'none';
         }
@@ -596,67 +612,126 @@ export default class BestaryScene extends Phaser.Scene {
         const monsterImageFile = this.monsterImageMapping[monsterType.tag];
         
         // Get monster stats from hardcoded data
-        // Note: These values should be updated manually if monster stats change in the backend
         const stats = this.getMonsterStats(monsterType.tag);
         
         // Phase indicator for boss monsters
         const phaseIndicator = this.currentTab === 'bosses' ? 
             `<div style="color: #e67e22; font-weight: bold; margin-top: 5px;">Phase ${this.selectedMonsterPhase}</div>` : '';
         
-        // Update the details panel content with the stats
-        this.monsterDetailsPanel.innerHTML = `
-            <div style="display: flex; flex-direction: column; gap: 15px;">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-                    <div>
-                        <h2 style="margin: 0; font-size: 24px; color: #3498db;">${monsterName}</h2>
-                        ${phaseIndicator}
-                    </div>
-                </div>
-                
-                <div style="display: flex; gap: 20px; margin-bottom: 15px;">
-                    <div style="flex-shrink: 0; width: 120px; height: 120px; display: flex; align-items: center; justify-content: center; background-color: rgba(0, 0, 0, 0.3); border-radius: 4px;">
-                        <img src="assets/${monsterImageFile}" style="max-width: 100px; max-height: 100px; object-fit: contain;" alt="${monsterName}">
+        const isMobile = isMobileDevice();
+        
+        // Create responsive layout for the details panel
+        if (isMobile) {
+            // More compact mobile layout
+            this.monsterDetailsPanel.innerHTML = `
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px;">
+                        <div>
+                            <h2 style="margin: 0; font-size: 20px; color: #3498db;">${monsterName}</h2>
+                            ${phaseIndicator}
+                        </div>
                     </div>
                     
-                    <div style="flex-grow: 1;">
-                        <p style="margin: 0 0 15px 0; line-height: 1.5;">${monsterDescription}</p>
-                    </div>
-                </div>
-                
-                <div style="background-color: rgba(0, 0, 0, 0.2); border-radius: 4px; padding: 15px; margin-bottom: 15px;">
-                    <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #f39c12;">Stats</h3>
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px;">
-                        <div>
-                            <div style="color: #e74c3c; font-weight: bold;">HP</div>
-                            <div>${stats.hp}</div>
+                    <div style="display: flex; gap: 10px; margin-bottom: 5px;">
+                        <div style="flex-shrink: 0; width: 70px; height: 70px; display: flex; align-items: center; justify-content: center; background-color: rgba(0, 0, 0, 0.3); border-radius: 4px;">
+                            <img src="assets/${monsterImageFile}" style="max-width: 60px; max-height: 60px; object-fit: contain;" alt="${monsterName}">
                         </div>
-                        <div>
-                            <div style="color: #3498db; font-weight: bold;">Speed</div>
-                            <div>${stats.speed}</div>
-                        </div>
-                        <div>
-                            <div style="color: #e67e22; font-weight: bold;">Damage</div>
-                            <div>${stats.damage}</div>
+                        
+                        <div style="flex-grow: 1;">
+                            <p style="margin: 0; line-height: 1.3; font-size: ${getResponsiveFontSize(13)};">${monsterDescription}</p>
                         </div>
                     </div>
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
-                        <div>
-                            <div style="color: #9b59b6; font-weight: bold;">Size</div>
-                            <div>${stats.radius}</div>
+                    
+                    <div style="background-color: rgba(0, 0, 0, 0.2); border-radius: 4px; padding: 8px; margin-bottom: 5px;">
+                        <h3 style="margin: 0 0 5px 0; font-size: 16px; color: #f39c12;">Stats</h3>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px;">
+                            <div>
+                                <div style="color: #e74c3c; font-weight: bold; font-size: ${getResponsiveFontSize(12)};">HP</div>
+                                <div style="font-size: ${getResponsiveFontSize(12)};">${stats.hp}</div>
+                            </div>
+                            <div>
+                                <div style="color: #3498db; font-weight: bold; font-size: ${getResponsiveFontSize(12)};">Speed</div>
+                                <div style="font-size: ${getResponsiveFontSize(12)};">${stats.speed}</div>
+                            </div>
+                            <div>
+                                <div style="color: #e67e22; font-weight: bold; font-size: ${getResponsiveFontSize(12)};">Damage</div>
+                                <div style="font-size: ${getResponsiveFontSize(12)};">${stats.damage}</div>
+                            </div>
                         </div>
-                        <div>
-                            <div style="color: #2ecc71; font-weight: bold;">XP Value</div>
-                            <div>${stats.exp}</div>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 5px;">
+                            <div>
+                                <div style="color: #9b59b6; font-weight: bold; font-size: ${getResponsiveFontSize(12)};">Size</div>
+                                <div style="font-size: ${getResponsiveFontSize(12)};">${stats.radius}</div>
+                            </div>
+                            <div>
+                                <div style="color: #2ecc71; font-weight: bold; font-size: ${getResponsiveFontSize(12)};">XP Value</div>
+                                <div style="font-size: ${getResponsiveFontSize(12)};">${stats.exp}</div>
+                            </div>
                         </div>
                     </div>
+                    
+                    <div>
+                        <h3 style="margin: 0 0 5px 0; font-size: 16px; color: #2ecc71;">Tips</h3>
+                        <div style="white-space: pre-line; line-height: 1.3; font-size: ${getResponsiveFontSize(12)};">${monsterTips}</div>
+                    </div>
                 </div>
-                
-                <div>
-                    <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #2ecc71;">Tips</h3>
-                    <div style="white-space: pre-line; line-height: 1.5;">${monsterTips}</div>
+            `;
+        } else {
+            // Original desktop layout
+            this.monsterDetailsPanel.innerHTML = `
+                <div style="display: flex; flex-direction: column; gap: 15px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                        <div>
+                            <h2 style="margin: 0; font-size: 24px; color: #3498db;">${monsterName}</h2>
+                            ${phaseIndicator}
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 20px; margin-bottom: 15px;">
+                        <div style="flex-shrink: 0; width: 120px; height: 120px; display: flex; align-items: center; justify-content: center; background-color: rgba(0, 0, 0, 0.3); border-radius: 4px;">
+                            <img src="assets/${monsterImageFile}" style="max-width: 100px; max-height: 100px; object-fit: contain;" alt="${monsterName}">
+                        </div>
+                        
+                        <div style="flex-grow: 1;">
+                            <p style="margin: 0 0 15px 0; line-height: 1.5;">${monsterDescription}</p>
+                        </div>
+                    </div>
+                    
+                    <div style="background-color: rgba(0, 0, 0, 0.2); border-radius: 4px; padding: 15px; margin-bottom: 15px;">
+                        <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #f39c12;">Stats</h3>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px;">
+                            <div>
+                                <div style="color: #e74c3c; font-weight: bold;">HP</div>
+                                <div>${stats.hp}</div>
+                            </div>
+                            <div>
+                                <div style="color: #3498db; font-weight: bold;">Speed</div>
+                                <div>${stats.speed}</div>
+                            </div>
+                            <div>
+                                <div style="color: #e67e22; font-weight: bold;">Damage</div>
+                                <div>${stats.damage}</div>
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                            <div>
+                                <div style="color: #9b59b6; font-weight: bold;">Size</div>
+                                <div>${stats.radius}</div>
+                            </div>
+                            <div>
+                                <div style="color: #2ecc71; font-weight: bold;">XP Value</div>
+                                <div>${stats.exp}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #2ecc71;">Tips</h3>
+                        <div style="white-space: pre-line; line-height: 1.5;">${monsterTips}</div>
+                    </div>
                 </div>
-            </div>
-        `;
+            `;
+        }
     }
 
     // Get hardcoded monster stats - update these values manually if monster stats change in the backend
@@ -679,5 +754,193 @@ export default class BestaryScene extends Phaser.Scene {
         };
         
         return monsterStats[monsterType] || { hp: 0, speed: 0, damage: 0, radius: 0, exp: 0 };
+    }
+
+    private createBackButton() {
+        // Remove any existing button
+        const existingButton = document.getElementById('bestiary-back-button');
+        if (existingButton) existingButton.remove();
+        
+        // Create back button
+        this.backButton = document.createElement('button');
+        this.backButton.id = 'bestiary-back-button';
+        this.backButton.textContent = '← Back';
+        this.backButton.style.position = 'absolute';
+        this.backButton.style.padding = '10px 20px';
+        this.backButton.style.backgroundColor = '#2c3e50';
+        this.backButton.style.color = 'white';
+        this.backButton.style.border = '2px solid #34495e';
+        this.backButton.style.borderRadius = '5px';
+        this.backButton.style.cursor = 'pointer';
+        this.backButton.style.fontFamily = 'Arial';
+        this.backButton.style.fontSize = '18px';
+        this.backButton.style.transition = 'background-color 0.2s';
+        
+        // Add hover effects
+        this.backButton.addEventListener('mouseover', () => {
+            this.backButton.style.backgroundColor = '#3498db';
+        });
+        
+        this.backButton.addEventListener('mouseout', () => {
+            this.backButton.style.backgroundColor = '#2c3e50';
+        });
+        
+        // Add click handler - go back to class select scene
+        this.backButton.addEventListener('click', () => {
+            this.scene.start('ClassSelectScene');
+        });
+        
+        document.body.appendChild(this.backButton);
+
+        // Make back button more touch friendly on mobile
+        if (isMobileDevice()) {
+            this.backButton.style.padding = '12px 20px';
+            this.backButton.style.fontSize = getResponsiveFontSize(16);
+            this.backButton.style.minWidth = '80px';
+            this.backButton.style.minHeight = '44px';
+        }
+    }
+
+    private positionHTMLElements() {
+        const width = this.cameras.main.width;
+        const height = this.cameras.main.height;
+        const isMobile = isMobileDevice();
+
+        if (isMobile) {
+            // Mobile layout - stack panels vertically
+            // Adjust title and description text sizes
+            this.titleText.setFontSize(parseInt(getResponsiveFontSize(36)));
+            this.descriptionText.setFontSize(parseInt(getResponsiveFontSize(16)));
+            
+            // Tabs at the top
+            const tabContainer = document.getElementById('bestiary-tabs-container');
+            if (tabContainer) {
+                tabContainer.style.left = '50%';
+                tabContainer.style.top = `${height * 0.20}px`;
+                tabContainer.style.width = '90%';
+                tabContainer.style.transform = 'translateX(-50%)';
+                
+                // Make tab buttons more touch friendly
+                if (this.commonMonstersTab && this.bossesTab) {
+                    this.commonMonstersTab.style.padding = '15px 10px';
+                    this.bossesTab.style.padding = '15px 10px';
+                    this.commonMonstersTab.style.fontSize = getResponsiveFontSize(16);
+                    this.bossesTab.style.fontSize = getResponsiveFontSize(16);
+                }
+            }
+            
+            // Position monsters list at the top
+            this.monstersList.style.left = '50%';
+            this.monstersList.style.top = `${height * 0.28}px`; // Below the tabs
+            this.monstersList.style.width = '90%';
+            this.monstersList.style.maxWidth = '400px';
+            this.monstersList.style.maxHeight = '150px'; // Smaller height on mobile
+            this.monstersList.style.transform = 'translateX(-50%)';
+            
+            // Position monster details panel below the list (smaller and more mobile-friendly)
+            this.monsterDetailsPanel.style.left = '50%';
+            this.monsterDetailsPanel.style.top = `${height * 0.28 + 170}px`; // Below monster list
+            this.monsterDetailsPanel.style.transform = 'translateX(-50%)';
+            this.monsterDetailsPanel.style.width = '90%';
+            this.monsterDetailsPanel.style.maxWidth = '350px'; // Smaller max width for mobile
+            this.monsterDetailsPanel.style.maxHeight = `${height * 0.40}px`; // Smaller height to fit on screen
+            this.monsterDetailsPanel.style.overflowY = 'auto';
+            this.monsterDetailsPanel.style.padding = '15px'; // Smaller padding
+            
+            // Update the monster display content for better mobile fit
+            if (this.selectedMonster) {
+                this.updateMonsterDisplay(this.selectedMonster);
+            }
+            
+            // Position back button at the bottom center
+            this.backButton.style.left = '50%';
+            this.backButton.style.bottom = '20px';
+            this.backButton.style.transform = 'translateX(-50%)';
+            this.backButton.style.top = 'auto'; // Use bottom instead of top
+            this.backButton.style.fontSize = getResponsiveFontSize(16);
+            this.backButton.style.padding = '12px 25px'; // Larger touch target
+            
+            // Position phase toggle button relative to details panel
+            if (this.monsterDetailsPanel && this.monsterDetailsPanel.style.display !== 'none') {
+                const panelRect = this.monsterDetailsPanel.getBoundingClientRect();
+                this.phaseToggleButton.style.position = 'fixed';
+                this.phaseToggleButton.style.top = `${panelRect.top + 10}px`;
+                this.phaseToggleButton.style.right = `${window.innerWidth - panelRect.right + 10}px`;
+                this.phaseToggleButton.style.left = 'auto';
+                this.phaseToggleButton.style.zIndex = '1002';
+            } else {
+                this.phaseToggleButton.style.right = '5%';
+                this.phaseToggleButton.style.left = 'auto';
+                this.phaseToggleButton.style.top = `${height * 0.28 + 170}px`;
+            }
+            this.phaseToggleButton.style.fontSize = getResponsiveFontSize(14);
+            this.phaseToggleButton.style.padding = '10px 15px'; // Larger touch target
+        } else {
+            // Desktop layout - horizontal arrangement
+            const panelSpacing = 30;
+            const totalContentWidth = 220 + panelSpacing + 450;
+            const leftOffset = (width - totalContentWidth) / 2;
+            
+            // Tabs container positioned above the monsters list
+            const tabContainer = document.getElementById('bestiary-tabs-container');
+            if (tabContainer) {
+                tabContainer.style.left = `${leftOffset}px`;
+                tabContainer.style.top = `${height * 0.20 - 48}px`; // Positioned above monsters list
+                tabContainer.style.width = `${totalContentWidth}px`;
+            }
+            
+            // Position monsters list on the left
+            this.monstersList.style.left = `${leftOffset}px`;
+            this.monstersList.style.top = `${height * 0.20}px`;
+            this.monstersList.style.width = '220px';
+            this.monstersList.style.maxHeight = '500px';
+            
+            // Position monster details panel on the right
+            this.monsterDetailsPanel.style.left = `${leftOffset + 220 + panelSpacing}px`;
+            this.monsterDetailsPanel.style.top = `${height * 0.20}px`;
+            this.monsterDetailsPanel.style.width = '450px';
+            this.monsterDetailsPanel.style.maxHeight = '500px';
+            
+            // Position back button in the bottom left
+            this.backButton.style.left = `${width * 0.1}px`;
+            this.backButton.style.top = `${height * 0.9}px`;
+            
+            // Position phase toggle button for bosses
+            if (this.monsterDetailsPanel && this.monsterDetailsPanel.style.display !== 'none') {
+                const panelRect = this.monsterDetailsPanel.getBoundingClientRect();
+                this.phaseToggleButton.style.position = 'absolute';
+                this.phaseToggleButton.style.top = `${panelRect.top + 10}px`;
+                this.phaseToggleButton.style.left = `${panelRect.right - 120}px`;
+            } else {
+                const panelSpacing = 30;
+                const leftOffset = (width - (220 + panelSpacing + 450)) / 2;
+                this.phaseToggleButton.style.position = 'absolute';
+                this.phaseToggleButton.style.left = `${leftOffset + 220 + panelSpacing + 330}px`;
+                this.phaseToggleButton.style.top = `${height * 0.20 + 10}px`;
+            }
+        }
+        
+        // Handle resize for the phase toggle button
+        if (this.phaseToggleButton) {
+            // Only show the phase toggle button if a boss monster is selected
+            if (this.currentTab === 'bosses' && this.selectedMonster) {
+                this.phaseToggleButton.style.display = 'block';
+            } else {
+                this.phaseToggleButton.style.display = 'none';
+            }
+        }
+    }
+    
+    private handleResize() {
+        // Update text positions
+        const width = this.cameras.main.width;
+        const height = this.cameras.main.height;
+        
+        this.titleText.setPosition(width/2, 60);
+        this.descriptionText.setPosition(width/2, 110);
+        this.descriptionText.setWordWrapWidth(width * 0.8);
+        
+        // Reposition all HTML elements
+        this.positionHTMLElements();
     }
 }

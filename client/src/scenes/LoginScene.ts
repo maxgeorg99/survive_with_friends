@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { GameEvents } from '../constants/GameEvents';
+import { localization } from '../utils/localization';
+import { isMobileDevice, getResponsiveFontSize, applyResponsiveStyles, getResponsiveDimensions } from '../utils/responsive';
 
 export default class LoginScene extends Phaser.Scene {
     private spacetimeDBClient: SpacetimeDBClient;
@@ -100,6 +102,8 @@ export default class LoginScene extends Phaser.Scene {
         const existingButtons = document.querySelectorAll('.login-button');
         existingButtons.forEach(btn => btn.remove());
         
+        const isMobile = isMobileDevice();
+        
         // Create name input
         this.nameInput = document.createElement('input');
         this.nameInput.id = 'login-name-input';
@@ -108,9 +112,10 @@ export default class LoginScene extends Phaser.Scene {
         this.nameInput.maxLength = 16;
         this.nameInput.style.position = 'absolute';
         this.nameInput.style.fontFamily = 'Arial';
-        this.nameInput.style.fontSize = '20px';
-        this.nameInput.style.padding = '10px';
-        this.nameInput.style.width = '300px';
+        this.nameInput.style.fontSize = isMobile ? getResponsiveFontSize(18) : '20px';
+        this.nameInput.style.padding = isMobile ? '12px' : '10px';
+        this.nameInput.style.width = isMobile ? '80%' : '300px';
+        this.nameInput.style.maxWidth = '300px';
         this.nameInput.style.textAlign = 'center';
         this.nameInput.style.borderRadius = '4px';
         this.nameInput.style.display = 'none';
@@ -125,16 +130,16 @@ export default class LoginScene extends Phaser.Scene {
         this.nameButton.className = 'login-button';
         this.nameButton.style.position = 'absolute';
         this.nameButton.style.fontFamily = 'Arial';
-        this.nameButton.style.fontSize = '20px';
-        this.nameButton.style.padding = '10px 20px';
-        this.nameButton.style.width = '150px'; // Fixed width for better centering
+        this.nameButton.style.fontSize = isMobile ? getResponsiveFontSize(18) : '20px';
+        this.nameButton.style.padding = isMobile ? '14px 20px' : '10px 20px';
+        this.nameButton.style.width = isMobile ? '200px' : '150px'; 
         this.nameButton.style.borderRadius = '4px';
         this.nameButton.style.backgroundColor = '#4CAF50';
         this.nameButton.style.color = 'white';
         this.nameButton.style.border = 'none';
         this.nameButton.style.cursor = 'pointer';
         this.nameButton.style.display = 'none';
-        this.nameButton.style.textAlign = 'center'; // Ensure text is centered in button
+        this.nameButton.style.textAlign = 'center';
         // Use transform for perfect centering
         this.nameButton.style.left = '50%';
         this.nameButton.style.transform = 'translateX(-50%)';
@@ -162,14 +167,31 @@ export default class LoginScene extends Phaser.Scene {
     
     private handleResize() {
         const { width, height } = this.scale;
+        const isMobile = isMobileDevice();
         
         // Update container position to new center
         if (this.loginContainer) {
             this.loginContainer.setPosition(width/2, height/2);
+            
+            // Update title text size based on screen width
+            const titleText = this.loginContainer.getAt(0) as Phaser.GameObjects.Text;
+            if (titleText) {
+                titleText.setFontSize(isMobile ? parseInt(getResponsiveFontSize(48)) : 64);
+            }
+            
+            // Update status text size
+            if (this.statusText) {
+                this.statusText.setFontSize(isMobile ? parseInt(getResponsiveFontSize(20)) : 24);
+            }
+            
+            // Update error text size
+            if (this.errorText) {
+                this.errorText.setFontSize(isMobile ? parseInt(getResponsiveFontSize(16)) : 18);
+            }
         }
         
-        // Position HTML elements
-        this.positionHTMLElements();
+        // Recreate HTML elements with new sizes
+        this.createHTMLElements();
     }
     
     private registerEventListeners() {

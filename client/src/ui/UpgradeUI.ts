@@ -24,11 +24,14 @@ interface AttackGraphicData {
 }
 
 // Constants
-const CARD_WIDTH = 200;
-const CARD_HEIGHT = 260;
-const CARD_SPACING = 20;
-const CARD_SCALE = 0.8;
+const CARD_WIDTH = 180; // Reduced from 200 to 180
+const CARD_HEIGHT = 250; // Reduced from 260 to 250
+const CARD_SPACING = 10; // Reduced from 20 to 10
+const CARD_SCALE_DESKTOP = 0.8;
+const CARD_SCALE_MOBILE = 0.65; // Smaller scale for mobile devices
 const UI_DEPTH = 100000; // Extremely high depth to ensure UI stays on top of all game elements
+const MOBILE_BOTTOM_MARGIN = 5; // Reduced bottom margin on mobile (from 20)
+const DESKTOP_BOTTOM_MARGIN = 20; // Original bottom margin for desktop
 
 // Define upgrade icon mapping
 const UPGRADE_ICON_MAP: { [key: string]: string } = {
@@ -56,11 +59,23 @@ export default class UpgradeUI {
     private isVisible: boolean = false;
     private keyListeners: Phaser.Input.Keyboard.Key[] = [];
     private rerollText: Phaser.GameObjects.Text | null = null;
+    private isMobile: boolean = false;
+
+    // Helper to detect mobile devices
+    private detectMobile(): boolean {
+        const userAgent = navigator.userAgent.toLowerCase();
+        return /android|webos|iphone|ipad|ipod|blackberry|windows phone/i.test(userAgent) 
+            || (window.innerWidth <= 800);
+    }
 
     constructor(scene: Phaser.Scene, spacetimeClient: SpacetimeDBClient, localPlayerId: number) {
         this.scene = scene;
         this.spacetimeClient = spacetimeClient;
         this.localPlayerId = localPlayerId;
+        
+        // Detect if we're on a mobile device
+        this.isMobile = this.detectMobile();
+        console.log(`UpgradeUI initialized on ${this.isMobile ? 'mobile' : 'desktop'} device`);
         
         // Create container for all upgrade UI elements
         this.container = this.scene.add.container(0, 0);
@@ -97,7 +112,10 @@ export default class UpgradeUI {
         const camera = this.scene.cameras.main;
         if (camera) {
             this.container.x = camera.scrollX + camera.width / 2;
-            this.container.y = camera.scrollY + camera.height - CARD_HEIGHT / 2 - 20;
+            
+            // Use different vertical positioning based on device type
+            const bottomMargin = this.isMobile ? MOBILE_BOTTOM_MARGIN : DESKTOP_BOTTOM_MARGIN;
+            this.container.y = camera.scrollY + camera.height - (CARD_HEIGHT / 2) - bottomMargin;
         }
 
         // Check for number key presses
@@ -134,13 +152,18 @@ export default class UpgradeUI {
         this.cards.forEach(card => card.destroy());
         this.cards = [];
 
+        // Use different spacing for mobile
+        const effectiveCardWidth = this.isMobile ? CARD_WIDTH * CARD_SCALE_MOBILE : CARD_WIDTH * CARD_SCALE_DESKTOP;
+        const effectiveCardSpacing = this.isMobile ? CARD_SPACING / 2 : CARD_SPACING; // Even tighter spacing on mobile
+
         // Calculate total width of all cards with spacing
-        const totalWidth = (this.upgradeOptions.length * CARD_WIDTH) + ((this.upgradeOptions.length - 1) * CARD_SPACING);
-        const startX = -totalWidth / 2 + CARD_WIDTH / 2;
+        const totalWidth = (this.upgradeOptions.length * effectiveCardWidth) + 
+                          ((this.upgradeOptions.length - 1) * effectiveCardSpacing);
+        const startX = -totalWidth / 2 + effectiveCardWidth / 2;
 
         // Create a card for each option
         this.upgradeOptions.forEach((option, index) => {
-            const x = startX + (index * (CARD_WIDTH + CARD_SPACING));
+            const x = startX + (index * (effectiveCardWidth + effectiveCardSpacing));
             const card = this.createCard(x, 0, option, index);
             this.cards.push(card);
             this.container.add(card);
@@ -150,9 +173,12 @@ export default class UpgradeUI {
     private createCard(x: number, y: number, option: UpgradeOptionData, index: number): Phaser.GameObjects.Container {
         const card = this.scene.add.container(x, y);
         
+        // Use different scale based on device type
+        const cardScale = this.isMobile ? CARD_SCALE_MOBILE : CARD_SCALE_DESKTOP;
+        
         // Card background
         const background = this.scene.add.image(0, 0, 'card_blank');
-        background.setScale(CARD_SCALE);
+        background.setScale(cardScale);
         card.add(background);
         
         // Make card interactive
@@ -162,12 +188,12 @@ export default class UpgradeUI {
         background.on('pointerout', () => background.clearTint());
         
         // Add number text (1, 2, or 3)
-        const numberText = this.scene.add.text(0, background.height * CARD_SCALE, `${index + 1}`, {
-            fontSize: '48px',
+        const numberText = this.scene.add.text(0, background.height * cardScale, `${index + 1}`, {
+            fontSize: this.isMobile ? '36px' : '48px', // Smaller font on mobile
             fontFamily: 'Arial',
             color: '#ffffff',
             stroke: '#000000',
-            strokeThickness: 4
+            strokeThickness: this.isMobile ? 3 : 4 // Reduced stroke thickness on mobile
         });
         numberText.setOrigin(0.5);
         card.add(numberText);
@@ -176,21 +202,22 @@ export default class UpgradeUI {
         const upgradeType = option.upgradeType.tag;
         const iconKey = UPGRADE_ICON_MAP[upgradeType] || 'white_pixel';
         
-        // Add upgrade icon
-        const icon = this.scene.add.image(0, -20, iconKey);
-        icon.setScale(0.8);
+        // Add upgrade icon - position higher on mobile
+        const iconY = this.isMobile ? -10 : -20;
+        const icon = this.scene.add.image(0, iconY, iconKey);
+        icon.setScale(this.isMobile ? 0.65 : 0.8); // Smaller icon on mobile
         card.add(icon);
         
-        // Create upgrade text
+        // Create upgrade text - position higher on mobile
         let upgradeText = this.getUpgradeDescription(option);
-        const descText = this.scene.add.text(0, background.height * CARD_SCALE * 0.28, upgradeText, {
-            fontSize: '18px',
+        const descText = this.scene.add.text(0, background.height * cardScale * 0.28, upgradeText, {
+            fontSize: this.isMobile ? '16px' : '18px', // Smaller font on mobile
             fontFamily: 'Arial',
             color: '#ffffff',
             stroke: '#000000',
-            strokeThickness: 3,
+            strokeThickness: this.isMobile ? 2 : 3, // Reduced stroke thickness on mobile
             align: 'center',
-            wordWrap: { width: background.width * CARD_SCALE * 0.8 }
+            wordWrap: { width: background.width * cardScale * 0.85 } // Slightly wider text area
         });
         descText.setOrigin(0.5);
         card.add(descText);

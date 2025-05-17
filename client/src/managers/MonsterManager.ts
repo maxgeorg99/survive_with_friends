@@ -767,7 +767,6 @@ export default class MonsterManager {
     private getMonsterTypeName(bestiaryId: any): string {
         // Check if bestiaryId is an object with a tag property (from autobindings)
         if (bestiaryId && typeof bestiaryId === 'object' && 'tag' in bestiaryId) {
-            console.log(`Getting monster type from tag: ${bestiaryId.tag}`);
             return bestiaryId.tag;
         }
         
