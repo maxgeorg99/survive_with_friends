@@ -2,14 +2,32 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Vibe Survivors</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #333; }
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: #333; 
+            height: 100%; 
+            position: fixed;
+            width: 100%;
+        }
+        
+        /* Fix for input fields on mobile */
+        input, button {
+            font-size: 16px; /* Prevent zoom on iOS */
+        }
+        
+        /* Style to keep input visible during keyboard display */
+        .keyboard-open .login-input-container {
+            position: fixed !important;
+            top: 20px !important;
+        }
     </style>
 </head>
 <body>
     <div id="gameContainer"></div>
     <script type="module" src="/src/main.ts"></script>
 </body>
-</html> 
+</html>

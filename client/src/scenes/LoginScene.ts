@@ -14,6 +14,7 @@ export default class LoginScene extends Phaser.Scene {
     private nameButton!: HTMLButtonElement;
     private errorText!: Phaser.GameObjects.Text;
     private loginContainer!: Phaser.GameObjects.Container;
+    private nameInputContainer!: HTMLDivElement; // Added container for input field
 
     constructor() {
         super('LoginScene');
@@ -96,7 +97,7 @@ export default class LoginScene extends Phaser.Scene {
     
     private createHTMLElements() {
         // Remove any existing elements
-        const existingInput = document.getElementById('login-name-input');
+        const existingInput = document.getElementById('login-name-input-container');
         if (existingInput) existingInput.remove();
         
         const existingButtons = document.querySelectorAll('.login-button');
@@ -104,46 +105,60 @@ export default class LoginScene extends Phaser.Scene {
         
         const isMobile = isMobileDevice();
         
+        // Create a wrapper container for the input field and button
+        // This provides better positioning stability when the keyboard opens
+        this.nameInputContainer = document.createElement('div');
+        this.nameInputContainer.id = 'login-name-input-container';
+        this.nameInputContainer.className = 'login-input-container'; // Add class for CSS targeting
+        this.nameInputContainer.style.position = 'absolute';
+        this.nameInputContainer.style.left = '50%';
+        this.nameInputContainer.style.transform = 'translateX(-50%)';
+        this.nameInputContainer.style.width = isMobile ? '80%' : '300px';
+        this.nameInputContainer.style.maxWidth = '300px';
+        this.nameInputContainer.style.display = 'none'; // Initially hidden
+        this.nameInputContainer.style.zIndex = '1000'; // Ensure it's above other elements
+        
+        // Important: use a fixed position that won't be affected by viewport changes
+        this.nameInputContainer.style.top = isMobile ? '60px' : `${window.innerHeight/2 - 25}px`;
+        
+        document.body.appendChild(this.nameInputContainer);
+        
         // Create name input
         this.nameInput = document.createElement('input');
         this.nameInput.id = 'login-name-input';
         this.nameInput.type = 'text';
         this.nameInput.placeholder = 'Enter your name';
         this.nameInput.maxLength = 16;
-        this.nameInput.style.position = 'absolute';
+        this.nameInput.style.width = '100%';
         this.nameInput.style.fontFamily = 'Arial';
-        this.nameInput.style.fontSize = isMobile ? getResponsiveFontSize(18) : '20px';
+        this.nameInput.style.fontSize = '16px'; // Fixed font size to prevent iOS zoom
         this.nameInput.style.padding = isMobile ? '12px' : '10px';
-        this.nameInput.style.width = isMobile ? '80%' : '300px';
-        this.nameInput.style.maxWidth = '300px';
         this.nameInput.style.textAlign = 'center';
         this.nameInput.style.borderRadius = '4px';
-        this.nameInput.style.display = 'none';
-        // Use transform for perfect centering
-        this.nameInput.style.left = '50%';
-        this.nameInput.style.transform = 'translateX(-50%)';
-        document.body.appendChild(this.nameInput);
+        this.nameInput.style.marginBottom = '15px';
+        this.nameInput.style.boxSizing = 'border-box';
+        this.nameInput.style.border = '2px solid #34495e';
+        this.nameInput.style.backgroundColor = '#fff'; // Ensure visible background
+        // Add to the container instead of directly to body
+        this.nameInputContainer.appendChild(this.nameInput);
         
         // Create Set Name button
         this.nameButton = document.createElement('button');
         this.nameButton.textContent = 'Set Name';
         this.nameButton.className = 'login-button';
-        this.nameButton.style.position = 'absolute';
+        this.nameButton.style.width = '100%';
+        this.nameButton.style.boxSizing = 'border-box';
         this.nameButton.style.fontFamily = 'Arial';
-        this.nameButton.style.fontSize = isMobile ? getResponsiveFontSize(18) : '20px';
+        this.nameButton.style.fontSize = '16px'; // Fixed font size
         this.nameButton.style.padding = isMobile ? '14px 20px' : '10px 20px';
-        this.nameButton.style.width = isMobile ? '200px' : '150px'; 
         this.nameButton.style.borderRadius = '4px';
         this.nameButton.style.backgroundColor = '#4CAF50';
         this.nameButton.style.color = 'white';
         this.nameButton.style.border = 'none';
         this.nameButton.style.cursor = 'pointer';
-        this.nameButton.style.display = 'none';
         this.nameButton.style.textAlign = 'center';
-        // Use transform for perfect centering
-        this.nameButton.style.left = '50%';
-        this.nameButton.style.transform = 'translateX(-50%)';
-        document.body.appendChild(this.nameButton);
+        // Add to the container instead of directly to body
+        this.nameInputContainer.appendChild(this.nameButton);
         
         // Add event listeners
         this.nameButton.addEventListener('click', () => this.setPlayerName());
@@ -153,16 +168,20 @@ export default class LoginScene extends Phaser.Scene {
             }
         });
         
-        // Position elements initially
-        this.positionHTMLElements();
+        // Add focus/blur handlers to detect keyboard appearance on mobile
+        if (isMobile) {
+            this.nameInput.addEventListener('focus', () => {
+                document.body.classList.add('keyboard-open');
+            });
+            
+            this.nameInput.addEventListener('blur', () => {
+                document.body.classList.remove('keyboard-open');
+            });
+        }
     }
     
     private positionHTMLElements() {
-        const { height } = this.scale;
-        
-        // Only need to set vertical position, horizontal is handled by transform
-        this.nameInput.style.top = `${height/2 - 25}px`;
-        this.nameButton.style.top = `${height/2 + 40}px`;
+        // No need to reposition - we're using fixed positioning now
     }
     
     private handleResize() {
@@ -190,8 +209,11 @@ export default class LoginScene extends Phaser.Scene {
             }
         }
         
-        // Recreate HTML elements with new sizes
-        this.createHTMLElements();
+        // Don't recreate elements on resize - this could be causing the issue
+        // Only recreate if needed (e.g., if they don't exist)
+        if (!document.getElementById('login-name-input-container')) {
+            this.createHTMLElements();
+        }
     }
     
     private registerEventListeners() {
@@ -295,13 +317,21 @@ export default class LoginScene extends Phaser.Scene {
     }
     
     private hideAllInputs() {
-        this.nameInput.style.display = 'none';
-        this.nameButton.style.display = 'none';
+        if (this.nameInputContainer) {
+            this.nameInputContainer.style.display = 'none';
+        }
     }
     
     private showNameInput() {
-        this.nameInput.style.display = 'block';
-        this.nameButton.style.display = 'block';
+        if (this.nameInputContainer) {
+            this.nameInputContainer.style.display = 'block';
+            // Focus on the input field so mobile keyboard appears
+            setTimeout(() => {
+                if (this.nameInput) {
+                    this.nameInput.focus();
+                }
+            }, 300); // Short delay to ensure the input is visible
+        }
     }
     
     private showError(message: string) {
@@ -328,30 +358,19 @@ export default class LoginScene extends Phaser.Scene {
             let buttonElements = [];
             
             // Method 1: Our class references
-            if (this.nameInput) inputElements.push(this.nameInput);
-            if (this.nameButton) buttonElements.push(this.nameButton);
+            if (this.nameInputContainer) inputElements.push(this.nameInputContainer);
             
             // Method 2: Query by ID
-            const inputById = document.getElementById('login-name-input');
-            if (inputById) inputElements.push(inputById);
+            const containerById = document.getElementById('login-name-input-container');
+            if (containerById) inputElements.push(containerById);
             
             // Method 3: Query by class
             document.querySelectorAll('.login-button').forEach(el => buttonElements.push(el));
             
-            // Method 4: Find all inputs and buttons that might be related
-            document.querySelectorAll('input[type="text"], button').forEach(el => {
-                if (el.id === 'login-name-input' || 
-                    (el as HTMLElement).className === 'login-button' ||
-                    (el.parentElement && el.parentElement.id === 'login-form')) {
-                    if (el.tagName === 'INPUT') inputElements.push(el);
-                    if (el.tagName === 'BUTTON') buttonElements.push(el);
-                }
-            });
-            
             // Remove all found elements
             inputElements.forEach(el => {
                 if (el && el.parentNode) {
-                    console.log("Removing login input element:", el.id);
+                    console.log("Removing login input container element:", el.id);
                     el.remove();
                 }
             });
@@ -378,20 +397,16 @@ export default class LoginScene extends Phaser.Scene {
         
         try {
             // Immediately hide any input elements we might have reference to
-            if (this.nameInput) {
-                this.nameInput.style.display = 'none';
-            }
-            
-            if (this.nameButton) {
-                this.nameButton.style.display = 'none';
+            if (this.nameInputContainer) {
+                this.nameInputContainer.style.display = 'none';
             }
             
             // Find ALL possible login elements in the document and remove them
             // By ID
-            const nameInput = document.getElementById('login-name-input');
-            if (nameInput) {
-                console.log("Force-removing login input by ID");
-                nameInput.remove();
+            const nameInputContainer = document.getElementById('login-name-input-container');
+            if (nameInputContainer) {
+                console.log("Force-removing login input container by ID");
+                nameInputContainer.remove();
             }
             
             // By class name
