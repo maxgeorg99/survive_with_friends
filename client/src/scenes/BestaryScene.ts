@@ -834,12 +834,12 @@ export default class BestaryScene extends Phaser.Scene {
             this.monstersList.style.top = `${height * 0.28}px`; // Below the tabs
             this.monstersList.style.width = '90%';
             this.monstersList.style.maxWidth = '400px';
-            this.monstersList.style.maxHeight = '150px'; // Smaller height on mobile
+            this.monstersList.style.maxHeight = '400px'; // Increased height for better visibility on mobile
             this.monstersList.style.transform = 'translateX(-50%)';
             
             // Position monster details panel below the list (smaller and more mobile-friendly)
             this.monsterDetailsPanel.style.left = '50%';
-            this.monsterDetailsPanel.style.top = `${height * 0.28 + 170}px`; // Below monster list
+            this.monsterDetailsPanel.style.top = `${height * 0.28 + 320}px`; // Adjusted to account for taller monster list
             this.monsterDetailsPanel.style.transform = 'translateX(-50%)';
             this.monsterDetailsPanel.style.width = '90%';
             this.monsterDetailsPanel.style.maxWidth = '350px'; // Smaller max width for mobile
