@@ -513,24 +513,32 @@ export default class ClassSelectScene extends Phaser.Scene {
     }
     
     private showClassInfoModal(classType: PlayerClass) {
-        if (!isMobileDevice() || !this.classInfoPanel) return;
+        if (!this.classInfoPanel) return;
         
-        const overlay = document.getElementById('modal-overlay');
-        if (!overlay) return;
-        
-        // Position the panel in the center of the screen
-        this.classInfoPanel.style.left = '50%';
-        this.classInfoPanel.style.top = '50%';
-        this.classInfoPanel.style.transform = 'translate(-50%, -50%)';
-        this.classInfoPanel.style.zIndex = '1001';
-        this.classInfoPanel.style.width = '85%';
-        this.classInfoPanel.style.maxWidth = '400px';
-        this.classInfoPanel.style.maxHeight = '80%';
-        this.classInfoPanel.style.overflowY = 'auto';
-        
-        // Show the overlay and panel
-        overlay.style.display = 'block';
-        this.classInfoPanel.style.display = 'block';
+        if (isMobileDevice()) {
+            // Mobile specific panel positioning
+            const overlay = document.getElementById('modal-overlay');
+            if (!overlay) return;
+            
+            // Position the panel in the center of the screen for mobile
+            this.classInfoPanel.style.left = '50%';
+            this.classInfoPanel.style.top = '50%';
+            this.classInfoPanel.style.transform = 'translate(-50%, -50%)';
+            this.classInfoPanel.style.zIndex = '1001';
+            this.classInfoPanel.style.width = '85%';
+            this.classInfoPanel.style.maxWidth = '400px';
+            this.classInfoPanel.style.maxHeight = '80%';
+            this.classInfoPanel.style.overflowY = 'auto';
+            
+            // Show the overlay and panel
+            overlay.style.display = 'block';
+            this.classInfoPanel.style.display = 'block';
+        } else {
+            // Desktop specific panel positioning - we handle this in selectClass method
+            // This is shown automatically when selecting a class on desktop
+            this.classInfoPanel.style.display = 'block';
+            this.positionHTMLElements(); // Ensure proper positioning
+        }
     }
     
     private hideClassInfoModal() {
@@ -911,11 +919,6 @@ export default class ClassSelectScene extends Phaser.Scene {
         const baseClassName = CLASS_NAME_MAP[classType.tag as keyof typeof CLASS_NAME_MAP];
         const info = CLASS_INFO[baseClassName as ClassNames];
 
-        // On desktop, show and update the info panel
-        if (!isMobileDevice()) {
-            this.classInfoPanel.style.display = 'block';
-        }
-        
         // Update button content before updating panel
         const originalCharName = this.getOriginalCharacterName(baseClassName);
         const isAltVersion = this.selectedAltVersions[originalCharName] || false;
@@ -932,7 +935,13 @@ export default class ClassSelectScene extends Phaser.Scene {
             textElement.textContent = isAltVersion ? info.altName : originalCharName;
         }
         
-        // Update the info panel
+        // On desktop, update and show the info panel
+        if (!isMobileDevice() && this.classInfoPanel) {
+            this.classInfoPanel.style.display = 'block';
+            this.positionHTMLElements(); // Ensure proper positioning
+        }
+        
+        // Update the info panel content
         this.updateClassInfoPanel(baseClassName, classType, info);
     }
 
