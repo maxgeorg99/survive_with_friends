@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import PlayerClass from '../autobindings/player_class_type';
 import { localization } from '../utils/localization';
+import { isMobileDevice, getResponsiveFontSize, getResponsiveDimensions } from '../utils/responsive';
 
 interface PrologSceneData {
     classType: PlayerClass;
@@ -15,10 +16,11 @@ export default class PrologScene extends Phaser.Scene {
     private background!: Phaser.GameObjects.Image;
     private container!: Phaser.GameObjects.Container;
     private textBox!: Phaser.GameObjects.Graphics;
-    private frameGraphics!: Phaser.GameObjects.Graphics;
     private storyText!: Phaser.GameObjects.Text;
-    private nextButton!: Phaser.GameObjects.Text;
+    private nextIndicator!: Phaser.GameObjects.Text;
     private languageSelector!: HTMLSelectElement;
+    private indicatorTween!: Phaser.Tweens.Tween;
+    private isSkipping: boolean = false;
 
     private readonly storyKeys = [
         "story.intro.1",
@@ -43,12 +45,14 @@ export default class PrologScene extends Phaser.Scene {
         this.load.image('scene_1', 'assets/scene_1.png');
         this.load.image('scene_2', 'assets/scene_2.png');
         this.load.image('scene_3', 'assets/scene_3.png');
+        
+        // We're not using an image for the indicator now
     }
 
     private createLanguageSelector() {
         const languageSelector = document.createElement('select');
         languageSelector.style.position = 'absolute';
-        languageSelector.style.bottom = '20px';
+        languageSelector.style.top = '20px';
         languageSelector.style.right = '20px';
         languageSelector.style.padding = '8px';
         languageSelector.style.fontFamily = 'Arial';
@@ -174,46 +178,130 @@ export default class PrologScene extends Phaser.Scene {
         const scale = Math.min(scaleX, scaleY);
         this.background.setScale(scale);
 
-        // Create large text overlay with semi-transparent background
-        this.storyText = this.add.text(width * 0.1, height * 0.65, '', {
-            fontFamily: 'Arial',
-            fontSize: '24px',
-            color: '#ffffff',
-            backgroundColor: '#000000CC', // More opaque background
-            padding: { x: 40, y: 30 },
-            wordWrap: { width: width * 0.8 },
-            lineSpacing: 20
-        });
-
-        // Create next button
-        this.nextButton = this.add.text(
-            width - 80, 
-            height - 80,
-            '▼', 
-            {
-                fontFamily: 'Arial',
-                fontSize: '24px',
-                color: '#ffffff',
-                backgroundColor: '#000000CC',
-                padding: { x: 40, y: 30 }
-            }
-        )
-        .setOrigin(1, 1)
-        .setInteractive({ useHandCursor: true })
-        .on('pointerdown', () => this.handleNext())
-        .on('pointerover', () => this.nextButton.setAlpha(0.7))
-        .on('pointerout', () => this.nextButton.setAlpha(1));
-
-        // Add keyboard input
-        this.input.keyboard?.on('keydown-ENTER', () => this.handleNext());
-        this.input.keyboard?.on('keydown-SPACE', () => this.handleNext());
+        // Create a stylish dialog box container
+        this.createDialogBox();
 
         // Create language selector
         this.createLanguageSelector();
 
+        // Add keyboard input
+        this.input.keyboard?.on('keydown-ENTER', () => this.handleNext());
+        this.input.keyboard?.on('keydown-SPACE', () => this.handleNext());
+        
+        // Add touch input for the entire screen
+        this.input.on('pointerdown', () => this.handleNext());
+
         // Display first text and background
         this.displayNextText();
         this.updateBackground();
+    }
+
+    private createDialogBox() {
+        const { width, height } = this.scale;
+        const isMobile = isMobileDevice();
+        
+        // Container for all dialog elements
+        this.container = this.add.container(0, 0);
+        
+        // Create a temporary text object to measure the text size
+        const textPadding = isMobile ? 12 : 25;
+        const fontSize = isMobile ? 16 : 24;
+        const responsiveFontSize = parseInt(getResponsiveFontSize(fontSize).replace('px', ''));
+        const boxWidth = isMobile ? width * 0.9 : width * 0.85;
+        
+        // Create a temporary text to calculate height
+        const tempText = this.add.text(
+            0, 0, 
+            localization.getText(this.storyKeys[this.storyIndex]), 
+            {
+                fontFamily: '"Trebuchet MS", "Arial", sans-serif',
+                fontSize: `${responsiveFontSize}px`,
+                color: '#ffffff',
+                wordWrap: { width: boxWidth - textPadding * 2 },
+                lineSpacing: isMobile ? 3 : 8
+            }
+        );
+        
+        // Calculate dynamic box height based on text content
+        // Get text height + padding on each side + minimum space for indicator
+        let textHeight = tempText.height + textPadding * 2;
+        // Ensure minimum height (for very short messages)
+        const minHeight = isMobile ? height * 0.15 : height * 0.18;
+        // Ensure maximum height (for very long messages)
+        const maxHeight = isMobile ? height * 0.25 : height * 0.28;
+        const boxHeight = Math.max(minHeight, Math.min(maxHeight, textHeight));
+        
+        // Remove the temporary text object since we no longer need it
+        tempText.destroy();
+        
+        const boxY = height - boxHeight * 0.65;
+        const boxX = width * 0.5;
+        const cornerRadius = isMobile ? 8 : 16;
+        
+        // Create darker semi-transparent textbox (Zelda-style)
+        this.textBox = this.add.graphics();
+        this.textBox.fillStyle(0x1a2942, 0.85);
+        this.textBox.fillRoundedRect(
+            boxX - boxWidth / 2,
+            boxY - boxHeight / 2,
+            boxWidth,
+            boxHeight,
+            cornerRadius
+        );
+        this.container.add(this.textBox);
+
+        // Add a decorative border
+        const border = this.add.graphics();
+        border.lineStyle(3, 0xffffff, 0.4);
+        border.strokeRoundedRect(
+            boxX - boxWidth / 2 + 3,
+            boxY - boxHeight / 2 + 3,
+            boxWidth - 6,
+            boxHeight - 6,
+            cornerRadius - 2
+        );
+        this.container.add(border);
+        
+        // Create the story text - white text for contrast with dark background
+        this.storyText = this.add.text(
+            boxX - boxWidth / 2 + textPadding,
+            boxY - boxHeight / 2 + textPadding,
+            '', 
+            {
+                fontFamily: '"Trebuchet MS", "Arial", sans-serif',
+                fontSize: `${responsiveFontSize}px`,
+                color: '#ffffff',
+                wordWrap: { width: boxWidth - textPadding * 2 },
+                lineSpacing: isMobile ? 3 : 8
+            }
+        );
+        this.container.add(this.storyText);
+
+        // Create a text-based triangle indicator (▼) at the bottom right - smaller on mobile
+        this.nextIndicator = this.add.text(
+            boxX + boxWidth / 2 - textPadding,
+            boxY + boxHeight / 2 - textPadding,
+            '▼',
+            {
+                fontFamily: 'Arial',
+                fontSize: `${Math.floor(responsiveFontSize * (isMobile ? 1.0 : 1.2))}px`,
+                color: '#ffffff'
+            }
+        ).setOrigin(1, 1);
+        
+        this.container.add(this.nextIndicator);
+        
+        // Add bouncing animation for the indicator
+        this.indicatorTween = this.tweens.add({
+            targets: this.nextIndicator,
+            y: '+=5',
+            duration: 800,
+            yoyo: true,
+            repeat: -1
+        });
+        
+        // Initially hide the next indicator until typing is complete
+        this.nextIndicator.visible = false;
     }
 
     private updateBackground() {
@@ -270,24 +358,38 @@ export default class PrologScene extends Phaser.Scene {
         if (!text) {
             console.error(`Translation missing for key: ${key}`);
             this.storyText.setText('Translation missing for: ' + key);
+            this.nextIndicator.visible = true;
             return;
         }
 
-        this.isTyping = true;
-        this.nextButton.setText('▼');
+        // Recreate the dialog box to adjust to the new text size
+        if (this.container) {
+            this.container.removeAll(true);
+            this.createDialogBox();
+        }
 
-        let currentChar = 0;
+        this.isTyping = true;
+        this.isSkipping = false;
+        this.nextIndicator.visible = false;
         this.storyText.setText('');
 
-        this.typingTimer = this.time.addEvent({
-            delay: 40,
-            callback: () => {
-                this.storyText.text += text[currentChar];
-                currentChar++;
+        // Calculate typing speed based on text length (faster for longer text)
+        const baseDelay = isMobileDevice() ? 30 : 40;
+        const typingDelay = Math.max(10, baseDelay - (text.length / 100));
 
-                if (currentChar === text.length) {
+        let currentChar = 0;
+        this.typingTimer = this.time.addEvent({
+            delay: typingDelay,
+            callback: () => {
+                // Add character-by-character with a subtle typing sound effect
+                if (currentChar < text.length) {
+                    this.storyText.text += text[currentChar];
+                    currentChar++;
+                }
+
+                if (currentChar >= text.length) {
                     this.isTyping = false;
-                    this.nextButton.setText('▼');
+                    this.nextIndicator.visible = true;
                 }
             },
             repeat: text.length - 1
@@ -295,16 +397,17 @@ export default class PrologScene extends Phaser.Scene {
     }
 
     private handleNext() {
-        if (this.isTyping) {
+        if (this.isTyping && !this.isSkipping) {
             // Skip typing animation
+            this.isSkipping = true;
             if (this.typingTimer) {
                 this.typingTimer.remove();
             }
             const key = this.storyKeys[this.storyIndex];
             this.storyText.setText(localization.getText(key));
             this.isTyping = false;
-            this.nextButton.setText('▼');
-        } else {
+            this.nextIndicator.visible = true;
+        } else if (!this.isTyping) {
             const previousIndex = this.storyIndex;
             this.storyIndex++;
 
@@ -320,27 +423,29 @@ export default class PrologScene extends Phaser.Scene {
             } else {
                 // No more story text, proceed to next scene
                 // Clean up DOM before transitioning
-                try {
-                    // Remove class select container if present
-                    const classContainer = document.getElementById('class-select-container');
-                    if (classContainer && classContainer.parentNode) {
-                        classContainer.remove();
-                    }
-                    // Remove all class select buttons
-                    document.querySelectorAll('.class-select-button').forEach(el => {
-                        if (el && el.parentNode) el.remove();
-                    });
-                    // Remove confirm button
-                    document.querySelectorAll('button').forEach(el => {
-                        const content = (el as HTMLElement).textContent;
-                        if (content && content.includes('Confirm Selection') && el.parentNode) {
-                            el.remove();
-                        }
-                    });
-                } catch (e) {
-                    console.error('Error in PrologScene cleanupHTMLElements (end):', e);
-                }
+                this.cleanupHTMLElements();
                 this.scene.start('ClassSelectScene');
+            }
+        }
+    }
+
+    resize() {
+        // Re-create dialog box with new dimensions
+        if (this.container) {
+            this.container.removeAll(true);
+            this.createDialogBox();
+            
+            // Restart typing animation with current text if needed
+            if (this.storyIndex < this.storyKeys.length) {
+                const key = this.storyKeys[this.storyIndex];
+                const text = localization.getText(key);
+                
+                if (this.isTyping) {
+                    this.displayNextText();
+                } else {
+                    this.storyText.setText(text);
+                    this.nextIndicator.visible = true;
+                }
             }
         }
     }
@@ -349,6 +454,12 @@ export default class PrologScene extends Phaser.Scene {
         // Clean up event listeners
         this.input.keyboard?.off('keydown-ENTER');
         this.input.keyboard?.off('keydown-SPACE');
+        this.input.off('pointerdown');
+        
+        // Stop tweens
+        if (this.indicatorTween) {
+            this.indicatorTween.stop();
+        }
         
         // Clean up HTML elements
         this.cleanupHTMLElements();
