@@ -93,15 +93,15 @@ export default class AchievementScene extends Phaser.Scene {
         this.achievementContainer.style.transform = 'translate(-50%, -50%)';
         
         if (isMobile) {
-            // Mobile-friendly styles
-            this.achievementContainer.style.width = '90%';
-            this.achievementContainer.style.maxWidth = '450px';
-            this.achievementContainer.style.maxHeight = '60vh';
+            // Mobile-friendly styles - reduced width and height
+            this.achievementContainer.style.width = '85%'; // Reduced from 90%
+            this.achievementContainer.style.maxWidth = '400px'; // Reduced from 450px
+            this.achievementContainer.style.maxHeight = '50vh'; // Reduced from 60vh
             this.achievementContainer.style.fontSize = getResponsiveFontSize(14);
         } else {
-            // Desktop styles
-            this.achievementContainer.style.width = '700px';
-            this.achievementContainer.style.maxHeight = '500px';
+            // Desktop styles - reduced width and height
+            this.achievementContainer.style.width = '600px'; // Reduced from 700px
+            this.achievementContainer.style.maxHeight = '450px'; // Reduced from 500px
             this.achievementContainer.style.fontSize = '16px';
         }
         
