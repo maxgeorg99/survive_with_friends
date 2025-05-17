@@ -89,5 +89,54 @@
     "bestiary.monster.FinalBossSimonPhase2.tips": "- Er erschafft jetzt mehrere Energieklone\n- Seine Angriffsmuster werden komplexer\n- Konzentriere dich auf den echten Simon, erkennbar an seiner einzigartigen Aura",
     "bestiary.monster.Scorpion.name": "Skorpion",
     "bestiary.monster.Scorpion.description": "Giftige Gliederfüßer mit tödlichen Stacheln. Ihre Giftangriffe können selbst die wendigsten Abenteurer vorübergehend verlangsamen.",
-    "bestiary.monster.Scorpion.tips": "- Skorpione setzen einen giftigen Stachelangriff ein, der die Bewegungsgeschwindigkeit reduziert\n- Der Gifteffekt ist vorübergehend, kann aber in Schwärmen tödlich sein\n- Halte Abstand, um ihre Nahkampfangriffe zu vermeiden\n- Achte auf das hellgrüne Projektil - das ist der giftige Stich"
+    "bestiary.monster.Scorpion.tips": "- Skorpione setzen einen giftigen Stachelangriff ein, der die Bewegungsgeschwindigkeit reduziert\n- Der Gifteffekt ist vorübergehend, kann aber in Schwärmen tödlich sein\n- Halte Abstand, um ihre Nahkampfangriffe zu vermeiden\n- Achte auf das hellgrüne Projektil - das ist der giftige Stich",
+    
+    "achievement.SlimeSlayer.title": "Schleimjäger",
+    "achievement.SlimeSlayer.description": "Besiege 100 Schleime",
+    
+    "achievement.RatSlayer.title": "Rattenjäger",
+    "achievement.RatSlayer.description": "Besiege 100 Ratten",
+    
+    "achievement.WormSlayer.title": "Wurmjäger",
+    "achievement.WormSlayer.description": "Besiege 100 Würmer",
+    
+    "achievement.ScorpionSlayer.title": "Skorpionjäger",
+    "achievement.ScorpionSlayer.description": "Besiege 100 Skorpione",
+    
+    "achievement.OrcHunter.title": "Orkjäger",
+    "achievement.OrcHunter.description": "Besiege 100 Orks",
+    
+    "achievement.DefeatJorge.title": "Jorge-Bezwinger",
+    "achievement.DefeatJorge.description": "Besiege Boss Jorge",
+    
+    "achievement.DefeatBjörn.title": "Björn-Bezwinger",
+    "achievement.DefeatBjörn.description": "Besiege Boss Björn",
+    
+    "achievement.DefeatSimon.title": "Simon-Bezwinger",
+    "achievement.DefeatSimon.description": "Besiege Boss Simon",
+    
+    "achievement.WeaponArsenal.title": "Waffensammler",
+    "achievement.WeaponArsenal.description": "Sammle 5 verschiedene Waffen",
+    
+    "achievement.Expert.title": "Erfahrener Überlebender",
+    "achievement.Expert.description": "Erreiche Level 10",
+    
+    "achievement.Survivor.title": "Ultimativer Überlebender",
+    "achievement.Survivor.description": "Gewinne das Spiel",
+    
+    "quest.survive.title": "Tils Herausforderung",
+    "quest.survive.description": "Tracke 5 Laufeinheiten",
+    "quest.survive.reward": "Schalte Fußball-Til frei",
+    
+    "quest.defeat.title": "Marcs Herausforderung",
+    "quest.defeat.description": "Gewinne eine Kartenspiel-Runde mit den Jungs",
+    "quest.defeat.reward": "Schalte Yugioh-Marc frei",
+    
+    "quest.level.title": "Max' Herausforderung",
+    "quest.level.description": "Tracke 5 Fitnessstudio-Besuche",
+    "quest.level.reward": "Schalte Fitness-Max frei",
+    
+    "quest.gems.title": "Chris' Herausforderung",
+    "quest.gems.description": "Tracke die Ernährung für 5 Tage",
+    "quest.gems.reward": "Schalte Koch-Chris frei"
 }

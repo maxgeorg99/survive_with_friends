@@ -21,7 +21,7 @@ public static partial class Module
         FinalBossSimonPhase2
     }
 
-    [SpacetimeDB.Table(Name = "bestiary")]
+    [SpacetimeDB.Table(Name = "bestiary", Public = true)]
     public partial struct Bestiary
     {
         [PrimaryKey]

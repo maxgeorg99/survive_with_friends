@@ -110,7 +110,9 @@ class SpacetimeDBClient {
                 "SELECT * FROM game_state",
                 "SELECT * FROM boss_spawn_timer",
                 "SELECT * FROM boss_attack_timer",
-                "SELECT * FROM player_poison_effect"
+                "SELECT * FROM player_poison_effect",
+                "SELECT * FROM achievements",
+                "SELECT * FROM bestiary",
             ]);
 
         // Register table event callbacks

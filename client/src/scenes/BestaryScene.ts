@@ -3,7 +3,7 @@ import { localization } from '../utils/localization';
 import { MonsterType } from '../autobindings/monster_type_type';
 import { isMobileDevice, getResponsiveFontSize, applyResponsiveStyles, getResponsiveDimensions } from '../utils/responsive';
 
-export default class BestaryScene extends Phaser.Scene {
+export default class BestaryScene extends Phaser.Scene {    private spacetimeDBClient: SpacetimeDBClient;
     // UI elements
     private titleText!: Phaser.GameObjects.Text;
     private descriptionText!: Phaser.GameObjects.Text;
@@ -38,7 +38,7 @@ export default class BestaryScene extends Phaser.Scene {
     };
 
     constructor() {
-        super('BestaryScene');
+        super('BestaryScene');        this.spacetimeDBClient = (window as any).spacetimeDBClient;
     }
 
     init() {
@@ -733,29 +733,37 @@ export default class BestaryScene extends Phaser.Scene {
             `;
         }
     }
-
-    // Get hardcoded monster stats - update these values manually if monster stats change in the backend
+    
     private getMonsterStats(monsterType: string): { hp: number, speed: number, damage: number, radius: number, exp: number } {
-        const monsterStats: Record<string, any> = {
-            "Rat": { hp: 10, speed: 160, damage: 1.0, radius: 24, exp: 1 },
-            "Slime": { hp: 25, speed: 100, damage: 1.5, radius: 30, exp: 2 },
-            "Orc": { hp: 50, speed: 140, damage: 2.0, radius: 40, exp: 5 },
-            "Wolf": { hp: 35, speed: 175, damage: 1.8, radius: 34, exp: 3 },
-            "Worm": { hp: 20, speed: 80, damage: 0.8, radius: 28, exp: 4 },
-            "Scorpion": { hp: 15, speed: 150, damage: 1.2, radius: 26, exp: 2 },
-            "FinalBossPhase1": { hp: 500, speed: 120, damage: 25, radius: 92, exp: 100 },
-            "FinalBossPhase2": { hp: 500, speed: 150, damage: 40, radius: 245, exp: 500 },
-            "FinalBossJorgePhase1": { hp: 500, speed: 120, damage: 25, radius: 92, exp: 100 },
-            "FinalBossJorgePhase2": { hp: 500, speed: 150, damage: 40, radius: 245, exp: 500 },
-            "FinalBossBjornPhase1": { hp: 500, speed: 120, damage: 25, radius: 92, exp: 100 },
-            "FinalBossBjornPhase2": { hp: 500, speed: 150, damage: 40, radius: 245, exp: 500 },
-            "FinalBossSimonPhase1": { hp: 500, speed: 120, damage: 25, radius: 92, exp: 100 },
-            "FinalBossSimonPhase2": { hp: 500, speed: 50, damage: 10, radius: 245, exp: 500 }
-        };
+        const ctx = this.spacetimeDBClient.sdkConnection;
         
-        return monsterStats[monsterType] || { hp: 0, speed: 0, damage: 0, radius: 0, exp: 0 };
+        if (!ctx || !ctx.db) {
+            console.error("Database connection not available");
+        }
+            for (const entry of ctx.db.bestiary.iter()) {
+            if (entry.monsterType.tag === monsterType) {
+                    return {
+                    hp: entry.maxHp,
+                    speed: entry.speed,
+                    damage: this.roundToOneDecimal(entry.atk),
+                    radius: entry.radius,
+                        exp: entry.exp
+                    };
+                }
+            }
+        return {
+            hp: 0,
+            speed: 0,
+            damage: 0,
+            radius: 0,
+            exp: 0
+        };        
     }
 
+    private roundToOneDecimal(value: number): number {
+        return Math.round(value * 10) / 10;
+    }
+    
     private createBackButton() {
         // Remove any existing button
         const existingButton = document.getElementById('bestiary-back-button');
@@ -892,32 +900,19 @@ export default class BestaryScene extends Phaser.Scene {
             // Position monsters list on the left
             this.monstersList.style.left = `${leftOffset}px`;
             this.monstersList.style.top = `${height * 0.20}px`;
-            this.monstersList.style.width = '220px';
-            this.monstersList.style.maxHeight = '500px';
             
             // Position monster details panel on the right
             this.monsterDetailsPanel.style.left = `${leftOffset + 220 + panelSpacing}px`;
             this.monsterDetailsPanel.style.top = `${height * 0.20}px`;
-            this.monsterDetailsPanel.style.width = '450px';
-            this.monsterDetailsPanel.style.maxHeight = '500px';
             
-            // Position back button in the bottom left
-            this.backButton.style.left = `${width * 0.1}px`;
-            this.backButton.style.top = `${height * 0.9}px`;
+            // Position back button at the bottom left
+            this.backButton.style.left = '20px';
+            this.backButton.style.bottom = '20px';
             
-            // Position phase toggle button for bosses
-            if (this.monsterDetailsPanel && this.monsterDetailsPanel.style.display !== 'none') {
-                const panelRect = this.monsterDetailsPanel.getBoundingClientRect();
-                this.phaseToggleButton.style.position = 'absolute';
-                this.phaseToggleButton.style.top = `${panelRect.top + 10}px`;
-                this.phaseToggleButton.style.left = `${panelRect.right - 120}px`;
-            } else {
-                const panelSpacing = 30;
-                const leftOffset = (width - (220 + panelSpacing + 450)) / 2;
-                this.phaseToggleButton.style.position = 'absolute';
-                this.phaseToggleButton.style.left = `${leftOffset + 220 + panelSpacing + 330}px`;
-                this.phaseToggleButton.style.top = `${height * 0.20 + 10}px`;
-            }
+            // Position phase toggle button in the top right of the details panel
+            this.phaseToggleButton.style.position = 'absolute';
+            this.phaseToggleButton.style.left = `${leftOffset + 220 + panelSpacing + 330}px`;
+            this.phaseToggleButton.style.top = `${height * 0.20 + 10}px`;
         }
         
         // Handle resize for the phase toggle button

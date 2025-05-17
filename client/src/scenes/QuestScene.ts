@@ -91,12 +91,28 @@ export default class QuestScene extends Phaser.Scene {
         this.questContainer.style.border = '2px solid #34495e';
         this.questContainer.style.padding = '20px';
 
-        // Add some example quests
+        // Define quests with localization keys
         const quests = [
-            { title: "Survive 5 Minutes", description: "Stay alive for 5 minutes", reward: "Unlock new upgrade options" },
-            { title: "Defeat 100 Monsters", description: "Slay 100 monsters in a single run", reward: "Increase max HP by 10%" },
-            { title: "Level Up 5 Times", description: "Reach level 5 in a single run", reward: "New attack pattern" },
-            { title: "Collect 50 Gems", description: "Gather 50 gems in one run", reward: "Bonus starting gold" }
+            { 
+                titleKey: "quest.survive.title", 
+                descriptionKey: "quest.survive.description", 
+                rewardKey: "quest.survive.reward" 
+            },
+            { 
+                titleKey: "quest.defeat.title", 
+                descriptionKey: "quest.defeat.description", 
+                rewardKey: "quest.defeat.reward" 
+            },
+            { 
+                titleKey: "quest.level.title", 
+                descriptionKey: "quest.level.description", 
+                rewardKey: "quest.level.reward" 
+            },
+            { 
+                titleKey: "quest.gems.title", 
+                descriptionKey: "quest.gems.description", 
+                rewardKey: "quest.gems.reward" 
+            }
         ];
 
         quests.forEach(quest => {
@@ -114,9 +130,9 @@ export default class QuestScene extends Phaser.Scene {
             const textSize = isMobile ? getResponsiveFontSize(14) : '16px';
 
             questElement.innerHTML = `
-                <h3 style="margin: 0 0 10px 0; font-size: ${titleSize}; color: #3498db;">${quest.title}</h3>
-                <p style="margin: 0 0 10px 0; color: #ecf0f1; font-size: ${textSize};">${quest.description}</p>
-                <p style="margin: 0; color: #2ecc71; font-size: ${textSize};">Reward: ${quest.reward}</p>
+                <h3 style="margin: 0 0 10px 0; font-size: ${titleSize}; color: #3498db;">${localization.getText(quest.titleKey)}</h3>
+                <p style="margin: 0 0 10px 0; color: #ecf0f1; font-size: ${textSize};">${localization.getText(quest.descriptionKey)}</p>
+                <p style="margin: 0; color: #2ecc71; font-size: ${textSize};">${localization.getText(quest.rewardKey)}</p>
             `;
 
             this.questContainer.appendChild(questElement);
@@ -133,18 +149,21 @@ export default class QuestScene extends Phaser.Scene {
         this.backButton.style.position = 'absolute';
         
         if (isMobile) {
-            // Mobile-friendly styles
-            this.backButton.style.top = '10px';
-            this.backButton.style.left = '10px';
+            // Mobile-friendly styles - position at bottom center
+            this.backButton.style.bottom = '20px';
+            this.backButton.style.left = '50%';
+            this.backButton.style.transform = 'translateX(-50%)';
+            this.backButton.style.top = 'auto'; // Use bottom instead of top
             this.backButton.style.padding = '12px 15px';
             this.backButton.style.fontSize = getResponsiveFontSize(16);
             // Increase touch target size for mobile
             this.backButton.style.minWidth = '80px';
             this.backButton.style.minHeight = '44px';
         } else {
-            // Desktop styles
-            this.backButton.style.top = '20px';
-            this.backButton.style.left = '20px';
+            // Desktop styles - position at bottom left
+            this.backButton.style.bottom = '40px';
+            this.backButton.style.left = '40px';
+            this.backButton.style.top = 'auto'; // Use bottom instead of top
             this.backButton.style.padding = '10px 20px';
             this.backButton.style.fontSize = '18px';
         }

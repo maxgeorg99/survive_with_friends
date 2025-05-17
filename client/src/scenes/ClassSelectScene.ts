@@ -87,6 +87,9 @@ export default class ClassSelectScene extends Phaser.Scene {
     private athleteButton!: HTMLButtonElement;
     private gourmandButton!: HTMLButtonElement;
     private bestiaryButton!: HTMLButtonElement;
+    private achievementsButton!: HTMLButtonElement; // New achievements button
+    private burgerMenuButton!: HTMLButtonElement; // Burger menu button for mobile
+    private burgerMenuContainer!: HTMLDivElement; // Container for burger menu options
     
     // State tracking
     private selectedClass: PlayerClass | null = null;
@@ -100,6 +103,7 @@ export default class ClassSelectScene extends Phaser.Scene {
         'Max': false,
         'Chris': false
     };
+    private isBurgerMenuOpen: boolean = false; // Track burger menu state
 
     constructor() {
         super('ClassSelectScene');
@@ -296,6 +300,168 @@ export default class ClassSelectScene extends Phaser.Scene {
         
         // Store reference for cleanup
         this.bestiaryButton = bestiaryButton;
+        
+        // Add achievements button below bestiary button
+        const achievementsButton = document.createElement('button');
+        achievementsButton.style.position = 'absolute';
+        achievementsButton.style.top = '170px'; // Position below bestiary button
+        achievementsButton.style.right = '50px';
+        achievementsButton.style.width = '180px';
+        achievementsButton.style.height = '50px';
+        achievementsButton.style.padding = '10px';
+        achievementsButton.style.backgroundColor = '#2c3e50';
+        achievementsButton.style.color = 'white';
+        achievementsButton.style.border = '2px solid #34495e';
+        achievementsButton.style.borderRadius = '5px';
+        achievementsButton.style.cursor = 'pointer';
+        achievementsButton.style.fontFamily = 'Arial';
+        achievementsButton.style.fontSize = '18px';
+        achievementsButton.style.transition = 'background-color 0.2s, border-color 0.2s';
+        achievementsButton.style.display = 'flex';
+        achievementsButton.style.alignItems = 'center';
+        achievementsButton.style.justifyContent = 'center';
+        achievementsButton.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+        achievementsButton.textContent = '🏆 Achievements';
+        
+        achievementsButton.addEventListener('mouseover', () => {
+            achievementsButton.style.backgroundColor = '#3498db';
+            achievementsButton.style.borderColor = '#2980b9';
+        });
+        
+        achievementsButton.addEventListener('mouseout', () => {
+            achievementsButton.style.backgroundColor = '#2c3e50';
+            achievementsButton.style.borderColor = '#34495e';
+        });
+        
+        achievementsButton.addEventListener('click', () => {
+            this.scene.start('AchievementScene');
+        });
+        
+        document.body.appendChild(achievementsButton);
+        
+        // Store reference for cleanup
+        this.achievementsButton = achievementsButton;
+        
+        // Add burger menu button for mobile
+        const burgerMenuButton = document.createElement('button');
+        burgerMenuButton.style.position = 'absolute';
+        burgerMenuButton.style.top = '20px';
+        burgerMenuButton.style.right = '20px';
+        burgerMenuButton.style.width = '50px';
+        burgerMenuButton.style.height = '50px';
+        burgerMenuButton.style.backgroundColor = '#2c3e50';
+        burgerMenuButton.style.border = '2px solid #34495e';
+        burgerMenuButton.style.borderRadius = '5px';
+        burgerMenuButton.style.cursor = 'pointer';
+        burgerMenuButton.style.zIndex = '1001';
+        burgerMenuButton.style.display = 'flex';
+        burgerMenuButton.style.flexDirection = 'column';
+        burgerMenuButton.style.justifyContent = 'center';
+        burgerMenuButton.style.alignItems = 'center';
+        
+        // Add burger icon (three horizontal lines)
+        for (let i = 0; i < 3; i++) {
+            const line = document.createElement('div');
+            line.style.width = '25px';
+            line.style.height = '3px';
+            line.style.backgroundColor = 'white';
+            line.style.margin = '3px 0';
+            burgerMenuButton.appendChild(line);
+        }
+        
+        // Create burger menu container (hidden by default)
+        const burgerMenuContainer = document.createElement('div');
+        burgerMenuContainer.style.position = 'absolute';
+        burgerMenuContainer.style.top = '80px';
+        burgerMenuContainer.style.right = '20px';
+        burgerMenuContainer.style.width = '200px';
+        burgerMenuContainer.style.backgroundColor = 'rgba(44, 62, 80, 0.95)';
+        burgerMenuContainer.style.color = 'white';
+        burgerMenuContainer.style.borderRadius = '8px';
+        burgerMenuContainer.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.2)';
+        burgerMenuContainer.style.zIndex = '1000';
+        burgerMenuContainer.style.display = 'none'; // Hidden by default
+        
+        // Add menu options
+        const menuOptions = [
+            { text: '📜 Quests', scene: 'QuestScene' },
+            { text: '🐺 Bestiary', scene: 'BestaryScene' },
+            { text: '🏆 Achievements', scene: 'AchievementScene' }
+        ];
+        
+        menuOptions.forEach(option => {
+            const menuButton = document.createElement('button');
+            menuButton.textContent = option.text;
+            menuButton.style.width = '100%';
+            menuButton.style.padding = '15px';
+            menuButton.style.backgroundColor = 'transparent';
+            menuButton.style.color = 'white';
+            menuButton.style.border = 'none';
+            menuButton.style.borderBottom = '1px solid #34495e';
+            menuButton.style.cursor = 'pointer';
+            menuButton.style.fontFamily = 'Arial';
+            menuButton.style.fontSize = '18px';
+            menuButton.style.transition = 'background-color 0.2s';
+            menuButton.style.textAlign = 'left';
+            
+            menuButton.addEventListener('mouseover', () => {
+                menuButton.style.backgroundColor = '#3498db';
+            });
+            
+            menuButton.addEventListener('mouseout', () => {
+                menuButton.style.backgroundColor = 'transparent';
+            });
+            
+            menuButton.addEventListener('click', () => {
+                if (option.scene === 'BestaryScene') {
+                    this.scene.start(option.scene, { spacetimeDBClient: this.spacetimeDBClient });
+                } else {
+                    this.scene.start(option.scene);
+                }
+            });
+            
+            burgerMenuContainer.appendChild(menuButton);
+        });
+        
+        // Add burger menu toggle functionality
+        burgerMenuButton.addEventListener('click', () => {
+            this.isBurgerMenuOpen = !this.isBurgerMenuOpen;
+            burgerMenuContainer.style.display = this.isBurgerMenuOpen ? 'block' : 'none';
+        });
+        
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (this.isBurgerMenuOpen && 
+                e.target !== burgerMenuButton && 
+                !burgerMenuButton.contains(e.target as Node) && 
+                !burgerMenuContainer.contains(e.target as Node)) {
+                this.isBurgerMenuOpen = false;
+                burgerMenuContainer.style.display = 'none';
+            }
+        });
+        
+        document.body.appendChild(burgerMenuButton);
+        document.body.appendChild(burgerMenuContainer);
+        
+        // Store references for cleanup
+        this.burgerMenuButton = burgerMenuButton;
+        this.burgerMenuContainer = burgerMenuContainer;
+        
+        // Make sure correct UI elements are shown based on device type right from the start
+        if (isMobileDevice()) {
+            // On mobile: show burger menu, hide individual buttons
+            if (this.burgerMenuButton) this.burgerMenuButton.style.display = 'flex';
+            if (this.questButton) this.questButton.style.display = 'none';
+            if (this.bestiaryButton) this.bestiaryButton.style.display = 'none';
+            if (this.achievementsButton) this.achievementsButton.style.display = 'none';
+        } else {
+            // On desktop: hide burger menu, show individual buttons
+            if (this.burgerMenuButton) this.burgerMenuButton.style.display = 'none';
+            if (this.burgerMenuContainer) this.burgerMenuContainer.style.display = 'none';
+            if (this.questButton) this.questButton.style.display = 'flex';
+            if (this.bestiaryButton) this.bestiaryButton.style.display = 'flex';
+            if (this.achievementsButton) this.achievementsButton.style.display = 'flex';
+        }
     }
     
     private createConfirmButton() {
@@ -665,11 +831,11 @@ export default class ClassSelectScene extends Phaser.Scene {
                     ${localization.getText(`${currentKey}.weapon`)}
                 </p>
             </div>
-            <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #2ecc71;">Strengths 💪</h3>
+            <h3 style="margin: 0 0 10px 0; fontSize: 18px; color: #2ecc71;">Strengths 💪</h3>
             <p style="margin: 0 0 15px 0;">
                 ${localization.getText(`${currentKey}.strengths`)}
             </p>
-            <h3 style="margin: 0 0 10px 0; font-size: 18px; color: #e74c3c;">Weaknesses 👎</h3>
+            <h3 style="margin: 0 0 10px 0; fontSize: 18px; color: #e74c3c;">Weaknesses 👎</h3>
             <p style="margin: 0;">
                 ${localization.getText(`${currentKey}.weaknesses`)}
             </p>
@@ -752,21 +918,21 @@ export default class ClassSelectScene extends Phaser.Scene {
                 this.classInfoPanel.style.overflowY = 'auto';
             }
             
-            // Adjust quest and bestiary buttons for mobile
+            // Show burger menu, hide individual buttons on mobile
+            if (this.burgerMenuButton) {
+                this.burgerMenuButton.style.display = 'flex';
+            }
+            
             if (this.questButton) {
-                this.questButton.style.top = '20px';
-                this.questButton.style.right = '20px';
-                this.questButton.style.width = '120px';
-                this.questButton.style.height = '40px';
-                this.questButton.style.fontSize = getResponsiveFontSize(16);
+                this.questButton.style.display = 'none';
             }
             
             if (this.bestiaryButton) {
-                this.bestiaryButton.style.top = '70px';
-                this.bestiaryButton.style.right = '20px';
-                this.bestiaryButton.style.width = '120px';
-                this.bestiaryButton.style.height = '40px';
-                this.bestiaryButton.style.fontSize = getResponsiveFontSize(16);
+                this.bestiaryButton.style.display = 'none';
+            }
+            
+            if (this.achievementsButton) {
+                this.achievementsButton.style.display = 'none';
             }
         } else {
             // Desktop layout - horizontal arrangement
@@ -785,8 +951,19 @@ export default class ClassSelectScene extends Phaser.Scene {
                 this.classInfoPanel.style.maxHeight = '450px';
             }
             
+            // Hide burger menu, show individual buttons on desktop
+            if (this.burgerMenuButton) {
+                this.burgerMenuButton.style.display = 'none';
+            }
+            
+            if (this.burgerMenuContainer) {
+                this.burgerMenuContainer.style.display = 'none';
+                this.isBurgerMenuOpen = false;
+            }
+            
             // Standard position for quest and bestiary buttons
             if (this.questButton) {
+                this.questButton.style.display = 'flex';
                 this.questButton.style.top = '50px';
                 this.questButton.style.right = '50px';
                 this.questButton.style.width = '180px';
@@ -795,11 +972,21 @@ export default class ClassSelectScene extends Phaser.Scene {
             }
             
             if (this.bestiaryButton) {
+                this.bestiaryButton.style.display = 'flex';
                 this.bestiaryButton.style.top = '110px';
                 this.bestiaryButton.style.right = '50px';
                 this.bestiaryButton.style.width = '180px';
                 this.bestiaryButton.style.height = '50px';
                 this.bestiaryButton.style.fontSize = '18px';
+            }
+            
+            if (this.achievementsButton) {
+                this.achievementsButton.style.display = 'flex';
+                this.achievementsButton.style.top = '170px';
+                this.achievementsButton.style.right = '50px';
+                this.achievementsButton.style.width = '180px';
+                this.achievementsButton.style.height = '50px';
+                this.achievementsButton.style.fontSize = '18px';
             }
         }
     }
@@ -976,6 +1163,19 @@ export default class ClassSelectScene extends Phaser.Scene {
 
             if (this.bestiaryButton && this.bestiaryButton.parentNode) {
                 this.bestiaryButton.remove();
+            }
+
+            if (this.achievementsButton && this.achievementsButton.parentNode) {
+                this.achievementsButton.remove();
+            }
+            
+            // Clean up burger menu elements
+            if (this.burgerMenuButton && this.burgerMenuButton.parentNode) {
+                this.burgerMenuButton.remove();
+            }
+            
+            if (this.burgerMenuContainer && this.burgerMenuContainer.parentNode) {
+                this.burgerMenuContainer.remove();
             }
             
             // Method 2: Query by ID and class

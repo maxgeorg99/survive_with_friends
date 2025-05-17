@@ -192,10 +192,12 @@ public static partial class Module
         // Initialize bestiary with monster data
         InitBestiary(ctx);
         
+        InitAchievementData(ctx);
+        
         // Note: When adding new monster types to the Bestiary, remember to update the
         // SpawnableMonsterTypes array in Monsters.cs if they should be part of normal spawning.
         // Boss monsters should NOT be added to the spawnable list.
-        
+
         // Initialize experience system
         InitExpSystem(ctx);
         

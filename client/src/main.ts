@@ -10,6 +10,7 @@ import { DbConnection, ErrorContext, Player, SubscriptionEventContext } from './
 import { GameEvents } from './constants/GameEvents';
 import PrologScene from './scenes/PrologScene';
 import BestaryScene from './scenes/BestaryScene';
+import AchievementScene from './scenes/AchievementScene';
 
 console.log("Main script loading...");
 
@@ -36,7 +37,7 @@ const config: Phaser.Types.Core.GameConfig = {
             // debug: true // Set to true for physics debugging
         }
     },
-    scene: [LoginScene, PrologScene, ClassSelectScene, GameScene, LoadingScene, QuestScene, BestaryScene],
+    scene: [LoginScene, PrologScene, ClassSelectScene, GameScene, LoadingScene, QuestScene, BestaryScene, AchievementScene],
     scale: {
         mode: Phaser.Scale.RESIZE,
         autoCenter: Phaser.Scale.CENTER_BOTH

@@ -88,5 +88,54 @@
     "bestiary.monster.FinalBossSimonPhase1.tips": "- Simon attacks with precise energy beams\n- His defensive shields can reflect your projectiles\n- Look for patterns in his attack sequences",
     "bestiary.monster.FinalBossSimonPhase2.name": "Simon",
     "bestiary.monster.FinalBossSimonPhase2.description": "Simon's ultimate form, combining tactical genius with overwhelming power.",
-    "bestiary.monster.FinalBossSimonPhase2.tips": "- He now creates multiple energy clones\n- His attack patterns become more complex\n- Focus on the real Simon, identified by his unique aura"
+    "bestiary.monster.FinalBossSimonPhase2.tips": "- He now creates multiple energy clones\n- His attack patterns become more complex\n- Focus on the real Simon, identified by his unique aura",
+    
+    "achievement.SlimeSlayer.title": "Slime Slayer",
+    "achievement.SlimeSlayer.description": "Defeat 100 slimes",
+    
+    "achievement.RatSlayer.title": "Rat Slayer",
+    "achievement.RatSlayer.description": "Defeat 100 rats",
+    
+    "achievement.WormSlayer.title": "Worm Slayer",
+    "achievement.WormSlayer.description": "Defeat 100 worms",
+    
+    "achievement.ScorpionSlayer.title": "Scorpion Slayer",
+    "achievement.ScorpionSlayer.description": "Defeat 100 scorpions",
+    
+    "achievement.OrcHunter.title": "Orc Hunter",
+    "achievement.OrcHunter.description": "Defeat 100 orcs",
+    
+    "achievement.DefeatJorge.title": "Jorge Slayer",
+    "achievement.DefeatJorge.description": "Defeat Boss Jorge",
+    
+    "achievement.DefeatBjörn.title": "Björn Slayer",
+    "achievement.DefeatBjörn.description": "Defeat Boss Björn",
+    
+    "achievement.DefeatSimon.title": "Simon Slayer",
+    "achievement.DefeatSimon.description": "Defeat Boss Simon",
+    
+    "achievement.WeaponArsenal.title": "Weapon Collector",
+    "achievement.WeaponArsenal.description": "Collect 5 different weapons",
+    
+    "achievement.Expert.title": "Expert Survivor",
+    "achievement.Expert.description": "Reach level 10",
+    
+    "achievement.Survivor.title": "Ultimate Survivor",
+    "achievement.Survivor.description": "Win the game",
+    
+    "quest.survive.title": "Til's Challenge",
+    "quest.survive.description": "Track 5 Running Sessions",
+    "quest.survive.reward": "Unlock Football Til class",
+    
+    "quest.defeat.title": "Marc's Challenge",
+    "quest.defeat.description": "Win a Card Game Session with the boys",
+    "quest.defeat.reward": "Unlock Yugioh Marc class",
+    
+    "quest.level.title": "Max's Challenge",
+    "quest.level.description": "Track 5 Gym Sessions",
+    "quest.level.reward": "Unlock Gym Max class",
+    
+    "quest.gems.title": "Chris's Challenge",
+    "quest.gems.description": "Track Food for 5 days",
+    "quest.gems.reward": "Unlock Chef Chris class"
 }
