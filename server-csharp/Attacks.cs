@@ -213,8 +213,8 @@ public static partial class Module
             attack_type = AttackType.Dumbbell,
             name = "Dumbbell Drop",
             cooldown = 1200,         // Slow attack speed
-            duration = 800,          // Quick impact
-            projectiles = 1,         
+            duration = 2000,          // Qlonng fall time
+            projectiles = 1,         // Multiple dumbbells
             fire_delay = 200,        // Delay between drops
             speed = 800,             // Fast falling speed
             piercing = true,         // Goes through enemies
@@ -1100,7 +1100,7 @@ public static partial class Module
                         // If monster is hit by football
                         if (distanceSquared <= radiusSum * radiusSum)
                         {
-                            // Apply strong knockback in the football's direction
+                            // Apply slight knockback in the football's direction
                             var knockbackStrength = 10f;
                             var knockbackPos = monsterEntity.position + (entity.direction * knockbackStrength);
                             
