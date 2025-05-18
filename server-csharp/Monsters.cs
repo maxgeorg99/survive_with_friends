@@ -162,7 +162,7 @@ public static partial class Module
         var randomTypeIndex = rng.Next(0, SpawnableMonsterTypes.Length);
         var monsterType = SpawnableMonsterTypes[randomTypeIndex];
         
-        Log.Info($"Selected monster type {monsterType} from spawnable list (index {randomTypeIndex} of {SpawnableMonsterTypes.Length} types)");
+        //Log.Info($"Selected monster type {monsterType} from spawnable list (index {randomTypeIndex} of {SpawnableMonsterTypes.Length} types)");
         
         // Get monster stats from bestiary using the monster type as numerical ID
         var bestiaryEntry = ctx.Db.bestiary.bestiary_id.Find((uint)monsterType);
@@ -201,7 +201,7 @@ public static partial class Module
             scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(PRE_SPAWN_DELAY_MS))
         });
         
-        Log.Info($"PreSpawned {monsterType} monster for position ({position.x}, {position.y}) for player: {targetPlayer.name}. Will spawn in {PRE_SPAWN_DELAY_MS}ms");
+        //Log.Info($"PreSpawned {monsterType} monster for position ({position.x}, {position.y}) for player: {targetPlayer.name}. Will spawn in {PRE_SPAWN_DELAY_MS}ms");
     }
     
     [Reducer]
@@ -216,7 +216,7 @@ public static partial class Module
         var playerCount = ctx.Db.player.Count;
         if (playerCount == 0)
         {
-            Log.Info("SpawnMonster: No players online, skipping monster spawn.");
+            //Log.Info("SpawnMonster: No players online, skipping monster spawn.");
             return;
         }
         
@@ -232,8 +232,7 @@ public static partial class Module
         var monsterCount = ctx.Db.monsters.Count;
         if (monsterCount >= config.max_monsters && spawner.monster_type != MonsterType.FinalBossPhase1 && spawner.monster_type != MonsterType.FinalBossPhase2)
         {
-            //TODO: If we're at monster capacity, we need to make sure we can still spawn the boss.
-            Log.Info($"SpawnMonster: At maximum monster capacity ({monsterCount}/{config.max_monsters}), skipping spawn.");
+            //Log.Info($"SpawnMonster: At maximum monster capacity ({monsterCount}/{config.max_monsters}), skipping spawn.");
             return;
         }
         
@@ -277,7 +276,7 @@ public static partial class Module
             throw new Exception("SpawnMonster: Failed to create boid!");
         }
 
-        Log.Info($"Spawned {spawner.monster_type} monster. Total monsters: {ctx.Db.monsters.Count}");
+        //Log.Info($"Spawned {spawner.monster_type} monster. Total monsters: {ctx.Db.monsters.Count}");
         
         // If this is a boss monster, update the game state with its ID
         if (spawner.monster_type == MonsterType.FinalBossPhase1 || spawner.monster_type == MonsterType.FinalBossPhase2)
