@@ -35,6 +35,8 @@ public static partial class Module
         
         // target entity id the monster is following
         public uint target_entity_id;
+        // New: track the last player who damaged this monster
+        public SpacetimeDB.Identity last_damager_identity;
     }
 
     // Timer table for spawning monsters

@@ -454,6 +454,16 @@ public static partial class Module
         // Insert the chosen upgrade
         ctx.Db.chosen_upgrades.Insert(chosenUpgrade);
         
+        // Call achievement tracker for weapon acquisition if this is a new weapon or weapon upgrade
+        if (chosenUpgrade.is_attack_upgrade) {
+            // Find the player's account identity
+            var account = ctx.Db.account.Iter().FirstOrDefault(a => a.current_player_id == playerId);
+            if (!account.Equals(default)) {
+                // Call the achievement tracker
+                Module.TrackWeaponAcquisition(ctx, account.identity, (AttackType)chosenUpgrade.attack_type);
+            }
+        }
+        
         // Apply the upgrade to the player
         ApplyPlayerUpgrade(ctx, chosenUpgrade);
         

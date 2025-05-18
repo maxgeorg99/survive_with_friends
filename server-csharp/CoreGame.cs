@@ -99,8 +99,6 @@ public static partial class Module
             damage_id = damageRecord.Value.damage_id,
             scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(cleanupDelay))
         });
-        
-        Log.Info($"Recorded monster {monsterId} hit by attack {attackEntityId}, cleanup scheduled in {cleanupDelay}ms");
     }
 
     // Helper function to remove all damage records for a given attack entity
@@ -156,10 +154,7 @@ public static partial class Module
         
         // Make sure we don't underflow
         if (monster.hp <= damageAmount)
-        {
-            // Monster is dead - log and delete
-            Log.Info($"Monster {monster.monster_id} (type: {monster.bestiary_id}) was killed!");
-            
+        {          
             // Get the monster's position before deleting it
             var entityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
             DbVector2 position = entityOpt != null
@@ -172,10 +167,15 @@ public static partial class Module
             // Check if this is a boss monster
             bool isBoss = false;
             var gameStateOpt = ctx.Db.game_state.id.Find(0);
-            
-            // Add debug info to verify boss identification
-            if (gameStateOpt != null) {
-                Log.Info($"DamageMonster ID={monsterId}, GameState boss_monster_id={gameStateOpt.Value.boss_monster_id}, boss_active={gameStateOpt.Value.boss_active}, boss_phase={gameStateOpt.Value.boss_phase}");
+                        
+            // Use last_damager_identity for achievement tracking
+            if (!monster.last_damager_identity.Equals(default(SpacetimeDB.Identity)))
+            {
+                TrackMonsterKill(ctx, monster.last_damager_identity, monster.bestiary_id);
+            }
+            else
+            {
+                Log.Warn($"No killer found for monster {monsterId} (type: {monster.bestiary_id}). Achievement not tracked for this kill.");
             }
             
             if (gameStateOpt != null && gameStateOpt.Value.boss_active && gameStateOpt.Value.boss_monster_id == monsterId)
@@ -247,6 +247,13 @@ public static partial class Module
                     // Phase 2 boss defeated - VICTORY!
                     Log.Info("BOSS PHASE 2 DEFEATED! GAME COMPLETE!");
                     
+                    // Track the boss defeat for the player who killed it
+                    if (!monster.last_damager_identity.Equals(default(SpacetimeDB.Identity)))
+                    {
+                        // Mark the player as a survivor (won the game)
+                        TrackGameWin(ctx, monster.last_damager_identity);
+                    }
+                    
                     // Delete the monster and entity
                     ctx.Db.monsters.monster_id.Delete(monsterId);
                     ctx.Db.entity.entity_id.Delete(monster.entity_id);
@@ -283,11 +290,33 @@ public static partial class Module
             monster.hp -= damageAmount;
             ctx.Db.monsters.monster_id.Update(monster);
             
-            // Log the damage
-            Log.Info($"Monster {monster.monster_id} (type: {monster.bestiary_id}) took {damageAmount} damage. HP: {monster.hp}/{monster.max_hp}");
-            
             return false;
         }
+    }
+    
+    // Helper method to find the player who dealt the killing blow to a monster
+    private static Identity FindMonsterKiller(ReducerContext ctx, uint monsterId)
+    {
+        // Check for the most recent damage dealt to this monster
+        var latestDamage = ctx.Db.monster_damage.monster_id.Filter(monsterId)
+            .OrderByDescending(damage => damage.damage_id) // Assuming higher IDs are more recent
+            .FirstOrDefault();
+            
+        if (latestDamage.Equals(default(Module.MonsterDamage)))
+        {
+            return default; // No damage records found
+        }
+        
+        // Find the attack that caused this damage
+        var attack = ctx.Db.active_attacks.Iter()
+            .FirstOrDefault(a => a.entity_id == latestDamage.attack_entity_id);
+            
+        if (attack.Equals(default(Module.ActiveAttack)))
+        {
+            return default; // Attack not found (might have been already cleaned up)
+        }
+        
+        return ctx.Db.account.Iter().FirstOrDefault(a => a.current_player_id == attack.player_id).identity;
     }
 
     [Reducer]
@@ -375,9 +404,6 @@ public static partial class Module
             // Update player record with 0 HP before we delete
             ctx.Db.player.player_id.Update(player);
             
-            // Log the death
-            Log.Info($"Player {player.name} (ID: {player.player_id}) has died!");
-            
             // Store the player in the dead_players table before removing them
             DeadPlayer? deadPlayerOpt = ctx.Db.dead_players.Insert(new DeadPlayer
             {
@@ -430,9 +456,7 @@ public static partial class Module
     
     // Helper method to clean up all attack-related data for a player
     private static void CleanupPlayerAttacks(ReducerContext ctx, uint playerId)
-    {
-        Log.Info($"Cleaning up all attack data for player {playerId}");
-        
+    {        
         // Step 1: Clean up active attacks using filter on player_id
         var activeAttacksToDelete = new List<uint>();
         var attackEntitiesToDelete = new List<uint>();
@@ -458,9 +482,7 @@ public static partial class Module
         {
             ctx.Db.entity.entity_id.Delete(entityId);
         }
-        
-        Log.Info($"Deleted {activeAttacksToDelete.Count} active attacks and their associated entities for player {playerId}");
-        
+                
         // Step 2: Clean up attack burst cooldowns using filter on player_id
         var burstCooldownsToDelete = new List<ulong>();
         
@@ -475,8 +497,7 @@ public static partial class Module
             ctx.Db.attack_burst_cooldowns.scheduled_id.Delete(scheduledId);
         }
         
-        Log.Info($"Deleted {burstCooldownsToDelete.Count} attack burst cooldowns for player {playerId}");
-        
+       
         // Step 3: Clean up scheduled attacks using filter on player_id
         var scheduledAttacksToDelete = new List<ulong>();
         
@@ -490,9 +511,7 @@ public static partial class Module
         {
             ctx.Db.player_scheduled_attacks.scheduled_id.Delete(scheduledId);
         }
-        
-        Log.Info($"Deleted {scheduledAttacksToDelete.Count} scheduled attacks for player {playerId}");
-        
+                
         // Step 4: Clean up active attack cleanup schedules
         // We need to do this more efficiently using the attackIDs we already collected
         if (activeAttacksToDelete.Any())
@@ -521,9 +540,7 @@ public static partial class Module
 
     // Helper method to clean up all pending upgrade options for a player
     private static void CleanupPlayerUpgradeOptions(ReducerContext ctx, uint playerId)
-    {
-        Log.Info($"Cleaning up all upgrade options for player {playerId}");
-        
+    {        
         // Get all upgrade options for this player
         var upgradeOptionsToDelete = new List<uint>();
         
@@ -561,7 +578,7 @@ public static partial class Module
         {
             var world = worldOpt.Value;
             world.tick_count += 1;
-            if(world.tick_count % 50 == 0)
+            if(world.tick_count % 100 == 0)
             {
                 Log.Info($"Game tick: {world.tick_count}");
             }
@@ -695,6 +712,21 @@ public static partial class Module
                     // Record the hit
                     RecordMonsterHitByAttack(ctx, monsterEntry.monster_id, attackEntity.entity_id);
                     
+                    // --- Set last_damager_identity to the attacker's identity ---
+                    var monster = monsterEntry;
+                    var playerOpt = ctx.Db.player.player_id.Find(activeAttack.player_id);
+                    if (playerOpt != null)
+                    {
+                        var player = playerOpt.Value;
+                        var accountOpt = ctx.Db.account.Iter().FirstOrDefault(a => a.current_player_id == player.player_id);
+                        if (!accountOpt.Equals(default(Module.Account)))
+                        {
+                            monster.last_damager_identity = accountOpt.identity;
+                            ctx.Db.monsters.monster_id.Update(monster);
+                        }
+                    }
+                    // ----------------------------------------------------------
+                    
                     // Apply damage to monster using the active attack's damage value
                     uint damage = activeAttack.damage;
                     
@@ -760,14 +792,11 @@ public static partial class Module
                     bool playerKilled = DamagePlayer(ctx, player.player_id, activeBossAttack.damage);
                     attackHitPlayer = true;
                     
-                    Log.Info($"Boss attack {activeBossAttack.active_boss_attack_id} (type: {activeBossAttack.attack_type}) hit player {player.name} (ID: {player.player_id}) for {activeBossAttack.damage} damage.");
-
                     // Check if this is a scorpion sting attack that causes poison
                     if (activeBossAttack.attack_type == AttackType.ScorpionSting && activeBossAttack.parameter_u == 1)
                     {
                         // Apply poison effect to the player
                         ApplyPoisonToPlayer(ctx, player.player_id);
-                        Log.Info($"Scorpion sting poisoned player {player.name} (ID: {player.player_id})");
                     }
 
                     // For non-piercing attacks, stop checking other players and destroy the attack
@@ -932,8 +961,6 @@ public static partial class Module
                 // Refresh the timer for 1 second
                 updatedEffect.scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(1000));
                 ctx.Db.player_poison_effect.poison_id.Update(updatedEffect);
-                
-                Log.Info($"Refreshed poison effect on player {playerId}, will expire in 1000ms");
                 return;
             }
         }
@@ -964,9 +991,7 @@ public static partial class Module
             poisoned_speed = poisonedSpeed,
             scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(1000)) // 1 second duration
         });
-        
-        Log.Info($"Applied poison effect to player {playerId}: Speed reduced from {originalSpeed} to {poisonedSpeed}, will expire in 1000ms");
-    }
+            }
 
     // Reducer method to remove poison effect when it expires
     [Reducer]
@@ -994,9 +1019,7 @@ public static partial class Module
             // Restore original speed
             player.speed = poisonEffect.original_speed;
             ctx.Db.player.player_id.Update(player);
-            
-            Log.Info($"Removed poison effect from player {player.player_id}: Speed restored from {poisonEffect.poisoned_speed} to {poisonEffect.original_speed}");
-        }
+         }
         
         // Delete the poison effect record
         ctx.Db.player_poison_effect.poison_id.Delete(poisonEffect.poison_id);

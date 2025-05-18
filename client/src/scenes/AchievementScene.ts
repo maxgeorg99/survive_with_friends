@@ -4,6 +4,7 @@ import { AchievementDefinition } from '../autobindings';
 import { GameEvents } from '../constants/GameEvents';
 import { localization } from '../utils/localization';
 import { isMobileDevice, getResponsiveFontSize, applyResponsiveStyles, getResponsiveDimensions } from '../utils/responsive';
+import { Identity } from '@clockworklabs/spacetimedb-sdk';
 
 export default class AchievementScene extends Phaser.Scene {
     private spacetimeDBClient: SpacetimeDBClient;
@@ -131,47 +132,37 @@ export default class AchievementScene extends Phaser.Scene {
                 return;
             }
 
-            // Get all achievement templates (with player_id = 0) using proper filters
-            const achievements = [];
-            for (const achievement of ctx.db.achievements.iter()) {
-                if (achievement.playerId === 0) {
-                    achievements.push(achievement);
-                }
-            }
-            console.log("Fetched achievements:", achievements);
-            
-            // Sort achievements by ID
-            achievements.sort((a, b) => a.achievementsId - b.achievementsId);
+            // Get current player ID and their achievements
+            const localIdentity = this.spacetimeDBClient.identity;
+            const playerAchievements: AchievementDefinition[] = [];
 
-            if (achievements.length === 0) {
-                this.showEmptyMessage();
+            if (!localIdentity) {
+                this.showErrorMessage("Player identity not available.");
                 return;
             }
 
-            // Get current player ID and their achievements
-            let playerId: number | undefined;
-            let playerAchievements: AchievementDefinition[] = [];
-
             try {
-                const clientIdentity = this.spacetimeDBClient.identity;
-                if (clientIdentity) {
-                    // Find the player with the matching identity by iterating through all players
-                    for (const player of ctx.db.player.iter()) {                           
-                            // Find all achievements for this player by filtering all achievements
-                            for (const achievement of ctx.db.achievements.iter()) {
-                                if (achievement.playerId === playerId) {
-                                    playerAchievements.push(achievement);
-                                }
-                            }
-                            break;
+                for (const achievement of ctx.db.achievements.iter()) {
+                    if (achievement.accountIdentity && achievement.accountIdentity.isEqual(localIdentity)) {
+                        playerAchievements.push(achievement);
                     }
                 }
             } catch (err) {
                 console.error("Error getting player achievements:", err);
+                this.showErrorMessage("Error loading your achievements.");
+                return;
+            }
+            
+            // Sort achievements by ID
+            playerAchievements.sort((a, b) => a.achievementsId - b.achievementsId);
+
+            if (playerAchievements.length === 0) {
+                this.showEmptyMessage();
+                return;
             }
 
-            // Display achievements
-            this.displayAchievements(achievements, playerAchievements, playerId);
+            // Display achievements - templates are no longer needed here
+            this.displayAchievements(playerAchievements);
         } catch (error) {
             console.error("Error fetching achievements:", error);
             this.showErrorMessage("Error loading achievements");
@@ -179,31 +170,38 @@ export default class AchievementScene extends Phaser.Scene {
     }
 
     private displayAchievements(
-        templates: AchievementDefinition[], 
         playerAchievements: AchievementDefinition[],
-        playerId?: number
     ) {
-        const isMobile = isMobileDevice();
-        
-        // Create achievement elements
-        templates.forEach(achievement => {
-            // Find player's version of this achievement if it exists
-            const playerAchievement = playerAchievements.find(
-                a => a.achievementTypeType === achievement.achievementTypeType
-            );
+        // Clear existing achievements in the container
+        this.achievementContainer.innerHTML = '';
 
+        // Check if we have any achievements to display
+        if (!playerAchievements || playerAchievements.length === 0) {
+            this.showEmptyMessage();       
+            return;
+        } 
+
+        // Sort achievements: completed at the bottom, then by ID
+        const sortedAchievements = [...playerAchievements].sort((a, b) => {
+            if (a.isCompleted && !b.isCompleted) return 1;
+            if (!a.isCompleted && b.isCompleted) return -1;
+            return a.achievementsId - b.achievementsId;
+        });
+
+        // Create and append each achievement entry
+        sortedAchievements.forEach(achievement => {
             // Determine if the achievement is completed
-            const isCompleted = playerAchievement?.isCompleted || false;
+            const isCompleted = achievement.isCompleted;
             
             // Determine progress
-            const progress = playerAchievement ? playerAchievement.progress : 0;
+            const progress = achievement.progress;
             const target = achievement.target;
             const progressPercent = Math.min(100, Math.floor((progress / target) * 100));
 
             const achievementElement = document.createElement('div');
             achievementElement.style.backgroundColor = isCompleted ? 'rgba(46, 204, 113, 0.2)' : 'rgba(52, 73, 94, 0.7)';
             achievementElement.style.margin = '10px 0';
-            achievementElement.style.padding = isMobile ? '12px' : '15px';
+            achievementElement.style.padding = isMobileDevice() ? '12px' : '15px';
             achievementElement.style.borderRadius = '5px';
             achievementElement.style.border = isCompleted ? '1px solid #2ecc71' : '1px solid #2980b9';
             achievementElement.style.color = 'white';
@@ -213,15 +211,15 @@ export default class AchievementScene extends Phaser.Scene {
             achievementElement.style.position = 'relative';
 
             // Responsive font sizes for achievement elements
-            const titleSize = isMobile ? getResponsiveFontSize(18) : '20px';
-            const textSize = isMobile ? getResponsiveFontSize(14) : '16px';
+            const titleSize = isMobileDevice() ? getResponsiveFontSize(18) : '20px';
+            const textSize = isMobileDevice() ? getResponsiveFontSize(14) : '16px';
 
             // Get sprite path without the assets/ prefix
             const spriteName = achievement.spritePath.replace('assets/', '');
 
             // Create HTML for achievement content
             achievementElement.innerHTML = `
-                <div style="flex-shrink: 0; width: ${isMobile ? '40px' : '50px'}; height: ${isMobile ? '40px' : '50px'}; 
+                <div style="flex-shrink: 0; width: ${isMobileDevice() ? '40px' : '50px'}; height: ${isMobileDevice() ? '40px' : '50px'}; 
                      background-color: rgba(0,0,0,0.3); border-radius: 5px; display: flex; 
                      align-items: center; justify-content: center; position: relative;">
                     <img src="assets/${spriteName}" style="max-width: 80%; max-height: 80%; object-fit: contain;" 
@@ -244,7 +242,7 @@ export default class AchievementScene extends Phaser.Scene {
                         <div style="height: 100%; width: ${progressPercent}%; background-color: ${isCompleted ? '#2ecc71' : '#3498db'}; 
                              transition: width 0.5s ease-in-out;"></div>
                     </div>
-                    <p style="margin: 5px 0 0 0; color: #bdc3c7; font-size: ${isMobile ? getResponsiveFontSize(12) : '14px'}; text-align: right;">
+                    <p style="margin: 5px 0 0 0; color: #bdc3c7; font-size: ${isMobileDevice() ? getResponsiveFontSize(12) : '14px'}; text-align: right;">
                         ${progress} / ${target} (${progressPercent}%)
                     </p>
                 </div>
@@ -252,6 +250,11 @@ export default class AchievementScene extends Phaser.Scene {
 
             this.achievementContainer.appendChild(achievementElement);
         });
+
+        // If we didn't add any achievements after all, show empty message
+        if (this.achievementContainer.children.length === 0) {
+            this.showEmptyMessage();
+        }
     }
 
     private showErrorMessage(message: string) {

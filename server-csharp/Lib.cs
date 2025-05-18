@@ -182,8 +182,8 @@ public static partial class Module
         }
         
         // Schedule game tick to run at regular intervals (50ms = 20 ticks/second)
-        ctx.Db.game_tick_timer.Insert(new GameTickTimer
-        {
+            ctx.Db.game_tick_timer.Insert(new GameTickTimer
+            {
             scheduled_at = new ScheduleAt.Interval(TimeSpan.FromMilliseconds(game_tick_rate))
         });
         
@@ -191,9 +191,7 @@ public static partial class Module
         
         // Initialize bestiary with monster data
         InitBestiary(ctx);
-        
-        InitAchievementData(ctx);
-        
+                
         // Note: When adding new monster types to the Bestiary, remember to update the
         // SpawnableMonsterTypes array in Monsters.cs if they should be part of normal spawning.
         // Boss monsters should NOT be added to the spawnable list.
@@ -215,54 +213,28 @@ public static partial class Module
     public static void ClientConnected(ReducerContext ctx)
     {
         var identity = ctx.Sender;
-        Log.Info($"Client connected: {identity}");
+        var now = ctx.Timestamp;
 
-        // Check if account already exists - if so, reconnect them
+        // Check if an account already exists for this identity
         var accountOpt = ctx.Db.account.identity.Find(identity);
+
         if (accountOpt != null)
         {
-            Log.Info($"Client has existing account: {identity} reconnected.");
+            // Account exists, update last login time
             var account = accountOpt.Value;
-            Log.Info($"Account details: Name={account.name}, PlayerID={account.current_player_id}");
+            account.last_login = now;
+            ctx.Db.account.identity.Update(account);
+            Log.Info($"Player {account.name} (Identity: {identity}) reconnected.");
 
-            // Check if player exists
-            var playerOpt = ctx.Db.player.player_id.Find(account.current_player_id);
-            if (playerOpt == null)
+            // Check if this reconnected player has a dead player entry
+            var deadPlayerOpt = ctx.Db.dead_players.player_id.Find(account.current_player_id);
+            if (deadPlayerOpt != null)
             {
-                Log.Info($"No living player found for account {identity}. Checking for dead players...");
-
-                DeadPlayer? deadPlayerOpt = ctx.Db.dead_players.player_id.Find(account.current_player_id);
-                if (deadPlayerOpt == null)
-                {
-                    Log.Info($"No dead player found for account {identity} either.");
-                }
-                else
-                {
-                    Log.Info($"Found dead player {deadPlayerOpt.Value.player_id} for account {identity}.");
-                }
-            }
-            else
-            {
-                Log.Info($"Found living player {playerOpt.Value.player_id} for account {identity}.");
+                Log.Info($"Player {account.name} was previously dead. Clearing dead player entry.");
+                ctx.Db.dead_players.player_id.Delete(deadPlayerOpt.Value.player_id);
             }
         }
-        else
-        {
-            // Create a new account
-            Log.Info($"New connection from {identity}. Creating a new account.");
-            
-            Account? newAccountOpt = ctx.Db.account.Insert(new Account
-            {
-                identity = identity,
-                name = "",
-                current_player_id = 0
-            });
-            
-            if (newAccountOpt != null)
-            {
-                Log.Info($"Created new account for {identity}");
-            }
-        }
+        // No 'else' block here: new account creation is not handled in ClientConnected directly.
     }
 
     // --- Reducers ---
@@ -453,6 +425,7 @@ public static partial class Module
     public static void SetName(ReducerContext ctx, string name)
     {
         var identity = ctx.Sender;
+        var now = ctx.Timestamp; // Needed for new account creation
         Log.Info($"SetName called by identity: {identity} with name: {name}");
 
         // Basic validation
@@ -461,19 +434,33 @@ public static partial class Module
             throw new Exception($"SetName: Invalid name provided by {identity}: '{name}'. Name must be 1-16 characters.");
         }
 
-        // Find the account using the context's Db object and the primary key index (identity)
         var accountOpt = ctx.Db.account.identity.Find(identity);
-        if (accountOpt is null)
+        Account account;
+
+        if (accountOpt == null)
         {
-            throw new Exception($"SetName: Attempted to set name for non-existent account {identity}.");
+            // Account does not exist, create it
+            Log.Info($"SetName: Account for {identity} does not exist. Creating new account.");
+            var newAccount = new Account
+            {
+                identity = identity,
+                name = name.Trim(), // Set name directly
+                current_player_id = 0, // Will be set when player spawns
+                last_login = now
+            };
+            var insertedAccountOpt = ctx.Db.account.Insert(newAccount);
+
+            // Initialize achievements for the new account
+            InitializePlayerAchievements(ctx, identity);
         }
-
-        var account = accountOpt.Value;
-
-        account.name = name.Trim();
-
-        ctx.Db.account.identity.Update(account);
-        Log.Info($"Account {identity} name set to {account.name}.");
+        else
+        {
+            // Account exists, update its name
+            account = accountOpt.Value;
+            account.name = name.Trim();
+            ctx.Db.account.identity.Update(account);
+            Log.Info($"Account {identity} name updated to {account.name}.");
+        }
     }
 
     //last_login

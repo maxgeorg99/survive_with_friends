@@ -264,6 +264,17 @@ public static partial class Module
                 DrawUpgradeOptions(ctx, playerId);
             }
             
+            // Track achievement progress for level up using the correct account identity
+            var account = ctx.Db.account.Iter().FirstOrDefault(a => a.current_player_id == playerId);
+            if (!account.Equals(default(Module.Account)))
+            {
+                TrackPlayerLevel(ctx, account.identity, currentLevel);
+            }
+            else
+            {
+                Log.Warn($"Could not find account for playerId {playerId} when tracking level achievement.");
+            }
+            
             Log.Info($"Player {playerId} leveled up to level {currentLevel}! Exp: {newExp}/{expNeeded}");
         }
         else
@@ -352,4 +363,4 @@ public static partial class Module
             }
         }
     }
-} 
+}

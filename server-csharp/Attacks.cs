@@ -1285,17 +1285,10 @@ public static partial class Module
             float moveDistance = moveSpeed * DELTA_TIME;
             var moveOffset = entity.direction * moveDistance;
 
-            Log.Info($"Boss attack {activeBossAttack.active_boss_attack_id} movement:");
-            Log.Info($"  Current pos: ({entity.position.x}, {entity.position.y})");
-            Log.Info($"  Direction: ({entity.direction.x}, {entity.direction.y})");
-            Log.Info($"  Move offset: ({moveOffset.x}, {moveOffset.y})");
-            
             // Update entity with new position
             var updatedEntity = entity;
             updatedEntity.position = entity.position + moveOffset;
             
-            Log.Info($"  New pos: ({updatedEntity.position.x}, {updatedEntity.position.y})");
-
             // Apply world boundary clamping
             updatedEntity.position.x = Math.Clamp(
                 updatedEntity.position.x, 
