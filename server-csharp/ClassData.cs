@@ -50,8 +50,8 @@ public static partial class Module
         {
             ClassId = (uint)PlayerClass.Fighter,
             PlayerClass = PlayerClass.Fighter,
-            MaxHp = 100,
-            Armor = 0,
+            MaxHp = 100000,
+            Armor = 12,
             Speed = 200.0f,
             StartingAttackType = AttackType.Sword
         });
@@ -61,8 +61,8 @@ public static partial class Module
         {
             ClassId = (uint)PlayerClass.Rogue,
             PlayerClass = PlayerClass.Rogue,
-            MaxHp = 100,
-            Armor = 0,
+            MaxHp = 100000,
+            Armor = 12,
             Speed = 200.0f,
             StartingAttackType = AttackType.Knives
         });
@@ -72,8 +72,8 @@ public static partial class Module
         {
             ClassId = (uint)PlayerClass.Mage,
             PlayerClass = PlayerClass.Mage,
-            MaxHp = 100,
-            Armor = 0,
+            MaxHp = 100000,
+            Armor = 12,
             Speed = 200.0f,
             StartingAttackType = AttackType.Wand
         });
@@ -83,7 +83,7 @@ public static partial class Module
         {
             ClassId = (uint)PlayerClass.Paladin,
             PlayerClass = PlayerClass.Paladin,
-            MaxHp = 100,
+            MaxHp = 100000,
             Armor = 12,
             Speed = 200.0f,
             StartingAttackType = AttackType.Shield

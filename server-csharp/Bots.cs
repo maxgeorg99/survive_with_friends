@@ -99,9 +99,12 @@ public static partial class Module
         }
 
         // Randomly select a class
+        /*
         int randomIndex = ctx.Rng.Next(0, availableClasses.Count);
         var selectedClass = availableClasses[randomIndex];
         var playerClass = selectedClass.PlayerClass;
+        */
+        var playerClass = PlayerClass.Rogue;
 
         Log.Info($"Selected random class: {playerClass}");
         

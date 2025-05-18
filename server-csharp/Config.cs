@@ -18,6 +18,8 @@ public static partial class Module
         public uint player_spawn_grace_period; // Player spawn grace period in milliseconds
         
         public uint monster_hit_cleanup_delay; // Delay in milliseconds before monster hit records are cleaned up
+
+        public uint monster_wave_size; // Number of monsters to spawn in a wave (per player)
     }
     
     // Initialize the game configuration
@@ -40,7 +42,8 @@ public static partial class Module
             game_tick_rate = 50, // Default game tick rate in milliseconds
             max_monsters = 1000,  // Default maximum monsters
             player_spawn_grace_period = 5000, // Default player spawn grace period in milliseconds
-            monster_hit_cleanup_delay = 500 // Default monster hit cleanup delay in milliseconds
+            monster_hit_cleanup_delay = 500, // Default monster hit cleanup delay in milliseconds
+            monster_wave_size = 1 // Default monster wave size
         });
 
         Log.Info("Game configuration initialized successfully");

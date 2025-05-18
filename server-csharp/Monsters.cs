@@ -43,7 +43,7 @@ public static partial class Module
     }
 
     // Timer table for spawning monsters
-    [Table(Name = "monster_spawn_timer", Scheduled = nameof(PreSpawnMonster), ScheduledAt = nameof(scheduled_at))]
+    [Table(Name = "monster_spawn_timer", Scheduled = nameof(PreSpawnMonsterWave), ScheduledAt = nameof(scheduled_at))]
     public partial struct MonsterSpawnTimer
     {
         [PrimaryKey, AutoInc]
@@ -89,8 +89,35 @@ public static partial class Module
         public uint damage_id;        // The damage record to clean up
         public ScheduleAt scheduled_at; // When to clean up the record
     }
-    
+
     [Reducer]
+    public static void PreSpawnMonsterWave(ReducerContext ctx, MonsterSpawnTimer timer)
+    {
+        if (ctx.Sender != ctx.Identity)
+        {
+            throw new Exception("Reducer PreSpawnMonsterWave may not be invoked by clients, only via scheduling.");
+        }
+
+        // Get wave size
+        var configOpt = ctx.Db.config.id.Find(0);
+        if (configOpt == null)
+        {
+            throw new Exception("PreSpawnMonsterWave: Could not find game configuration!");
+        }
+        var config = configOpt.Value;  
+        var waveSize = config.monster_wave_size;
+
+        // For each player, spawn a wave of monsters
+        foreach (var player in ctx.Db.player.Iter())
+        {
+            //For each wave size, pre-spawn a monster
+            for (int i = 0; i < waveSize; i++)
+            {
+                PreSpawnMonster(ctx, timer);
+            }
+        }
+    }
+    
     public static void PreSpawnMonster(ReducerContext ctx, MonsterSpawnTimer timer)
     {
         if (ctx.Sender != ctx.Identity)
