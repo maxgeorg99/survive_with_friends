@@ -796,7 +796,7 @@ export default class ClassSelectScene extends Phaser.Scene {
         const toggleHtml = info.altClass ? `
             <button id="version-toggle" style="
                 position: absolute;
-                right: 20px;
+                right: 10px;
                 background-color: #3498db;
                 border: none;
                 border-radius: 15px;
@@ -809,8 +809,8 @@ export default class ClassSelectScene extends Phaser.Scene {
                 font-size: 14px;
                 transition: background-color 0.2s;
             ">
-            <span style="font-size: 18px;">${isAltVersion ? '🔓' : '🔒'}</span>
-            <span>${isAltVersion ? 'Switch to Original' : 'Unlock Alt Class'}</span>
+            <span>Version</span>
+            <span style="font-size: 18px;">🔁</span>
             </button>
         ` : '';
 
