@@ -81,7 +81,7 @@ public static partial class Module
                 {
                     // Wands shoot at the nearest enemy
                     // TODO: can we use the spatial hash to speed this up?
-                    Monsters? nearestEnemy = FindNearestEnemy(ctx, player.position);
+                    MonsterBoid? nearestEnemy = FindNearestEnemy(ctx, player.position);
                     if (nearestEnemy != null)
                     {
                         var enemyActual = nearestEnemy.Value;
@@ -124,25 +124,25 @@ public static partial class Module
         }
 
         // Find the nearest enemy to a player entity
-        public static Monsters? FindNearestEnemy(ReducerContext ctx, DbVector2 position)
+        public static MonsterBoid? FindNearestEnemy(ReducerContext ctx, DbVector2 position)
         {
-            Monsters? nearestEnemy = null;
+            MonsterBoid? nearestEnemy = null;
             float nearestDistanceSquared = float.MaxValue;
 
             // Iterate through all monsters in the game
             // TODO: can we use the spatial hash to speed this up?
-            foreach (var monster in ctx.Db.monsters.Iter())
+            foreach (var boid in ctx.Db.monsters_boid.Iter())
             {
                 // Calculate squared distance (more efficient than using square root)
-                var dx = monster.position.x - position.x;
-                var dy = monster.position.y - position.y;
+                var dx = boid.position.x - position.x;
+                var dy = boid.position.y - position.y;
                 var distanceSquared = dx * dx + dy * dy;
 
                 // If this monster is closer than the current nearest, update nearest
                 if (distanceSquared < nearestDistanceSquared)
                 {
                     nearestDistanceSquared = distanceSquared;
-                    nearestEnemy = monster;
+                    nearestEnemy = boid;
                 }
             }
 

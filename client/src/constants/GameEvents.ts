@@ -26,6 +26,9 @@ export enum GameEvents {
     MONSTER_CREATED = 'monster:created',
     MONSTER_UPDATED = 'monster:updated',
     MONSTER_DELETED = 'monster:deleted',
+
+    // Monster Boid events
+    MONSTER_BOID_UPDATED = 'monster_boid:updated',
     
     // Attack events
     ATTACK_CREATED = 'attack:created',

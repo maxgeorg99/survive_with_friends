@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { Monsters, EventContext, MonsterType } from "../autobindings";
+import { Monsters, EventContext, MonsterType, MonsterBoid} from "../autobindings";
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { MONSTER_ASSET_KEYS, MONSTER_SHADOW_OFFSETS_X, MONSTER_SHADOW_OFFSETS_Y} from '../constants/MonsterConfig';
 import { GameEvents } from '../constants/GameEvents';
@@ -84,6 +84,18 @@ export default class MonsterManager {
         this.gameEvents.on(GameEvents.MONSTER_DELETED, (ctx: EventContext, monster: Monsters) => {
             this.removeMonster(monster.monsterId);
         });
+
+        this.gameEvents.on(GameEvents.MONSTER_BOID_UPDATED, (ctx: EventContext, oldBoid: MonsterBoid, newBoid: MonsterBoid) => {
+            this.onMonsterBoidUpdated(ctx, oldBoid, newBoid);
+        });
+    }
+
+    onMonsterBoidUpdated(ctx: EventContext, oldBoid: MonsterBoid, newBoid: MonsterBoid) {
+        let container = this.monsters.get(newBoid.monsterId);
+        if (container) {
+            container.setPosition(newBoid.position.x, newBoid.position.y);
+            container.setDepth(BASE_DEPTH + newBoid.position.y);
+        }
     }
     
     // Create or update a monster sprite
@@ -96,8 +108,8 @@ export default class MonsterManager {
         
         if (!container) {
             // Create new container if it doesn't exist
-            container = this.scene.add.container(monsterData.position.x, monsterData.position.y);
-            container.setDepth(BASE_DEPTH + monsterData.position.y);
+            container = this.scene.add.container(monsterData.spawnPosition.x, monsterData.spawnPosition.y);
+            container.setDepth(BASE_DEPTH + monsterData.spawnPosition.y);
             this.monsters.set(monsterData.monsterId, container);
             
             // Create shadow first (so it appears behind the sprite)
@@ -151,10 +163,6 @@ export default class MonsterManager {
             console.log(`Created new monster sprite for ${monsterTypeName} (ID: ${monsterData.monsterId})`);
         }
         
-        // Update position and other properties
-        container.setPosition(monsterData.position.x, monsterData.position.y);
-        container.setDepth(BASE_DEPTH + monsterData.position.y);
-        
         // Update health bar
         var healthBarToUpdate = container.getByName('healthBar') as Phaser.GameObjects.Rectangle;
         this.updateHealthBar(healthBarToUpdate, monsterData.hp, monsterData.maxHp);
@@ -165,7 +173,7 @@ export default class MonsterManager {
         // Special handling for boss monsters
         if (monsterTypeName === "FinalBossPhase1" || monsterTypeName === "FinalBossPhase2") {
             console.log(`Updating boss monster ${monsterTypeName} (ID: ${monsterData.monsterId}):`);
-            console.log(`- Position: (${monsterData.position.x}, ${monsterData.position.y})`);
+            console.log(`- Position: (${monsterData.spawnPosition.x}, ${monsterData.spawnPosition.y})`);
             console.log(`- HP: ${monsterData.hp}/${monsterData.maxHp}`);
             console.log(`- Container visible: ${container.visible}`);
             console.log(`- Container alpha: ${container.alpha}`);
@@ -261,7 +269,7 @@ export default class MonsterManager {
             console.log(`- HP: ${monster.hp}/${monster.maxHp}`);
             console.log(`- Asset key: ${MONSTER_ASSET_KEYS[monsterTypeName]}`);
             console.log(`- Texture exists: ${this.scene.textures.exists(MONSTER_ASSET_KEYS[monsterTypeName])}`);
-            console.log(`- Position: (${monster.position.x}, ${monster.position.y})`);
+            console.log(`- Position: (${monster.spawnPosition.x}, ${monster.spawnPosition.y})`);
             
             // If this is phase 2, it means phase 1 was defeated
             if (monsterTypeName === "FinalBossPhase2") {
@@ -275,7 +283,7 @@ export default class MonsterManager {
                 }
                 
                 // Play the dark transformation effect
-                this.createBossTransformationEffect(monster.position.x, monster.position.y);
+                this.createBossTransformationEffect(monster.spawnPosition.x, monster.spawnPosition.y);
             }
             
             // Log all sprites to debug visibility issues

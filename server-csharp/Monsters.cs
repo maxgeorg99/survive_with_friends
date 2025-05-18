@@ -30,11 +30,18 @@ public static partial class Module
         public uint target_player_id;
         public int target_player_ordinal_index;
         // entity attributes
-        public DbVector2 position;  
-        public float radius;     
+        public float radius;
+        public DbVector2 spawn_position;
     }
 
-    private static readonly Monsters[] MonsterUpdatePool = new Monsters[MAX_ATTACK_COUNT];
+    [SpacetimeDB.Table(Name = "monsters_boid", Public = true)]
+    public partial struct MonsterBoid
+    {
+        [PrimaryKey]
+        public uint monster_id;
+        public DbVector2 position;
+        public DbVector2 velocity;
+    }
 
     // Timer table for spawning monsters
     [Table(Name = "monster_spawn_timer", Scheduled = nameof(PreSpawnMonster), ScheduledAt = nameof(scheduled_at))]
@@ -224,13 +231,26 @@ public static partial class Module
             speed = bestiaryEntry.Value.speed,
             target_player_id = closestPlayerId,
             target_player_ordinal_index = closestPlayerOrdinalIndex,
-            position = spawner.position,
-            radius = bestiaryEntry.Value.radius
+            radius = bestiaryEntry.Value.radius,
+            spawn_position = spawner.position
         });
         
         if (monsterOpt is null)
         {
             throw new Exception("SpawnMonster: Failed to create monster!");
+        }
+
+        // Create the boid
+        MonsterBoid? boidOpt = ctx.Db.monsters_boid.Insert(new MonsterBoid
+        {
+            monster_id = monsterOpt.Value.monster_id,
+            position = spawner.position,
+            velocity = new DbVector2(0, 0)
+        }); 
+
+        if (boidOpt is null)
+        {
+            throw new Exception("SpawnMonster: Failed to create boid!");
         }
 
         Log.Info($"Spawned {spawner.monster_type} monster. Total monsters: {ctx.Db.monsters.Count}");
@@ -417,32 +437,17 @@ public static partial class Module
             NextsMonster[mid] = HeadsMonster[gridCellKey];
             HeadsMonster[gridCellKey] = mid;
         }
-    }   
-
-    private static void MoveMonstersSimple(ReducerContext ctx)
-    {
-        foreach (var monster in ctx.Db.monsters.Iter())
-        {
-            KeysMonster[CachedCountMonsters] = monster.monster_id;
-            PosXMonster[CachedCountMonsters] = monster.position.x + 1.0f;
-            PosYMonster[CachedCountMonsters] = monster.position.y + 1.0f;
-            RadiusMonster[CachedCountMonsters] = monster.radius;
-    
-            CachedCountMonsters++;
-        }
     }
 
     private static void PopulateMonsterCache(ReducerContext ctx)
     {
         CachedCountMonsters = 0;
-
         foreach (var monster in ctx.Db.monsters.Iter())
         {
             CachedTargetPlayerOrdinalIndex[CachedCountMonsters] = monster.target_player_ordinal_index;
 
             KeysMonster[CachedCountMonsters] = monster.monster_id;
-            PosXMonster[CachedCountMonsters] = monster.position.x;
-            PosYMonster[CachedCountMonsters] = monster.position.y;
+            KeyToCacheIndexMonster[monster.monster_id] = (uint)CachedCountMonsters;
             RadiusMonster[CachedCountMonsters] = monster.radius;
             SpeedMonster[CachedCountMonsters] = monster.speed;
 
@@ -456,28 +461,39 @@ public static partial class Module
                 TargetXMonster[CachedCountMonsters] = PosXMonster[CachedCountMonsters];
                 TargetYMonster[CachedCountMonsters] = PosYMonster[CachedCountMonsters];
             }
+    
+            CachedCountMonsters++;
+        }
 
-            ushort gridCellKey = GetWorldCellFromPosition(monster.position.x, monster.position.y);
+        var boidIdx = 0;
+        foreach (var boid in ctx.Db.monsters_boid.Iter())
+        {
+            var monsterCacheIdx = KeyToCacheIndexMonster[boid.monster_id];
+
+            PosXMonster[monsterCacheIdx] = boid.position.x;
+            PosYMonster[monsterCacheIdx] = boid.position.y;
+            VelXMonster[monsterCacheIdx] = boid.velocity.x;
+            VelYMonster[monsterCacheIdx] = boid.velocity.y;
+
+            ushort gridCellKey = GetWorldCellFromPosition(boid.position.x, boid.position.y);
             CellMonster[CachedCountMonsters] = gridCellKey;
             NextsMonster[CachedCountMonsters] = HeadsMonster[gridCellKey];
             HeadsMonster[gridCellKey] = CachedCountMonsters;
-    
-            CachedCountMonsters++;
+
+            boidIdx++;
         }
     }   
 
     private static void CommitMonsterMotion(ReducerContext ctx)
     {
-        uint monsterCacheIdx = 0;
-        foreach (var monster in ctx.Db.monsters.Iter())
+        foreach (var boid in ctx.Db.monsters_boid.Iter())
         {
-            //var monsterUpdated = MonsterUpdatePool[monsterCacheIdx];
-            var monsterUpdated = monster;
-            monsterUpdated.position.x = Math.Clamp(PosXMonster[monsterCacheIdx], RadiusMonster[monsterCacheIdx], WORLD_SIZE - RadiusMonster[monsterCacheIdx]);
-            monsterUpdated.position.y = Math.Clamp(PosYMonster[monsterCacheIdx], RadiusMonster[monsterCacheIdx], WORLD_SIZE - RadiusMonster[monsterCacheIdx]);
+            var monsterCacheIdx = KeyToCacheIndexMonster[boid.monster_id];
+            var boidUpdated = boid;
+            boidUpdated.position.x = Math.Clamp(PosXMonster[monsterCacheIdx], RadiusMonster[monsterCacheIdx], WORLD_SIZE - RadiusMonster[monsterCacheIdx]);
+            boidUpdated.position.y = Math.Clamp(PosYMonster[monsterCacheIdx], RadiusMonster[monsterCacheIdx], WORLD_SIZE - RadiusMonster[monsterCacheIdx]);
 
-            ctx.Db.monsters.monster_id.Update(monsterUpdated);
-            monsterCacheIdx++;
+            ctx.Db.monsters_boid.monster_id.Update(boidUpdated);
         }
     }
     
@@ -619,7 +635,7 @@ public static partial class Module
             float ay = PosYMonster[iA];
             float rA = RadiusMonster[iA];
 
-            int keyA = GetWorldCellFromPosition(ax, ay);
+            int keyA = CellMonster[iA];
             int cx   =  keyA & WORLD_CELL_MASK;
             int cy   = keyA >> WORLD_CELL_BIT_SHIFT;
 
@@ -643,6 +659,8 @@ public static partial class Module
                     {
                         if (iB <= iA) continue;          // unordered pair once
 
+                        Log.Info($"Pushing monster {iA} and {iB} apart");
+
                         float dxAB = ax - PosXMonster[iB];
                         float dyAB = ay - PosYMonster[iB];
                         float d2   = dxAB * dxAB + dyAB * dyAB;
@@ -652,22 +670,18 @@ public static partial class Module
                         if (d2 >= rSum2) continue;       // no overlap
 
                         // ---- penetration & normal (inv-sqrt) -----------------
-                        float invLen      = 1.0f / MathF.Sqrt(d2);
-                        float penetration = rSum - (1.0f * invLen);   // rSum − √d2
+                        float dist = Math.Max(MathF.Sqrt(d2), 0.001f);
+                        float invLen      = 1.0f / dist;
+                        float penetration = rSum - (dist * 0.5f);
                         float nxAB        = dxAB * invLen;
                         float nyAB        = dyAB * invLen;
 
-                        // ---- split the push: heavier = larger radius ----------
-                        //   wA = rB / (rA + rB)   ,   wB = rA / (rA + rB)
-                        float wA = RadiusMonster[iB] / rSum;
-                        float wB = rA / rSum;
-
                         float pushFactor = 0.1f;
 
-                        PosXMonster[iA] += nxAB * penetration * wA * pushFactor;
-                        PosYMonster[iA] += nyAB * penetration * wA * pushFactor;
-                        PosXMonster[iB] -= nxAB * penetration * wB * pushFactor;
-                        PosYMonster[iB] -= nyAB * penetration * wB * pushFactor;
+                        PosXMonster[iA] += nxAB * penetration * pushFactor;
+                        PosYMonster[iA] += nyAB * penetration * pushFactor;
+                        PosXMonster[iB] -= nxAB * penetration * pushFactor;
+                        PosYMonster[iB] -= nyAB * penetration * pushFactor;
                     }
                 }
             }

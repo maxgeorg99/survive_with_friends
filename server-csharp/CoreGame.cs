@@ -65,8 +65,16 @@ public static partial class Module
             Log.Info($"Monster {monster.monster_id} (type: {monster.bestiary_id}) was killed!");
             
             // Get the monster's position before deleting it
-            DbVector2 position = monster.position;
-            
+            DbVector2 position = default;
+            var boidOpt = ctx.Db.monsters_boid.monster_id.Find(monsterId);
+            if (boidOpt != null)
+            {
+                position = boidOpt.Value.position;
+            }
+            else
+            {
+                throw new Exception($"Monster {monster.monster_id} has no boid record!");
+            }
             // Clean up any monster damage records for this monster
             CleanupMonsterDamageRecords(ctx, monsterId);
             
@@ -97,6 +105,7 @@ public static partial class Module
                     
                     // Only after successful spawn of phase 2, delete phase 1
                     ctx.Db.monsters.monster_id.Delete(monsterId);
+                    ctx.Db.monsters_boid.monster_id.Delete(monsterId);
                     Log.Info("Phase 1 boss monster and entity deleted after phase 2 spawned");
                     
                     // Add a verification check to confirm phase 2 exists
@@ -133,6 +142,7 @@ public static partial class Module
                     
                     // Delete the monster and entity
                     ctx.Db.monsters.monster_id.Delete(monsterId);
+                    ctx.Db.monsters_boid.monster_id.Delete(monsterId);
                     
                     // Handle boss defeated (true victory!)
                     HandleBossDefeated(ctx);
@@ -153,6 +163,7 @@ public static partial class Module
                 
                 // Delete the monster
                 ctx.Db.monsters.monster_id.Delete(monsterId);
+                ctx.Db.monsters_boid.monster_id.Delete(monsterId);
             }
             
             return true;
@@ -506,15 +517,6 @@ public static partial class Module
             
             ctx.Db.world.world_id.Update(world);
         }
-
-        // Get world size from config
-        uint worldSize = 20000; // Default fallback (10x larger)
-        
-        if (configOpt != null)
-        {
-            worldSize = configOpt.Value.world_size;
-        }
-
         // Schedule the next game tick as a one-off event
         ctx.Db.game_tick_timer.Insert(new GameTickTimer
         {
@@ -522,9 +524,8 @@ public static partial class Module
         });
 
         ClearCollisionCacheForFrame();
-        //BuildDirectionLookupTable();
 
-        ProcessPlayerMovement(ctx, tick_rate, worldSize);
+        ProcessPlayerMovement(ctx, tick_rate, WORLD_SIZE);
         ProcessMonsterMovements(ctx);
         ProcessAttackMovements(ctx);
         MaintainGems(ctx);

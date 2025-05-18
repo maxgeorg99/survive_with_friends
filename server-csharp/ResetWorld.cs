@@ -25,6 +25,7 @@ public static partial class Module
         foreach (var monster in ctx.Db.monsters.Iter())
         {
             ctx.Db.monsters.monster_id.Delete(monster.monster_id);
+            ctx.Db.monsters_boid.monster_id.Delete(monster.monster_id);
             monsterCount++;
         }
         

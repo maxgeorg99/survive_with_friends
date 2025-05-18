@@ -1,5 +1,6 @@
 using SpacetimeDB;
 using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 public static partial class Module
@@ -16,12 +17,16 @@ public static partial class Module
 
     // --- Monster Collision ---
     private static readonly uint[] KeysMonster = new uint[MAX_MONSTERS];
+    //private static readonly uint[] KeyToCacheIndexMonster = new uint[MAX_MONSTERS];
+    private static readonly Dictionary<uint, uint> KeyToCacheIndexMonster = new Dictionary<uint, uint>(MAX_MONSTERS);
     private static readonly int[] CachedTargetPlayerOrdinalIndex = new int[MAX_MONSTERS];
     private static readonly int[] HeadsMonster = new int[NUM_WORLD_CELLS];
     private static readonly int[] NextsMonster = new int[MAX_MONSTERS];
     private static readonly int[] CellMonster = new int[MAX_MONSTERS];
     private static readonly float[] PosXMonster = new float[MAX_MONSTERS];
     private static readonly float[] PosYMonster = new float[MAX_MONSTERS];
+    private static readonly float[] VelXMonster = new float[MAX_MONSTERS];
+    private static readonly float[] VelYMonster = new float[MAX_MONSTERS];
     private static readonly float[] TargetXMonster = new float[MAX_MONSTERS];
     private static readonly float[] TargetYMonster = new float[MAX_MONSTERS];
     private static readonly float[] RadiusMonster = new float[MAX_MONSTERS];
@@ -68,9 +73,12 @@ public static partial class Module
         Array.Fill(NextsMonster, -1);
         Array.Fill(PosXMonster, 0);
         Array.Fill(PosYMonster, 0);
+        Array.Fill(VelXMonster, 0);
+        Array.Fill(VelYMonster, 0);
         Array.Fill(TargetXMonster, 0);
         Array.Fill(TargetYMonster, 0);
         Array.Fill(RadiusMonster, 0);
+        KeyToCacheIndexMonster.Clear();
 
         Array.Fill(KeysGem, (uint)0);
         Array.Fill(HeadsGem, -1);

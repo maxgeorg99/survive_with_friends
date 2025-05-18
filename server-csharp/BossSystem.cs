@@ -195,13 +195,24 @@ public static partial class Module
             speed = bestiaryEntry.Value.speed,
             target_player_id = closestPlayerId,
             target_player_ordinal_index = closestPlayerOrdinalIndex,
-            position = position,
-            radius = bestiaryEntry.Value.radius
+            radius = bestiaryEntry.Value.radius,
+            spawn_position = position
         });
         
         if (monsterOpt == null)
         {
             throw new Exception("SpawnBossPhaseTwo: Failed to create boss monster!");
+        }
+
+        MonsterBoid? boidOpt = ctx.Db.monsters_boid.Insert(new MonsterBoid
+        {
+            monster_id = monsterOpt.Value.monster_id,
+            position = position
+        }); 
+        
+        if (boidOpt == null)
+        {
+            throw new Exception("SpawnBossPhaseTwo: Failed to create boss boid!");
         }
         
         Log.Info($"Created phase 2 boss monster with ID: {monsterOpt.Value.monster_id}");

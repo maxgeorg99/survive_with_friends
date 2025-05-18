@@ -88,6 +88,7 @@ class SpacetimeDBClient {
                 "SELECT * FROM dead_players",
                 "SELECT * FROM entity",
                 "SELECT * FROM monsters",
+                "SELECT * FROM monsters_boid",
                 "SELECT * FROM active_attacks",
                 "SELECT * FROM attack_data",
                 "SELECT * FROM gems",
@@ -145,6 +146,13 @@ class SpacetimeDBClient {
             });
             connection.db.monsters.onDelete((ctx, monster) => {
                 this.gameEvents.emit(GameEvents.MONSTER_DELETED, ctx, monster);
+            });
+        }
+
+        // Monster Boid Events
+        if (connection.db.monstersBoid) {
+            connection.db.monstersBoid.onUpdate((ctx, oldBoid, newBoid) => {
+                this.gameEvents.emit(GameEvents.MONSTER_BOID_UPDATED, ctx, oldBoid, newBoid);
             });
         }
 
