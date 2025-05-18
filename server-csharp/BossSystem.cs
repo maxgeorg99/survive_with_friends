@@ -179,10 +179,8 @@ public static partial class Module
             throw new Exception($"SpawnBossPhaseTwo: Could not find bestiary entry for boss phase 2!");
         }
         
-        Log.Info($"Retrieved bestiary entry for FinalBossPhase2: HP={bestiaryEntry.Value.max_hp}, Speed={bestiaryEntry.Value.speed}, Radius={bestiaryEntry.Value.radius}");
-        
         // Find the closest player to target
-        (uint closestPlayerId, int closestPlayerOrdinalIndex) = GetClosestPlayer(ctx, position);
+        var closestPlayerId = GetClosestPlayer(ctx, position);
         
         // Create the boss monster
         Log.Info($"Creating phase 2 boss monster...");
@@ -194,7 +192,6 @@ public static partial class Module
             atk = bestiaryEntry.Value.atk,
             speed = bestiaryEntry.Value.speed,
             target_player_id = closestPlayerId,
-            target_player_ordinal_index = closestPlayerOrdinalIndex,
             radius = bestiaryEntry.Value.radius,
             spawn_position = position
         });

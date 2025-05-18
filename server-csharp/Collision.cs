@@ -19,7 +19,7 @@ public static partial class Module
     private static readonly uint[] KeysMonster = new uint[MAX_MONSTERS];
     //private static readonly uint[] KeyToCacheIndexMonster = new uint[MAX_MONSTERS];
     private static readonly Dictionary<uint, uint> KeyToCacheIndexMonster = new Dictionary<uint, uint>(MAX_MONSTERS);
-    private static readonly int[] CachedTargetPlayerOrdinalIndex = new int[MAX_MONSTERS];
+    private static readonly Dictionary<uint, uint> TargetPlayerIdToCacheIndex = new Dictionary<uint, uint>(MAX_PLAYERS);
     private static readonly int[] HeadsMonster = new int[NUM_WORLD_CELLS];
     private static readonly int[] NextsMonster = new int[MAX_MONSTERS];
     private static readonly int[] CellMonster = new int[MAX_MONSTERS];
@@ -27,6 +27,7 @@ public static partial class Module
     private static readonly float[] PosYMonster = new float[MAX_MONSTERS];
     private static readonly float[] VelXMonster = new float[MAX_MONSTERS];
     private static readonly float[] VelYMonster = new float[MAX_MONSTERS];
+    private static readonly int[] TargetIdMonster = new int[MAX_MONSTERS];
     private static readonly float[] TargetXMonster = new float[MAX_MONSTERS];
     private static readonly float[] TargetYMonster = new float[MAX_MONSTERS];
     private static readonly float[] RadiusMonster = new float[MAX_MONSTERS];
@@ -67,7 +68,6 @@ public static partial class Module
         Array.Fill(RadiusPlayer, 0);
 
         Array.Fill(KeysMonster, (uint)0);
-        Array.Fill(CachedTargetPlayerOrdinalIndex, -1);
         Array.Fill(CellMonster, 0);
         Array.Fill(HeadsMonster, -1);
         Array.Fill(NextsMonster, -1);
@@ -75,10 +75,12 @@ public static partial class Module
         Array.Fill(PosYMonster, 0);
         Array.Fill(VelXMonster, 0);
         Array.Fill(VelYMonster, 0);
+        Array.Fill(TargetIdMonster, -1);
         Array.Fill(TargetXMonster, 0);
         Array.Fill(TargetYMonster, 0);
         Array.Fill(RadiusMonster, 0);
         KeyToCacheIndexMonster.Clear();
+        TargetPlayerIdToCacheIndex.Clear();
 
         Array.Fill(KeysGem, (uint)0);
         Array.Fill(HeadsGem, -1);
@@ -121,19 +123,5 @@ public static partial class Module
         
         // If distance squared is less than minimum distance squared, they are colliding
         return distanceSquared < minDistanceSquared;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static float FastInvSqrt(float x)
-    {
-        unsafe
-        {
-            float xhalf = 0.5f * x;
-            int i = *(int*)&x;              // get bits for floating value
-            i = 0x5f3759df - (i >> 1);      // initial guess
-            x = *(float*)&i;                // convert bits back to float
-            x = x * (1.5f - xhalf * x * x); // one Newton-Raphson iteration
-            return x;
-        }
     }
 }

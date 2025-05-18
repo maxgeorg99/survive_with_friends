@@ -8,8 +8,6 @@ public static partial class Module
     {
         [PrimaryKey, AutoInc]
         public uint player_id;
-        public int ordinal_index;
-
         public string name;
 
         public uint spawn_grace_period_remaining;
@@ -165,6 +163,7 @@ public static partial class Module
     private static void ProcessPlayerMovement(ReducerContext ctx, uint tick_rate, uint worldSize)
     {
         // Process all movable players
+        CachedCountPlayers = 0;
         foreach (var player in ctx.Db.player.Iter())
         {
             var modifiedPlayer = player;
@@ -242,6 +241,8 @@ public static partial class Module
             CellPlayer[CachedCountPlayers] = gridCellKey;
             NextsPlayer[CachedCountPlayers] = HeadsPlayer[gridCellKey];
             HeadsPlayer[gridCellKey] = (int)CachedCountPlayers;
+
+            TargetPlayerIdToCacheIndex[modifiedPlayer.player_id] = (uint)CachedCountPlayers;
 
             CachedCountPlayers++;
         }

@@ -28,7 +28,6 @@ public static partial class Module
         public float atk;
         public float speed;
         public uint target_player_id;
-        public int target_player_ordinal_index;
         // entity attributes
         public float radius;
         public DbVector2 spawn_position;
@@ -219,7 +218,7 @@ public static partial class Module
         }
         
         // Find the closest player to target
-        (uint closestPlayerId, int closestPlayerOrdinalIndex) = GetClosestPlayer(ctx, spawner.position);
+        uint closestPlayerId = GetClosestPlayer(ctx, spawner.position);
         
         // Create the monster
         Monsters? monsterOpt = ctx.Db.monsters.Insert(new Monsters
@@ -230,7 +229,6 @@ public static partial class Module
             atk = bestiaryEntry.Value.atk,
             speed = bestiaryEntry.Value.speed,
             target_player_id = closestPlayerId,
-            target_player_ordinal_index = closestPlayerOrdinalIndex,
             radius = bestiaryEntry.Value.radius,
             spawn_position = spawner.position
         });
@@ -263,10 +261,9 @@ public static partial class Module
         }
     }
 
-    private static (uint, int) GetClosestPlayer(ReducerContext ctx, DbVector2 position)
+    private static uint GetClosestPlayer(ReducerContext ctx, DbVector2 position)
     {
         uint closestPlayerId = 0;
-        int closestPlayerOrdinalIndex = -1;
         float closestDistance = float.MaxValue;
         
         foreach (var player in ctx.Db.player.Iter())
@@ -281,12 +278,11 @@ public static partial class Module
             {
                 closestDistance = distanceSquared;
                 closestPlayerId = player.player_id;
-                closestPlayerOrdinalIndex = player.ordinal_index;
             }
         }
 
         //Pair of closest player and its ordinal index
-        return (closestPlayerId, closestPlayerOrdinalIndex);
+        return closestPlayerId;
     }
     
     // Method to schedule monster spawning - called from Init in Lib.cs
@@ -340,7 +336,7 @@ public static partial class Module
         // Clean up monster status
         for(int i = 0; i < CachedCountMonsters; i += 1)
         {
-            if(CachedTargetPlayerOrdinalIndex[i] == -1)
+            if(TargetIdMonster[i] == -1)
             {
                 var monster = ctx.Db.monsters.monster_id.Find(KeysMonster[i]);
                 if(monster is not null)
@@ -413,7 +409,7 @@ public static partial class Module
                 Log.Info($"Monster {KeysMonster[i]} position: {PosXMonster[i]}, {PosYMonster[i]}");
             }
 
-            if(CachedTargetPlayerOrdinalIndex[i] == -1)
+            if(TargetIdMonster[i] == -1)
             {
                 var monster = ctx.Db.monsters.monster_id.Find(KeysMonster[i]);
                 if(monster is not null)
@@ -427,6 +423,7 @@ public static partial class Module
     private static void CalculateMonsterSpatialHashGrid(ReducerContext ctx)
     {
         // Reset the spatial hash grid
+        Array.Fill(CellMonster, -1);
         Array.Fill(HeadsMonster, -1);
         Array.Fill(NextsMonster, -1);
 
@@ -436,6 +433,7 @@ public static partial class Module
             ushort gridCellKey = GetWorldCellFromPosition(PosXMonster[mid], PosYMonster[mid]);
             NextsMonster[mid] = HeadsMonster[gridCellKey];
             HeadsMonster[gridCellKey] = mid;
+            CellMonster[mid] = gridCellKey;
         }
     }
 
@@ -444,17 +442,26 @@ public static partial class Module
         CachedCountMonsters = 0;
         foreach (var monster in ctx.Db.monsters.Iter())
         {
-            CachedTargetPlayerOrdinalIndex[CachedCountMonsters] = monster.target_player_ordinal_index;
-
             KeysMonster[CachedCountMonsters] = monster.monster_id;
             KeyToCacheIndexMonster[monster.monster_id] = (uint)CachedCountMonsters;
             RadiusMonster[CachedCountMonsters] = monster.radius;
             SpeedMonster[CachedCountMonsters] = monster.speed;
 
-            if(monster.target_player_ordinal_index != -1)
+            var targetPlayerId = monster.target_player_id;
+            if(TargetPlayerIdToCacheIndex.ContainsKey(targetPlayerId))
             {
-                TargetXMonster[CachedCountMonsters] = PosXPlayer[monster.target_player_ordinal_index];
-                TargetYMonster[CachedCountMonsters] = PosYPlayer[monster.target_player_ordinal_index];
+                TargetIdMonster[CachedCountMonsters] = (int)targetPlayerId;
+            }
+            else
+            {
+                TargetIdMonster[CachedCountMonsters] = -1;
+            }
+
+            if(TargetIdMonster[CachedCountMonsters] != -1)
+            {
+                var playerCacheIdx = TargetPlayerIdToCacheIndex[(uint)TargetIdMonster[CachedCountMonsters]];
+                TargetXMonster[CachedCountMonsters] = PosXPlayer[playerCacheIdx];
+                TargetYMonster[CachedCountMonsters] = PosYPlayer[playerCacheIdx];
             }
             else
             {
@@ -476,9 +483,9 @@ public static partial class Module
             VelYMonster[monsterCacheIdx] = boid.velocity.y;
 
             ushort gridCellKey = GetWorldCellFromPosition(boid.position.x, boid.position.y);
-            CellMonster[CachedCountMonsters] = gridCellKey;
-            NextsMonster[CachedCountMonsters] = HeadsMonster[gridCellKey];
-            HeadsMonster[gridCellKey] = CachedCountMonsters;
+            CellMonster[monsterCacheIdx] = gridCellKey;
+            NextsMonster[monsterCacheIdx] = HeadsMonster[gridCellKey];
+            HeadsMonster[gridCellKey] = (ushort)monsterCacheIdx;
 
             boidIdx++;
         }
@@ -492,6 +499,9 @@ public static partial class Module
             var boidUpdated = boid;
             boidUpdated.position.x = Math.Clamp(PosXMonster[monsterCacheIdx], RadiusMonster[monsterCacheIdx], WORLD_SIZE - RadiusMonster[monsterCacheIdx]);
             boidUpdated.position.y = Math.Clamp(PosYMonster[monsterCacheIdx], RadiusMonster[monsterCacheIdx], WORLD_SIZE - RadiusMonster[monsterCacheIdx]);
+
+            boidUpdated.velocity.x = VelXMonster[monsterCacheIdx];
+            boidUpdated.velocity.y = VelYMonster[monsterCacheIdx];
 
             ctx.Db.monsters_boid.monster_id.Update(boidUpdated);
         }
@@ -516,7 +526,8 @@ public static partial class Module
         // Update the monster with the new target
         var updatedMonster = monster;
         updatedMonster.target_player_id = newTarget.player_id;
-        updatedMonster.target_player_ordinal_index = newTarget.ordinal_index;
+        var monsterCacheIdx = KeyToCacheIndexMonster[monster.monster_id];
+        TargetIdMonster[monsterCacheIdx] = (int)newTarget.player_id;
         ctx.Db.monsters.monster_id.Update(updatedMonster);
     }
 
@@ -652,14 +663,12 @@ public static partial class Module
                     if ((uint)nx >= WORLD_GRID_WIDTH) continue;
 
                     int key = rowBase | nx;
-
                     for (int iB = HeadsMonster[key];
                         iB != -1;
                         iB  = NextsMonster[iB])
                     {
                         if (iB <= iA) continue;          // unordered pair once
 
-                        Log.Info($"Pushing monster {iA} and {iB} apart");
 
                         float dxAB = ax - PosXMonster[iB];
                         float dyAB = ay - PosYMonster[iB];

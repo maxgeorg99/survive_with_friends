@@ -250,9 +250,6 @@ public static partial class Module
             //Delete the player from the player table
             ctx.Db.player.player_id.Delete(player_id);
             
-            //Repair the player ordinal index for players and monsters
-            RepairPlayerOrdinalIndexAfterDeletion(ctx, player_id);
-            
             // Check if all players are now dead
             if (ctx.Db.player.Count == 0)
             {
@@ -270,59 +267,7 @@ public static partial class Module
 
             return false;
         }
-    }
-
-    private static void RepairPlayerOrdinalIndexAfterDeletion(ReducerContext ctx, uint removedIndex)
-    {
-        var players = ctx.Db.player.Iter();
-        int ordinal_index = 0;
-        foreach (var player in players) 
-        {
-            //Skip until we find a hole in the ordinal indices
-            if(ordinal_index < removedIndex)
-            {
-                ordinal_index++;
-                continue;
-            }
-            else if(ordinal_index == removedIndex)
-            {
-                //Set monster target ordinal index to -1
-                var monsters = ctx.Db.monsters.Iter();
-                foreach (var monster in monsters)
-                {
-                    if (monster.target_player_ordinal_index == removedIndex)
-                    {
-                        var modifiedMonster = monster;
-                        modifiedMonster.target_player_ordinal_index = -1;
-                        ctx.Db.monsters.monster_id.Update(modifiedMonster);
-                    }
-                }
-                ordinal_index++;
-                continue;
-            }
-            else
-            {
-                var modifiedPlayer = player;
-                var newOrdinalIndex = ordinal_index;
-
-                //Fix monster target ordinal index  
-                var monsters = ctx.Db.monsters.Iter();
-                foreach (var monster in monsters)
-                {
-                    if (monster.target_player_ordinal_index == player.ordinal_index)
-                    {
-                        var modifiedMonster = monster;
-                        modifiedMonster.target_player_ordinal_index = newOrdinalIndex;
-                        ctx.Db.monsters.monster_id.Update(modifiedMonster);
-                    }
-                }   
-
-                modifiedPlayer.ordinal_index = newOrdinalIndex;
-                ctx.Db.player.player_id.Update(modifiedPlayer);
-                ordinal_index++;
-            }
-        }
-    }   
+    }  
     
     // Helper method to clean up all attack-related data for a player
     private static void CleanupPlayerAttacks(ReducerContext ctx, uint playerId)

@@ -352,6 +352,8 @@ public static partial class Module
             //Check against all gems in the same spatial hash cell
             var cellKey = GetWorldCellFromPosition(px, py);
 
+            var realPlayerId = KeysPlayer[pid];
+
             int cx =  cellKey & WORLD_CELL_MASK;
             int cy = cellKey >> WORLD_CELL_BIT_SHIFT;
 
