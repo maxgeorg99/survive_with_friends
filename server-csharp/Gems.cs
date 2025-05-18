@@ -157,6 +157,12 @@ public static partial class Module
     // Spawns a gem at the position of a killed monster
     public static void SpawnGemOnMonsterDeath(ReducerContext ctx, uint monsterId, DbVector2 position)
     {
+        if(CachedCountGems >= MAX_GEM_COUNT)
+        {
+            //TODO grow gems
+            return;
+        }
+
         // Get monster data to determine gem drop chance and level
         var monsterOpt = ctx.Db.monsters.monster_id.Find(monsterId);
         if (monsterOpt == null)
@@ -317,6 +323,12 @@ public static partial class Module
             var gemEntityOpt = ctx.Db.entity.entity_id.Find(gem.entity_id);
             if(gemEntityOpt == null)
             {
+                continue;
+            }
+
+            if(CachedCountGems >= MAX_GEM_COUNT)
+            {
+                //TODO grow gems
                 continue;
             }
 

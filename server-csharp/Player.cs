@@ -31,6 +31,9 @@ public static partial class Module
         // entity attributes
         public DbVector2 position;  
         public float radius;   
+
+        // Bot flag
+        public bool is_bot;           // Whether this player is a bot
     }
 
     // Table to store dead players for run history purposes
@@ -160,7 +163,7 @@ public static partial class Module
         }
     }
 
-    private static void ProcessPlayerMovement(ReducerContext ctx, uint tick_rate, uint worldSize)
+    private static void ProcessPlayerMovement(ReducerContext ctx, uint tick_rate)
     {
         // Process all movable players
         CachedCountPlayers = 0;
@@ -171,7 +174,6 @@ public static partial class Module
             // Update player status
             if(player.spawn_grace_period_remaining > 0)
             {
-                
                 if(modifiedPlayer.spawn_grace_period_remaining >= tick_rate)
                 {
                     modifiedPlayer.spawn_grace_period_remaining -= tick_rate;
@@ -183,48 +185,56 @@ public static partial class Module
                 ctx.Db.player.player_id.Update(modifiedPlayer);
             }
 
-            // Process player movement
-            float moveSpeed = player.speed;
-
-            if (player.has_waypoint)
+            // Skip movement for bot players
+            if (!player.is_bot)
             {
-                // Calculate direction to waypoint
-                var directionVector = new DbVector2(
-                    player.waypoint.x - player.position.x,
-                    player.waypoint.y - player.position.y
-                );
-                
-                // Calculate distance to waypoint
-                float distanceToWaypoint = directionVector.Magnitude();
-                
-                // If we're close enough to the waypoint, stop moving
-                const float WAYPOINT_REACHED_DISTANCE = 5.0f;
-                if (distanceToWaypoint < WAYPOINT_REACHED_DISTANCE)
+                // Process player movement
+                float moveSpeed = player.speed;
+
+                if (player.has_waypoint)
                 {
-                    // Reached waypoint, stop moving
-                    modifiedPlayer.has_waypoint = false;
-                    ctx.Db.player.player_id.Update(modifiedPlayer);
-                }
-                else
-                {
-                    // Calculate new position based on direction, speed and time delta
-                    float moveDistance = moveSpeed * DELTA_TIME;
-                    var moveOffset = directionVector.Normalize() * moveDistance;
-                    
-                    // Update entity with new position
-                    modifiedPlayer.position = modifiedPlayer.position + moveOffset;
-                    
-                    // Apply world boundary clamping using entity radius
-                    modifiedPlayer.position.x = Math.Clamp(
-                        modifiedPlayer.position.x, 
-                        modifiedPlayer.radius, 
-                        worldSize - modifiedPlayer.radius
+                    // Calculate direction to waypoint
+                    var directionVector = new DbVector2(
+                        player.waypoint.x - player.position.x,
+                        player.waypoint.y - player.position.y
                     );
-                    modifiedPlayer.position.y = Math.Clamp(
-                        modifiedPlayer.position.y, 
-                        modifiedPlayer.radius, 
-                        worldSize - modifiedPlayer.radius
+                    
+                    // Calculate distance to waypoint
+                    float distance = (float)Math.Sqrt(
+                        directionVector.x * directionVector.x + 
+                        directionVector.y * directionVector.y
                     );
+                    
+                    // If we're close enough to the waypoint, clear it
+                    if (distance < moveSpeed * DELTA_TIME)
+                    {
+                        modifiedPlayer.has_waypoint = false;
+
+                        modifiedPlayer.position.x = modifiedPlayer.waypoint.x;
+                        modifiedPlayer.position.y = modifiedPlayer.waypoint.y;
+                    }
+                    else
+                    {
+                        // Normalize direction vector
+                        directionVector.x /= distance;
+                        directionVector.y /= distance;
+                        
+                        // Move towards waypoint
+                        modifiedPlayer.position.x += directionVector.x * moveSpeed * DELTA_TIME;
+                        modifiedPlayer.position.y += directionVector.y * moveSpeed * DELTA_TIME;
+                        
+                        // Clamp position to world boundaries
+                        modifiedPlayer.position.x = Math.Clamp(
+                            modifiedPlayer.position.x, 
+                            modifiedPlayer.radius, 
+                            WORLD_SIZE - modifiedPlayer.radius
+                        );
+                        modifiedPlayer.position.y = Math.Clamp(
+                            modifiedPlayer.position.y, 
+                            modifiedPlayer.radius, 
+                            WORLD_SIZE - modifiedPlayer.radius
+                        );
+                    }
                     
                     // Update entity in database
                     ctx.Db.player.player_id.Update(modifiedPlayer);

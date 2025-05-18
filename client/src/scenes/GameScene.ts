@@ -102,6 +102,7 @@ export default class GameScene extends Phaser.Scene {
         background: Phaser.GameObjects.Rectangle;
         playerDot: Phaser.GameObjects.Arc;
         border: Phaser.GameObjects.Rectangle;
+        botDotsContainer?: Phaser.GameObjects.Container;
     } | null = null;
     
     private localPlayerId: number = 0;
@@ -242,6 +243,9 @@ export default class GameScene extends Phaser.Scene {
             
             // Add R key for rerolling upgrades
             this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R).on('down', this.rerollUpgrades, this);
+
+            // Add B key for spawning bots
+            this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.B).on('down', this.spawnBot, this);
         }
         console.log("Keyboard input set up.");
 
@@ -1534,7 +1538,7 @@ export default class GameScene extends Phaser.Scene {
     
     // Update the minimap with player's position
     private updateMinimap() {
-        if (!this.minimap || !this.localPlayerSprite) return;
+        if (!this.minimap || !this.localPlayerSprite || !this.minimap.botDotsContainer) return;
         
         // Get world bounds and minimap size
         const worldBounds = this.physics.world.bounds;
@@ -1547,6 +1551,29 @@ export default class GameScene extends Phaser.Scene {
         // Position player dot on minimap based on world position
         this.minimap.playerDot.x = ratioX * minimapSize;
         this.minimap.playerDot.y = ratioY * minimapSize;
+
+        // Update bot dots
+        if (this.spacetimeDBClient.sdkConnection?.db) {
+            // Clear existing bot dots
+            this.minimap.botDotsContainer.removeAll(true);
+
+            // Add dots for all bot players
+            for (const player of this.spacetimeDBClient.sdkConnection.db.player.iter()) {
+                if (player.isBot) {
+                    const botRatioX = player.position.x / worldBounds.width;
+                    const botRatioY = player.position.y / worldBounds.height;
+                    
+                    const botDot = this.add.circle(
+                        botRatioX * minimapSize,
+                        botRatioY * minimapSize,
+                        5, // Same size as player dot
+                        0x800080, // Purple color
+                        1
+                    );
+                    this.minimap.botDotsContainer.add(botDot);
+                }
+            }
+        }
     }
 
     // Force a synchronization of player entities
@@ -2218,9 +2245,12 @@ export default class GameScene extends Phaser.Scene {
             0xFFFFFF,
             1
         );
+
+        // Create container for bot dots
+        const botDotsContainer = this.add.container(0, 0);
         
         // Add all elements to container
-        container.add([background, border, playerDot]);
+        container.add([background, border, playerDot, botDotsContainer]);
         
         // Fix to camera so it doesn't move with world
         container.setScrollFactor(0);
@@ -2233,7 +2263,8 @@ export default class GameScene extends Phaser.Scene {
             container,
             background,
             playerDot,
-            border
+            border,
+            botDotsContainer
         };
         
         console.log("Minimap created");
@@ -2414,5 +2445,16 @@ export default class GameScene extends Phaser.Scene {
             expBar.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
             expBar.setDepth(BASE_DEPTH + this.localPlayerSprite.y + EXP_BAR_DEPTH_OFFSET);
         }
+    }
+
+    // Add the spawnBot method
+    private spawnBot(): void {
+        if (!this.spacetimeDBClient.sdkConnection?.db) {
+            console.log("Cannot spawn bot: Connection not available");
+            return;
+        }
+        
+        console.log("Spawning bot...");
+        this.spacetimeDBClient.sdkConnection.reducers.spawnBot();
     }
 }

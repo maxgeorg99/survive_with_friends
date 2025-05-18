@@ -470,7 +470,7 @@ public static partial class Module
 
         ClearCollisionCacheForFrame();
 
-        ProcessPlayerMovement(ctx, tick_rate, WORLD_SIZE);
+        ProcessPlayerMovement(ctx, tick_rate);
         ProcessMonsterMovements(ctx);
         ProcessAttackMovements(ctx);
         MaintainGems(ctx);

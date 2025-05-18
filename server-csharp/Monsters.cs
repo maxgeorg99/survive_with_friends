@@ -38,8 +38,8 @@ public static partial class Module
     {
         [PrimaryKey]
         public uint monster_id;
+
         public DbVector2 position;
-        public DbVector2 velocity;
     }
 
     // Timer table for spawning monsters
@@ -203,7 +203,7 @@ public static partial class Module
         
         // Check if we're at monster capacity (player could have spawned during delay)
         var monsterCount = ctx.Db.monsters.Count;
-        if (monsterCount >= config.max_monsters)
+        if (monsterCount >= config.max_monsters && spawner.monster_type != MonsterType.FinalBossPhase1 && spawner.monster_type != MonsterType.FinalBossPhase2)
         {
             //TODO: If we're at monster capacity, we need to make sure we can still spawn the boss.
             Log.Info($"SpawnMonster: At maximum monster capacity ({monsterCount}/{config.max_monsters}), skipping spawn.");
@@ -242,8 +242,7 @@ public static partial class Module
         MonsterBoid? boidOpt = ctx.Db.monsters_boid.Insert(new MonsterBoid
         {
             monster_id = monsterOpt.Value.monster_id,
-            position = spawner.position,
-            velocity = new DbVector2(0, 0)
+            position = spawner.position
         }); 
 
         if (boidOpt is null)
@@ -479,8 +478,6 @@ public static partial class Module
 
             PosXMonster[monsterCacheIdx] = boid.position.x;
             PosYMonster[monsterCacheIdx] = boid.position.y;
-            VelXMonster[monsterCacheIdx] = boid.velocity.x;
-            VelYMonster[monsterCacheIdx] = boid.velocity.y;
 
             ushort gridCellKey = GetWorldCellFromPosition(boid.position.x, boid.position.y);
             CellMonster[monsterCacheIdx] = gridCellKey;
@@ -499,9 +496,6 @@ public static partial class Module
             var boidUpdated = boid;
             boidUpdated.position.x = Math.Clamp(PosXMonster[monsterCacheIdx], RadiusMonster[monsterCacheIdx], WORLD_SIZE - RadiusMonster[monsterCacheIdx]);
             boidUpdated.position.y = Math.Clamp(PosYMonster[monsterCacheIdx], RadiusMonster[monsterCacheIdx], WORLD_SIZE - RadiusMonster[monsterCacheIdx]);
-
-            boidUpdated.velocity.x = VelXMonster[monsterCacheIdx];
-            boidUpdated.velocity.y = VelYMonster[monsterCacheIdx];
 
             ctx.Db.monsters_boid.monster_id.Update(boidUpdated);
         }
@@ -647,6 +641,7 @@ public static partial class Module
             float rA = RadiusMonster[iA];
 
             int keyA = CellMonster[iA];
+            uint monsterIdA = KeysMonster[iA];
             int cx   =  keyA & WORLD_CELL_MASK;
             int cy   = keyA >> WORLD_CELL_BIT_SHIFT;
 
@@ -669,14 +664,13 @@ public static partial class Module
                     {
                         if (iB <= iA) continue;          // unordered pair once
 
-
                         float dxAB = ax - PosXMonster[iB];
                         float dyAB = ay - PosYMonster[iB];
-                        float d2   = MathF.Max(dxAB * dxAB + dyAB * dyAB, 0.01f);
+                        float d2   = MathF.Max(dxAB * dxAB + dyAB * dyAB, 0.1f);
 
                         float rSum  = rA + RadiusMonster[iB];
                         float rSum2 = rSum * rSum;
-                        if (d2 >= rSum2) continue;       // no overlap
+                        if (d2 >= rSum2) continue;
 
                         // ---- penetration & normal (inv-sqrt) -----------------
                         float invLen = (float)Math.ReciprocalSqrtEstimate(d2);
@@ -684,23 +678,24 @@ public static partial class Module
                         float nxAB        = dxAB * invLen;
                         float nyAB        = dyAB * invLen;
 
-                        float pushFactor = 4.0f;
+                        float pushFactor = 0.5f;
+                        float pushPower = penetration * penetration * pushFactor;
 
-                        // Only push one monster away from the other
-                        /*
-                        if(KeysMonster[iA] > KeysMonster[iB])
+                        float pushX = Math.Clamp(nxAB * pushPower, -rSum, rSum);
+                        float pushY = Math.Clamp(nyAB * pushPower, -rSum, rSum);
+
+                        //Push the younger monster away from the older monster
+                        uint monsterIdB = KeysMonster[iB];
+                        if(monsterIdA > monsterIdB)
                         {
-                            PosXMonster[iA] += nxAB * penetration * pushFactor;
-                            PosYMonster[iA] += nyAB * penetration * pushFactor;
+                            PosXMonster[iA] = Math.Clamp(PosXMonster[iA] + pushX, rA, WORLD_SIZE - rA);
+                            PosYMonster[iA] = Math.Clamp(PosYMonster[iA] + pushY, rA, WORLD_SIZE - rA);
                         }
                         else
                         {
-                            PosXMonster[iB] -= nxAB * penetration * pushFactor;
-                            PosYMonster[iB] -= nyAB * penetration * pushFactor;
+                            PosXMonster[iB] = Math.Clamp(PosXMonster[iB] - pushX, rA, WORLD_SIZE - rA);
+                            PosYMonster[iB] = Math.Clamp(PosYMonster[iB] - pushY, rA, WORLD_SIZE - rA);
                         }
-                        */
-                        PosXMonster[iA] += nxAB * penetration * pushFactor;
-                        PosYMonster[iA] += nyAB * penetration * pushFactor;
                     }
                 }
             }

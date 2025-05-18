@@ -400,7 +400,8 @@ public static partial class Module
             unspent_upgrades = 0,
             rerolls = 999,
             position = position,
-            radius = 48.0f
+            radius = 48.0f,
+            is_bot = false
         });
 
         // Check if player insertion failed
