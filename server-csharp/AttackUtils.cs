@@ -148,29 +148,5 @@ public static partial class Module
 
             return nearestEnemy;
         }
-
-        // Helper to normalize a direction vector, with default fallback
-        private static DbVector2 GetNormalizedDirection(DbVector2 direction)
-        {
-            // If the entity has no direction (not moving), use a default direction
-            if (direction.x == 0 && direction.y == 0)
-            {
-                // Default to right direction if no movement direction
-                return new DbVector2(1, 0);
-            }
-            else
-            {
-                // Normalize the direction vector
-                var length = Math.Sqrt(direction.x * direction.x + direction.y * direction.y);
-                if (length > 0)
-                {
-                    return new DbVector2((float)(direction.x / length), (float)(direction.y / length));
-                }
-                else
-                {
-                    return new DbVector2(1, 0); // Fallback
-                }
-            }
-        }
     }
 } 

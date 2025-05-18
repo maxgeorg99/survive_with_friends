@@ -123,7 +123,7 @@ public static partial class Module
             return 0;
         }
 
-        Log.Info($"Created {level} gem (ID: {gemOpt.Value.gem_id}) at position {position.x}, {position.y}");
+        //Log.Info($"Created {level} gem (ID: {gemOpt.Value.gem_id}) at position {position.x}, {position.y}");
         return gemOpt.Value.gem_id;
     }
 
@@ -172,7 +172,7 @@ public static partial class Module
         if (roll <= dropChance)
         {
             SpawnRandomGem(ctx, position);
-            Log.Info($"Monster {monsterId} dropped a gem at position {position.x}, {position.y}");
+            //Log.Info($"Monster {monsterId} dropped a gem at position {position.x}, {position.y}");
         }
     }
 
@@ -268,7 +268,7 @@ public static partial class Module
         }
         else
         {
-            Log.Info($"Player {playerId} gained {expAmount} exp. Now: {newExp}/{expNeeded}");
+            //Log.Info($"Player {playerId} gained {expAmount} exp. Now: {newExp}/{expNeeded}");
         }
         
         // Update player record
@@ -297,7 +297,7 @@ public static partial class Module
         GivePlayerExp(ctx, playerId, expValue);
 
         // Log the collection
-        Log.Info($"Player {playerId} collected a {gem.level} gem worth {expValue} exp");
+        //Log.Info($"Player {playerId} collected a {gem.level} gem worth {expValue} exp");
 
         // Delete the gem and its entity
         ctx.Db.gems.gem_id.Delete(gemId);

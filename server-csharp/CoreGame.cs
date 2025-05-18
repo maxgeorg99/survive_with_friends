@@ -62,7 +62,7 @@ public static partial class Module
         if (monster.hp <= damageAmount)
         {
             // Monster is dead - log and delete
-            Log.Info($"Monster {monster.monster_id} (type: {monster.bestiary_id}) was killed!");
+            //Log.Info($"Monster {monster.monster_id} (type: {monster.bestiary_id}) was killed!");
             
             // Get the monster's position before deleting it
             DbVector2 position = default;

@@ -27,10 +27,11 @@ public static partial class Module
         // Get normalized vector (direction only)
         public DbVector2 Normalize()
         {
-            float mag = Magnitude();
-            if (mag > 0)
+            float d2 = x * x + y * y;
+            if (d2 > 0)
             {
-                return new DbVector2(x / mag, y / mag);
+                float inv_mag = (float)Math.ReciprocalSqrtEstimate(d2);
+                return new DbVector2(x * inv_mag, y * inv_mag);
             }
             return new DbVector2(0, 0);
         }
@@ -38,7 +39,7 @@ public static partial class Module
         // Get magnitude (length) of vector
         public float Magnitude()
         {
-            return MathF.Sqrt(x * x + y * y);
+            return (float)Math.Sqrt(x * x + y * y);
         }
         
         // Vector addition

@@ -317,7 +317,7 @@ public static partial class Module
             var dist_y = TargetYMonster[i] - PosYMonster[i];
 
             var dist_squared = dist_x * dist_x + dist_y * dist_y;
-            var inv_dist = 1.0f / MathF.Sqrt(dist_squared); 
+            var inv_dist = (float)Math.ReciprocalSqrtEstimate(dist_squared);
 
             var norm_x = dist_x * inv_dist;
             var norm_y = dist_y * inv_dist;
@@ -388,7 +388,7 @@ public static partial class Module
             var dist_y = TargetYMonster[i] - PosYMonster[i];
 
             var dist_squared = dist_x * dist_x + dist_y * dist_y;
-            var inv_dist = 1.0f / MathF.Sqrt(dist_squared); 
+            var inv_dist = (float)Math.ReciprocalSqrtEstimate(dist_squared);
 
             var norm_x = dist_x * inv_dist;
             var norm_y = dist_y * inv_dist;
@@ -672,25 +672,35 @@ public static partial class Module
 
                         float dxAB = ax - PosXMonster[iB];
                         float dyAB = ay - PosYMonster[iB];
-                        float d2   = dxAB * dxAB + dyAB * dyAB;
+                        float d2   = MathF.Max(dxAB * dxAB + dyAB * dyAB, 0.01f);
 
                         float rSum  = rA + RadiusMonster[iB];
                         float rSum2 = rSum * rSum;
                         if (d2 >= rSum2) continue;       // no overlap
 
                         // ---- penetration & normal (inv-sqrt) -----------------
-                        float dist = Math.Max(MathF.Sqrt(d2), 0.001f);
-                        float invLen      = 1.0f / dist;
-                        float penetration = rSum - (dist * 0.5f);
+                        float invLen = (float)Math.ReciprocalSqrtEstimate(d2);
+                        float penetration = rSum2 / d2;
                         float nxAB        = dxAB * invLen;
                         float nyAB        = dyAB * invLen;
 
-                        float pushFactor = 0.1f;
+                        float pushFactor = 4.0f;
 
+                        // Only push one monster away from the other
+                        /*
+                        if(KeysMonster[iA] > KeysMonster[iB])
+                        {
+                            PosXMonster[iA] += nxAB * penetration * pushFactor;
+                            PosYMonster[iA] += nyAB * penetration * pushFactor;
+                        }
+                        else
+                        {
+                            PosXMonster[iB] -= nxAB * penetration * pushFactor;
+                            PosYMonster[iB] -= nyAB * penetration * pushFactor;
+                        }
+                        */
                         PosXMonster[iA] += nxAB * penetration * pushFactor;
                         PosYMonster[iA] += nyAB * penetration * pushFactor;
-                        PosXMonster[iB] -= nxAB * penetration * pushFactor;
-                        PosYMonster[iB] -= nyAB * penetration * pushFactor;
                     }
                 }
             }
@@ -746,7 +756,7 @@ public static partial class Module
             scheduled_at = new ScheduleAt.Time(ctx.Timestamp + TimeSpan.FromMilliseconds(cleanupDelay))
         });
         
-        Log.Info($"Recorded monster {monsterId} hit by attack {attackEntityId}, cleanup scheduled in {cleanupDelay}ms");
+        //Log.Info($"Recorded monster {monsterId} hit by attack {attackEntityId}, cleanup scheduled in {cleanupDelay}ms");
     }
 
         // Reducer to clean up a monster hit record
