@@ -1,6 +1,6 @@
 {
   "name": "vibe_survivors_client",
-  "homepage": "https://maxgeorg99.github.io/survive_with_friends/",
+  "homepage": "http://www.survive-with-friends.com/",
   "version": "1.0.0",
   "description": "Phaser client for Vibe Survivors",
   "main": "src/main.ts",
