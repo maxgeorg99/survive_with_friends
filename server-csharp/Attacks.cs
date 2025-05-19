@@ -462,13 +462,13 @@ public static partial class Module
             attack_type = AttackType.MagicDagger,
             name = "Magic Dagger Throw",
             cooldown = 500,          // Fast cooldown
-            duration = 600,          // Short duration
+            duration = 2000,          // Short duration
             projectiles = 1,         // Burst of 2 daggers
             fire_delay = 50,         // Quick delay between daggers
-            speed = 950,             // Fast speed
+            speed = 400,             // Fast speed
             piercing = true,
             radius = 12,
-            damage = 4,
+            damage = 20,
             armor_piercing = 2       
         });
 
@@ -1252,7 +1252,7 @@ public static partial class Module
                 {
                     // After traveling a certain distance or time, switch to returning mode
                     // Use elapsed ticks as a timer
-                    if (activeAttack.ticks_elapsed >= 30) // Approx half a second with 60 ticks per second
+                    if (activeAttack.ticks_elapsed >= 10) // Approx half a second with 60 ticks per second
                     {
                         var playerOpt = ctx.Db.player.player_id.Find(activeAttack.player_id);
                         if (playerOpt != null)

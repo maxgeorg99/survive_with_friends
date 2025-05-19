@@ -477,6 +477,9 @@ export class AttackManager {
                 if (Math.random() < 0.3) { // Higher chance than worm spit for more visible effect
                     this.createScorpionStingParticles(predictedPosition.x, predictedPosition.y);
                 }
+            } else if (attackGraphicData.attackType === 'MagicDagger') {
+                // Add spinning animation for Magic Dagger
+                sprite.rotation += 0.05; // Moderate spin speed, adjust as desired
             } else if (!attackGraphicData.isShield) {
                 // For regular projectiles and boss attacks, rotate based on movement direction
                 if (direction.length() > 0) {

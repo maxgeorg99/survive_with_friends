@@ -71,6 +71,125 @@ class LocalizationManager {
 
         return text;
     }
+
+    /**
+     * Gets the localized name for a weapon based on its tag
+     * @param tag The weapon tag (e.g., "Sword", "FireSword")
+     * @returns Localized weapon name
+     */
+    public getWeaponName(tag: string): string {
+        return this.getText(`weapon.${tag}.name`);
+    }
+
+    /**
+     * Gets the localized description for a weapon based on its tag
+     * @param tag The weapon tag (e.g., "Sword", "FireSword")
+     * @returns Localized weapon description
+     */
+    public getWeaponDescription(tag: string): string {
+        return this.getText(`weapon.${tag}.description`);
+    }
+
+    /**
+     * Gets all weapon names mapped by their tag
+     */
+    get weaponNames(): Record<string, string> {
+        const translation = this.translations[this.currentLanguage];
+        const result: Record<string, string> = {};
+        
+        const prefix = 'weapon.';
+        const suffix = '.name';
+        
+        // Find all weapon name keys and parse them
+        for (const key in translation) {
+            if (key.startsWith(prefix) && key.endsWith(suffix)) {
+                const weaponTag = key.slice(prefix.length, key.length - suffix.length);
+                result[weaponTag] = translation[key as keyof LocalizationData] as string;
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Gets all weapon descriptions mapped by their tag
+     */
+    get weaponDescriptions(): Record<string, string> {
+        const translation = this.translations[this.currentLanguage];
+        const result: Record<string, string> = {};
+        
+        const prefix = 'weapon.';
+        const suffix = '.description';
+        
+        // Find all weapon description keys and parse them
+        for (const key in translation) {
+            if (key.startsWith(prefix) && key.endsWith(suffix)) {
+                const weaponTag = key.slice(prefix.length, key.length - suffix.length);
+                result[weaponTag] = translation[key as keyof LocalizationData] as string;
+            }
+        }
+        
+        return result;
+    }
+
+    /**
+     * Gets all weapon stats mapped by their tag
+     */
+    get weaponStats(): Record<string, { damage: number, cooldown: number, range: number, special: string }> {
+        const translation = this.translations[this.currentLanguage];
+        const result: Record<string, { damage: number, cooldown: number, range: number, special: string }> = {};
+        
+        const prefix = 'weapon.';
+        
+        // We'll loop through all keys once and build up the stats objects
+        const statsMap: Record<string, Partial<{ damage: number, cooldown: number, range: number, special: string }>> = {};
+        
+        for (const key in translation) {
+            if (!key.startsWith(prefix)) continue;
+            
+            // Extract the weapon tag and stat property from the key
+            const keyParts = key.split('.');
+            if (keyParts.length !== 3) continue;
+            
+            const weaponTag = keyParts[1];
+            const statProperty = keyParts[2];
+            
+            // Initialize the object for this weapon if it doesn't exist
+            if (!statsMap[weaponTag]) {
+                statsMap[weaponTag] = {};
+            }
+            
+            // Add the stat to the object
+            const value = translation[key as keyof LocalizationData];
+            switch (statProperty) {
+                case 'damage':
+                    statsMap[weaponTag].damage = Number(value);
+                    break;
+                case 'cooldown':
+                    statsMap[weaponTag].cooldown = Number(value);
+                    break;
+                case 'range':
+                    statsMap[weaponTag].range = Number(value);
+                    break;
+                case 'special':
+                    statsMap[weaponTag].special = value as string;
+                    break;
+            }
+        }
+        
+        // Convert all partial objects to complete objects with defaults
+        for (const weaponTag in statsMap) {
+            const stats = statsMap[weaponTag];
+            result[weaponTag] = {
+                damage: stats.damage ?? 0,
+                cooldown: stats.cooldown ?? 0,
+                range: stats.range ?? 0,
+                special: stats.special ?? 'None'
+            };
+        }
+        
+        return result;
+    }
 }
 
 export const localization = LocalizationManager.getInstance();

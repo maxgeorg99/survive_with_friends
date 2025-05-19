@@ -11,6 +11,7 @@ import { GameEvents } from './constants/GameEvents';
 import PrologScene from './scenes/PrologScene';
 import BestaryScene from './scenes/BestaryScene';
 import AchievementScene from './scenes/AchievementScene';
+import WeaponCombinationsScene from './scenes/WeaponCombinationsScene';
 
 console.log("Main script loading...");
 
@@ -37,7 +38,7 @@ const config: Phaser.Types.Core.GameConfig = {
             // debug: true // Set to true for physics debugging
         }
     },
-    scene: [LoginScene, PrologScene, ClassSelectScene, GameScene, LoadingScene, QuestScene, BestaryScene, AchievementScene],
+    scene: [LoginScene, PrologScene, ClassSelectScene, GameScene, LoadingScene, QuestScene, BestaryScene, AchievementScene, WeaponCombinationsScene],
     scale: {
         mode: Phaser.Scale.RESIZE,
         autoCenter: Phaser.Scale.CENTER_BOTH

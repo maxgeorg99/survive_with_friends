@@ -90,6 +90,7 @@ export default class ClassSelectScene extends Phaser.Scene {
     private achievementsButton!: HTMLButtonElement; // New achievements button
     private burgerMenuButton!: HTMLButtonElement; // Burger menu button for mobile
     private burgerMenuContainer!: HTMLDivElement; // Container for burger menu options
+    private weaponCombosButton!: HTMLButtonElement; // Weapon combos button
     
     // State tracking
     private selectedClass: PlayerClass | null = null;
@@ -239,7 +240,7 @@ export default class ClassSelectScene extends Phaser.Scene {
         questButton.style.alignItems = 'center';
         questButton.style.justifyContent = 'center';
         questButton.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
-        questButton.textContent = '📜 Quests';
+        questButton.textContent = '📜 ' + localization.getText('ui.quests');
         
         questButton.addEventListener('mouseover', () => {
             questButton.style.backgroundColor = '#3498db';
@@ -280,7 +281,7 @@ export default class ClassSelectScene extends Phaser.Scene {
         bestiaryButton.style.alignItems = 'center';
         bestiaryButton.style.justifyContent = 'center';
         bestiaryButton.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
-        bestiaryButton.textContent = '🐺 Bestiary';
+        bestiaryButton.textContent = '🐺 ' + localization.getText('ui.bestiary');
         
         bestiaryButton.addEventListener('mouseover', () => {
             bestiaryButton.style.backgroundColor = '#3498db';
@@ -321,7 +322,7 @@ export default class ClassSelectScene extends Phaser.Scene {
         achievementsButton.style.alignItems = 'center';
         achievementsButton.style.justifyContent = 'center';
         achievementsButton.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
-        achievementsButton.textContent = '🏆 Achievements';
+        achievementsButton.textContent = '🏆 ' + localization.getText('ui.achievements');
         
         achievementsButton.addEventListener('mouseover', () => {
             achievementsButton.style.backgroundColor = '#3498db';
@@ -341,6 +342,47 @@ export default class ClassSelectScene extends Phaser.Scene {
         
         // Store reference for cleanup
         this.achievementsButton = achievementsButton;
+        
+        // Add weapon combinations button below achievements button
+        const weaponCombosButton = document.createElement('button');
+        weaponCombosButton.style.position = 'absolute';
+        weaponCombosButton.style.top = '230px'; // Position below achievements button
+        weaponCombosButton.style.right = '50px';
+        weaponCombosButton.style.width = '180px';
+        weaponCombosButton.style.height = '50px';
+        weaponCombosButton.style.padding = '10px';
+        weaponCombosButton.style.backgroundColor = '#2c3e50';
+        weaponCombosButton.style.color = 'white';
+        weaponCombosButton.style.border = '2px solid #34495e';
+        weaponCombosButton.style.borderRadius = '5px';
+        weaponCombosButton.style.cursor = 'pointer';
+        weaponCombosButton.style.fontFamily = 'Arial';
+        weaponCombosButton.style.fontSize = '18px';
+        weaponCombosButton.style.transition = 'background-color 0.2s, border-color 0.2s';
+        weaponCombosButton.style.display = 'flex';
+        weaponCombosButton.style.alignItems = 'center';
+        weaponCombosButton.style.justifyContent = 'center';
+        weaponCombosButton.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+        weaponCombosButton.textContent = '🔨 ' + localization.getText('ui.weapon_combinations');
+        
+        weaponCombosButton.addEventListener('mouseover', () => {
+            weaponCombosButton.style.backgroundColor = '#3498db';
+            weaponCombosButton.style.borderColor = '#2980b9';
+        });
+        
+        weaponCombosButton.addEventListener('mouseout', () => {
+            weaponCombosButton.style.backgroundColor = '#2c3e50';
+            weaponCombosButton.style.borderColor = '#34495e';
+        });
+        
+        weaponCombosButton.addEventListener('click', () => {
+            this.scene.start('WeaponCombinationsScene');
+        });
+        
+        document.body.appendChild(weaponCombosButton);
+        
+        // Store reference for cleanup
+        this.weaponCombosButton = weaponCombosButton;
         
         // Add burger menu button for mobile
         const burgerMenuButton = document.createElement('button');
@@ -386,7 +428,8 @@ export default class ClassSelectScene extends Phaser.Scene {
         const menuOptions = [
             { text: '📜 Quests', scene: 'QuestScene' },
             { text: '🐺 Bestiary', scene: 'BestaryScene' },
-            { text: '🏆 Achievements', scene: 'AchievementScene' }
+            { text: '🏆 Achievements', scene: 'AchievementScene' },
+            { text: '🔨 Combinations', scene: 'WeaponCombinationsScene' } // Add weapon combos to menu
         ];
         
         menuOptions.forEach(option => {
@@ -454,6 +497,7 @@ export default class ClassSelectScene extends Phaser.Scene {
             if (this.questButton) this.questButton.style.display = 'none';
             if (this.bestiaryButton) this.bestiaryButton.style.display = 'none';
             if (this.achievementsButton) this.achievementsButton.style.display = 'none';
+            if (this.weaponCombosButton) this.weaponCombosButton.style.display = 'none';
         } else {
             // On desktop: hide burger menu, show individual buttons
             if (this.burgerMenuButton) this.burgerMenuButton.style.display = 'none';
@@ -461,6 +505,7 @@ export default class ClassSelectScene extends Phaser.Scene {
             if (this.questButton) this.questButton.style.display = 'flex';
             if (this.bestiaryButton) this.bestiaryButton.style.display = 'flex';
             if (this.achievementsButton) this.achievementsButton.style.display = 'flex';
+            if (this.weaponCombosButton) this.weaponCombosButton.style.display = 'flex';
         }
     }
     
@@ -934,6 +979,10 @@ export default class ClassSelectScene extends Phaser.Scene {
             if (this.achievementsButton) {
                 this.achievementsButton.style.display = 'none';
             }
+            
+            if (this.weaponCombosButton) {
+                this.weaponCombosButton.style.display = 'none';
+            }
         } else {
             // Desktop layout - horizontal arrangement
             this.classButtonsContainer.style.left = '50%';
@@ -987,6 +1036,15 @@ export default class ClassSelectScene extends Phaser.Scene {
                 this.achievementsButton.style.width = '180px';
                 this.achievementsButton.style.height = '50px';
                 this.achievementsButton.style.fontSize = '18px';
+            }
+            
+            if (this.weaponCombosButton) {
+                this.weaponCombosButton.style.display = 'flex';
+                this.weaponCombosButton.style.top = '230px'; // Position below achievements button
+                this.weaponCombosButton.style.right = '50px';
+                this.weaponCombosButton.style.width = '180px';
+                this.weaponCombosButton.style.height = '50px';
+                this.weaponCombosButton.style.fontSize = '18px';
             }
         }
     }
@@ -1167,6 +1225,11 @@ export default class ClassSelectScene extends Phaser.Scene {
 
             if (this.achievementsButton && this.achievementsButton.parentNode) {
                 this.achievementsButton.remove();
+            }
+            
+            // Add cleanup for weapon combos button
+            if (this.weaponCombosButton && this.weaponCombosButton.parentNode) {
+                this.weaponCombosButton.remove();
             }
             
             // Clean up burger menu elements
