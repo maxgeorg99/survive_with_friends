@@ -63,8 +63,6 @@ export default class BossTimerUI {
         
         // Check for existing boss spawn timer in the database
         this.checkForExistingBossTimer();
-        
-        console.log('BossTimerUI initialized');
     }
 
     private registerEventListeners(): void {
@@ -93,32 +91,17 @@ export default class BossTimerUI {
     }
 
     private handleBossTimerCreated(ctx: any, timer: any): void {
-        console.log("Boss timer created event received");
-        console.log("Raw timer in event:", timer); 
-        console.log("Timer type:", typeof timer);
-        
-        if (timer?.scheduledAt?.value) {
-            console.log("Timer value direct access:", timer.scheduledAt.value);
-            console.log("Value type:", typeof timer.scheduledAt.value);
-        }
-        
         // Extract the timestamp using our helper
         const timestamp = this.extractTimestampFromTimer(timer);
         if (timestamp) {
-            console.log("Successfully extracted timestamp:", timestamp);
-            console.log("Human readable date:", new Date(timestamp).toLocaleString());
             this.bossSpawnTime = timestamp;
             this.startTimer();
-            console.log("Started boss timer from timer creation event");
-        } else {
-            console.log("Failed to extract timestamp from timer, trying fallbacks...");
-            
+        } else {            
             // Fallback 1: Try direct access to value if it exists
             if (timer?.scheduledAt?.value) {
                 const directValue = timer.scheduledAt.value;
                 if (typeof directValue === 'bigint' || !isNaN(Number(directValue))) {
                     const directTimestamp = Number(directValue) / 1000;
-                    console.log("Fallback 1: Direct value conversion:", directTimestamp);
                     this.bossSpawnTime = directTimestamp;
                     this.startTimer();
                     return;
@@ -128,7 +111,6 @@ export default class BossTimerUI {
             // Hide timer if no valid timestamp was found
             this.stopTimer();
             this.container.setVisible(false);
-            console.log("Could not extract valid timestamp from created timer, hiding boss timer UI");
         }
     }
 
@@ -148,7 +130,6 @@ export default class BossTimerUI {
 
     public startTimer(): void {
         if (!this.bossSpawnTime) {
-            console.log("Cannot start timer - no valid boss spawn time");
             this.container.setVisible(false);
             return;
         }
@@ -158,14 +139,12 @@ export default class BossTimerUI {
         
         // Ensure UI is properly visible
         if (!this.container.visible) {
-            console.warn("Boss timer container not visible after setVisible(true), forcing visibility");
             this.container.visible = true;
             this.container.alpha = 1;
         }
         
         // Check if the spawn time is in the past
         if (this.bossSpawnTime <= Date.now()) {
-            console.log("Boss spawn time is in the past, showing IMMINENT message");
             this.timerText.setText("End of the world: IMMINENT!");
             this.startWarningFlash(true);
         }
@@ -262,13 +241,11 @@ export default class BossTimerUI {
     private checkForExistingBossTimer(): void {
         // Only if we have a connection
         if (this.spacetimeClient?.sdkConnection?.db) {
-            console.log("Checking for existing boss spawn timer...");
             
             try {
                 // Try to find a boss timer in the database
                 const bossTimers = Array.from(this.spacetimeClient.sdkConnection.db.bossSpawnTimer.iter());
                 
-                console.log("Boss timers found:", bossTimers.length);
                 console.log("Raw timer data:", 
                     JSON.stringify(bossTimers, (key, value) => 
                         typeof value === 'bigint' ? value.toString() + 'n' : value

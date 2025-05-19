@@ -247,49 +247,96 @@ export class AttackManager {
     private createAttackSprite(attackType: string, x: number, y: number): Phaser.GameObjects.Sprite | null {
         let spriteKey = '';
         
-        switch (attackType) {
-            case 'Sword':
+        // Normalize the attackType to ensure consistent case handling
+        const normalizedType = attackType.toLowerCase().replace(/\s+/g, '');
+        
+        console.log(`Creating sprite for attack type: ${attackType} (normalized: ${normalizedType})`);
+        
+        // Handle all weapon types with improved case insensitivity
+        switch (normalizedType) {
+            // Base weapons
+            case 'sword':
                 spriteKey = 'attack_sword';
                 break;
-            case 'Wand':
+            case 'wand':
                 spriteKey = 'attack_wand';
                 break;
-            case 'Knives':
+            case 'knives':
                 spriteKey = 'attack_knife';
                 break;
-            case 'Shield':
+            case 'shield':
                 spriteKey = 'attack_shield';
                 break;
-            case 'Football':
+            case 'football':
                 spriteKey = 'attack_football';
                 break;
-            case 'Cards':
+            case 'cards':
                 spriteKey = 'attack_cards';
                 break;
-            case 'Dumbbell':
+            case 'dumbbell':
                 spriteKey = 'attack_dumbbell';
                 break;
-            case 'Garlic':
+            case 'garlic':
                 spriteKey = 'attack_garlic';
                 break;
-            case 'BossJorgeBolt':
+                
+            // Boss attacks
+            case 'bossjorgebolt':
+            case 'bossjorge':
                 spriteKey = 'attack_boss_jorge';
                 break;
-            case 'BossBjornBolt':
+            case 'bossbjornbolt':
+            case 'bossbjorn':
                 spriteKey = 'attack_boss_bjorn';
                 break;
-            case 'BossSimonBolt':
+            case 'bosssimonbolt':
+            case 'bosssimon':
                 spriteKey = 'attack_boss_simon';
                 break;
-            case 'WormSpit':
-                spriteKey = 'attack_spit'; // Using the dedicated spit sprite
+                
+            // Monster attacks
+            case 'wormspit':
+                spriteKey = 'attack_spit';
                 break;
-            case 'ScorpionSting':
-                spriteKey = 'attack_sting'; // Using the dedicated sting sprite
+            case 'scorpionsting':
+                spriteKey = 'attack_sting';
                 break;
+                
+            // Combined weapons - improved case matching
+            case 'shuriken':
+                spriteKey = 'attack_shuriken';
+                break;
+            case 'firesword':
+                spriteKey = 'attack_fire_sword';
+                break;
+            case 'holyhammer':
+                spriteKey = 'attack_holy_hammer';
+                break;
+            case 'magicdagger':
+                spriteKey = 'attack_magic_dagger';
+                break;
+            case 'throwingshield':
+                spriteKey = 'attack_throwing_shield';
+                break;
+            case 'energyorb':
+                spriteKey = 'attack_energy_orb';
+                break;
+                
             default:
-                console.warn(`Unknown attack type: ${attackType}, using default sprite`);
-                return null;
+                // Fallback for any unmatched cases - try to guess the asset name
+                console.warn(`Unknown attack type: ${attackType} (normalized: ${normalizedType}), attempting to guess sprite`);
+                
+                // Try to convert camelCase to snake_case for sprite key
+                let guessedKey = normalizedType.replace(/([A-Z])/g, "_$1").toLowerCase();
+                if (guessedKey.startsWith("_")) guessedKey = guessedKey.substring(1);
+                
+                spriteKey = 'attack_' + guessedKey;
+                
+                // Check if this sprite exists
+                if (!this.scene.textures.exists(spriteKey)) {
+                    console.error(`Failed to find sprite for ${attackType} - tried ${spriteKey}`);
+                    return null;
+                }
         }
 
         // Create the sprite and set its properties
@@ -299,15 +346,15 @@ export class AttackManager {
         sprite.setAlpha(1); // Make sure sprite is fully visible
         
         // Set initial rotation and scale based on attack type
-        if (attackType === 'Dumbbell') {
+        if (normalizedType === 'dumbbell') {
             sprite.setScale(1.5);
-        } else if (attackType === 'BossJorgeBolt' || attackType === 'BossBjornBolt' || attackType === 'BossSimonBolt') {
+        } else if (normalizedType.includes('boss')) {
             sprite.setScale(1); // Smaller scale for boss bolts
-        } else if (attackType === 'Football') {
+        } else if (normalizedType === 'football') {
             sprite.setScale(0.6); // Slightly larger for the football
-        } else if (attackType === 'Garlic') {
+        } else if (normalizedType === 'garlic') {
             sprite.setScale(0.1); // Small garlic AoE
-        } else if (attackType === 'ScorpionSting') {
+        } else if (normalizedType === 'scorpionsting') {
             sprite.setScale(0.8); // Slightly smaller scale for scorpion sting
         } else {
             sprite.setScale(1.0); // Normal scale for other attacks

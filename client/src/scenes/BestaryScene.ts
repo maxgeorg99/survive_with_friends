@@ -2,8 +2,10 @@ import Phaser from 'phaser';
 import { localization } from '../utils/localization';
 import { MonsterType } from '../autobindings/monster_type_type';
 import { isMobileDevice, getResponsiveFontSize, applyResponsiveStyles, getResponsiveDimensions } from '../utils/responsive';
+import SpacetimeDBClient from 'src/SpacetimeDBClient';
 
-export default class BestaryScene extends Phaser.Scene {    private spacetimeDBClient: SpacetimeDBClient;
+export default class BestaryScene extends Phaser.Scene {    
+    private spacetimeDBClient: SpacetimeDBClient;
     // UI elements
     private titleText!: Phaser.GameObjects.Text;
     private descriptionText!: Phaser.GameObjects.Text;
@@ -38,7 +40,8 @@ export default class BestaryScene extends Phaser.Scene {    private spacetimeDBC
     };
 
     constructor() {
-        super('BestaryScene');        this.spacetimeDBClient = (window as any).spacetimeDBClient;
+        super('BestaryScene');        
+        this.spacetimeDBClient = (window as any).spacetimeDBClient;
     }
 
     init() {

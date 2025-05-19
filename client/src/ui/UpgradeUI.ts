@@ -1,37 +1,17 @@
 import Phaser from 'phaser';
-import { UpgradeOptionData, UpgradeType } from '../autobindings';
+import { UpgradeOptionData, UpgradeType, AttackType, ChosenUpgradeData } from '../autobindings';
 import SpacetimeDBClient from '../SpacetimeDBClient';
-import { ChooseUpgrade } from '../autobindings';
-
-// Define a type for our attack graphic data with prediction capabilities
-interface AttackGraphicData {
-    graphic: Phaser.GameObjects.Graphics;
-    sprite: Phaser.GameObjects.Sprite | null;
-    radius: number;
-    baseRadius: number; // Store the base radius from attack data for scaling calculation
-    alpha: number;
-    // Add prediction-related properties
-    lastUpdateTime: number;
-    predictedPosition: Phaser.Math.Vector2;
-    serverPosition: Phaser.Math.Vector2;
-    direction: Phaser.Math.Vector2;
-    speed: number;
-    isShield: boolean;
-    playerId: number | null;
-    parameterU: number;
-    ticksElapsed: number;
-    attackType: string;
-}
+import { GameEvents } from '../constants/GameEvents';
 
 // Constants
-const CARD_WIDTH = 180; // Reduced from 200 to 180
-const CARD_HEIGHT = 250; // Reduced from 260 to 250
-const CARD_SPACING = 10; // Reduced from 20 to 10
+const CARD_WIDTH = 180; 
+const CARD_HEIGHT = 250;
+const CARD_SPACING = 10;
 const CARD_SCALE_DESKTOP = 0.8;
-const CARD_SCALE_MOBILE = 0.65; // Smaller scale for mobile devices
-const UI_DEPTH = 100000; // Extremely high depth to ensure UI stays on top of all game elements
-const MOBILE_BOTTOM_MARGIN = 5; // Reduced bottom margin on mobile (from 20)
-const DESKTOP_BOTTOM_MARGIN = 20; // Original bottom margin for desktop
+const CARD_SCALE_MOBILE = 0.65;
+const UI_DEPTH = 100000;
+const MOBILE_BOTTOM_MARGIN = 5;
+const DESKTOP_BOTTOM_MARGIN = 20;
 
 // Define upgrade icon mapping
 const UPGRADE_ICON_MAP: { [key: string]: string } = {
@@ -49,10 +29,47 @@ const UPGRADE_ICON_MAP: { [key: string]: string } = {
     'AttackGarlic': 'attack_garlic'
 };
 
+// Weapon asset mapping for combinations
+const WEAPON_ASSET_MAP: Partial<Record<number, string>> = {
+    [AttackType.Sword]: 'attack_sword',
+    [AttackType.Wand]: 'attack_wand',
+    [AttackType.Knives]: 'attack_knife',
+    [AttackType.Shield]: 'attack_shield',
+    [AttackType.Football]: 'attack_football',
+    [AttackType.Cards]: 'attack_cards',
+    [AttackType.Dumbbell]: 'attack_dumbbell',
+    [AttackType.Garlic]: 'attack_garlic',
+    [AttackType.Shuriken]: 'attack_shuriken',
+    [AttackType.FireSword]: 'attack_fire_sword',
+    [AttackType.HolyHammer]: 'attack_holy_hammer',
+    [AttackType.MagicDagger]: 'attack_magic_dagger',
+    [AttackType.ThrowingShield]: 'attack_throwing_shield',
+    [AttackType.EnergyOrb]: 'attack_energy_orb'
+};
+
+// Weapon name mapping for combinations
+const WEAPON_NAME_MAP: Partial<Record<number, string>> = {
+    [AttackType.Sword]: "Sword",
+    [AttackType.Wand]: "Wand",
+    [AttackType.Knives]: "Knives",
+    [AttackType.Shield]: "Shield",
+    [AttackType.Football]: "Football",
+    [AttackType.Cards]: "Cards",
+    [AttackType.Dumbbell]: "Dumbbell",
+    [AttackType.Garlic]: "Garlic",
+    [AttackType.Shuriken]: "Shuriken",
+    [AttackType.FireSword]: "Fire Sword",
+    [AttackType.HolyHammer]: "Holy Hammer",
+    [AttackType.MagicDagger]: "Magic Dagger",
+    [AttackType.ThrowingShield]: "Throwing Shield",
+    [AttackType.EnergyOrb]: "Energy Orb"
+};
+
 export default class UpgradeUI {
     private scene: Phaser.Scene;
     private spacetimeClient: SpacetimeDBClient;
-    private container: Phaser.GameObjects.Container;
+    private upgradeContainer: Phaser.GameObjects.Container;
+    private combinationContainer: Phaser.GameObjects.Container;
     private cards: Phaser.GameObjects.Container[] = [];
     private localPlayerId: number = 0;
     private upgradeOptions: UpgradeOptionData[] = [];
@@ -60,6 +77,7 @@ export default class UpgradeUI {
     private keyListeners: Phaser.Input.Keyboard.Key[] = [];
     private rerollText: Phaser.GameObjects.Text | null = null;
     private isMobile: boolean = false;
+    private gameEvents: Phaser.Events.EventEmitter;
 
     // Helper to detect mobile devices
     private detectMobile(): boolean {
@@ -72,15 +90,21 @@ export default class UpgradeUI {
         this.scene = scene;
         this.spacetimeClient = spacetimeClient;
         this.localPlayerId = localPlayerId;
+        this.gameEvents = (window as any).gameEvents;
         
         // Detect if we're on a mobile device
         this.isMobile = this.detectMobile();
         console.log(`UpgradeUI initialized on ${this.isMobile ? 'mobile' : 'desktop'} device`);
         
-        // Create container for all upgrade UI elements
-        this.container = this.scene.add.container(0, 0);
-        this.container.setDepth(UI_DEPTH);
-        this.container.setVisible(false);
+        // Create container for upgrade UI elements
+        this.upgradeContainer = this.scene.add.container(0, 0);
+        this.upgradeContainer.setDepth(UI_DEPTH);
+        this.upgradeContainer.setVisible(false);
+        
+        // Create container for weapon combination UI elements
+        this.combinationContainer = this.scene.add.container(0, 0);
+        this.combinationContainer.setDepth(UI_DEPTH);
+        this.combinationContainer.setVisible(false);
 
         // Create keyboard input for number keys 1-3
         this.keyListeners = [
@@ -89,18 +113,8 @@ export default class UpgradeUI {
             this.scene.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.THREE)
         ].filter((key): key is Phaser.Input.Keyboard.Key => key !== undefined);
 
-        // Create reroll text with instruction 
-        /*
-        this.rerollText = this.scene.add.text(0, -CARD_HEIGHT, "Press R to reroll (Available: 0)", {
-            fontSize: '18px',
-            fontFamily: 'Arial',
-            color: '#ffffff',
-            stroke: '#000000',
-            strokeThickness: 3,
-        });
-        this.rerollText.setOrigin(0.5);
-        this.container.add(this.rerollText);
-        */
+        // Register for weapon combination events
+        this.registerCombinationEventListeners();
 
         console.log('UpgradeUI initialized');
     }
@@ -111,11 +125,11 @@ export default class UpgradeUI {
         // Position the container at the bottom of the camera
         const camera = this.scene.cameras.main;
         if (camera) {
-            this.container.x = camera.scrollX + camera.width / 2;
+            this.upgradeContainer.x = camera.scrollX + camera.width / 2;
             
             // Use different vertical positioning based on device type
             const bottomMargin = this.isMobile ? MOBILE_BOTTOM_MARGIN : DESKTOP_BOTTOM_MARGIN;
-            this.container.y = camera.scrollY + camera.height - (CARD_HEIGHT / 2) - bottomMargin;
+            this.upgradeContainer.y = camera.scrollY + camera.height - (CARD_HEIGHT / 2) - bottomMargin;
         }
 
         // Check for number key presses
@@ -131,19 +145,11 @@ export default class UpgradeUI {
         console.log('Setting upgrade options:', options);
         this.upgradeOptions = options;
         
-        // Update reroll text with current count if player data is available
-        if (this.rerollText && this.spacetimeClient.sdkConnection?.db) {
-            const player = this.spacetimeClient.sdkConnection.db.player.playerId.find(this.localPlayerId);
-            if (player && player.rerolls !== undefined) {
-                this.rerollText.setText(`Press R to reroll (Available: ${player.rerolls})`);
-            }
-        }
-        
         if (options.length > 0) {
             this.createUpgradeCards();
-            this.show();
+            this.showUpgradeUI();
         } else {
-            this.hide();
+            this.hideUpgradeUI();
         }
     }
 
@@ -166,7 +172,7 @@ export default class UpgradeUI {
             const x = startX + (index * (effectiveCardWidth + effectiveCardSpacing));
             const card = this.createCard(x, 0, option, index);
             this.cards.push(card);
-            this.container.add(card);
+            this.upgradeContainer.add(card);
         });
     }
 
@@ -210,10 +216,20 @@ export default class UpgradeUI {
         
         // Create upgrade text - position higher on mobile
         let upgradeText = this.getUpgradeDescription(option);
+        
+        // Show special indication if this is a weapon combination
+        // Check for both possible property naming conventions (snake_case from C# and camelCase in TypeScript)
+        if (option.isCombinationTrigger || (option as any).is_combination_trigger) {
+            upgradeText = "⚔COMBO⚔";
+            
+            // Debug log to help diagnose property naming
+            console.log("Found combination trigger option:", option);
+        }
+        
         const descText = this.scene.add.text(0, background.height * cardScale * 0.28, upgradeText, {
             fontSize: this.isMobile ? '16px' : '18px', // Smaller font on mobile
             fontFamily: 'Arial',
-            color: '#ffffff',
+            color: (option.isCombinationTrigger || (option as any).is_combination_trigger) ? '#FFD700' : '#ffffff', // Gold color for combinations
             stroke: '#000000',
             strokeThickness: this.isMobile ? 2 : 3, // Reduced stroke thickness on mobile
             align: 'center',
@@ -242,7 +258,7 @@ export default class UpgradeUI {
         
         // Handle attack upgrades
         if (option.isNewAttack) {
-            return "New"
+            return "New";
         }
         
         // Handle attack stat upgrades
@@ -283,7 +299,7 @@ export default class UpgradeUI {
             this.createUpgradeAppliedEffect(player);
             
             // Hide the UI
-            this.hide();
+            this.hideUpgradeUI();
         } else {
             console.error("Cannot choose upgrade: SpacetimeDB connection not available");
         }
@@ -351,19 +367,164 @@ export default class UpgradeUI {
         });
     }
 
-    public show(): void {
+    // ------ Weapon Combination UI Methods ------
+    
+    private registerCombinationEventListeners(): void {
+        // Listen for chosen upgrade events that might be combinations
+        if (this.spacetimeClient.sdkConnection) {
+            this.spacetimeClient.sdkConnection.db.chosenUpgrades.onInsert((ctx, chosenUpgrade: ChosenUpgradeData) => {
+                console.log("ChosenUpgrade insert detected:", chosenUpgrade);
+                
+                // Check both camelCase and snake_case property names for combination trigger
+                const isCombination = chosenUpgrade.isCombinationTrigger || (chosenUpgrade as any).is_combination_trigger;
+                
+                if (isCombination && chosenUpgrade.playerId === this.localPlayerId) {
+                    // Log the raw object to help with debugging
+                    console.log("Weapon combination detected with properties:", 
+                        "isCombinationTrigger:", chosenUpgrade.isCombinationTrigger,
+                        "is_combination_trigger:", (chosenUpgrade as any).is_combination_trigger);
+                    
+                    // Get the weapon types, checking both naming conventions
+                    const firstWeapon = chosenUpgrade.firstWeaponToCombine || (chosenUpgrade as any).first_weapon_to_combine;
+                    const secondWeapon = chosenUpgrade.secondWeaponToCombine || (chosenUpgrade as any).second_weapon_to_combine;
+                    const combinedWeapon = chosenUpgrade.combinedWeaponResult || (chosenUpgrade as any).combined_weapon_result;
+                    
+                    this.handleWeaponCombination(
+                        firstWeapon as AttackType,
+                        secondWeapon as AttackType,
+                        combinedWeapon as AttackType
+                    );
+                }
+            });
+        }
+    }
+
+    private handleWeaponCombination(firstWeapon: AttackType, secondWeapon: AttackType, combinedWeapon: AttackType): void {
+        console.log("Local player received weapon combination trigger:", 
+            this.getWeaponDisplayName(firstWeapon), "+", this.getWeaponDisplayName(secondWeapon), "->", this.getWeaponDisplayName(combinedWeapon));
+        this.showWeaponCombinationNotification(firstWeapon, secondWeapon, combinedWeapon);
+    }
+    
+    private showWeaponCombinationNotification(firstWeapon: AttackType, secondWeapon: AttackType, combinedWeapon: AttackType): void {
+        this.combinationContainer.removeAll(true);
+        
+        const { width, height } = this.scene.scale;
+        
+        this.combinationContainer.x = width / 2;
+        this.combinationContainer.y = height / 2 - 100;
+        
+        const background = this.scene.add.rectangle(0, 0, 550, 200, 0x000000, 0.8);
+        background.setStrokeStyle(4, 0xFFD700);
+        
+        const titleText = this.scene.add.text(0, -70, "WEAPON COMBINATION!", { 
+            fontFamily: 'Arial', fontSize: '28px', color: '#FFD700', stroke: '#000000', strokeThickness: 4
+        }).setOrigin(0.5);
+        
+        const firstWeaponName = this.getWeaponDisplayName(firstWeapon);
+        const secondWeaponName = this.getWeaponDisplayName(secondWeapon);
+        const combinedWeaponName = this.getWeaponDisplayName(combinedWeapon);
+        
+        const descText = this.scene.add.text(0, -20, `Your ${firstWeaponName} and ${secondWeaponName}\nhave combined to form:`, {
+            fontFamily: 'Arial', fontSize: '20px', color: '#FFFFFF', align: 'center'
+        }).setOrigin(0.5);
+        
+        const combinedWeaponText = this.scene.add.text(0, 40, combinedWeaponName, {
+            fontFamily: 'Arial', fontSize: '32px', color: '#00FFFF', stroke: '#000000', strokeThickness: 5, fontStyle: 'bold'
+        }).setOrigin(0.5);
+        
+        const firstWeaponKey = this.getWeaponAssetKey(firstWeapon);
+        const secondWeaponKey = this.getWeaponAssetKey(secondWeapon);
+        const combinedWeaponKey = this.getWeaponAssetKey(combinedWeapon);
+        
+        const firstWeaponIcon = this.scene.add.image(-150, 40, firstWeaponKey).setScale(0.7);
+        const secondWeaponIcon = this.scene.add.image(-70, 40, secondWeaponKey).setScale(0.7);
+        
+        const plusSign = this.scene.add.text(-110, 40, '+', { fontFamily: 'Arial', fontSize: '32px', color: '#FFFFFF' }).setOrigin(0.5);
+        const equalsSign = this.scene.add.text(-20, 40, '=', { fontFamily: 'Arial', fontSize: '32px', color: '#FFFFFF' }).setOrigin(0.5);
+        const combinedWeaponIcon = this.scene.add.image(50, 40, combinedWeaponKey).setScale(1.2);
+        
+        this.combinationContainer.add([
+            background, titleText, descText, combinedWeaponText,
+            firstWeaponIcon, plusSign, secondWeaponIcon, equalsSign, combinedWeaponIcon
+        ]);
+        
+        this.combinationContainer.setVisible(true);
+        this.combinationContainer.setAlpha(0);
+        
+        this.scene.tweens.add({
+            targets: this.combinationContainer, 
+            alpha: 1, 
+            y: height / 2 - 50, 
+            duration: 500, 
+            ease: 'Back.easeOut',
+            onComplete: () => {
+                this.createCombinationParticles(combinedWeaponIcon.x, combinedWeaponIcon.y);
+                this.scene.time.delayedCall(4000, () => {
+                    this.scene.tweens.add({
+                        targets: this.combinationContainer, 
+                        alpha: 0, 
+                        y: height / 2 - 150, 
+                        duration: 500, 
+                        ease: 'Back.easeIn',
+                        onComplete: () => { 
+                            this.combinationContainer.setVisible(false); 
+                        }
+                    });
+                });
+            }
+        });
+    }
+    
+    private createCombinationParticles(x: number, y: number): void {
+        const worldX = this.combinationContainer.x + x;
+        const worldY = this.combinationContainer.y + y;
+        const particles = this.scene.add.particles(worldX, worldY, 'white_pixel', {
+            speed: { min: 30, max: 100 }, 
+            scale: { start: 0.5, end: 0 }, 
+            blendMode: 'ADD',
+            tint: [0x00FFFF, 0xFFD700, 0xFFFFFF], 
+            lifespan: 1000, 
+            quantity: 2, 
+            frequency: 50, 
+            emitting: true
+        });
+        particles.setDepth(UI_DEPTH + 1);
+        this.scene.time.delayedCall(3000, () => { particles.destroy(); });
+    }
+    
+    private getWeaponDisplayName(attackType: AttackType): string {
+        return WEAPON_NAME_MAP[attackType as unknown as number] || `Weapon ${attackType as unknown as number}`;
+    }
+    
+    private getWeaponAssetKey(attackType: AttackType): string {
+        return WEAPON_ASSET_MAP[attackType as unknown as number] || 'card_blank';
+    }
+
+    // ------ UI Visibility Methods ------
+    
+    public showUpgradeUI(): void {
         this.isVisible = true;
-        this.container.setVisible(true);
+        this.upgradeContainer.setVisible(true);
+    }
+
+    public hideUpgradeUI(): void {
+        this.isVisible = false;
+        this.upgradeContainer.setVisible(false);
+    }
+    
+    // Alias methods for backward compatibility
+    public show(): void {
+        this.showUpgradeUI();
     }
 
     public hide(): void {
-        this.isVisible = false;
-        this.container.setVisible(false);
+        this.hideUpgradeUI();
     }
 
     public destroy(): void {
         this.keyListeners.forEach(key => key.destroy());
         this.cards.forEach(card => card.destroy());
-        this.container.destroy();
+        this.upgradeContainer.destroy();
+        this.combinationContainer.destroy();
     }
 }

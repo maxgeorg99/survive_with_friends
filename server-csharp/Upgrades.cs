@@ -31,9 +31,29 @@ public enum AttackStat
     Radius
 }
 
+// Define weapon combination structure (can be expanded)
+public struct WeaponCombinationDef
+{
+    public AttackType Weapon1;
+    public AttackType Weapon2;
+    public AttackType CombinedWeapon;
+    public uint RequiredLevel;
+}
+
 public static partial class Module
 {
-    [SpacetimeDB.Table(Name = "upgrade_options", Public = true)    ]
+    // List of defined weapon combinations
+    private static readonly List<WeaponCombinationDef> WeaponCombinations = new List<WeaponCombinationDef>
+    {
+        new WeaponCombinationDef { Weapon1 = AttackType.Sword, Weapon2 = AttackType.Knives, CombinedWeapon = AttackType.Shuriken, RequiredLevel = 1 },
+        new WeaponCombinationDef { Weapon1 = AttackType.Sword, Weapon2 = AttackType.Wand, CombinedWeapon = AttackType.FireSword, RequiredLevel = 1 },
+        new WeaponCombinationDef { Weapon1 = AttackType.Sword, Weapon2 = AttackType.Shield, CombinedWeapon = AttackType.HolyHammer, RequiredLevel = 1 },
+        new WeaponCombinationDef { Weapon1 = AttackType.Knives, Weapon2 = AttackType.Wand, CombinedWeapon = AttackType.MagicDagger, RequiredLevel = 1 },
+        new WeaponCombinationDef { Weapon1 = AttackType.Knives, Weapon2 = AttackType.Shield, CombinedWeapon = AttackType.ThrowingShield, RequiredLevel = 1 },
+        new WeaponCombinationDef { Weapon1 = AttackType.Wand, Weapon2 = AttackType.Shield, CombinedWeapon = AttackType.EnergyOrb, RequiredLevel = 1 },
+    };
+
+    [SpacetimeDB.Table(Name = "upgrade_options", Public = true)]
     public partial struct UpgradeOptionData
     {
         [PrimaryKey, AutoInc]
@@ -45,10 +65,8 @@ public static partial class Module
         
         public UpgradeType upgrade_type;
         public bool is_attack_upgrade;
-        public uint value;
-
-        // Attack upgrade data
-        public uint attack_type;
+        public uint value; // For stat upgrades: new value. For attack upgrades: new skill level.
+        public uint attack_type; // Cast to AttackType enum if is_attack_upgrade is true
         public uint damage;
         public uint cooldown_ratio;
         public uint projectiles;
@@ -56,6 +74,10 @@ public static partial class Module
         public uint radius;
 
         public bool is_new_attack;
+        public bool is_combination_trigger;
+        public AttackType first_weapon_to_combine;
+        public AttackType second_weapon_to_combine;
+        public AttackType combined_weapon_result;
     }
 
     [SpacetimeDB.Table(Name = "chosen_upgrades", Public = true)]
@@ -79,18 +101,23 @@ public static partial class Module
         public uint speed;
         public uint radius; 
         public bool is_new_attack;
+
+        // New fields to mirror from UpgradeOptionData if needed, or handle logic before this stage
+        public bool is_combination_trigger;
+        public AttackType first_weapon_to_combine;
+        public AttackType second_weapon_to_combine;
+        public AttackType combined_weapon_result;
     }
     public static void DrawUpgradeOptions(ReducerContext ctx, uint playerId)
     {
-        // See if player has any upgrade options
-        var existingUpgradeOptions = ctx.Db.upgrade_options.player_id.Filter(playerId);
-        if (existingUpgradeOptions.Count() != 0)
+        // 1. Delete existing upgrade options for player
+        var existingUpgradeOptions = ctx.Db.upgrade_options.player_id.Filter(playerId).ToList();
+        foreach (var opt in existingUpgradeOptions)
         {
-            // Skip drawing upgrade options      
-            return;
+            ctx.Db.upgrade_options.Delete(opt);
         }
 
-        // Get player's class to filter available upgrades
+        // 2. Get player's class
         var playerOpt = ctx.Db.player.player_id.Find(playerId);
         if (playerOpt == null)
         {
@@ -98,55 +125,134 @@ public static partial class Module
         }
         var player = playerOpt.Value;
 
-        // Create a list of all upgrade types
-        var allUpgradeTypes = new List<UpgradeType>();
-        foreach (UpgradeType type in Enum.GetValues(typeof(UpgradeType)))
+        // 3. Get player's current attacks
+        var playerAttacks = new Dictionary<AttackType, uint>();
+        foreach (var pa in ctx.Db.player_scheduled_attacks.player_id.Filter(playerId))
         {
-            // Filter alt form weapon upgrades based on player class
-            bool shouldAdd = true;
-            switch (type)
-            {
-                case UpgradeType.AttackFootball:
-                    shouldAdd = player.player_class == PlayerClass.Football;
-                    break;
-                case UpgradeType.AttackCards:
-                    shouldAdd = player.player_class == PlayerClass.Gambler;
-                    break;
-                case UpgradeType.AttackDumbbell:
-                    shouldAdd = player.player_class == PlayerClass.Athlete;
-                    break;
-                case UpgradeType.AttackGarlic:
-                    shouldAdd = player.player_class == PlayerClass.Gourmand;
-                    break;
-                default:
-                    // All other upgrade types are available to everyone
-                    shouldAdd = true;
-                    break;
-            }
+            playerAttacks[pa.attack_type] = pa.skill_level;
+        }
 
-            if (shouldAdd)
+        // 4. FIRST PRIORITY: Check for possible weapon combinations
+        List<UpgradeOptionData> combinationOptions = new List<UpgradeOptionData>();
+        
+        foreach (var combo in WeaponCombinations)
+        {
+            // Only offer combinations if the player doesn't already have the combined weapon
+            if (!playerAttacks.ContainsKey(combo.CombinedWeapon))
             {
-                allUpgradeTypes.Add(type);
+                bool hasBothWeapons = playerAttacks.ContainsKey(combo.Weapon1) && playerAttacks.ContainsKey(combo.Weapon2);
+                bool hasRequiredLevel = playerAttacks.TryGetValue(combo.Weapon1, out uint weapon1Level) && 
+                                       playerAttacks.TryGetValue(combo.Weapon2, out uint weapon2Level) &&
+                                       weapon1Level >= combo.RequiredLevel && 
+                                       weapon2Level >= combo.RequiredLevel;
+                
+                if (hasBothWeapons && hasRequiredLevel)
+                {
+                    // Create a combination option
+                    var combinationOption = new UpgradeOptionData
+                    {
+                        upgrade_type = GetUpgradeTypeFromAttack(combo.Weapon1), // We'll use the first weapon's upgrade type
+                        player_id = playerId,
+                        is_attack_upgrade = true,
+                        is_new_attack = false,
+                        is_combination_trigger = true,
+                        first_weapon_to_combine = combo.Weapon1,
+                        second_weapon_to_combine = combo.Weapon2,
+                        combined_weapon_result = combo.CombinedWeapon,
+                        
+                        // Default values for required fields
+                        attack_type = (uint)combo.Weapon1, 
+                        value = 0,
+                        damage = 0,
+                        cooldown_ratio = 0,
+                        projectiles = 0,
+                        speed = 0,
+                        radius = 0
+                    };
+                    
+                    combinationOptions.Add(combinationOption);
+                    Log.Info($"Offering combination: {combo.Weapon1} + {combo.Weapon2} => {combo.CombinedWeapon} to player {playerId}");
+                }
             }
         }
         
-        // Shuffle the list randomly
-        var random = new Random();
-        ShuffleList(allUpgradeTypes, random);
-        
-        // Pick the first 3 types
-        var selectedTypes = allUpgradeTypes.Take(3).ToList();
-        
-        Log.Info($"Selected upgrade types for player {playerId} (class {player.player_class}): {string.Join(", ", selectedTypes)}");
-        
-        // Insert upgrade options into database
-        for (uint i = 0; i < selectedTypes.Count; i++)
+        // If we found possible combinations, prioritize them in the options
+        if (combinationOptions.Count > 0)
         {
-            var upgradeType = selectedTypes[(int)i];
-            var upgradeOptionData = CreateUpgradeOptionData(ctx, upgradeType, playerId);
-            upgradeOptionData.player_id = playerId;
-            upgradeOptionData.upgrade_index = i;
-            ctx.Db.upgrade_options.Insert(upgradeOptionData);
+            // Shuffle the combination options to add some randomness
+            var random = new Random();
+            ShuffleList(combinationOptions, random);
+            
+            // Take up to 3 combination options
+            var selectedCombos = combinationOptions.Take(3).ToList();
+            
+            // Assign upgrade indices
+            for (int i = 0; i < selectedCombos.Count; i++)
+            {
+                var option = selectedCombos[i];
+                option.upgrade_index = (uint)i;
+                selectedCombos[i] = option; // Update since it's a struct
+            }
+            
+            // Insert the combination options
+            foreach (var combo in selectedCombos)
+            {
+                ctx.Db.upgrade_options.Insert(combo);
+            }
+            
+            // If we have 3 combinations, we're done
+            if (selectedCombos.Count == 3)
+            {
+                return;
+            }
+            
+            // If we have 1-2 combinations, continue with normal upgrade process for remaining slots
+            int remainingSlots = 3 - selectedCombos.Count;
+
+            // 5. Determine random upgrade types based on class for remaining slots
+            var allUpgradeTypes = GetAvailableUpgradeTypes(ctx, player.player_class, playerAttacks);
+            
+            ShuffleList(allUpgradeTypes, random);
+            var selectedTypes = allUpgradeTypes.Take(remainingSlots).ToList();
+            
+            // 6. Create remaining upgrade options
+            for (int i = 0; i < selectedTypes.Count; i++)
+            {
+                var upgradeType = selectedTypes[i];
+                var upgradeOptionData = CreateUpgradeOptionData(ctx, upgradeType, playerId);
+                upgradeOptionData.player_id = playerId;
+                upgradeOptionData.upgrade_index = (uint)(i + selectedCombos.Count); // Continue indexing from where combinations left off
+                ctx.Db.upgrade_options.Insert(upgradeOptionData);
+            }
+        }
+        else
+        {
+            // No combinations available, proceed with normal upgrade options
+            
+            // 5. Determine 3 random upgrade types based on class
+            var allUpgradeTypes = GetAvailableUpgradeTypes(ctx, player.player_class, playerAttacks);
+            
+            var random = new Random();
+            ShuffleList(allUpgradeTypes, random);
+            var selectedTypes = allUpgradeTypes.Take(3).ToList();
+            Log.Info($"Selected upgrade types for player {playerId} (class {player.player_class}): {string.Join(", ", selectedTypes)}");
+            
+            // 6. Create initial UpgradeOptionData objects
+            List<UpgradeOptionData> generatedOptions = new List<UpgradeOptionData>();
+            for (int i = 0; i < selectedTypes.Count; i++)
+            {
+                var upgradeType = selectedTypes[i];
+                var upgradeOptionData = CreateUpgradeOptionData(ctx, upgradeType, playerId);
+                upgradeOptionData.player_id = playerId;
+                upgradeOptionData.upgrade_index = (uint)i; // Assign unique index 0, 1, 2
+                generatedOptions.Add(upgradeOptionData);
+            }
+
+            // 7. Insert the options into the database
+            foreach (var finalOptionToInsert in generatedOptions)
+            {
+                ctx.Db.upgrade_options.Insert(finalOptionToInsert);
+            }
         }
     }
     
@@ -417,20 +523,21 @@ public static partial class Module
         }
 
         // Find the specific upgrade option selected
-        UpgradeOptionData? selectedUpgrade = null;
+        UpgradeOptionData? selectedUpgradeOpt = null;
         foreach (var option in upgradeOptionsData)
         {
             if (option.upgrade_index == upgradeIndex)
             {
-                selectedUpgrade = option;
+                selectedUpgradeOpt = option;
                 break;
             }
         }
 
-        if (selectedUpgrade == null)
+        if (selectedUpgradeOpt == null)
         {
             throw new Exception($"Upgrade with index {upgradeIndex} not found");
         }
+        var selectedUpgrade = selectedUpgradeOpt.Value;
 
         // Get count of player's current chosen upgrades to determine the order
         uint upgradeOrder = (uint)ctx.Db.chosen_upgrades.player_id.Filter(playerId).Count();
@@ -439,16 +546,20 @@ public static partial class Module
         var chosenUpgrade = new ChosenUpgradeData
         {
             player_id = playerId,
-            upgrade_type = selectedUpgrade.Value.upgrade_type,
-            is_attack_upgrade = selectedUpgrade.Value.is_attack_upgrade,
-            value = selectedUpgrade.Value.value,
-            attack_type = selectedUpgrade.Value.attack_type,
-            damage = selectedUpgrade.Value.damage,
-            cooldown_ratio = selectedUpgrade.Value.cooldown_ratio,
-            projectiles = selectedUpgrade.Value.projectiles,
-            speed = selectedUpgrade.Value.speed,
-            radius = selectedUpgrade.Value.radius,
-            is_new_attack = selectedUpgrade.Value.is_new_attack
+            upgrade_type = selectedUpgrade.upgrade_type,
+            is_attack_upgrade = selectedUpgrade.is_attack_upgrade,
+            value = selectedUpgrade.value,
+            attack_type = selectedUpgrade.attack_type,
+            damage = selectedUpgrade.damage,
+            cooldown_ratio = selectedUpgrade.cooldown_ratio,
+            projectiles = selectedUpgrade.projectiles,
+            speed = selectedUpgrade.speed,
+            radius = selectedUpgrade.radius,
+            is_new_attack = selectedUpgrade.is_new_attack,
+            is_combination_trigger = selectedUpgrade.is_combination_trigger,
+            first_weapon_to_combine = selectedUpgrade.first_weapon_to_combine,
+            second_weapon_to_combine = selectedUpgrade.second_weapon_to_combine,
+            combined_weapon_result = selectedUpgrade.combined_weapon_result
         };
 
         // Insert the chosen upgrade
@@ -467,8 +578,6 @@ public static partial class Module
         // Apply the upgrade to the player
         ApplyPlayerUpgrade(ctx, chosenUpgrade);
         
-        Console.WriteLine($"Player {playerId} chose upgrade: {selectedUpgrade.Value.upgrade_type}, Order: {upgradeOrder}");
-
         // Delete all upgrade options for the player
         var deleteCount = 0;
         foreach (var option in upgradeOptionsData)
@@ -479,8 +588,6 @@ public static partial class Module
             }
         }
         
-        Console.WriteLine($"Deleted {deleteCount} upgrade options for player {playerId}");
-
         // Try to get player data to update their unspent upgrades
         var playerOpt = ctx.Db.player.player_id.Find(playerId);
         if (playerOpt != null)
@@ -502,7 +609,7 @@ public static partial class Module
             }
         }
     }
-
+    
     // Helper method to apply an upgrade to a player
     private static void ApplyPlayerUpgrade(ReducerContext ctx, ChosenUpgradeData upgrade)
     {
@@ -521,7 +628,24 @@ public static partial class Module
         Console.WriteLine($"Applying upgrade {upgrade.upgrade_type} to player {playerId}");
         
         // Handle different upgrade types
-        if (!upgrade.is_attack_upgrade)
+        if (upgrade.is_combination_trigger)
+        {
+            Log.Info($"Player {playerId} chose a combination upgrade: {upgrade.first_weapon_to_combine} + {upgrade.second_weapon_to_combine} => {upgrade.combined_weapon_result}.");
+
+            // 1. Remove the first base weapon
+            DeletePlayerAttack(ctx, playerId, upgrade.first_weapon_to_combine);
+            Log.Info($"Removed {upgrade.first_weapon_to_combine} from player {playerId}.");
+
+            // 2. Remove the second base weapon
+            DeletePlayerAttack(ctx, playerId, upgrade.second_weapon_to_combine);
+            Log.Info($"Removed {upgrade.second_weapon_to_combine} from player {playerId}.");
+            
+            // 3. Add the new combined weapon (at skill level 1)
+            ScheduleNewPlayerAttack(ctx, playerId, upgrade.combined_weapon_result, 1);
+            Log.Info($"Added combined weapon {upgrade.combined_weapon_result} L1 to player {playerId}.");
+            return; // Combination applied, no further upgrade logic needed for this choice.
+        }
+        else if (!upgrade.is_attack_upgrade)
         {
             // Handle non-attack upgrades (directly modify player stats)
             switch (upgrade.upgrade_type)
@@ -559,7 +683,22 @@ public static partial class Module
         {
             // Handle attack upgrades
             // First, determine which attack type we're upgrading
-            AttackType attackType = GetAttackTypeFromUpgrade(upgrade.upgrade_type);
+            Log.Info($"DEBUG: Processing attack upgrade with numeric ID: {upgrade.attack_type}");
+            
+            // If the upgrade is from a UI selection, use the UpgradeType for more reliable mapping
+            AttackType attackType;
+            if (upgrade.upgrade_type.ToString().StartsWith("Attack"))
+            {
+                // This is from a UI selection, use the more reliable UpgradeType mapping
+                attackType = GetAttackTypeFromUpgrade(upgrade.upgrade_type);
+                Log.Info($"DEBUG: Mapped from UpgradeType {upgrade.upgrade_type} to AttackType {attackType}");
+            }
+            else
+            {
+                // Otherwise use the numeric ID
+                attackType = GetAttackTypeFromUpgrade(upgrade.attack_type);
+                Log.Info($"DEBUG: Mapped from numeric ID {upgrade.attack_type} to AttackType {attackType}");
+            }
             
             // Check if this is a new attack
             if (upgrade.is_new_attack)
@@ -598,6 +737,11 @@ public static partial class Module
             bool updateScheduledAttack = false;
             bool updateScheduleInterval = false;
             uint cooldownReduction = 0;
+
+            // Track upgrade count for weapon combinations
+            modifiedAttack.skill_level++;
+            var upgradeLevel = modifiedAttack.skill_level;
+            Console.WriteLine($"Increasing skill level of {attackType} to {upgradeLevel}");
             
             // Apply upgrades to the attack stats
             if (upgrade.damage > 0)
@@ -689,8 +833,32 @@ public static partial class Module
         }
     }
 
+    // Helper method to delete a player's attack
+    private static void DeletePlayerAttack(ReducerContext ctx, uint playerId, AttackType attackType)
+    {
+        foreach (var attack in ctx.Db.player_scheduled_attacks.player_id.Filter(playerId))
+        {
+            if (attack.attack_type == attackType)
+            {
+                ctx.Db.player_scheduled_attacks.scheduled_id.Delete(attack.scheduled_id);
+                Console.WriteLine($"Deleted attack {attackType} from player {playerId}");
+                return;
+            }
+        }
+    }
+    
+    // Helper method to determine if a weapon is a base weapon (not combined)
+    private static bool IsBaseWeapon(AttackType attackType)
+    {
+        // Only these base weapons can be combined
+        return attackType == AttackType.Sword ||
+               attackType == AttackType.Knives ||
+               attackType == AttackType.Wand ||
+               attackType == AttackType.Shield;
+    }
+    
     // Helper method to convert from UpgradeType to AttackType
-    private static AttackType GetAttackTypeFromUpgrade(UpgradeType upgradeType)
+    public static AttackType GetAttackTypeFromUpgrade(UpgradeType upgradeType)
     {
         switch (upgradeType)
         {
@@ -711,11 +879,93 @@ public static partial class Module
             case UpgradeType.AttackGarlic:
                 return AttackType.Garlic;
             default:
-                throw new Exception($"Cannot convert upgrade type {upgradeType} to attack type");
+                throw new Exception($"No AttackType mapping for UpgradeType: {upgradeType}");
         }
     }
 
-    // Reroll upgrade options for a player
+    // Helper method to convert from numeric attack type to AttackType
+    public static AttackType GetAttackTypeFromUpgrade(uint attackType)
+    {
+        switch (attackType)
+        {
+            // Base weapons (IDs 1-10)
+            case 1:
+                return AttackType.Sword;
+            case 2:
+                return AttackType.Wand;
+            case 3:
+                return AttackType.Knives;
+            case 4:
+                return AttackType.Shield;
+            case 5:
+                return AttackType.Football;
+            case 6:
+                return AttackType.Cards;
+            case 7:
+                return AttackType.Dumbbell;
+            case 8:
+                return AttackType.Garlic;
+
+            // Combined weapons (IDs 11-20)
+            case 11:
+                return AttackType.Shuriken;
+            case 12:
+                return AttackType.FireSword;
+            case 13:
+                return AttackType.HolyHammer;
+            case 14:
+                return AttackType.MagicDagger;
+            case 15:
+                return AttackType.ThrowingShield;
+            case 16:
+                return AttackType.EnergyOrb;
+
+            // Boss attack types (IDs 21-30)
+            case 21:
+                return AttackType.BossBolt;
+            case 22:
+                return AttackType.BossJorgeBolt;
+            case 23:
+                return AttackType.BossBjornBolt;
+                
+            // Monster attack types (IDs 31-40)
+            case 31:
+                return AttackType.WormSpit;
+            case 32:
+                return AttackType.ScorpionSting;
+                
+            default:
+                throw new Exception($"No AttackType mapping for numeric attack type: {attackType}");
+        }
+    }
+
+    // Helper method to convert from AttackType to UpgradeType
+    private static UpgradeType GetUpgradeTypeFromAttack(AttackType attackType)
+    {
+        switch (attackType)
+        {
+            case AttackType.Sword:
+                return UpgradeType.AttackSword;
+            case AttackType.Wand:
+                return UpgradeType.AttackWand;
+            case AttackType.Knives:
+                return UpgradeType.AttackKnives;
+            case AttackType.Shield:
+                return UpgradeType.AttackShield;
+            case AttackType.Football:
+                return UpgradeType.AttackFootball;
+            case AttackType.Cards:
+                return UpgradeType.AttackCards;
+            case AttackType.Dumbbell:
+                return UpgradeType.AttackDumbbell;
+            case AttackType.Garlic:
+                return UpgradeType.AttackGarlic;
+            default:
+                // Default to sword for combined/special weapons
+                return UpgradeType.AttackSword;
+        }
+    }
+
     [Reducer]
     public static void RerollUpgrades(ReducerContext ctx, uint playerId)
     {
@@ -730,31 +980,30 @@ public static partial class Module
         {
             throw new Exception("RerollUpgrades called by wrong player");
         }
-        
+
         // Get player data
         var playerOpt = ctx.Db.player.player_id.Find(playerId);
         if (playerOpt == null)
         {
-            throw new Exception($"Player with ID {playerId} not found");
+            throw new Exception($"Cannot reroll upgrades - player {playerId} not found");
         }
-        
         var player = playerOpt.Value;
-        
-        // Check if player has rerolls and unspent upgrades
-        if (player.rerolls <= 0)
-        {
-            throw new Exception("Player has no rerolls available");
-        }
-        
+
+        // Check if player has unspent upgrades
         if (player.unspent_upgrades <= 0)
         {
-            throw new Exception("Player has no unspent upgrades to reroll");
+            throw new Exception("Cannot reroll - no unspent upgrades available");
         }
-        
-        // Delete existing upgrade options
-        var upgradeOptionsData = ctx.Db.upgrade_options.player_id.Filter(playerId);
+
+        // Check if player has rerolls
+        if (player.rerolls <= 0)
+        {
+            throw new Exception("Cannot reroll - no rerolls available");
+        }
+
+        // Delete all current upgrade options
         var deleteCount = 0;
-        foreach (var option in upgradeOptionsData)
+        foreach (var option in ctx.Db.upgrade_options.player_id.Filter(playerId))
         {
             if (ctx.Db.upgrade_options.upgrade_id.Delete(option.upgrade_id))
             {
@@ -762,15 +1011,94 @@ public static partial class Module
             }
         }
         
-        Console.WriteLine($"Deleted {deleteCount} upgrade options for player {playerId} during reroll");
-        
-        // Decrement player's rerolls
+        Log.Info($"Reroll: Deleted {deleteCount} upgrade options for player {playerId}");
+
+        // Decrement rerolls
         player.rerolls--;
         ctx.Db.player.player_id.Update(player);
-        
-        Console.WriteLine($"Player {playerId} used a reroll. Remaining rerolls: {player.rerolls}");
-        
+        Log.Info($"Player {playerId} used a reroll. Remaining rerolls: {player.rerolls}");
+
         // Draw new upgrade options
         DrawUpgradeOptions(ctx, playerId);
+    }
+
+    // Helper method to get available upgrade types based on player class and current attacks
+    private static List<UpgradeType> GetAvailableUpgradeTypes(ReducerContext ctx, PlayerClass playerClass, Dictionary<AttackType, uint> playerAttacks)
+    {
+        var allUpgradeTypes = new List<UpgradeType>();
+        foreach (UpgradeType type in Enum.GetValues(typeof(UpgradeType)))
+        {
+            bool shouldAdd = true;
+            switch (type)
+            {
+                case UpgradeType.AttackFootball:
+                    shouldAdd = playerClass == PlayerClass.Football;
+                    break;
+                case UpgradeType.AttackCards:
+                    shouldAdd = playerClass == PlayerClass.Gambler;
+                    break;
+                case UpgradeType.AttackDumbbell:
+                    shouldAdd = playerClass == PlayerClass.Athlete;
+                    break;
+                case UpgradeType.AttackGarlic:
+                    shouldAdd = playerClass == PlayerClass.Gourmand;
+                    break;
+                default:
+                    shouldAdd = true;
+                    break;
+            }
+            if (shouldAdd) allUpgradeTypes.Add(type);
+        }
+
+        // Check for combined weapons that the player already has
+        HashSet<AttackType> baseWeaponsToExclude = new HashSet<AttackType>();
+        
+        foreach (var playerAttack in playerAttacks.Keys)
+        {
+            // Look for base weapons that have already been used in combinations
+            foreach (var combo in WeaponCombinations)
+            {
+                if (playerAttack == combo.CombinedWeapon)
+                {
+                    // Player has this combined weapon, exclude its base components
+                    baseWeaponsToExclude.Add(combo.Weapon1);
+                    baseWeaponsToExclude.Add(combo.Weapon2);
+                    Log.Info($"Player has combined weapon {combo.CombinedWeapon}, excluding base weapons {combo.Weapon1} and {combo.Weapon2}");
+                }
+            }
+        }
+
+        // Remove upgrade types for attacks the player already has
+        // And also remove base weapons that have been used in combinations
+        List<UpgradeType> typesToRemove = new List<UpgradeType>();
+        foreach (var upgradeType in allUpgradeTypes)
+        {
+            // Skip non-attack upgrade types
+            if (!upgradeType.ToString().StartsWith("Attack")) continue;
+            
+            // Check if this upgrade is for an attack the player already has
+            AttackType attackType;
+            try
+            {
+                attackType = GetAttackTypeFromUpgrade(upgradeType);
+                
+                if (playerAttacks.ContainsKey(attackType) || baseWeaponsToExclude.Contains(attackType))
+                {
+                    typesToRemove.Add(upgradeType);
+                }
+            }
+            catch (Exception)
+            {
+                // Skip any upgrade types that can't be converted to attack types
+            }
+        }
+        
+        // Remove the identified types
+        foreach (var typeToRemove in typesToRemove)
+        {
+            allUpgradeTypes.Remove(typeToRemove);
+        }
+        
+        return allUpgradeTypes;
     }
 }

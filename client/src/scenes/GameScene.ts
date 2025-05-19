@@ -32,7 +32,7 @@ const PLAYER_NAME_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
 // Health bar configuration
 const HEALTH_BAR_WIDTH = 50;
 const HEALTH_BAR_HEIGHT = 6;
-const HEALTH_BAR_OFFSET_Y = 18; // Position health bar above the exp bar
+const HEALTH_BAR_OFFSET_Y = 18 // Position health bar above the exp bar
 // EXP bar configuration
 const EXP_BAR_WIDTH = 50;
 const EXP_BAR_HEIGHT = 4;
@@ -195,7 +195,15 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('attack_boss_simon', 'assets/attack_boss_simon.png');
         this.load.image('attack_spit', 'assets/attack_spit.png');
         this.load.image('attack_sting', 'assets/attack_sting.png');
-        
+
+        // Load combined weapon assets
+        this.load.image('attack_shuriken', 'assets/attack_shuriken.png');
+        this.load.image('attack_fire_sword', 'assets/attack_fire_sword.png');
+        this.load.image('attack_holy_hammer', 'assets/attack_holy_hammer.png');
+        this.load.image('attack_magic_dagger', 'assets/attack_magic_dagger.png');
+        this.load.image('attack_throwing_shield', 'assets/attack_throwing_shield.png');
+        this.load.image('attack_energy_orb', 'assets/attack_energy_orb.png');
+
         // Load upgrade assets
         this.load.image('card_blank', 'assets/card_blank.png');
         this.load.image('upgrade_maxHP', 'assets/upgrade_maxHP.png');

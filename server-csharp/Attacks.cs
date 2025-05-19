@@ -17,7 +17,13 @@ public enum AttackType
     BossJorgeBolt,
     BossBjornBolt,
     WormSpit,
-    ScorpionSting
+    ScorpionSting,
+    Shuriken,       // Sword + Knives
+    FireSword,      // Sword + Wand
+    HolyHammer,     // Sword + Shield
+    MagicDagger,    // Knives + Wand
+    ThrowingShield, // Knives + Shield
+    EnergyOrb       // Wand + Shield
 }
 
 public static partial class Module
@@ -74,6 +80,7 @@ public static partial class Module
         public AttackType attack_type; // The type of attack
         public uint id_within_burst;   // Position within a burst (0-based index)
         public uint parameter_u;       // Parameter used for special attacks
+        public int parameter_i;        // Integer parameter used for special attacks
         public uint ticks_elapsed;    // Number of ticks since the attack was created
         public uint damage;           // Damage of this specific attack instance
         public float radius;          // Radius of this attack (for area effects)
@@ -172,74 +179,7 @@ public static partial class Module
 
         Log.Info("Initializing attack data...");
 
-        // Football - bouncing projectile with knockback
-        ctx.Db.attack_data.Insert(new AttackData
-        {
-            attack_id = 11,
-            attack_type = AttackType.Football,
-            name = "Football Shot",
-            cooldown = 800,          // Slower attack speed
-            duration = 2500,         // Stays longer
-            projectiles = 1,         // Burst of 3 footballs
-            fire_delay = 200,        // Small delay between shots
-            speed = 600,             // Medium speed
-            piercing = true,         // Goes through enemies
-            radius = 24,             // Medium size
-            damage = 4,              // Moderate damage
-            armor_piercing = 2       
-        });
-
-        // Cards - spread attack
-        ctx.Db.attack_data.Insert(new AttackData
-        {
-            attack_id = 12,
-            attack_type = AttackType.Cards,
-            name = "Card Throw",
-            cooldown = 600,          
-            duration = 800,          
-            projectiles = 3,         // Multiple cards
-            fire_delay = 50,         
-            speed = 700,             
-            piercing = false,        
-            radius = 16,             
-            damage = 3,              
-            armor_piercing = 2       
-        });
-
-        // Dumbbell - falling aerial attack
-        ctx.Db.attack_data.Insert(new AttackData
-        {
-            attack_id = 13,
-            attack_type = AttackType.Dumbbell,
-            name = "Dumbbell Drop",
-            cooldown = 1200,         // Slow attack speed
-            duration = 2000,          // Qlonng fall time
-            projectiles = 1,         // Multiple dumbbells
-            fire_delay = 200,        // Delay between drops
-            speed = 800,             // Fast falling speed
-            piercing = true,         // Goes through enemies
-            radius = 40,             // Large impact radius
-            damage = 8,              // High damage
-            armor_piercing = 4       
-        });
-
-        // Garlic - aura attack
-        ctx.Db.attack_data.Insert(new AttackData
-        {
-            attack_id = 14,
-            attack_type = AttackType.Garlic,
-            name = "Garlic Aura",
-            cooldown = 800,          // Frequent ticks
-            duration = 800,          // Duration of each pulse
-            projectiles = 1,         // Single aura
-            fire_delay = 0,          // Continuous
-            speed = 0,               // Stationary
-            piercing = true,         // Hits all enemies in range
-            radius = 100,            // Large aura radius
-            damage = 2,              // Low damage but constant
-            armor_piercing = 1       
-        });
-
+        // Base weapons use attack IDs 1-10
         // Sword - melee attack
         ctx.Db.attack_data.Insert(new AttackData
         {
@@ -307,12 +247,80 @@ public static partial class Module
             damage = 4,             
             armor_piercing = 10       
         });
-
-        // Boss Standard Bolt - for Simon's spread attack
-        // Assumes AttackType.BossBolt is defined in the AttackType enum
+        
+        // Football - bouncing projectile with knockback
         ctx.Db.attack_data.Insert(new AttackData
         {
-            attack_id = 5, // Using an available ID
+            attack_id = 5,
+            attack_type = AttackType.Football,
+            name = "Football Shot",
+            cooldown = 800,          // Slower attack speed
+            duration = 2500,         // Stays longer
+            projectiles = 1,         // Burst of 3 footballs
+            fire_delay = 200,        // Small delay between shots
+            speed = 600,             // Medium speed
+            piercing = true,         // Goes through enemies
+            radius = 24,             // Medium size
+            damage = 4,              // Moderate damage
+            armor_piercing = 2       
+        });
+
+        // Cards - spread attack
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 6,
+            attack_type = AttackType.Cards,
+            name = "Card Throw",
+            cooldown = 600,          
+            duration = 800,          
+            projectiles = 3,         // Multiple cards
+            fire_delay = 50,         
+            speed = 700,             
+            piercing = false,        
+            radius = 16,             
+            damage = 3,              
+            armor_piercing = 2       
+        });
+
+        // Dumbbell - falling aerial attack
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 7,
+            attack_type = AttackType.Dumbbell,
+            name = "Dumbbell Drop",
+            cooldown = 1200,         // Slow attack speed
+            duration = 2000,          // Qlonng fall time
+            projectiles = 1,         // Multiple dumbbells
+            fire_delay = 200,        // Delay between drops
+            speed = 800,             // Fast falling speed
+            piercing = true,         // Goes through enemies
+            radius = 40,             // Large impact radius
+            damage = 8,              // High damage
+            armor_piercing = 4       
+        });
+
+        // Garlic - aura attack
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 8,
+            attack_type = AttackType.Garlic,
+            name = "Garlic Aura",
+            cooldown = 800,          // Frequent ticks
+            duration = 800,          // Duration of each pulse
+            projectiles = 1,         // Single aura
+            fire_delay = 0,          // Continuous
+            speed = 0,               // Stationary
+            piercing = true,         // Hits all enemies in range
+            radius = 100,            // Large aura radius
+            damage = 2,              // Low damage but constant
+            armor_piercing = 1       
+        });
+
+        // Boss attack IDs use 21-30
+        // Boss Standard Bolt - for Simon's spread attack
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 21,
             attack_type = AttackType.BossBolt, 
             name = "Boss Standard Bolt",
             cooldown = 10000,      // Example cooldown for Simon's attack sequence
@@ -329,7 +337,7 @@ public static partial class Module
         // Boss Jorge Bolt - unique projectile for Jorge
         ctx.Db.attack_data.Insert(new AttackData
         {
-            attack_id = 6,
+            attack_id = 22,
             attack_type = AttackType.BossJorgeBolt,
             name = "Jorge Bolt",
             cooldown = 1000,           // Faster fire rate
@@ -346,7 +354,7 @@ public static partial class Module
         // Boss Björn Bolt - unique homing projectile for Björn
         ctx.Db.attack_data.Insert(new AttackData
         {
-            attack_id = 7,
+            attack_id = 23,
             attack_type = AttackType.BossBjornBolt,
             name = "Björn Homing Bolt",
             cooldown = 1800,           // Medium fire rate
@@ -360,10 +368,11 @@ public static partial class Module
             armor_piercing = 5
         });
 
+        // Monster attacks use IDs 31-40
         // Worm Spit - weak projectile attack
         ctx.Db.attack_data.Insert(new AttackData
         {
-            attack_id = 8,
+            attack_id = 31,
             attack_type = AttackType.WormSpit,
             name = "Worm Spit",
             cooldown = 8000,           // Slow attack speed (8 seconds)
@@ -380,7 +389,7 @@ public static partial class Module
         // Scorpion Sting - short range projectile with poison effect
         ctx.Db.attack_data.Insert(new AttackData
         {
-            attack_id = 9,
+            attack_id = 32,
             attack_type = AttackType.ScorpionSting,
             name = "Scorpion Sting",
             cooldown = 4000,           // Slower
@@ -392,6 +401,109 @@ public static partial class Module
             radius = 10,               // Smaller size
             damage = 1,                // Lower damage (poison effect is the main threat)
             armor_piercing = 0         // No armor piercing
+        });
+
+        // Combined weapons use IDs 11-20
+        // Shuriken - combines Sword and Knives properties
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 11,
+            attack_type = AttackType.Shuriken,
+            name = "Shuriken Toss",
+            cooldown = 700,          // Medium cooldown
+            duration = 600,          // Shorter duration
+            projectiles = 1,         
+            fire_delay = 100,        // Delay between shurikens
+            speed = 900,             // Fast speed
+            piercing = true,         // Pierces through enemies
+            radius = 18,             // Medium radius
+            damage = 5,              // Moderate damage
+            armor_piercing = 3       
+        });
+
+        // Fire Sword - combines Sword and Wand properties
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 12,
+            attack_type = AttackType.FireSword,
+            name = "Fire Sword Slash",
+            cooldown = 800,          // Medium cooldown
+            duration = 700,          // Medium duration
+            projectiles = 1,         // Single fiery slash
+            fire_delay = 0,          // No delay, instant hit
+            speed = 1000,            // Very fast
+            piercing = true,         // Pierces through enemies
+            radius = 30,             // Medium radius
+            damage = 6,              // Moderate damage
+            armor_piercing = 4       
+        });
+
+        // Holy Hammer - combines Sword and Shield properties
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 13,
+            attack_type = AttackType.HolyHammer,
+            name = "Holy Hammer Throw",
+            cooldown = 1200,         // Slower cooldown
+            duration = 800,          // Medium duration
+            projectiles = 1,         // Single hammer smash
+            fire_delay = 0,          // No delay, instant hit
+            speed = 700,             // Medium speed
+            piercing = false,        // Does not pierce, blunt force
+            radius = 35,             // Large radius
+            damage = 10,             // High damage
+            armor_piercing = 5       
+        });
+
+        // Magic Dagger - combines Knives and Wand properties
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 14,
+            attack_type = AttackType.MagicDagger,
+            name = "Magic Dagger Throw",
+            cooldown = 500,          // Fast cooldown
+            duration = 600,          // Short duration
+            projectiles = 1,         // Burst of 2 daggers
+            fire_delay = 50,         // Quick delay between daggers
+            speed = 950,             // Fast speed
+            piercing = true,
+            radius = 12,
+            damage = 4,
+            armor_piercing = 2       
+        });
+
+        // Throwing Shield - combines Knives and Shield properties
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 15,
+            attack_type = AttackType.ThrowingShield,
+            name = "Throwing Shield Bash",
+            cooldown = 1000,
+            duration = 700,
+            projectiles = 1,
+            fire_delay = 0,
+            speed = 800,
+            piercing = true,
+            radius = 25,
+            damage = 7,
+            armor_piercing = 3       
+        });
+
+        // Energy Orb - combines Wand and Shield properties
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 16,
+            attack_type = AttackType.EnergyOrb,
+            name = "Energy Orb Blast",
+            cooldown = 900,
+            duration = 800,
+            projectiles = 4,
+            fire_delay = 0,
+            speed = 850,
+            piercing = false,
+            radius = 40,
+            damage = 8,
+            armor_piercing = 4       
         });
 
         Log.Info("Attack data initialized successfully.");
@@ -984,6 +1096,73 @@ public static partial class Module
                 
                 ctx.Db.entity.entity_id.Update(updatedEntity);
             }
+            else if (activeAttack.attack_type == AttackType.EnergyOrb)
+            {
+                // Energy Orb orbits around the player similar to Shield but with different attributes
+                var playerOpt = ctx.Db.player.player_id.Find(activeAttack.player_id);
+                if (playerOpt is null)
+                {
+                    continue; // Skip if player not found
+                }
+                
+                var player = playerOpt.Value;
+                var playerEntityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
+                if (playerEntityOpt is null)
+                {
+                    continue; // Skip if player entity not found
+                }
+                
+                var playerEntity = playerEntityOpt.Value;
+                
+                // Get all energy orbs for this player to determine total count and positioning
+                int totalOrbs = 0;
+                foreach (var attack in ctx.Db.active_attacks.player_id.Filter(activeAttack.player_id))
+                {
+                    if (attack.attack_type == AttackType.EnergyOrb)
+                    {
+                        totalOrbs++;
+                    }
+                }
+                
+                if (totalOrbs == 0)
+                {
+                    continue; // Something's wrong, skip this iteration
+                }
+                
+                // Calculate orbit angle - energy orbs rotate faster than normal shields
+                double rotationSpeed = attackData.speed * 1.2 * Math.PI / 180.0 * DELTA_TIME;
+                double parameterAngle = activeAttack.parameter_u * Math.PI / 180.0;
+                double baseAngle = parameterAngle + (2 * Math.PI * activeAttack.id_within_burst / totalOrbs);
+                double orbAngle = baseAngle + rotationSpeed * activeAttack.ticks_elapsed;
+                
+                // Energy orbs orbit further away from player
+                float offsetDistance = (playerEntity.radius + entity.radius) * 3;
+                
+                // Calculate new position using angle
+                float offsetX = (float)Math.Cos(orbAngle) * offsetDistance;
+                float offsetY = (float)Math.Sin(orbAngle) * offsetDistance;
+                
+                // Update orb entity with new position
+                var updatedEntity = entity;
+                updatedEntity.position = new DbVector2(
+                    playerEntity.position.x + offsetX,
+                    playerEntity.position.y + offsetY
+                );
+                
+                // Apply world boundary clamping
+                updatedEntity.position.x = Math.Clamp(
+                    updatedEntity.position.x, 
+                    updatedEntity.radius, 
+                    worldSize - updatedEntity.radius
+                );
+                updatedEntity.position.y = Math.Clamp(
+                    updatedEntity.position.y, 
+                    updatedEntity.radius, 
+                    worldSize - updatedEntity.radius
+                );
+                
+                ctx.Db.entity.entity_id.Update(updatedEntity);
+            }
             else if (activeAttack.attack_type == AttackType.Garlic)
             {
                 // Garlic aura stays with player
@@ -1043,6 +1222,395 @@ public static partial class Module
                             ctx.Db.entity.entity_id.Update(updatedMonster);
                         }
                     }
+                }
+            }
+            else if (activeAttack.attack_type == AttackType.MagicDagger)
+            {
+                // Magic Dagger has two phases: outgoing and returning
+                float moveSpeed = attackData.speed;
+                var moveDistance = moveSpeed * DELTA_TIME;
+                var moveOffset = entity.direction * moveDistance;
+                
+                // Update entity with new position
+                var updatedEntity = entity;
+                updatedEntity.position = entity.position + moveOffset;
+                
+                // Apply world boundary clamping
+                updatedEntity.position.x = Math.Clamp(
+                    updatedEntity.position.x, 
+                    updatedEntity.radius, 
+                    worldSize - updatedEntity.radius
+                );
+                updatedEntity.position.y = Math.Clamp(
+                    updatedEntity.position.y, 
+                    updatedEntity.radius, 
+                    worldSize - updatedEntity.radius
+                );
+                
+                // Check if it's an outgoing dagger
+                if (activeAttack.parameter_u == 0)
+                {
+                    // After traveling a certain distance or time, switch to returning mode
+                    // Use elapsed ticks as a timer
+                    if (activeAttack.ticks_elapsed >= 30) // Approx half a second with 60 ticks per second
+                    {
+                        var playerOpt = ctx.Db.player.player_id.Find(activeAttack.player_id);
+                        if (playerOpt != null)
+                        {
+                            var player = playerOpt.Value;
+                            var playerEntityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
+                            if (playerEntityOpt != null)
+                            {
+                                var playerEntity = playerEntityOpt.Value;
+                                
+                                // Update to returning state
+                                activeAttack.parameter_u = 1;
+                                // Store player's position for return targeting
+                                activeAttack.parameter_i = (int)player.entity_id;
+                                ctx.Db.active_attacks.active_attack_id.Update(activeAttack);
+                                
+                                // Calculate return direction to player
+                                var dx = playerEntity.position.x - updatedEntity.position.x;
+                                var dy = playerEntity.position.y - updatedEntity.position.y;
+                                float length = (float)Math.Sqrt(dx * dx + dy * dy);
+                                if (length > 0)
+                                {
+                                    updatedEntity.direction = new DbVector2(dx / length, dy / length);
+                                }
+                                else
+                                {
+                                    updatedEntity.direction = new DbVector2(1, 0); // Fallback direction
+                                }
+                                
+                                ctx.Db.entity.entity_id.Update(updatedEntity);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Regular outgoing movement
+                        ctx.Db.entity.entity_id.Update(updatedEntity);
+                    }
+                }
+                else // Returning dagger
+                {
+                    var playerOpt = ctx.Db.player.player_id.Find(activeAttack.player_id);
+                    if (playerOpt != null)
+                    {
+                        var player = playerOpt.Value;
+                        var playerEntityOpt = ctx.Db.entity.entity_id.Find(player.entity_id);
+                        if (playerEntityOpt != null)
+                        {
+                            var playerEntity = playerEntityOpt.Value;
+                            
+                            // Update direction to home in on player's current position
+                            var dx = playerEntity.position.x - updatedEntity.position.x;
+                            var dy = playerEntity.position.y - updatedEntity.position.y;
+                            float distSq = dx * dx + dy * dy;
+                            
+                            // Check if the dagger is close enough to the player
+                            if (distSq <= (playerEntity.radius + entity.radius) * (playerEntity.radius + entity.radius))
+                            {
+                                // Dagger returned to player - delete it
+                                ctx.Db.entity.entity_id.Delete(entity.entity_id);
+                                ctx.Db.active_attacks.active_attack_id.Delete(activeAttack.active_attack_id);
+                                
+                                CleanupAttackDamageRecords(ctx, entity.entity_id);
+                            }
+                            else
+                            {
+                                // Update direction to follow player
+                                float length = (float)Math.Sqrt(distSq);
+                                if (length > 0)
+                                {
+                                    updatedEntity.direction = new DbVector2(dx / length, dy / length);
+                                }
+                                
+                                ctx.Db.entity.entity_id.Update(updatedEntity);
+                            }
+                        }
+                        else
+                        {
+                            ctx.Db.entity.entity_id.Update(updatedEntity);
+                        }
+                    }
+                    else
+                    {
+                        ctx.Db.entity.entity_id.Update(updatedEntity);
+                    }
+                }
+            }
+            else if (activeAttack.attack_type == AttackType.ThrowingShield)
+            {
+                // Throwing Shield bounces between enemies
+                float moveSpeed = attackData.speed;
+                var moveDistance = moveSpeed * DELTA_TIME;
+                var moveOffset = entity.direction * moveDistance;
+                
+                // Max number of bounces the shield can perform
+                const uint MAX_BOUNCES = 2;
+                
+                // Update entity with new position
+                var updatedEntity = entity;
+                updatedEntity.position = entity.position + moveOffset;
+                
+                // Apply world boundary clamping
+                updatedEntity.position.x = Math.Clamp(
+                    updatedEntity.position.x, 
+                    updatedEntity.radius, 
+                    worldSize - updatedEntity.radius
+                );
+                updatedEntity.position.y = Math.Clamp(
+                    updatedEntity.position.y, 
+                    updatedEntity.radius, 
+                    worldSize - updatedEntity.radius
+                );
+                
+                // Check if the throwing shield has reached its maximum number of bounces
+                if (activeAttack.parameter_u >= MAX_BOUNCES)
+                {
+                    // If reached max bounces, continue movement but don't bounce anymore
+                    ctx.Db.entity.entity_id.Update(updatedEntity);
+                    
+                    // Check if hitting world boundary
+                    bool hitBoundary = 
+                        updatedEntity.position.x <= updatedEntity.radius ||
+                        updatedEntity.position.x >= worldSize - updatedEntity.radius ||
+                        updatedEntity.position.y <= updatedEntity.radius ||
+                        updatedEntity.position.y >= worldSize - updatedEntity.radius;
+                    
+                    if (hitBoundary)
+                    {
+                        // Delete attack entity and active attack record
+                        ctx.Db.entity.entity_id.Delete(entity.entity_id);
+                        ctx.Db.active_attacks.active_attack_id.Delete(activeAttack.active_attack_id);
+                        
+                        CleanupAttackDamageRecords(ctx, entity.entity_id);
+                    }
+                    
+                    continue;
+                }
+                
+                // Find a new target enemy to bounce to, excluding the last hit enemy
+                Entity? bestTarget = null;
+                float bestTargetDistance = float.MaxValue;
+                
+                foreach (var monster in ctx.Db.monsters.Iter())
+                {
+                    var monsterEntityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
+                    if (monsterEntityOpt is null) continue;
+                    
+                    var monsterEntity = monsterEntityOpt.Value;
+                    
+                    // Skip if this monster is too close (we've just hit it)
+                    var dx = monsterEntity.position.x - updatedEntity.position.x;
+                    var dy = monsterEntity.position.y - updatedEntity.position.y;
+                    var distanceSquared = dx * dx + dy * dy;
+                    
+                    // Skip monsters that are too close (we've just hit them)
+                    if (distanceSquared < (entity.radius + monsterEntity.radius) * (entity.radius + monsterEntity.radius) * 2)
+                    {
+                        continue;
+                    }
+                    
+                    // Find the closest valid target
+                    if (distanceSquared < bestTargetDistance)
+                    {
+                        bestTargetDistance = distanceSquared;
+                        bestTarget = monsterEntity;
+                    }
+                }
+                
+                // If found a valid target, bounce to it
+                if (bestTarget.HasValue)
+                {
+                    // Calculate direction to the new target
+                    var dx = bestTarget.Value.position.x - updatedEntity.position.x;
+                    var dy = bestTarget.Value.position.y - updatedEntity.position.y;
+                    var length = (float)Math.Sqrt(dx * dx + dy * dy);
+                    
+                    if (length > 0)
+                    {
+                        // Update direction to point at the new target
+                        updatedEntity.direction = new DbVector2(dx / length, dy / length);
+                        ctx.Db.entity.entity_id.Update(updatedEntity);
+                        
+                        // Increment bounce counter
+                        activeAttack.parameter_u += 1;
+                        ctx.Db.active_attacks.active_attack_id.Update(activeAttack);
+                    }
+                    else
+                    {
+                        ctx.Db.entity.entity_id.Update(updatedEntity);
+                    }
+                }
+                else
+                {
+                    ctx.Db.entity.entity_id.Update(updatedEntity);
+                }
+            }
+            else if (activeAttack.attack_type == AttackType.HolyHammer)
+            {
+                // Holy Hammer - high damage projectile with knockback effect
+                float moveSpeed = attackData.speed;
+                
+                // Calculate movement based on direction and speed
+                float moveDistance = moveSpeed * DELTA_TIME;
+                var moveOffset = entity.direction * moveDistance;
+                
+                // Update entity with new position
+                var updatedEntity = entity;
+                updatedEntity.position = entity.position + moveOffset;
+                
+                // Apply world boundary clamping
+                updatedEntity.position.x = Math.Clamp(
+                    updatedEntity.position.x, 
+                    updatedEntity.radius, 
+                    worldSize - updatedEntity.radius
+                );
+                updatedEntity.position.y = Math.Clamp(
+                    updatedEntity.position.y, 
+                    updatedEntity.radius, 
+                    worldSize - updatedEntity.radius
+                );
+                
+                // Apply knockback to all monsters hit by the hammer
+                foreach (var monster in ctx.Db.monsters.Iter())
+                {
+                    var monsterEntityOpt = ctx.Db.entity.entity_id.Find(monster.entity_id);
+                    if (monsterEntityOpt is null) continue;
+                    
+                    var monsterEntity = monsterEntityOpt.Value;
+                    
+                    // Calculate distance to monster
+                    var dx = monsterEntity.position.x - updatedEntity.position.x;
+                    var dy = monsterEntity.position.y - updatedEntity.position.y;
+                    var distanceSquared = dx * dx + dy * dy;
+                    var radiusSum = updatedEntity.radius + monsterEntity.radius;
+                    
+                    // If monster is hit by the hammer
+                    if (distanceSquared <= radiusSum * radiusSum)
+                    {
+                        // Apply significant knockback in the hammer's direction
+                        var knockbackStrength = 15f; // Strong knockback
+                        var knockbackPos = monsterEntity.position + (entity.direction * knockbackStrength);
+                        
+                        // Update monster position with knockback
+                        var updatedMonster = monsterEntity;
+                        updatedMonster.position = knockbackPos;
+                        ctx.Db.entity.entity_id.Update(updatedMonster);
+                    }
+                }
+                
+                // Check if entity hit the world boundary
+                bool hitBoundary = 
+                    updatedEntity.position.x <= updatedEntity.radius ||
+                    updatedEntity.position.x >= worldSize - updatedEntity.radius ||
+                    updatedEntity.position.y <= updatedEntity.radius ||
+                    updatedEntity.position.y >= worldSize - updatedEntity.radius;
+                
+                if (hitBoundary)
+                {
+                    // Delete attack entity and active attack record
+                    ctx.Db.entity.entity_id.Delete(entity.entity_id);
+                    ctx.Db.active_attacks.active_attack_id.Delete(activeAttack.active_attack_id);
+                    
+                    // Clean up any damage records associated with this attack
+                    CleanupAttackDamageRecords(ctx, entity.entity_id);
+                }
+                else
+                {
+                    // Update entity position
+                    ctx.Db.entity.entity_id.Update(updatedEntity);
+                }
+            }
+            else if (activeAttack.attack_type == AttackType.FireSword)
+            {
+                // Fire Sword - fast, high-damage melee with fire trail
+                float moveSpeed = attackData.speed;
+                
+                // Calculate movement based on direction and speed
+                float moveDistance = moveSpeed * DELTA_TIME;
+                var moveOffset = entity.direction * moveDistance;
+                
+                // Update entity with new position
+                var updatedEntity = entity;
+                updatedEntity.position = entity.position + moveOffset;
+                
+                // Apply world boundary clamping
+                updatedEntity.position.x = Math.Clamp(
+                    updatedEntity.position.x, 
+                    updatedEntity.radius, 
+                    worldSize - updatedEntity.radius
+                );
+                updatedEntity.position.y = Math.Clamp(
+                    updatedEntity.position.y, 
+                    updatedEntity.radius, 
+                    worldSize - updatedEntity.radius
+                );
+                
+                // Fire sword has a shorter lifetime but higher damage
+                // We can enforce this with a faster timer-based cleanup
+                if (activeAttack.ticks_elapsed >= attackData.duration / DELTA_TIME / 1000)
+                {
+                    // Delete attack entity and active attack record when time is up
+                    ctx.Db.entity.entity_id.Delete(entity.entity_id);
+                    ctx.Db.active_attacks.active_attack_id.Delete(activeAttack.active_attack_id);
+                    
+                    // Clean up any damage records associated with this attack
+                    CleanupAttackDamageRecords(ctx, entity.entity_id);
+                }
+                else
+                {
+                    // Update entity position
+                    ctx.Db.entity.entity_id.Update(updatedEntity);
+                }
+            }
+            else if (activeAttack.attack_type == AttackType.Shuriken)
+            {
+                // Shuriken - fast spinning projectile that flies straight
+                float moveSpeed = attackData.speed;
+                
+                // Calculate movement based on direction and speed
+                float moveDistance = moveSpeed * DELTA_TIME;
+                var moveOffset = entity.direction * moveDistance;
+                
+                // Update entity with new position
+                var updatedEntity = entity;
+                updatedEntity.position = entity.position + moveOffset;
+                
+                // Apply world boundary clamping
+                updatedEntity.position.x = Math.Clamp(
+                    updatedEntity.position.x, 
+                    updatedEntity.radius, 
+                    worldSize - updatedEntity.radius
+                );
+                updatedEntity.position.y = Math.Clamp(
+                    updatedEntity.position.y, 
+                    updatedEntity.radius, 
+                    worldSize - updatedEntity.radius
+                );
+                
+                // Check if entity hit the world boundary
+                bool hitBoundary = 
+                    updatedEntity.position.x <= updatedEntity.radius ||
+                    updatedEntity.position.x >= worldSize - updatedEntity.radius ||
+                    updatedEntity.position.y <= updatedEntity.radius ||
+                    updatedEntity.position.y >= worldSize - updatedEntity.radius;
+                
+                if (hitBoundary)
+                {
+                    // Delete attack entity and active attack record
+                    ctx.Db.entity.entity_id.Delete(entity.entity_id);
+                    ctx.Db.active_attacks.active_attack_id.Delete(activeAttack.active_attack_id);
+                    
+                    // Clean up any damage records associated with this attack
+                    CleanupAttackDamageRecords(ctx, entity.entity_id);
+                }
+                else
+                {
+                    // Update entity position
+                    ctx.Db.entity.entity_id.Update(updatedEntity);
                 }
             }
             else
