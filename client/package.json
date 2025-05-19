@@ -8,7 +8,7 @@
     "start": "vite --host",
     "build": "vite build",
     "serve": "vite preview",
-    "predeploy": "npm run build",
+    "predeploy": "npm run build && echo 'www.survive-with-friends.com' > dist/CNAME",
     "deploy": "gh-pages -d dist",
     "generate-bindings": "spacetimedb generate --lang typescript --out-dir ./src/autobindings"
   },
