@@ -327,7 +327,8 @@ public static partial class Module
     private static void ProcessMonsterMovements(ReducerContext ctx)
     {
         PopulateMonsterCache(ctx);
-        MoveMonsters(ctx);
+        // Use the vectorized version for monster movement
+        MoveMonstersVectorized(ctx);
         CalculateMonsterSpatialHashGrid(ctx);
         SolveMonsterRepulsionSpatialHash(ctx);
         CalculateMonsterSpatialHashGrid(ctx);
@@ -374,15 +375,22 @@ public static partial class Module
 
     private static void MoveMonstersVectorized(ReducerContext ctx)
     {
-        //Note: Doesn't work for some reason, and is slower than the non-vectorized version.
-        //TODO: revisit this.
+        // SIMD-optimized version of monster movement using Vector<float>
         int laneCount = Vector<float>.Count;       // SIMD lane width
         int i;
+
+        // Create a constant Vector for WORLD_SIZE
+        var worldSizeVector = new Vector<float>(WORLD_SIZE);
+        // Create an epsilon vector for avoiding division by zero
+        var epsilon = new Vector<float>(0.0001f);
+        // Create a vector with 1.0f in each lane
+        var ones = Vector<float>.One;
 
         for (i = 0; i <= CachedCountMonsters - laneCount; i += laneCount)
         {
             var monster_xs = new Vector<float>(PosXMonster, i);
             var monster_ys = new Vector<float>(PosYMonster, i);
+            var monster_rs = new Vector<float>(RadiusMonster, i);
 
             var target_xs = new Vector<float>(TargetXMonster, i);
             var target_ys = new Vector<float>(TargetYMonster, i);
@@ -391,22 +399,40 @@ public static partial class Module
             var dist_ys = target_ys - monster_ys;
 
             var dist_squareds = dist_xs * dist_xs + dist_ys * dist_ys;
-            var inv_dists = Vector.SquareRoot(dist_squareds);
+            
+            // Create a mask for zero distances (monster is already at target)
+            var zeroDistanceMask = Vector.LessThanOrEqual(dist_squareds, epsilon);
+            
+            // Calculate distance with safe division for normalization
+            var dists = Vector.SquareRoot(Vector.Max(dist_squareds, epsilon));
+            var inv_dists = ones / dists;
+            
+            // Calculate normalized direction (with zero-distance protection)
+            var norm_xs = Vector.ConditionalSelect(zeroDistanceMask, Vector<float>.Zero, dist_xs * inv_dists);
+            var norm_ys = Vector.ConditionalSelect(zeroDistanceMask, Vector<float>.Zero, dist_ys * inv_dists);
 
-            var norm_xs = dist_xs * inv_dists;
-            var norm_ys = dist_ys * inv_dists;
-
+            // Apply movement
             var speed_vecs = new Vector<float>(SpeedMonster, i);
             var move_xs = norm_xs * speed_vecs * DELTA_TIME;
             var move_ys = norm_ys * speed_vecs * DELTA_TIME;
 
             var new_xs = monster_xs + move_xs;
             var new_ys = monster_ys + move_ys;
-
+            
+            // Apply world boundary clamping
+            var min_bounds = monster_rs;  // Min bound is radius
+            var max_bounds = worldSizeVector - monster_rs;  // Max bound is WORLD_SIZE - radius
+            
+            // Clamp using min and max operations
+            new_xs = Vector.Min(Vector.Max(new_xs, min_bounds), max_bounds);
+            new_ys = Vector.Min(Vector.Max(new_ys, min_bounds), max_bounds);
+            
+            // Store the results back to the arrays
             new_xs.CopyTo(PosXMonster, i);
-            new_ys.CopyTo(PosYMonster, i);                 // store
+            new_ys.CopyTo(PosYMonster, i);
         }
-        // tail-process leftovers
+        
+        // Handle remaining monsters (the "tail") with scalar code
         for (; i < CachedCountMonsters; ++i)
         {
             var dist_x = TargetXMonster[i] - PosXMonster[i];
@@ -422,8 +448,9 @@ public static partial class Module
             var move_x = norm_x * speed * DELTA_TIME;
             var move_y = norm_y * speed * DELTA_TIME;
 
-            PosXMonster[i] += move_x;
-            PosYMonster[i] += move_y;
+            // Apply movement with clamping
+            PosXMonster[i] = Math.Clamp(PosXMonster[i] + move_x, RadiusMonster[i], WORLD_SIZE - RadiusMonster[i]);
+            PosYMonster[i] = Math.Clamp(PosYMonster[i] + move_y, RadiusMonster[i], WORLD_SIZE - RadiusMonster[i]);
         }
 
         // Clean up monster status
