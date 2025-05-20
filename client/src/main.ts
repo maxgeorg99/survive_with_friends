@@ -12,6 +12,7 @@ import PrologScene from './scenes/PrologScene';
 import BestaryScene from './scenes/BestaryScene';
 import AchievementScene from './scenes/AchievementScene';
 import WeaponCombinationsScene from './scenes/WeaponCombinationsScene';
+import SplashScene from './scenes/SplashScene';
 
 console.log("Main script loading...");
 
@@ -38,7 +39,7 @@ const config: Phaser.Types.Core.GameConfig = {
             // debug: true // Set to true for physics debugging
         }
     },
-    scene: [LoginScene, PrologScene, ClassSelectScene, GameScene, LoadingScene, QuestScene, BestaryScene, AchievementScene, WeaponCombinationsScene],
+    scene: [SplashScene, LoginScene, PrologScene, ClassSelectScene, GameScene, LoadingScene, QuestScene, BestaryScene, AchievementScene, WeaponCombinationsScene],
     scale: {
         mode: Phaser.Scale.RESIZE,
         autoCenter: Phaser.Scale.CENTER_BOTH
@@ -46,7 +47,10 @@ const config: Phaser.Types.Core.GameConfig = {
 };
 
 const game = new Phaser.Game(config);
-console.log("Phaser game initialized.");
+console.log("Phaser game initialized. Starting with SplashScene.");
+
+// Force start with SplashScene - this ensures it's always shown first
+game.scene.start('SplashScene');
 
 // Global DOM cleanup function
 const cleanupDOMElements = () => {
@@ -66,6 +70,13 @@ const cleanupDOMElements = () => {
                 el.remove();
             }
         });
+        
+        // Clean up login container
+        const loginContainer = document.getElementById('login-name-input-container');
+        if (loginContainer && loginContainer.parentNode) {
+            console.log("Global cleanup: Removing login container");
+            loginContainer.remove();
+        }
         
         // Clean up class select scene elements
         const classContainer = document.getElementById('class-select-container');
@@ -126,6 +137,7 @@ const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
     // Listen for account inserts
     localDb.account.onInsert((ctx, account) => {
         console.log("Account inserted event received");
+        console.log("- Account data: ", account.name + " - " + account.currentPlayerId + " - " + account.lastLogin);
 
         // Check if account is local
         if (account.identity.isEqual(localIdentity)) 
@@ -135,36 +147,7 @@ const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
             // Emit account created event with the account data
             gameEvents.emit(GameEvents.ACCOUNT_CREATED, ctx, account);
             
-            // Automatically go to login scene if account has no name
-            if (!account.name) 
-            {
-                return;
-            } 
-            else 
-            {
-                // If account has a name but no player, go to ClassSelectScene
-                if (account.currentPlayerId === 0) 
-                {
-                    cleanupDOMElements(); // Clean up before transition
-                    game.scene.start('ClassSelectScene');
-                    return;
-                } 
-                else 
-                {
-                    // Check if the player exists and is alive
-                    const localPlayer = ctx.db?.player.playerId.find(account.currentPlayerId);
-                    if (localPlayer) 
-                    {
-                        cleanupDOMElements(); // Clean up before transition
-                        game.scene.start('GameScene');
-                    } 
-                    else 
-                    {
-                        cleanupDOMElements(); // Clean up before transition
-                        game.scene.start('ClassSelectScene');
-                    }
-                }
-            }
+            // Important: Do NOT directly transition scenes here! Let the SplashScene manage transitions
         }
         else
         {
@@ -172,6 +155,7 @@ const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
         }
     });
 
+    // Listen for account updates but don't perform direct scene transitions
     localDb.account.onUpdate((ctx, oldAccount, newAccount) => {
         console.log("Account updated event received");
         console.log("- Account data: ", newAccount.name + " - " + newAccount.currentPlayerId + " - " + newAccount.lastLogin);
@@ -202,37 +186,11 @@ const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
                         loadingScene.completeLoading();
                     }
                 }
-                
-                return;
-            }
-
-            // Check if playerId changed
-            if (oldAccount.currentPlayerId !== newAccount.currentPlayerId) 
-            {
-                console.log("Player ID changed from", oldAccount.currentPlayerId, "to", newAccount.currentPlayerId);
-                
-                // Check if the new player exists
-                if (newAccount.currentPlayerId > 0) {
-                    const player = ctx.db?.player.playerId.find(newAccount.currentPlayerId);
-                    if (player) 
-                    {
-                        // Emit player created event if in LoadingScene
-                        if (game.scene.isActive('LoadingScene')) 
-                        {
-                            const loadingScene = game.scene.getScene('LoadingScene') as any;
-                            if (loadingScene.completeLoading) 
-                            {
-                                console.log("Completing loading for player id change");
-                                loadingScene.completeLoading();
-                            }
-                        }
-                    }
-                }
             }
         }
         else
         {
-            console.log("Another user has logged on: " + newAccount.identity.toString());
+            console.log("Another user has updated their account: " + newAccount.identity.toString());
         }
     });
 
@@ -358,53 +316,30 @@ const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
     
     if (!myAccount) {
         console.log("No account found for local identity. Waiting for account to be created.");
-        // Start with LoginScene (default)
-        return;
+        return; // Let SplashScene handle the scene transition
     }
 
-    if (!myAccount.name) 
-    {
-        console.log("Account has no name. Going to LoginScene.");
-        return;
+    // Always ensure the SplashScene is active and let it handle transitions
+    if (!game.scene.isActive('SplashScene')) {
+        console.log("Forcing redirect to SplashScene for proper scene flow");
+        cleanupDOMElements();
+        game.scene.start('SplashScene');
     }
-
-    if (myAccount.currentPlayerId === 0) 
-    {
-        console.log("Account has name but no player. Going to ClassSelectScene.");
-        cleanupDOMElements(); // Clean up before transition
-        game.scene.start('ClassSelectScene');
-        return;
-    }
-
-    // Check if player exists and is alive
-    const localPlayer = ctx.db?.player.playerId.find(myAccount.currentPlayerId);
-    if (localPlayer) 
-    {
-        console.log("Account has name and living player. Going to GameScene.");
-        cleanupDOMElements(); // Clean up before transition
-        game.scene.start('GameScene');
-    }
-    else 
-    {
-        // Check if player is in dead_players table
-        const deadPlayer = ctx.db?.deadPlayers.playerId.find(myAccount.currentPlayerId);
-        if (deadPlayer) 
-        {
-            console.log("Player is dead. Going to ClassSelectScene.");
-        } 
-        else 
-        {
-            console.log("Player not found. Going to ClassSelectScene.");
-        }
-        cleanupDOMElements(); // Clean up before transition
-        game.scene.start('ClassSelectScene');
-    }
+    
+    // The rest of the scene transitions will be handled by SplashScene
 };
 
 const onConnect = (ctx: DbConnection, identity: Identity, token: string) => {
     console.log("SpacetimeDB connection established.");
     // Emit connection established event
     gameEvents.emit(GameEvents.CONNECTION_ESTABLISHED, ctx, identity, token);
+    
+    // Always ensure we're showing splash screen first
+    if (!game.scene.isActive('SplashScene')) {
+        console.log("Ensuring SplashScene is active after connection");
+        cleanupDOMElements(); // Clean up before transition
+        game.scene.start('SplashScene');
+    }
 };
 
 const onDisconnect = (ctx: ErrorContext, error?: Error) => {

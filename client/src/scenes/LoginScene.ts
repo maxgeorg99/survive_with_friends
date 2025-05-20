@@ -14,7 +14,7 @@ export default class LoginScene extends Phaser.Scene {
     private nameButton!: HTMLButtonElement;
     private errorText!: Phaser.GameObjects.Text;
     private loginContainer!: Phaser.GameObjects.Container;
-    private nameInputContainer!: HTMLDivElement; // Added container for input field
+    private nameInputContainer!: HTMLDivElement;
 
     constructor() {
         super('LoginScene');
@@ -29,14 +29,14 @@ export default class LoginScene extends Phaser.Scene {
     }
 
     create() {
-        // Remove force cleanup at scene creation
-        // this.forceCleanupDOMElements();
-        
         // Set up background
         const { width, height } = this.scale;
         
         // Use a dark blue color if no background image
         this.cameras.main.setBackgroundColor('#042E64');
+        
+        // Add fade-in effect for smoother transitions
+        this.cameras.main.fadeIn(500);
         
         try {
             if (this.textures.exists('title_bg')) {
@@ -54,7 +54,7 @@ export default class LoginScene extends Phaser.Scene {
         // Add game title
         const titleText = this.add.text(0, -150, 'SURVIVE WITH FRIENDS', {
             fontFamily: 'Arial Black',
-            fontSize: '64px',
+            fontSize: isMobileDevice() ? '32px' : '64px',
             color: '#ffffff',
             align: 'center',
             stroke: '#000000',
@@ -65,7 +65,7 @@ export default class LoginScene extends Phaser.Scene {
         // Add status text (only for connection status, not for name prompt)
         this.statusText = this.add.text(0, -80, 'Connecting to server...', {
             fontFamily: 'Arial',
-            fontSize: '24px',
+            fontSize: isMobileDevice() ? '20px' : '24px',
             color: '#ffffff',
             align: 'center'
         }).setOrigin(0.5);
@@ -77,7 +77,7 @@ export default class LoginScene extends Phaser.Scene {
         // Add error text (initially hidden)
         this.errorText = this.add.text(0, 200, '', {
             fontFamily: 'Arial',
-            fontSize: '18px',
+            fontSize: isMobileDevice() ? '18px' : '18px',
             color: '#ff0000',
             align: 'center'
         }).setOrigin(0.5).setVisible(false);
@@ -104,26 +104,27 @@ export default class LoginScene extends Phaser.Scene {
         existingButtons.forEach(btn => btn.remove());
         
         const isMobile = isMobileDevice();
+        const { width, height } = this.scale;
         
         // Create a wrapper container for the input field and button
-        // This provides better positioning stability when the keyboard opens
         this.nameInputContainer = document.createElement('div');
         this.nameInputContainer.id = 'login-name-input-container';
-        this.nameInputContainer.className = 'login-input-container'; // Add class for CSS targeting
+        this.nameInputContainer.className = 'login-input-container';
         this.nameInputContainer.style.position = 'absolute';
         this.nameInputContainer.style.left = '50%';
         this.nameInputContainer.style.transform = 'translateX(-50%)';
         this.nameInputContainer.style.width = isMobile ? '80%' : '300px';
         this.nameInputContainer.style.maxWidth = '300px';
         this.nameInputContainer.style.display = 'none'; // Initially hidden
-        this.nameInputContainer.style.zIndex = '1000'; // Ensure it's above other elements
+        this.nameInputContainer.style.zIndex = '1000';
         
-        // Important: use a fixed position that won't be affected by viewport changes
-        this.nameInputContainer.style.top = isMobile ? '60px' : `${window.innerHeight/2 - 25}px`;
+        // Position in the center vertically on mobile too - using percentage instead of fixed value
+        const topPosition = height * 0.4; // 40% from the top
+        this.nameInputContainer.style.top = `${topPosition}px`;
         
         document.body.appendChild(this.nameInputContainer);
         
-        // Create name input
+        // Create name input with improved styling
         this.nameInput = document.createElement('input');
         this.nameInput.id = 'login-name-input';
         this.nameInput.type = 'text';
@@ -131,34 +132,43 @@ export default class LoginScene extends Phaser.Scene {
         this.nameInput.maxLength = 16;
         this.nameInput.style.width = '100%';
         this.nameInput.style.fontFamily = 'Arial';
-        this.nameInput.style.fontSize = '16px'; // Fixed font size to prevent iOS zoom
-        this.nameInput.style.padding = isMobile ? '12px' : '10px';
+        this.nameInput.style.fontSize = isMobile ? '18px' : '16px';
+        this.nameInput.style.padding = isMobile ? '15px' : '10px';
         this.nameInput.style.textAlign = 'center';
-        this.nameInput.style.borderRadius = '4px';
+        this.nameInput.style.borderRadius = '8px';
         this.nameInput.style.marginBottom = '15px';
         this.nameInput.style.boxSizing = 'border-box';
         this.nameInput.style.border = '2px solid #34495e';
-        this.nameInput.style.backgroundColor = '#fff'; // Ensure visible background
-        // Add to the container instead of directly to body
+        this.nameInput.style.backgroundColor = '#fff';
+        this.nameInput.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
         this.nameInputContainer.appendChild(this.nameInput);
         
-        // Create Set Name button
+        // Create Set Name button with improved styling
         this.nameButton = document.createElement('button');
         this.nameButton.textContent = 'Set Name';
         this.nameButton.className = 'login-button';
         this.nameButton.style.width = '100%';
         this.nameButton.style.boxSizing = 'border-box';
         this.nameButton.style.fontFamily = 'Arial';
-        this.nameButton.style.fontSize = '16px'; // Fixed font size
-        this.nameButton.style.padding = isMobile ? '14px 20px' : '10px 20px';
-        this.nameButton.style.borderRadius = '4px';
+        this.nameButton.style.fontSize = isMobile ? '18px' : '16px';
+        this.nameButton.style.padding = isMobile ? '15px' : '12px';
+        this.nameButton.style.borderRadius = '8px';
         this.nameButton.style.backgroundColor = '#4CAF50';
         this.nameButton.style.color = 'white';
         this.nameButton.style.border = 'none';
         this.nameButton.style.cursor = 'pointer';
         this.nameButton.style.textAlign = 'center';
-        // Add to the container instead of directly to body
+        this.nameButton.style.fontWeight = 'bold';
+        this.nameButton.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
         this.nameInputContainer.appendChild(this.nameButton);
+        
+        // Create a mobile-optimized wrapper container for visual enhancement
+        if (isMobile) {
+            this.nameInputContainer.style.backgroundColor = 'rgba(0,0,0,0.7)';
+            this.nameInputContainer.style.padding = '20px';
+            this.nameInputContainer.style.borderRadius = '12px';
+            this.nameInputContainer.style.boxShadow = '0 8px 16px rgba(0,0,0,0.3)';
+        }
         
         // Add event listeners
         this.nameButton.addEventListener('click', () => this.setPlayerName());
@@ -168,15 +178,52 @@ export default class LoginScene extends Phaser.Scene {
             }
         });
         
-        // Add focus/blur handlers to detect keyboard appearance on mobile
+        // Handle keyboard visibility changes on mobile without extreme positioning
+        // We'll use a more subtle approach that doesn't jump as drastically
         if (isMobile) {
-            this.nameInput.addEventListener('focus', () => {
-                document.body.classList.add('keyboard-open');
-            });
+            // Store the original position
+            const originalTopPosition = topPosition;
             
-            this.nameInput.addEventListener('blur', () => {
-                document.body.classList.remove('keyboard-open');
-            });
+            // On iOS, use the visualViewport API if available
+            if (window.visualViewport) {
+                // Listen for resize events on the viewport (keyboard opening/closing)
+                window.visualViewport.addEventListener('resize', () => {
+                    if (document.activeElement === this.nameInput) {
+                        // Check if the keyboard is likely open (viewport height reduced)
+                        if (window.visualViewport.height < window.innerHeight * 0.75) {
+                            // Adjust position to be visible with keyboard, but not too high
+                            const adjustedPosition = Math.max(height * 0.2, window.visualViewport.height * 0.25);
+                            this.nameInputContainer.style.top = `${adjustedPosition}px`;
+                        } else {
+                            // Restore the original position
+                            this.nameInputContainer.style.top = `${originalTopPosition}px`;
+                        }
+                    }
+                });
+            } else {
+                // Fallback for browsers without visualViewport API
+                this.nameInput.addEventListener('focus', () => {
+                    // Add a small class to flag that the keyboard is open
+                    document.body.classList.add('keyboard-open');
+                    
+                    // Move only slightly up instead of jumping to the very top
+                    const adjustedPosition = Math.max(height * 0.25, originalTopPosition * 0.6);
+                    this.nameInputContainer.style.top = `${adjustedPosition}px`;
+                    
+                    // Use a timeout to ensure repositioning after keyboard is fully shown
+                    setTimeout(() => {
+                        // Only adjust if still focused
+                        if (document.activeElement === this.nameInput) {
+                            this.nameInputContainer.style.top = `${adjustedPosition}px`;
+                        }
+                    }, 300);
+                });
+                
+                this.nameInput.addEventListener('blur', () => {
+                    document.body.classList.remove('keyboard-open');
+                    this.nameInputContainer.style.top = `${originalTopPosition}px`;
+                });
+            }
         }
     }
     
@@ -209,10 +256,16 @@ export default class LoginScene extends Phaser.Scene {
             }
         }
         
-        // Don't recreate elements on resize - this could be causing the issue
-        // Only recreate if needed (e.g., if they don't exist)
-        if (!document.getElementById('login-name-input-container')) {
-            this.createHTMLElements();
+        // Update HTML element positions - use percentage-based positioning for more stability
+        if (this.nameInputContainer) {
+            const topPosition = height * 0.4; // 40% from the top for consistency
+            
+            // Only update if not currently focused, to avoid jumping during typing
+            if (document.activeElement !== this.nameInput) {
+                this.nameInputContainer.style.top = `${topPosition}px`;
+            }
+            
+            this.nameInputContainer.style.width = isMobile ? '80%' : '300px';
         }
     }
     
@@ -261,8 +314,20 @@ export default class LoginScene extends Phaser.Scene {
     
     private updateConnectionStatus() {
         if (this.spacetimeDBClient.isConnected) {
-            console.log("Connected to server");
+            console.log("Connected to server in LoginScene");
             this.statusText.setText(''); // Remove any status text after connection
+            
+            // Check if we already have an account with a name
+            if (this.spacetimeDBClient.sdkConnection?.db?.account) {
+                const myAccount = this.spacetimeDBClient.sdkConnection.db.account.identity.find(this.spacetimeDBClient.identity);
+                if (myAccount && myAccount.name) {
+                    console.log("Already have an account with name in LoginScene, redirecting to SplashScene");
+                    this.hideAllInputs();
+                    this.scene.start('SplashScene');
+                    return;
+                }
+            }
+            
             this.showNameInput();
         } else {
             this.statusText.setText('Connecting to server...');
@@ -285,34 +350,21 @@ export default class LoginScene extends Phaser.Scene {
         this.scene.start('LoadingScene', { 
             message: 'Setting your name...', 
             nextScene: 'PrologScene',
-            timeoutDuration: 10000 // 10 seconds timeout
+            timeoutDuration: 10000, // 10 seconds timeout
+            waitingFor: 'name'  // Explicitly wait for the name to be set
         });
         
         try {
-            if (this.spacetimeDBClient.sdkConnection?.reducers) 
-            {
+            if (this.spacetimeDBClient.sdkConnection?.reducers) {
                 console.log(`Setting name to: ${name}`);
                 this.spacetimeDBClient.sdkConnection.reducers.setName(name);
-                
-                // No need for timeout logic here as that's handled by LoadingScene
-            } 
-            else 
-            {
-                // If reducers aren't available, go back to LoginScene with error
-                this.scene.start('LoginScene');
-                setTimeout(() => {
-                    this.showError('Cannot set name: SpacetimeDB reducers not available');
-                }, 100);
+            } else {
+                console.error("Cannot set name: SpacetimeDB reducers not available");
+                this.gameEvents.emit(GameEvents.LOADING_ERROR, "Connection to server failed");
             }
-        } 
-        catch (error) 
-        {
+        } catch (error) {
             console.error('Error setting name:', error);
-            // If there's an error, go back to LoginScene with error
-            this.scene.start('LoginScene');
-            setTimeout(() => {
-                this.showError('An error occurred while setting your name');
-            }, 100);
+            this.gameEvents.emit(GameEvents.LOADING_ERROR, "Failed to set your name");
         }
     }
     

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GameEvents } from '../constants/GameEvents';
+import { isMobileDevice } from '../utils/responsive';
 
 export default class LoadingScene extends Phaser.Scene {
     private loadingText!: Phaser.GameObjects.Text;
@@ -41,6 +42,9 @@ export default class LoadingScene extends Phaser.Scene {
         // Set background color
         this.cameras.main.setBackgroundColor('#042E64');
         
+        // Add fade-in effect
+        this.cameras.main.fadeIn(500);
+        
         // Add title background
         try {
             if (this.textures.exists('title_bg')) {
@@ -52,19 +56,24 @@ export default class LoadingScene extends Phaser.Scene {
             console.error("Error loading background:", error);
         }
         
-        // Create loading text
-        this.loadingText = this.add.text(width / 2, height / 2 - 50, this.message, {
+        // Create loading text with nicer styling
+        this.loadingText = this.add.text(width / 2, height / 2 - 70, this.message, {
             fontFamily: 'Arial',
-            fontSize: '24px',
+            fontSize: isMobileDevice() ? '20px' : '24px',
             color: '#ffffff',
-            align: 'center'
+            align: 'center',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 2,
         }).setOrigin(0.5);
         
         // Create animated dots
-        this.dots = this.add.text(width / 2, height / 2 - 20, '', {
+        this.dots = this.add.text(width / 2, height / 2 - 40, '', {
             fontFamily: 'Arial',
-            fontSize: '24px',
-            color: '#ffffff'
+            fontSize: isMobileDevice() ? '20px' : '24px',
+            color: '#ffffff',
+            stroke: '#000000',
+            strokeThickness: 2,
         }).setOrigin(0.5);
         
         // Create spinner animation
@@ -102,10 +111,10 @@ export default class LoadingScene extends Phaser.Scene {
         
         // Listen for specific events based on what we're waiting for
         if (this.waitingFor === 'name') {
-            console.log("done waiting for name");
+            console.log("Waiting for name to be set");
             this.gameEvents.on(GameEvents.NAME_SET, this.completeLoading, this);
         } else if (this.waitingFor === 'player') {
-            console.log("done waiting for player");
+            console.log("Waiting for player to be created");
             this.gameEvents.on(GameEvents.PLAYER_CREATED, this.completeLoading, this);
         }
 
@@ -124,7 +133,7 @@ export default class LoadingScene extends Phaser.Scene {
             const angle = (i / numDots) * Math.PI * 2;
             const dotX = Math.cos(angle) * radius;
             const dotY = Math.sin(angle) * radius;
-            const dotSize = 8;
+            const dotSize = isMobileDevice() ? 6 : 8;
             const alpha = 0.3 + (0.7 * i / numDots);
             
             const dot = this.add.circle(dotX, dotY, dotSize, 0xffffff, alpha);
@@ -150,11 +159,11 @@ export default class LoadingScene extends Phaser.Scene {
         const { width, height } = this.scale;
         
         if (this.loadingText) {
-            this.loadingText.setPosition(width / 2, height / 2 - 50);
+            this.loadingText.setPosition(width / 2, height / 2 - 70);
         }
         
         if (this.dots) {
-            this.dots.setPosition(width / 2, height / 2 - 20);
+            this.dots.setPosition(width / 2, height / 2 - 40);
         }
         
         if (this.spinner) {
@@ -173,23 +182,36 @@ export default class LoadingScene extends Phaser.Scene {
      * Call this method to complete loading and move to the next scene
      */
     public completeLoading() {
+        console.log("completeLoading called, next scene:", this.nextScene);
+        
         if (this.timeoutTimer) {
             this.timeoutTimer.remove();
             this.timeoutTimer = null;
         }
         
         if (this.nextScene) {
-            this.proceedToNextScene();
-            this.nextScene = "";
+            const targetScene = this.nextScene; // Store the reference before clearing it
+            console.log(`Loading complete, preparing transition to ${targetScene}`);
+            
+            // Add a fade-out effect before transitioning
+            this.cameras.main.fadeOut(500);
+            this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+                console.log(`Fade out complete, now starting ${targetScene}`);
+                this.scene.start(targetScene);
+            });
+            
+            this.nextScene = ""; // Clear the next scene to prevent double transitions
+        } else {
+            console.warn('No next scene specified in completeLoading, staying in LoadingScene');
         }
     }
     
     private proceedToNextScene() {
         if (this.nextScene) {
-            console.log(`Loading complete, proceeding to ${this.nextScene}`);
+            console.log(`Timeout reached, proceeding to ${this.nextScene}`);
             this.scene.start(this.nextScene);
         } else {
-            console.warn('No next scene specified, staying in LoadingScene');
+            console.warn('No next scene specified in proceedToNextScene, staying in LoadingScene');
         }
     }
     
@@ -278,4 +300,4 @@ export default class LoadingScene extends Phaser.Scene {
             console.error("Error in cleanupLingeringUIElements:", e);
         }
     }
-} 
+}

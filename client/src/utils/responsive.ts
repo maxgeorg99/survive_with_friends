@@ -1,187 +1,83 @@
 /**
- * Utilities for responsive design and mobile device detection
+ * Utility functions for responsive UI and device detection
  */
 
 /**
- * Detects if the current device is a mobile device
- * @returns true if the device is a mobile device
+ * Check if the current device is mobile
  */
-export const isMobileDevice = (): boolean => {
-  // Check for touch capability and screen size
-  const hasTouchScreen = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-  const isSmallScreen = window.innerWidth < 768;
-  
-  // Check for mobile user agent (fallback method)
-  const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
-  const isMobileUserAgent = mobileRegex.test(navigator.userAgent);
-  
-  // Consider it a mobile device if it has a touch screen and is either small or has a mobile user agent
-  return hasTouchScreen && (isSmallScreen || isMobileUserAgent);
-};
+export function isMobileDevice(): boolean {
+    const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+    
+    // Check for mobile user agents
+    const mobileRegex = /(android|bb\d+|meego).+mobile|avantgo|bada\/|blackberry|blazer|compal|elaine|fennec|hiptop|iemobile|ip(hone|od)|iris|kindle|lge |maemo|midp|mmp|mobile.+firefox|netfront|opera m(ob|in)i|palm( os)?|phone|p(ixi|re)\/|plucker|pocket|psp|series(4|6)0|symbian|treo|up\.(browser|link)|vodafone|wap|windows ce|xda|xiino/i;
+    const mobileRegex2 = /1207|6310|6590|3gso|4thp|50[1-6]i|770s|802s|a wa|abac|ac(er|oo|s\-)|ai(ko|rn)|al(av|ca|co)|amoi|an(ex|ny|yw)|aptu|ar(ch|go)|as(te|us)|attw|au(di|\-m|r |s )|avan|be(ck|ll|nq)|bi(lb|rd)|bl(ac|az)|br(e|v)w|bumb|bw\-(n|u)|c55\/|capi|ccwa|cdm\-|cell|chtm|cldc|cmd\-|co(mp|nd)|craw|da(it|ll|ng)|dbte|dc\-s|devi|dica|dmob|do(c|p)o|ds(12|\-d)|el(49|ai)|em(l2|ul)|er(ic|k0)|esl8|ez([4-7]0|os|wa|ze)|fetc|fly(\-|_)|g1 u|g560|gene|gf\-5|g\-mo|go(\.w|od)|gr(ad|un)|haie|hcit|hd\-(m|p|t)|hei\-|hi(pt|ta)|hp( i|ip)|hs\-c|ht(c(\-| |_|a|g|p|s|t)|tp)|hu(aw|tc)|i\-(20|go|ma)|i230|iac( |\-|\/)|ibro|idea|ig01|ikom|im1k|inno|ipaq|iris|ja(t|v)a|jbro|jemu|jigs|kddi|keji|kgt( |\/)|klon|kpt |kwc\-|kyo(c|k)|le(no|xi)|lg( g|\/(k|l|u)|50|54|\-[a-w])|libw|lynx|m1\-w|m3ga|m50\/|ma(te|ui|xo)|mc(01|21|ca)|m\-cr|me(rc|ri)|mi(o8|oa|ts)|mmef|mo(01|02|bi|de|do|t(\-| |o|v)|zz)|mt(50|p1|v )|mwbp|mywa|n10[0-2]|n20[2-3]|n30(0|2)|n50(0|2|5)|n7(0(0|1)|10)|ne((c|m)\-|on|tf|wf|wg|wt)|nok(6|i)|nzph|o2im|op(ti|wv)|oran|owg1|p800|pan(a|d|t)|pdxg|pg(13|\-([1-8]|c))|phil|pire|pl(ay|uc)|pn\-2|po(ck|rt|se)|prox|psio|pt\-g|qa\-a|qc(07|12|21|32|60|\-[2-7]|i\-)|qtek|r380|r600|raks|rim9|ro(ve|zo)|s55\/|sa(ge|ma|mm|ms|ny|va)|sc(01|h\-|oo|p\-)|sdk\/|se(c(\-|0|1)|47|mc|nd|ri)|sgh\-|shar|sie(\-|m)|sk\-0|sl(45|id)|sm(al|ar|b3|it|t5)|so(ft|ny)|sp(01|h\-|v\-|v )|sy(01|mb)|t2(18|50)|t6(00|10|18)|ta(gt|lk)|tcl\-|tdg\-|tel(i|m)|tim\-|t\-mo|to(pl|sh)|ts(70|m\-|m3|m5)|tx\-9|up(\.b|g1|si)|utst|v400|v750|veri|vi(rg|te)|vk(40|5[0-3]|\-v)|vm40|voda|vulc|vx(52|53|60|61|70|80|81|83|85|98)|w3c(\-| )|webc|whit|wi(g |nc|nw)|wmlb|wonu|x700|yas\-|your|zeto|zte\-/i;
+    
+    // Check for tablet size
+    const isTablet = window.innerWidth <= 1024 && window.innerWidth > 480;
+    
+    // Consider tablets as mobile devices for UI purposes
+    return (mobileRegex.test(userAgent) || mobileRegex2.test(userAgent.substr(0, 4)) || isTablet || window.innerWidth <= 768);
+}
 
 /**
- * Gets the appropriate font size based on screen width
- * @param baseFontSize The base font size for desktop
- * @returns The responsive font size
+ * Get a responsive font size based on the screen width
+ * @param baseSize The base font size in pixels
  */
-export const getResponsiveFontSize = (baseFontSize: number): string => {
-  const screenWidth = window.innerWidth;
-  
-  if (screenWidth < 360) {
-    return `${Math.max(10, Math.floor(baseFontSize * 0.6))}px`;
-  } else if (screenWidth < 480) {
-    return `${Math.max(12, Math.floor(baseFontSize * 0.7))}px`;
-  } else if (screenWidth < 768) {
-    return `${Math.max(14, Math.floor(baseFontSize * 0.8))}px`;
-  }
-  
-  return `${baseFontSize}px`;
-};
+export function getResponsiveFontSize(baseSize: number): string {
+    const screenWidth = window.innerWidth;
+    let fontSize = baseSize;
+    
+    if (screenWidth <= 320) fontSize = baseSize * 0.7;
+    else if (screenWidth <= 480) fontSize = baseSize * 0.8;
+    else if (screenWidth <= 768) fontSize = baseSize * 0.9;
+    else fontSize = baseSize;
+    
+    return `${fontSize}px`;
+}
 
 /**
- * Gets responsive dimensions as percentage of screen size
- * @param baseWidth Base width in pixels for desktop
- * @param baseHeight Base height in pixels for desktop
- * @returns Object with width and height as percentage strings
- */
-export const getResponsiveDimensions = (
-  baseWidth: number,
-  baseHeight: number
-): { width: string; height: string } => {
-  const screenWidth = window.innerWidth;
-  const screenHeight = window.innerHeight;
-  
-  // Calculate percentages based on a reference desktop size (1920x1080)
-  const widthPercent = (baseWidth / 1920) * 100;
-  const heightPercent = (baseHeight / 1080) * 100;
-  
-  // Adjust for smaller screens
-  const scale = screenWidth < 768 ? 1.2 : 1;
-  
-  return {
-    width: `${widthPercent * scale}vw`,
-    height: `${heightPercent * scale}vh`,
-  };
-};
-
-/**
- * Applies responsive styles to an HTML element
+ * Apply responsive styles to HTML elements
  * @param element The HTML element to style
- * @param options Styling options
+ * @param styleOptions Style options for the element
  */
-export const applyResponsiveStyles = (
-  element: HTMLElement,
-  options: {
-    baseFontSize?: number;
-    baseWidth?: number;
-    baseHeight?: number;
-    mobileStyles?: Partial<CSSStyleDeclaration>;
-    desktopStyles?: Partial<CSSStyleDeclaration>;
-  }
-): void => {
-  const isMobile = isMobileDevice();
-  
-  // Apply font size if specified
-  if (options.baseFontSize) {
-    element.style.fontSize = getResponsiveFontSize(options.baseFontSize);
-  }
-  
-  // Apply dimensions if specified
-  if (options.baseWidth && options.baseHeight) {
-    const { width, height } = getResponsiveDimensions(
-      options.baseWidth,
-      options.baseHeight
-    );
-    element.style.width = width;
-    element.style.height = height;
-  }
-  
-  // Apply device-specific styles
-  const styles = isMobile ? options.mobileStyles : options.desktopStyles;
-  if (styles) {
-    Object.keys(styles).forEach((key) => {
-      const value = styles[key as keyof typeof styles];
-      if (value) {
-        (element.style as any)[key] = value;
-      }
-    });
-  }
-};
-
-/**
- * Gets responsive position for centered elements
- * @param verticalOffset Offset from center (negative = up, positive = down)
- * @returns CSS position object with top and left values
- */
-export const getResponsiveCenteredPosition = (
-  verticalOffset: number = 0
-): { top: string; left: string; transform: string } => {
-  const isMobile = isMobileDevice();
-  const mobileOffset = isMobile ? verticalOffset * 0.7 : verticalOffset;
-  
-  return {
-    top: `calc(50% + ${mobileOffset}px)`,
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
-  };
-};
-
-/**
- * Create a readable text style for Phaser text elements based on screen size
- * @param baseSize The base font size for desktop
- * @returns TextStyle object with enhanced readability properties
- */
-export const getReadableTextStyle = (baseSize: number): any => {
-  const fontSize = getResponsiveFontSize(baseSize);
-  
-  return {
-    fontFamily: 'Arial Black, Arial Bold, Gadget, sans-serif',
-    fontSize: fontSize,
-    color: '#ffffff',
-    align: 'center',
-    stroke: '#000000',
-    strokeThickness: Math.max(3, Math.floor(baseSize / 10)),
-    shadow: {
-      offsetX: 2,
-      offsetY: 2,
-      color: '#000000',
-      blur: 5,
-      stroke: true,
-      fill: true
-    },
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    padding: {
-      left: 15,
-      right: 15,
-      top: 8, 
-      bottom: 8
+export function applyResponsiveStyles(element: HTMLElement, styleOptions: {
+    width?: string,
+    height?: string,
+    fontSize?: string,
+    padding?: string,
+    margin?: string,
+    borderRadius?: string
+}) {
+    const isMobile = isMobileDevice();
+    
+    if (isMobile) {
+        if (styleOptions.width) element.style.width = styleOptions.width;
+        if (styleOptions.height) element.style.height = styleOptions.height;
+        if (styleOptions.fontSize) element.style.fontSize = styleOptions.fontSize;
+        if (styleOptions.padding) element.style.padding = styleOptions.padding;
+        if (styleOptions.margin) element.style.margin = styleOptions.margin;
+        if (styleOptions.borderRadius) element.style.borderRadius = styleOptions.borderRadius;
     }
-  };
-};
+}
 
 /**
- * Add a semi-transparent background to text for better readability
- * @param text The Phaser Text object to enhance
- * @param padding Optional padding override
+ * Get responsive dimensions for UI elements
  */
-export const addTextBackground = (text: Phaser.GameObjects.Text, padding?: {x: number, y: number}): void => {
-  const paddingX = padding?.x || 10;
-  const paddingY = padding?.y || 5;
-  
-  // Create a background rectangle
-  const graphics = text.scene.add.graphics();
-  graphics.fillStyle(0x000000, 0.6);
-  graphics.fillRoundedRect(
-    text.x - text.width / 2 - paddingX,
-    text.y - text.height / 2 - paddingY,
-    text.width + paddingX * 2,
-    text.height + paddingY * 2,
-    8
-  );
-  
-  // Ensure the background is behind the text
-  graphics.setDepth(text.depth - 1);
-  
-  // Add the background as data to the text for reference
-  text.setData('background', graphics);
-};
+export function getResponsiveDimensions() {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const isMobile = isMobileDevice();
+    
+    return {
+        width,
+        height,
+        buttonWidth: isMobile ? Math.min(width * 0.8, 280) : 200,
+        buttonHeight: isMobile ? 60 : 50,
+        inputWidth: isMobile ? Math.min(width * 0.8, 280) : 200,
+        inputHeight: isMobile ? 50 : 40,
+        padding: isMobile ? 20 : 15,
+        margin: isMobile ? 15 : 10,
+        fontSize: isMobile ? getResponsiveFontSize(18) : getResponsiveFontSize(16),
+        titleFontSize: isMobile ? getResponsiveFontSize(32) : getResponsiveFontSize(48)
+    };
+}
