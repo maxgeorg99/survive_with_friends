@@ -61,7 +61,7 @@ public static partial class Module
     private const float DELTA_TIME = 1.0f / TICK_RATE; // Time between ticks in seconds
 
     // --- World Constants ---
-    private const int WORLD_SIZE = 20000;
+    private const int WORLD_SIZE = 6400;
     private const ushort NUM_WORLD_CELLS = 40704;
     private const ushort WORLD_GRID_WIDTH = 157;
     private const ushort WORLD_GRID_HEIGHT = 157;
@@ -371,7 +371,7 @@ public static partial class Module
             speed = classData.Speed;
             startingAttackType = classData.StartingAttackType;
         }
-    
+
         uint shieldCount = 0;
         if(startingAttackType == AttackType.Shield)
         {

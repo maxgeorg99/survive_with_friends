@@ -73,7 +73,7 @@ public static partial class Module
         var player = playerOpt.Value;
         
         // Get world size from config for boundary checking
-        uint worldSize = 20000; // Default fallback
+        uint worldSize = WORLD_SIZE; // Default fallback
         var configOpt = ctx.Db.config.id.Find(0);
         if (configOpt != null)
         {

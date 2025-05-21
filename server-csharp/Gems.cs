@@ -389,7 +389,7 @@ public static partial class Module
 
                         if(SpatialHashCollisionChecker(px, py, pr, gx, gy, gr))
                         {                     
-                            CollectGem(ctx, KeysGem[gid], KeysPlayer[pid]);
+                            CollectGem(ctx, KeysGem[gid], realPlayerId);
                         }
                     }
                 }

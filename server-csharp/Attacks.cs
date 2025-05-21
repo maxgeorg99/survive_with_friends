@@ -172,7 +172,7 @@ public static partial class Module
             cooldown = 500,          
             duration = 800,          
             projectiles = 5,          
-            fire_delay = 1,           
+            fire_delay = 0,           
             speed = 1000,               
             piercing = false,         
             radius = 15,              

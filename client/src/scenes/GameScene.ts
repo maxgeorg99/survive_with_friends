@@ -289,7 +289,7 @@ export default class GameScene extends Phaser.Scene {
         console.log("Tap marker created", { marker: this.tapMarker });
 
         // Background - Make it large enough to feel like a world
-        const worldSize = 20000; // World size - 10x larger
+        const worldSize = 6400; // World size - 10x larger
         this.backgroundTile = this.add.tileSprite(0, 0, worldSize, worldSize, GRASS_ASSET_KEY)
             .setOrigin(0, 0)
             .setScrollFactor(1); // Scroll with the camera
