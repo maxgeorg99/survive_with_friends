@@ -524,39 +524,27 @@ public static partial class Module
             // Handle special case for Shield attack type
             if (activeAttack.attack_type == AttackType.Shield)
             {
+                var playerCacheIdx = PlayerIdToCacheIndex[activeAttack.player_id];
+
                 // Shield orbits around the player - update its position based on time
-                var playerOpt = ctx.Db.player.player_id.Find(activeAttack.player_id);
-                if (playerOpt is null)
+                var shieldCount = ShieldCountPlayer[playerCacheIdx];
+                if(shieldCount == 0)
                 {
-                    continue; // Skip if player not found
-                }
-                
-                var player = playerOpt.Value;
-                
-                // Get all shields for this player to determine total count and positioning
-                int totalShields = 0;
-                foreach (var attack in ctx.Db.active_attacks.player_id.Filter(activeAttack.player_id))
-                {
-                    if (attack.attack_type == AttackType.Shield)
-                    {
-                        totalShields++;
-                    }
-                }
-                
-                if (totalShields == 0)
-                {
-                    continue; // Something's wrong, skip this iteration
+                    continue;
                 }
                 
                 // Calculate orbit angle based on shield's offset value and current position in burst
                 double rotationSpeed = attackData.speed * Math.PI / 180.0 * DELTA_TIME;
                 //convert parameter_u from degrees to radians
                 double parameterAngle = activeAttack.parameter_u * Math.PI / 180.0;
-                double baseAngle = parameterAngle + (2 * Math.PI * activeAttack.id_within_burst / totalShields);
+                double baseAngle = parameterAngle + (2 * Math.PI * activeAttack.id_within_burst / shieldCount);
                 double shieldAngle = baseAngle + rotationSpeed * activeAttack.ticks_elapsed;
                 
                 // Calculate offset distance from player center
-                float offsetDistance = (player.radius + entity.radius) * 2; // Added some spacing
+                var playerRadius = RadiusPlayer[playerCacheIdx];
+                var playerX = PosXPlayer[playerCacheIdx];
+                var playerY = PosYPlayer[playerCacheIdx];
+                float offsetDistance = (playerRadius + entity.radius) * 2; // Added some spacing
                 
                 // Calculate new position using angle
                 float offsetX = (float)Math.Cos(shieldAngle) * offsetDistance;
@@ -565,8 +553,8 @@ public static partial class Module
                 // Update shield entity with new position
                 var updatedEntity = entity;
                 updatedEntity.position = new DbVector2(
-                    player.position.x + offsetX,
-                    player.position.y + offsetY
+                    playerX + offsetX,
+                    playerY + offsetY
                 );
                 
                 ctx.Db.entity.entity_id.Update(updatedEntity);

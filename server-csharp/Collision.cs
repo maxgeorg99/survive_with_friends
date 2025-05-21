@@ -13,13 +13,15 @@ public static partial class Module
     private static readonly float[] PosXPlayer = new float[MAX_PLAYERS];
     private static readonly float[] PosYPlayer = new float[MAX_PLAYERS];
     private static readonly float[] RadiusPlayer = new float[MAX_PLAYERS];
+    private static readonly float[] DamageToPlayer = new float[MAX_PLAYERS];
+    private static readonly uint[] ShieldCountPlayer = new uint[MAX_PLAYERS];
     private static uint CachedCountPlayers = 0;
 
     // --- Monster Collision ---
     private static readonly uint[] KeysMonster = new uint[MAX_MONSTERS];
     //private static readonly uint[] KeyToCacheIndexMonster = new uint[MAX_MONSTERS];
     private static readonly Dictionary<uint, uint> KeyToCacheIndexMonster = new Dictionary<uint, uint>(MAX_MONSTERS);
-    private static readonly Dictionary<uint, uint> TargetPlayerIdToCacheIndex = new Dictionary<uint, uint>(MAX_PLAYERS);
+    private static readonly Dictionary<uint, uint> PlayerIdToCacheIndex = new Dictionary<uint, uint>(MAX_PLAYERS);
     private static readonly int[] HeadsMonster = new int[NUM_WORLD_CELLS];
     private static readonly int[] NextsMonster = new int[MAX_MONSTERS];
     private static readonly int[] CellMonster = new int[MAX_MONSTERS];
@@ -32,6 +34,7 @@ public static partial class Module
     private static readonly float[] TargetYMonster = new float[MAX_MONSTERS];
     private static readonly float[] RadiusMonster = new float[MAX_MONSTERS];
     private static readonly float[] SpeedMonster = new float[MAX_MONSTERS];
+    private static readonly float[] AtkMonster = new float[MAX_MONSTERS];
     private static int CachedCountMonsters = 0;
 
     // --- Gem Collision ---
@@ -66,6 +69,8 @@ public static partial class Module
         Array.Fill(PosXPlayer, 0);
         Array.Fill(PosYPlayer, 0);
         Array.Fill(RadiusPlayer, 0);
+        Array.Fill(DamageToPlayer, 0);
+        Array.Fill(ShieldCountPlayer, (uint)0);
 
         Array.Fill(KeysMonster, (uint)0);
         Array.Fill(CellMonster, 0);
@@ -79,8 +84,9 @@ public static partial class Module
         Array.Fill(TargetXMonster, 0);
         Array.Fill(TargetYMonster, 0);
         Array.Fill(RadiusMonster, 0);
+        Array.Fill(AtkMonster, 0);
         KeyToCacheIndexMonster.Clear();
-        TargetPlayerIdToCacheIndex.Clear();
+        PlayerIdToCacheIndex.Clear();
 
         Array.Fill(KeysGem, (uint)0);
         Array.Fill(HeadsGem, -1);

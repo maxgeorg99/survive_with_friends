@@ -371,6 +371,12 @@ public static partial class Module
             speed = classData.Speed;
             startingAttackType = classData.StartingAttackType;
         }
+    
+        uint shieldCount = 0;
+        if(startingAttackType == AttackType.Shield)
+        {
+            shieldCount = 2;
+        }
         
         uint initialExpNeeded = CalculateExpForLevel(ctx, 1);
 
@@ -399,6 +405,7 @@ public static partial class Module
             armor = (uint)armor,
             unspent_upgrades = 0,
             rerolls = 999,
+            shield_count = shieldCount,
             position = position,
             radius = 48.0f,
             is_bot = false

@@ -498,9 +498,10 @@ public static partial class Module
             KeyToCacheIndexMonster[monster.monster_id] = (uint)CachedCountMonsters;
             RadiusMonster[CachedCountMonsters] = monster.radius;
             SpeedMonster[CachedCountMonsters] = monster.speed;
+            AtkMonster[CachedCountMonsters] = monster.atk;
 
             var targetPlayerId = monster.target_player_id;
-            if(TargetPlayerIdToCacheIndex.ContainsKey(targetPlayerId))
+            if(PlayerIdToCacheIndex.ContainsKey(targetPlayerId))
             {
                 TargetIdMonster[CachedCountMonsters] = (int)targetPlayerId;
             }
@@ -511,7 +512,7 @@ public static partial class Module
 
             if(TargetIdMonster[CachedCountMonsters] != -1)
             {
-                var playerCacheIdx = TargetPlayerIdToCacheIndex[(uint)TargetIdMonster[CachedCountMonsters]];
+                var playerCacheIdx = PlayerIdToCacheIndex[(uint)TargetIdMonster[CachedCountMonsters]];
                 TargetXMonster[CachedCountMonsters] = PosXPlayer[playerCacheIdx];
                 TargetYMonster[CachedCountMonsters] = PosYPlayer[playerCacheIdx];
             }

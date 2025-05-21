@@ -23,6 +23,7 @@ public static partial class Module
         public uint armor; 
         public uint unspent_upgrades;
         public uint rerolls;
+        public uint shield_count;
 
         // For tap-to-move
         public DbVector2 waypoint;    // Target position for movement
@@ -246,13 +247,14 @@ public static partial class Module
             PosXPlayer[CachedCountPlayers] = modifiedPlayer.position.x;
             PosYPlayer[CachedCountPlayers] = modifiedPlayer.position.y;
             RadiusPlayer[CachedCountPlayers] = modifiedPlayer.radius;
+            ShieldCountPlayer[CachedCountPlayers] = modifiedPlayer.shield_count;
 
             ushort gridCellKey = GetWorldCellFromPosition(modifiedPlayer.position.x, modifiedPlayer.position.y);
             CellPlayer[CachedCountPlayers] = gridCellKey;
             NextsPlayer[CachedCountPlayers] = HeadsPlayer[gridCellKey];
             HeadsPlayer[gridCellKey] = (int)CachedCountPlayers;
 
-            TargetPlayerIdToCacheIndex[modifiedPlayer.player_id] = (uint)CachedCountPlayers;
+            PlayerIdToCacheIndex[modifiedPlayer.player_id] = CachedCountPlayers;
 
             CachedCountPlayers++;
         }
@@ -267,8 +269,6 @@ public static partial class Module
         //Iterate through all players using spatial hash
         for(var pid = 0; pid < CachedCountPlayers; pid++)
         {
-            bool playerIsDead = false;
-
             var px = PosXPlayer[pid];
             var py = PosYPlayer[pid];
             var pr = RadiusPlayer[pid];
@@ -282,7 +282,7 @@ public static partial class Module
             for (int dy = -1; dy <= +1; ++dy)
             {
                 int ny = cy + dy;
-                if ((uint)ny >= (uint)WORLD_GRID_HEIGHT) continue;   // unsigned trick == clamp
+                if ((uint)ny >= WORLD_GRID_HEIGHT) continue;   // unsigned trick == clamp
 
                 int rowBase = ny << WORLD_CELL_BIT_SHIFT;
                 for (int dx = -1; dx <= +1; ++dx)
@@ -298,32 +298,19 @@ public static partial class Module
                         var mr = RadiusMonster[mid];
 
                         if(SpatialHashCollisionChecker(px, py, pr, mx, my, mr))
-                        {                     
-                            var monsterEntry = ctx.Db.monsters.monster_id.Find(KeysMonster[mid]);
-                            if(monsterEntry is null)
-                            {
-                                continue;
-                            }
-
-                            playerIsDead = DamagePlayer(ctx, KeysPlayer[pid], monsterEntry.Value.atk);
-                        }
-
-                        if(playerIsDead)
                         {
-                            break;
+                            DamageToPlayer[pid] += AtkMonster[mid];
                         }
                     }
-
-                    if(playerIsDead)
-                    {
-                        break;
-                    }
                 }
+            }
+        }
 
-                if(playerIsDead)
-                {
-                    break;
-                }
+        for(var pid = 0; pid < CachedCountPlayers; pid++)
+        {
+            if(DamageToPlayer[pid] > 0)
+            {
+                DamagePlayer(ctx, KeysPlayer[pid], DamageToPlayer[pid]);
             }
         }
     }

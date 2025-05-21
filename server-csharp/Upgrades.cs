@@ -469,6 +469,12 @@ public static partial class Module
             // Handle attack upgrades
             // First, determine which attack type we're upgrading
             AttackType attackType = GetAttackTypeFromUpgrade(upgrade.upgrade_type);
+
+            if(attackType == AttackType.Shield && upgrade.projectiles > 0)
+            {
+                player.shield_count += upgrade.projectiles;
+                ctx.Db.player.player_id.Update(player);
+            }
             
             // Check if this is a new attack
             if (upgrade.is_new_attack)
