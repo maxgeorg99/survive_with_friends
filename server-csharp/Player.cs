@@ -186,60 +186,64 @@ public static partial class Module
                 ctx.Db.player.player_id.Update(modifiedPlayer);
             }
 
-            // Skip movement for bot players
-            if (!player.is_bot)
+            // Process player movement
+            float moveSpeed = player.speed;
+
+            if (player.has_waypoint)
             {
-                // Process player movement
-                float moveSpeed = player.speed;
-
-                if (player.has_waypoint)
+                // Calculate direction to waypoint
+                var directionVector = new DbVector2(
+                    player.waypoint.x - player.position.x,
+                    player.waypoint.y - player.position.y
+                );
+                
+                // Calculate distance to waypoint
+                float distance = (float)Math.Sqrt(
+                    directionVector.x * directionVector.x + 
+                    directionVector.y * directionVector.y
+                );
+                
+                // If we're close enough to the waypoint, clear it
+                if (distance < moveSpeed * DELTA_TIME)
                 {
-                    // Calculate direction to waypoint
-                    var directionVector = new DbVector2(
-                        player.waypoint.x - player.position.x,
-                        player.waypoint.y - player.position.y
-                    );
-                    
-                    // Calculate distance to waypoint
-                    float distance = (float)Math.Sqrt(
-                        directionVector.x * directionVector.x + 
-                        directionVector.y * directionVector.y
-                    );
-                    
-                    // If we're close enough to the waypoint, clear it
-                    if (distance < moveSpeed * DELTA_TIME)
-                    {
-                        modifiedPlayer.has_waypoint = false;
+                    modifiedPlayer.has_waypoint = false;
 
-                        modifiedPlayer.position.x = modifiedPlayer.waypoint.x;
-                        modifiedPlayer.position.y = modifiedPlayer.waypoint.y;
-                    }
-                    else
-                    {
-                        // Normalize direction vector
-                        directionVector.x /= distance;
-                        directionVector.y /= distance;
-                        
-                        // Move towards waypoint
-                        modifiedPlayer.position.x += directionVector.x * moveSpeed * DELTA_TIME;
-                        modifiedPlayer.position.y += directionVector.y * moveSpeed * DELTA_TIME;
-                        
-                        // Clamp position to world boundaries
-                        modifiedPlayer.position.x = Math.Clamp(
-                            modifiedPlayer.position.x, 
-                            modifiedPlayer.radius, 
-                            WORLD_SIZE - modifiedPlayer.radius
-                        );
-                        modifiedPlayer.position.y = Math.Clamp(
-                            modifiedPlayer.position.y, 
-                            modifiedPlayer.radius, 
-                            WORLD_SIZE - modifiedPlayer.radius
-                        );
-                    }
-                    
-                    // Update entity in database
-                    ctx.Db.player.player_id.Update(modifiedPlayer);
+                    modifiedPlayer.position.x = modifiedPlayer.waypoint.x;
+                    modifiedPlayer.position.y = modifiedPlayer.waypoint.y;
                 }
+                else
+                {
+                    // Normalize direction vector
+                    directionVector.x /= distance;
+                    directionVector.y /= distance;
+                    
+                    // Move towards waypoint
+                    modifiedPlayer.position.x += directionVector.x * moveSpeed * DELTA_TIME;
+                    modifiedPlayer.position.y += directionVector.y * moveSpeed * DELTA_TIME;
+                    
+                    // Clamp position to world boundaries
+                    modifiedPlayer.position.x = Math.Clamp(
+                        modifiedPlayer.position.x, 
+                        modifiedPlayer.radius, 
+                        WORLD_SIZE - modifiedPlayer.radius
+                    );
+                    modifiedPlayer.position.y = Math.Clamp(
+                        modifiedPlayer.position.y, 
+                        modifiedPlayer.radius, 
+                        WORLD_SIZE - modifiedPlayer.radius
+                    );
+                }
+                
+                // Update entity in database
+                ctx.Db.player.player_id.Update(modifiedPlayer);
+            }
+            else if(player.is_bot)
+            {
+                //Bot should set a waypoint at a random position
+                modifiedPlayer.waypoint.x = modifiedPlayer.radius + (float)ctx.Rng.NextDouble() * (WORLD_SIZE - modifiedPlayer.radius * 2);
+                modifiedPlayer.waypoint.y = modifiedPlayer.radius + (float)ctx.Rng.NextDouble() * (WORLD_SIZE - modifiedPlayer.radius * 2);
+                modifiedPlayer.has_waypoint = true;
+                ctx.Db.player.player_id.Update(modifiedPlayer);
             }
 
             //Update collision cache
