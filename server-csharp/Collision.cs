@@ -119,13 +119,13 @@ public static partial class Module
     private static bool SpatialHashCollisionChecker(float ax, float ay, float ar, float bx, float by, float br)
     {
         // Get the distance between the two entities
-        float dx = ax - bx;
-        float dy = ay - by;
-        float distanceSquared = dx * dx + dy * dy;
+        int dx = (int)(ax - bx);
+        int dy = (int)(ay - by);
+        int distanceSquared = dx * dx + dy * dy;
         
         // Calculate the minimum distance to avoid collision (sum of both radii)
-        float minDistance = ar + br;
-        float minDistanceSquared = minDistance * minDistance;
+        int minDistance = (int)(ar + br);
+        int minDistanceSquared = minDistance * minDistance;
         
         // If distance squared is less than minimum distance squared, they are colliding
         return distanceSquared < minDistanceSquared;

@@ -153,7 +153,7 @@ public static partial class Module
             attack_type = AttackType.Wand,
             name = "Magic Bolt",
             cooldown = 400,           
-            duration = 1000,          
+            duration = 390,         
             projectiles = 1,          
             fire_delay = 20,          
             speed = 800,                
@@ -170,7 +170,7 @@ public static partial class Module
             attack_type = AttackType.Knives,
             name = "Throwing Knives",
             cooldown = 500,          
-            duration = 800,          
+            duration = 490,
             projectiles = 5,          
             fire_delay = 0,           
             speed = 1000,               
@@ -215,17 +215,7 @@ public static partial class Module
 
     // Helper method to trigger a single projectile of an attack
     private static void TriggerAttackProjectile(ReducerContext ctx, uint playerId, AttackType attackType, uint idWithinBurst = 0, uint parameterU = 0, int parameterI = 0)
-    {
-        // Get attack data
-        var attackDataOpt = FindAttackDataByType(ctx, attackType);
-        if (attackDataOpt == null)
-        {
-            Log.Error($"Attack data not found for type {attackType}");
-            return;
-        }
-
-        var attackData = attackDataOpt.Value;
-        
+    {        
         // Get player's scheduled attack to use actual stats (which may have been upgraded)
         PlayerScheduledAttack? scheduledAttack = null;
         foreach (var attack in ctx.Db.player_scheduled_attacks.player_id.Filter(playerId))
@@ -242,16 +232,10 @@ public static partial class Module
             Log.Error($"Scheduled attack not found for player {playerId}, attack type {attackType}");
             return;
         }
-        
-        // Get player data
-        var playerOpt = ctx.Db.player.player_id.Find(playerId);
-        if (playerOpt == null)
-        {
-            Log.Error($"Player {playerId} not found");
-            return;
-        }
-        
-        var player = playerOpt.Value;
+
+        var playerCacheIdx = PlayerIdToCacheIndex[playerId];
+        var playerX = PosXPlayer[playerCacheIdx];
+        var playerY = PosYPlayer[playerCacheIdx];
         
         // Get attack direction using AttackUtils
         var direction = AttackUtils.DetermineAttackDirection(ctx, playerId, attackType, idWithinBurst, parameterU, parameterI);
@@ -259,7 +243,7 @@ public static partial class Module
         // Create a new entity for the projectile and get its ID
         var projectileEntity = ctx.Db.entity.Insert(new Entity
         {
-            position = player.position,
+            position = new DbVector2(playerX, playerY),
             direction = direction,
             radius = scheduledAttack.Value.radius
         });
