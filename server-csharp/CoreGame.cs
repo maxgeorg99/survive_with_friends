@@ -477,6 +477,8 @@ public static partial class Module
 
         ProcessPlayerMonsterCollisionsSpatialHash(ctx);
         ProcessMonsterAttackCollisionsSpatialHash(ctx);
+        ProcessPlayerAttackCollisionsSpatialHash(ctx);
+        CommitPlayerDamage(ctx);
         ProcessGemCollisionsSpatialHash(ctx);
     }
 }

@@ -1,4 +1,5 @@
 using SpacetimeDB;
+using SpacetimeDB.Internal.TableHandles;
 using System;
 
 // Attack type enum
@@ -570,6 +571,85 @@ public static partial class Module
             HeadsAttack[gridCellKey] = CachedCountAttacks;
 
             CachedCountAttacks++;
+        }
+    }
+
+    // Helper method to process collisions between attacks and players using spatial hash (simplified version)
+    public static void ProcessPlayerAttackCollisionsSpatialHash(ReducerContext ctx)
+    {
+        // Iterate through all players first (likely fewer than attacks)
+        for(var pid = 0; pid < CachedCountPlayers; pid++)
+        {
+            var px = PosXPlayer[pid];
+            var py = PosYPlayer[pid];
+            var pr = RadiusPlayer[pid];
+            var playerId = KeysPlayer[pid];
+
+            // Check against all attacks in the same spatial hash cell
+            var cellKey = GetWorldCellFromPosition(px, py);
+
+            int cx = cellKey & WORLD_CELL_MASK;
+            int cy = cellKey >> WORLD_CELL_BIT_SHIFT;
+
+            for (int dy = -1; dy <= +1; ++dy)
+            {
+                int ny = cy + dy;
+                if ((uint)ny >= WORLD_GRID_HEIGHT) continue;   // unsigned trick == clamp
+
+                int rowBase = ny << WORLD_CELL_BIT_SHIFT;
+                for (int dx = -1; dx <= +1; ++dx)
+                {
+                    int nx = cx + dx;
+                    if ((uint)nx >= WORLD_GRID_WIDTH) continue;
+
+                    int testCellKey = rowBase | nx;
+                    for(var aid = HeadsAttack[testCellKey]; aid != -1; aid = NextsAttack[aid])
+                    {
+                        var ax = PosXAttack[aid];
+                        var ay = PosYAttack[aid];
+                        var ar = RadiusAttack[aid];
+
+                        if(SpatialHashCollisionChecker(px, py, pr, ax, ay, ar))
+                        {
+                            // Get the active attack data
+                            var activeAttackOpt = ctx.Db.active_attacks.active_attack_id.Find(KeysAttack[aid]);
+                            if(activeAttackOpt is null)
+                            {
+                                continue;
+                            }
+                            
+                            var activeAttack = activeAttackOpt.Value;
+
+                            // Skip if the player is the owner of the attack (can't hurt yourself)
+                            if (playerId == activeAttack.player_id)
+                            {
+                                continue;   
+                            }
+                            
+                            // Apply damage to player using the active attack's damage value
+                            float damage = activeAttack.damage;
+                            
+                            // If the attack is not piercing, remove it after hitting this player
+                            if (!activeAttack.piercing)
+                            {
+                                // Reduce damage because it will hit each tick
+                                damage /= 8;
+
+                                // Delete the attack entity
+                                ctx.Db.entity.entity_id.Delete(activeAttack.entity_id);
+                                
+                                // Delete the active attack record
+                                ctx.Db.active_attacks.active_attack_id.Delete(activeAttack.active_attack_id);
+                                
+                                // Clean up any damage records for this attack
+                                CleanupAttackDamageRecords(ctx, activeAttack.entity_id);
+                            }
+
+                            DamageToPlayer[playerId] += damage;
+                        }
+                    }
+                }
+            }
         }
     }
 } 

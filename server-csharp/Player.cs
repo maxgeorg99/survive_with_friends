@@ -309,7 +309,10 @@ public static partial class Module
                 }
             }
         }
+    }
 
+    private static void CommitPlayerDamage(ReducerContext ctx)
+    {
         for(var pid = 0; pid < CachedCountPlayers; pid++)
         {
             if(DamageToPlayer[pid] > 0)
