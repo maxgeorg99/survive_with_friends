@@ -220,7 +220,7 @@ public static partial class Module
             attack_id = 3,
             attack_type = AttackType.Knives,
             name = "Throwing Knives",
-            cooldown = 1000,          
+            cooldown = 1200,          
             duration = 800,          
             projectiles = 4,          
             fire_delay = 1,           
@@ -289,7 +289,7 @@ public static partial class Module
             attack_type = AttackType.Dumbbell,
             name = "Dumbbell Drop",
             cooldown = 1200,         // Slow attack speed
-            duration = 2000,          // Qlonng fall time
+            duration = 1000,          // Qlonng fall time
             projectiles = 1,         // Multiple dumbbells
             fire_delay = 200,        // Delay between drops
             speed = 800,             // Fast falling speed
@@ -1213,7 +1213,7 @@ public static partial class Module
                             );
                             
                             // Apply knockback
-                            var knockbackStrength = 5f;
+                            var knockbackStrength = 3f;
                             var knockbackPos = monsterEntity.position + (knockbackDirection * knockbackStrength);
                             
                             // Update monster position with knockback
