@@ -355,7 +355,7 @@ export default class WeaponCombinationsScene extends Phaser.Scene {
                 w1: combo.w1,
                 w2: combo.w2,
                 result: combo.result,
-                requiredLevel: 1 // Default to level 1 for now
+                requiredLevel: 3 // Default to level 1 for now
             }));
 
             if (combinations.length === 0) {
