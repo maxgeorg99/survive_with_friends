@@ -112,10 +112,11 @@ export default class WeaponCombinationsScene extends Phaser.Scene {
         // Create combinations list container
         this.combinationsContainer = document.createElement('div');
         this.combinationsContainer.id = 'combinations-container';
-        this.combinationsContainer.style.position = 'absolute';
+        this.combinationsContainer.style.position = 'fixed'; // Changed from absolute to fixed
         this.combinationsContainer.style.left = '50%';
         this.combinationsContainer.style.top = '50%';
         this.combinationsContainer.style.transform = 'translate(-50%, -50%)';
+        this.combinationsContainer.style.zIndex = '2000'; // High z-index to appear above game elements
         
         if (isMobile) {
             // Mobile-friendly styles
@@ -533,7 +534,8 @@ export default class WeaponCombinationsScene extends Phaser.Scene {
         
         this.backButton = document.createElement('button');
         this.backButton.textContent = '← Back';
-        this.backButton.style.position = 'absolute';
+        this.backButton.style.position = 'fixed'; // Changed from absolute to fixed
+        this.backButton.style.zIndex = '1999'; // High z-index, but below modal
         
         if (isMobile) {
             // Mobile-friendly styles - position at bottom center

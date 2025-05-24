@@ -189,7 +189,7 @@ public static partial class Module
             cooldown = 600,          
             duration = 340,          
             projectiles = 1,          
-            fire_delay = 50,          
+            fire_delay = 40,          
             speed = 800,              
             piercing = true,         
             radius = 32,             
@@ -227,7 +227,7 @@ public static partial class Module
             speed = 1000,               
             piercing = false,         
             radius = 15,              
-            damage = 1,              
+            damage = 2,              
             armor_piercing = 0       
         });
 
@@ -259,7 +259,7 @@ public static partial class Module
             projectiles = 1,         // Burst of 3 footballs
             fire_delay = 200,        // Small delay between shots
             speed = 600,             // Medium speed
-            piercing = true,         // Goes through enemies
+            piercing = false,         // Goes through enemies
             radius = 24,             // Medium size
             damage = 4,              // Moderate damage
             armor_piercing = 2       
@@ -417,7 +417,7 @@ public static partial class Module
             speed = 900,             // Fast speed
             piercing = true,         // Pierces through enemies
             radius = 18,             // Medium radius
-            damage = 5,              // Moderate damage
+            damage = 15,              // Moderate damage
             armor_piercing = 3       
         });
 
@@ -434,7 +434,7 @@ public static partial class Module
             speed = 1000,            // Very fast
             piercing = true,         // Pierces through enemies
             radius = 30,             // Medium radius
-            damage = 6,              // Moderate damage
+            damage = 25,              // Moderate damage
             armor_piercing = 4       
         });
 
@@ -449,9 +449,9 @@ public static partial class Module
             projectiles = 1,         // Single hammer smash
             fire_delay = 0,          // No delay, instant hit
             speed = 700,             // Medium speed
-            piercing = false,        // Does not pierce, blunt force
+            piercing = true,        // Does not pierce, blunt force
             radius = 35,             // Large radius
-            damage = 10,             // High damage
+            damage = 15,             // High damage
             armor_piercing = 5       
         });
 
@@ -485,7 +485,7 @@ public static partial class Module
             speed = 800,
             piercing = true,
             radius = 25,
-            damage = 7,
+            damage = 17,
             armor_piercing = 3       
         });
 

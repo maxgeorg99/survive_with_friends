@@ -108,7 +108,25 @@ public static partial class Module
             {
                 case AttackType.Sword:
                 {
-                    // Sword attacks swing Right then Left
+                    // Sword attacks now target the nearest enemy like wands for better kiting
+                    Entity? nearestEnemy = FindNearestEnemy(ctx, entity);
+                    if (nearestEnemy != null)
+                    {
+                        var enemyActual = nearestEnemy.Value;
+
+                        // Calculate direction vector to the enemy
+                        var dx = enemyActual.position.x - entity.position.x;
+                        var dy = enemyActual.position.y - entity.position.y;
+                        
+                        // Normalize the direction
+                        var length = Math.Sqrt(dx * dx + dy * dy);
+                        if (length > 0)
+                        {
+                            return new DbVector2((float)(dx / length), (float)(dy / length));
+                        }
+                    }
+                    
+                    // If no enemies or calculation issue, fall back to alternating left/right pattern
                     var countParam = parameterU + idWithinBurst;
                     if (countParam % 2 == 0)
                     {

@@ -9,9 +9,20 @@ const CARD_HEIGHT = 250;
 const CARD_SPACING = 10;
 const CARD_SCALE_DESKTOP = 0.8;
 const CARD_SCALE_MOBILE = 0.65;
-const UI_DEPTH = 100000;
+const UI_DEPTH = 100000; // Much higher depth to ensure UI stays above all game elements including monsters
 const MOBILE_BOTTOM_MARGIN = 5;
 const DESKTOP_BOTTOM_MARGIN = 20;
+
+// Animation constants for weapon fusion
+const FUSION_ANIMATION = {
+    WEAPON_SCALE: 1.0,
+    FUSION_DURATION: 2500,
+    WEAPON_MOVE_DURATION: 800,
+    MERGE_PAUSE_DURATION: 400,
+    RESULT_REVEAL_DURATION: 600,
+    PARTICLE_BURST_COUNT: 50,
+    ENERGY_STREAM_COUNT: 12
+};
 
 // Define upgrade icon mapping
 const UPGRADE_ICON_MAP: { [key: string]: string } = {
@@ -29,40 +40,40 @@ const UPGRADE_ICON_MAP: { [key: string]: string } = {
     'AttackGarlic': 'attack_garlic'
 };
 
-// Weapon asset mapping for combinations
-const WEAPON_ASSET_MAP: Partial<Record<number, string>> = {
-    [AttackType.Sword]: 'attack_sword',
-    [AttackType.Wand]: 'attack_wand',
-    [AttackType.Knives]: 'attack_knife',
-    [AttackType.Shield]: 'attack_shield',
-    [AttackType.Football]: 'attack_football',
-    [AttackType.Cards]: 'attack_cards',
-    [AttackType.Dumbbell]: 'attack_dumbbell',
-    [AttackType.Garlic]: 'attack_garlic',
-    [AttackType.Shuriken]: 'attack_shuriken',
-    [AttackType.FireSword]: 'attack_fire_sword',
-    [AttackType.HolyHammer]: 'attack_holy_hammer',
-    [AttackType.MagicDagger]: 'attack_magic_dagger',
-    [AttackType.ThrowingShield]: 'attack_throwing_shield',
-    [AttackType.EnergyOrb]: 'attack_energy_orb'
+// Weapon asset mapping for combinations - Fix TypeScript errors by using string keys
+const WEAPON_ASSET_MAP: Record<string, string> = {
+    'Sword': 'attack_sword',
+    'Wand': 'attack_wand',
+    'Knives': 'attack_knife',
+    'Shield': 'attack_shield',
+    'Football': 'attack_football',
+    'Cards': 'attack_cards',
+    'Dumbbell': 'attack_dumbbell',
+    'Garlic': 'attack_garlic',
+    'Shuriken': 'attack_shuriken',
+    'FireSword': 'attack_fire_sword',
+    'HolyHammer': 'attack_holy_hammer',
+    'MagicDagger': 'attack_magic_dagger',
+    'ThrowingShield': 'attack_throwing_shield',
+    'EnergyOrb': 'attack_energy_orb'
 };
 
-// Weapon name mapping for combinations
-const WEAPON_NAME_MAP: Partial<Record<number, string>> = {
-    [AttackType.Sword]: "Sword",
-    [AttackType.Wand]: "Wand",
-    [AttackType.Knives]: "Knives",
-    [AttackType.Shield]: "Shield",
-    [AttackType.Football]: "Football",
-    [AttackType.Cards]: "Cards",
-    [AttackType.Dumbbell]: "Dumbbell",
-    [AttackType.Garlic]: "Garlic",
-    [AttackType.Shuriken]: "Shuriken",
-    [AttackType.FireSword]: "Fire Sword",
-    [AttackType.HolyHammer]: "Holy Hammer",
-    [AttackType.MagicDagger]: "Magic Dagger",
-    [AttackType.ThrowingShield]: "Throwing Shield",
-    [AttackType.EnergyOrb]: "Energy Orb"
+// Weapon name mapping for combinations - Fix TypeScript errors by using string keys
+const WEAPON_NAME_MAP: Record<string, string> = {
+    'Sword': "Sword",
+    'Wand': "Wand",
+    'Knives': "Knives",
+    'Shield': "Shield",
+    'Football': "Football",
+    'Cards': "Cards",
+    'Dumbbell': "Dumbbell",
+    'Garlic': "Garlic",
+    'Shuriken': "Shuriken",
+    'FireSword': "Fire Sword",
+    'HolyHammer': "Holy Hammer",
+    'MagicDagger': "Magic Dagger",
+    'ThrowingShield': "Throwing Shield",
+    'EnergyOrb': "Energy Orb"
 };
 
 export default class UpgradeUI {
@@ -406,68 +417,164 @@ export default class UpgradeUI {
     }
     
     private showWeaponCombinationNotification(firstWeapon: AttackType, secondWeapon: AttackType, combinedWeapon: AttackType): void {
+        console.log("Starting weapon combination animation...");
         this.combinationContainer.removeAll(true);
         
+        // Get camera position for proper positioning
+        const camera = this.scene.cameras.main;
         const { width, height } = this.scene.scale;
         
-        this.combinationContainer.x = width / 2;
-        this.combinationContainer.y = height / 2 - 100;
+        // Position relative to camera viewport, not world coordinates
+        this.combinationContainer.x = camera.scrollX + width / 2;
+        this.combinationContainer.y = camera.scrollY + height / 2 - 100;
         
-        const background = this.scene.add.rectangle(0, 0, 550, 200, 0x000000, 0.8);
-        background.setStrokeStyle(4, 0xFFD700);
+        console.log(`Combination container positioned at: ${this.combinationContainer.x}, ${this.combinationContainer.y}`);
         
-        const titleText = this.scene.add.text(0, -70, "WEAPON COMBINATION!", { 
-            fontFamily: 'Arial', fontSize: '28px', color: '#FFD700', stroke: '#000000', strokeThickness: 4
+        // Create animated background with growing effect
+        const background = this.scene.add.rectangle(0, 0, 600, 250, 0x000000, 0.9);
+        background.setStrokeStyle(6, 0xFFD700);
+        background.setScale(0.1);
+        
+        // Animate background entrance
+        this.scene.tweens.add({
+            targets: background,
+            scaleX: 1,
+            scaleY: 1,
+            duration: 400,
+            ease: 'Back.easeOut'
+        });
+        
+        const titleText = this.scene.add.text(0, -100, "WEAPON FUSION!", { 
+            fontFamily: 'Arial Black', 
+            fontSize: '32px', 
+            color: '#FFD700', 
+            stroke: '#000000', 
+            strokeThickness: 6,
+            fontStyle: 'bold'
         }).setOrigin(0.5);
         
-        const firstWeaponName = this.getWeaponDisplayName(firstWeapon);
-        const secondWeaponName = this.getWeaponDisplayName(secondWeapon);
-        const combinedWeaponName = this.getWeaponDisplayName(combinedWeapon);
+        // Animate title with glow effect
+        titleText.setScale(0);
+        this.scene.tweens.add({
+            targets: titleText,
+            scaleX: 1,
+            scaleY: 1,
+            duration: 500,
+            delay: 200,
+            ease: 'Elastic.easeOut'
+        });
         
-        const descText = this.scene.add.text(0, -20, `Your ${firstWeaponName} and ${secondWeaponName}\nhave combined to form:`, {
-            fontFamily: 'Arial', fontSize: '20px', color: '#FFFFFF', align: 'center'
-        }).setOrigin(0.5);
-        
-        const combinedWeaponText = this.scene.add.text(0, 40, combinedWeaponName, {
-            fontFamily: 'Arial', fontSize: '32px', color: '#00FFFF', stroke: '#000000', strokeThickness: 5, fontStyle: 'bold'
-        }).setOrigin(0.5);
-        
+        // Create weapon sprites for fusion animation
         const firstWeaponKey = this.getWeaponAssetKey(firstWeapon);
         const secondWeaponKey = this.getWeaponAssetKey(secondWeapon);
         const combinedWeaponKey = this.getWeaponAssetKey(combinedWeapon);
         
-        const firstWeaponIcon = this.scene.add.image(-150, 40, firstWeaponKey).setScale(0.7);
-        const secondWeaponIcon = this.scene.add.image(-70, 40, secondWeaponKey).setScale(0.7);
+        console.log(`Weapon assets: ${firstWeaponKey}, ${secondWeaponKey} -> ${combinedWeaponKey}`);
         
-        const plusSign = this.scene.add.text(-110, 40, '+', { fontFamily: 'Arial', fontSize: '32px', color: '#FFFFFF' }).setOrigin(0.5);
-        const equalsSign = this.scene.add.text(-20, 40, '=', { fontFamily: 'Arial', fontSize: '32px', color: '#FFFFFF' }).setOrigin(0.5);
-        const combinedWeaponIcon = this.scene.add.image(50, 40, combinedWeaponKey).setScale(1.2);
+        // Position weapons far apart initially
+        const leftWeapon = this.scene.add.image(-200, 0, firstWeaponKey)
+            .setScale(FUSION_ANIMATION.WEAPON_SCALE)
+            .setAlpha(0);
+        const rightWeapon = this.scene.add.image(200, 0, secondWeaponKey)
+            .setScale(FUSION_ANIMATION.WEAPON_SCALE)
+            .setAlpha(0);
+        
+        // Create combined weapon (hidden initially)
+        const resultWeapon = this.scene.add.image(0, 0, combinedWeaponKey)
+            .setScale(0)
+            .setAlpha(0);
+        
+        // Add glow effects to weapons
+        const leftGlow = this.scene.add.circle(-200, 0, 40, 0x00FFFF, 0.3);
+        const rightGlow = this.scene.add.circle(200, 0, 40, 0xFF6B6B, 0.3);
+        const resultGlow = this.scene.add.circle(0, 0, 60, 0xFFD700, 0.5).setScale(0);
         
         this.combinationContainer.add([
-            background, titleText, descText, combinedWeaponText,
-            firstWeaponIcon, plusSign, secondWeaponIcon, equalsSign, combinedWeaponIcon
+            background, titleText, leftGlow, rightGlow, resultGlow,
+            leftWeapon, rightWeapon, resultWeapon
         ]);
         
+        // Ensure the container is visible and has proper depth
         this.combinationContainer.setVisible(true);
-        this.combinationContainer.setAlpha(0);
+        this.combinationContainer.setDepth(UI_DEPTH + 10); // Extra high depth
+        this.combinationContainer.setAlpha(1); // Start visible instead of 0
         
+        console.log("Combination container setup complete, starting animation...");
+        
+        // Start the fusion animation sequence
+        this.startFusionAnimation(leftWeapon, rightWeapon, resultWeapon, leftGlow, rightGlow, resultGlow, firstWeapon, secondWeapon, combinedWeapon);
+    }
+    
+    private startFusionAnimation(
+        leftWeapon: Phaser.GameObjects.Image, 
+        rightWeapon: Phaser.GameObjects.Image, 
+        resultWeapon: Phaser.GameObjects.Image,
+        leftGlow: Phaser.GameObjects.Arc,
+        rightGlow: Phaser.GameObjects.Arc,
+        resultGlow: Phaser.GameObjects.Arc,
+        firstWeapon: AttackType, 
+        secondWeapon: AttackType, 
+        combinedWeapon: AttackType
+    ): void {
+        console.log("Starting fusion animation phases...");
+        
+        // Get camera position for proper relative positioning
+        const camera = this.scene.cameras.main;
+        const { height } = this.scene.scale;
+        
+        // Phase 1: Container and weapons appear
+        console.log("Phase 1: Container appears");
         this.scene.tweens.add({
-            targets: this.combinationContainer, 
-            alpha: 1, 
-            y: height / 2 - 50, 
-            duration: 500, 
-            ease: 'Back.easeOut',
+            targets: this.combinationContainer,
+            alpha: 1,
+            y: camera.scrollY + height / 2 - 50, // Position relative to camera
+            duration: 400,
+            ease: 'Power2.easeOut',
             onComplete: () => {
-                this.createCombinationParticles(combinedWeaponIcon.x, combinedWeaponIcon.y);
-                this.scene.time.delayedCall(4000, () => {
+                console.log("Phase 2: Weapons fade in");
+                // Phase 2: Weapons fade in with rotation
+                this.scene.tweens.add({
+                    targets: [leftWeapon, rightWeapon],
+                    alpha: 1,
+                    rotation: Math.PI * 2,
+                    duration: 600,
+                    ease: 'Power2.easeOut'
+                });
+                
+                // Glow pulse animation
+                this.scene.tweens.add({
+                    targets: [leftGlow, rightGlow],
+                    scale: { from: 1, to: 1.5 },
+                    alpha: { from: 0.3, to: 0.6 },
+                    duration: 500,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut'
+                });
+                
+                // Phase 3: Move weapons towards center with energy streams
+                this.scene.time.delayedCall(800, () => {
+                    console.log("Phase 3: Weapons moving to center");
+                    this.createEnergyStreams(leftWeapon.x, leftWeapon.y, rightWeapon.x, rightWeapon.y);
+                    
                     this.scene.tweens.add({
-                        targets: this.combinationContainer, 
-                        alpha: 0, 
-                        y: height / 2 - 150, 
-                        duration: 500, 
-                        ease: 'Back.easeIn',
-                        onComplete: () => { 
-                            this.combinationContainer.setVisible(false); 
+                        targets: [leftWeapon, leftGlow],
+                        x: -50,
+                        rotation: leftWeapon.rotation + Math.PI,
+                        duration: FUSION_ANIMATION.WEAPON_MOVE_DURATION,
+                        ease: 'Power2.easeInOut'
+                    });
+                    
+                    this.scene.tweens.add({
+                        targets: [rightWeapon, rightGlow],
+                        x: 50,
+                        rotation: rightWeapon.rotation - Math.PI,
+                        duration: FUSION_ANIMATION.WEAPON_MOVE_DURATION,
+                        ease: 'Power2.easeInOut',
+                        onComplete: () => {
+                            console.log("Phase 4: Starting merge effect");
+                            // Phase 4: Merge effect
+                            this.createMergeEffect(leftWeapon, rightWeapon, resultWeapon, leftGlow, rightGlow, resultGlow, firstWeapon, secondWeapon, combinedWeapon);
                         }
                     });
                 });
@@ -475,29 +582,367 @@ export default class UpgradeUI {
         });
     }
     
-    private createCombinationParticles(x: number, y: number): void {
+    private createEnergyStreams(x1: number, y1: number, x2: number, y2: number): void {
+        for (let i = 0; i < FUSION_ANIMATION.ENERGY_STREAM_COUNT; i++) {
+            const delay = i * 50;
+            
+            this.scene.time.delayedCall(delay, () => {
+                // Create energy particle that travels between weapons
+                const energy = this.scene.add.circle(x1, y1, 3, 0x00FFFF, 0.8);
+                energy.setBlendMode(Phaser.BlendModes.ADD);
+                this.combinationContainer.add(energy);
+                
+                this.scene.tweens.add({
+                    targets: energy,
+                    x: x2,
+                    y: y2,
+                    scale: { from: 1, to: 0.1 },
+                    alpha: { from: 0.8, to: 0 },
+                    duration: 400,
+                    ease: 'Power2.easeOut',
+                    onComplete: () => {
+                        energy.destroy();
+                    }
+                });
+                
+                // Reverse energy stream
+                const reverseEnergy = this.scene.add.circle(x2, y2, 3, 0xFF6B6B, 0.8);
+                reverseEnergy.setBlendMode(Phaser.BlendModes.ADD);
+                this.combinationContainer.add(reverseEnergy);
+                
+                this.scene.tweens.add({
+                    targets: reverseEnergy,
+                    x: x1,
+                    y: y1,
+                    scale: { from: 1, to: 0.1 },
+                    alpha: { from: 0.8, to: 0 },
+                    duration: 400,
+                    delay: 100,
+                    ease: 'Power2.easeOut',
+                    onComplete: () => {
+                        reverseEnergy.destroy();
+                    }
+                });
+            });
+        }
+    }
+    
+    private createMergeEffect(
+        leftWeapon: Phaser.GameObjects.Image, 
+        rightWeapon: Phaser.GameObjects.Image, 
+        resultWeapon: Phaser.GameObjects.Image,
+        leftGlow: Phaser.GameObjects.Arc,
+        rightGlow: Phaser.GameObjects.Arc,
+        resultGlow: Phaser.GameObjects.Arc,
+        firstWeapon: AttackType, 
+        secondWeapon: AttackType, 
+        combinedWeapon: AttackType
+    ): void {
+        // Create brilliant flash effect
+        const flash = this.scene.add.circle(0, 0, 100, 0xFFFFFF, 0.8);
+        flash.setBlendMode(Phaser.BlendModes.ADD);
+        this.combinationContainer.add(flash);
+        
+        // Flash animation
+        this.scene.tweens.add({
+            targets: flash,
+            scale: { from: 0.1, to: 3 },
+            alpha: { from: 0.8, to: 0 },
+            duration: 500,
+            ease: 'Power3.easeOut',
+            onComplete: () => {
+                flash.destroy();
+            }
+        });
+        
+        // Create massive particle burst at merge point
+        this.createFusionParticles(0, 0);
+        
+        // Weapons merge and disappear
+        this.scene.tweens.add({
+            targets: [leftWeapon, rightWeapon],
+            x: 0,
+            y: 0,
+            scale: 0.1,
+            alpha: 0,
+            rotation: `+=${Math.PI * 3}`,
+            duration: FUSION_ANIMATION.MERGE_PAUSE_DURATION,
+            ease: 'Power3.easeIn',
+            onComplete: () => {
+                leftWeapon.setVisible(false);
+                rightWeapon.setVisible(false);
+                
+                // Hide old glows
+                leftGlow.setVisible(false);
+                rightGlow.setVisible(false);
+                
+                // Reveal the result weapon with dramatic effect
+                this.revealResultWeapon(resultWeapon, resultGlow, firstWeapon, secondWeapon, combinedWeapon);
+            }
+        });
+    }
+    
+    private createFusionParticles(x: number, y: number): void {
         const worldX = this.combinationContainer.x + x;
         const worldY = this.combinationContainer.y + y;
-        const particles = this.scene.add.particles(worldX, worldY, 'white_pixel', {
-            speed: { min: 30, max: 100 }, 
-            scale: { start: 0.5, end: 0 }, 
+        
+        // Main fusion burst
+        const fusionBurst = this.scene.add.particles(worldX, worldY, 'white_pixel', {
+            speed: { min: 100, max: 300 },
+            scale: { start: 1, end: 0 },
             blendMode: 'ADD',
-            tint: [0x00FFFF, 0xFFD700, 0xFFFFFF], 
-            lifespan: 1000, 
-            quantity: 2, 
-            frequency: 50, 
+            tint: [0xFFD700, 0x00FFFF, 0xFF6B6B, 0xFFFFFF],
+            lifespan: 1500,
+            quantity: 3,
+            frequency: 20,
             emitting: true
         });
-        particles.setDepth(UI_DEPTH + 1);
-        this.scene.time.delayedCall(3000, () => { particles.destroy(); });
+        fusionBurst.setDepth(UI_DEPTH + 2);
+        
+        // Swirling energy particles
+        const energySwirl = this.scene.add.particles(worldX, worldY, 'white_pixel', {
+            speed: { min: 50, max: 150 },
+            scale: { start: 0.5, end: 0 },
+            blendMode: 'ADD',
+            tint: [0x00FFFF, 0xFFD700],
+            lifespan: 2000,
+            quantity: 2,
+            frequency: 30,
+            emitting: true,
+            gravityY: -50,
+            rotate: { min: 0, max: 360 }
+        });
+        energySwirl.setDepth(UI_DEPTH + 1);
+        
+        // Stop particles after animation
+        this.scene.time.delayedCall(1000, () => {
+            fusionBurst.stop();
+            energySwirl.stop();
+        });
+        
+        this.scene.time.delayedCall(3000, () => {
+            fusionBurst.destroy();
+            energySwirl.destroy();
+        });
     }
     
-    private getWeaponDisplayName(attackType: AttackType): string {
-        return WEAPON_NAME_MAP[attackType as unknown as number] || `Weapon ${attackType as unknown as number}`;
+    private revealResultWeapon(
+        resultWeapon: Phaser.GameObjects.Image,
+        resultGlow: Phaser.GameObjects.Arc,
+        firstWeapon: AttackType, 
+        secondWeapon: AttackType, 
+        combinedWeapon: AttackType
+    ): void {
+        const firstWeaponName = this.getWeaponDisplayName(firstWeapon);
+        const secondWeaponName = this.getWeaponDisplayName(secondWeapon);
+        const combinedWeaponName = this.getWeaponDisplayName(combinedWeapon);
+        
+        // Create result text
+        const resultText = this.scene.add.text(0, 80, `${firstWeaponName} + ${secondWeaponName}`, {
+            fontFamily: 'Arial', 
+            fontSize: '18px', 
+            color: '#CCCCCC', 
+            align: 'center'
+        }).setOrigin(0.5).setAlpha(0);
+        
+        const transformText = this.scene.add.text(0, 100, "▼ TRANSFORMS INTO ▼", {
+            fontFamily: 'Arial', 
+            fontSize: '14px', 
+            color: '#FFD700', 
+            align: 'center'
+        }).setOrigin(0.5).setAlpha(0);
+        
+        const newWeaponText = this.scene.add.text(0, 130, combinedWeaponName, {
+            fontFamily: 'Arial Black', 
+            fontSize: '28px', 
+            color: '#00FFFF', 
+            stroke: '#000000', 
+            strokeThickness: 4,
+            fontStyle: 'bold'
+        }).setOrigin(0.5).setAlpha(0);
+        
+        this.combinationContainer.add([resultText, transformText, newWeaponText]);
+        
+        // Dramatic weapon reveal
+        resultWeapon.setAlpha(1);
+        resultGlow.setAlpha(1);
+        
+        this.scene.tweens.add({
+            targets: [resultWeapon, resultGlow],
+            scale: { from: 0, to: 1.5 },
+            duration: FUSION_ANIMATION.RESULT_REVEAL_DURATION,
+            ease: 'Elastic.easeOut',
+            onComplete: () => {
+                // Scale back to normal size
+                this.scene.tweens.add({
+                    targets: resultWeapon,
+                    scale: 1.2,
+                    duration: 300,
+                    ease: 'Power2.easeOut'
+                });
+                
+                // Pulsing glow effect
+                this.scene.tweens.add({
+                    targets: resultGlow,
+                    scale: { from: 1.5, to: 2 },
+                    alpha: { from: 0.5, to: 0.2 },
+                    duration: 1000,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut'
+                });
+            }
+        });
+        
+        // Fade in text elements sequentially
+        this.scene.tweens.add({
+            targets: resultText,
+            alpha: 1,
+            y: 70,
+            duration: 400,
+            delay: 200,
+            ease: 'Power2.easeOut'
+        });
+        
+        this.scene.tweens.add({
+            targets: transformText,
+            alpha: 1,
+            duration: 400,
+            delay: 600,
+            ease: 'Power2.easeOut'
+        });
+        
+        this.scene.tweens.add({
+            targets: newWeaponText,
+            alpha: 1,
+            scale: { from: 0.5, to: 1 },
+            duration: 500,
+            delay: 1000,
+            ease: 'Back.easeOut'
+        });
+        
+        // Final celebration particles around result weapon
+        this.scene.time.delayedCall(1200, () => {
+            this.createCelebrationParticles(resultWeapon.x, resultWeapon.y);
+        });
+        
+        // Auto-hide after extended duration
+        this.scene.time.delayedCall(6000, () => {
+            this.scene.tweens.add({
+                targets: this.combinationContainer,
+                alpha: 0,
+                y: this.combinationContainer.y - 100,
+                duration: 800,
+                ease: 'Power2.easeIn',
+                onComplete: () => {
+                    this.combinationContainer.setVisible(false);
+                }
+            });
+        });
     }
     
-    private getWeaponAssetKey(attackType: AttackType): string {
-        return WEAPON_ASSET_MAP[attackType as unknown as number] || 'card_blank';
+    private createCelebrationParticles(x: number, y: number): void {
+        const worldX = this.combinationContainer.x + x;
+        const worldY = this.combinationContainer.y + y;
+        
+        // Golden sparkles around the new weapon
+        const celebration = this.scene.add.particles(worldX, worldY, 'white_pixel', {
+            speed: { min: 30, max: 80 },
+            scale: { start: 0.8, end: 0 },
+            blendMode: 'ADD',
+            tint: [0xFFD700, 0xFFA500, 0xFFFF00],
+            lifespan: 2000,
+            quantity: 1,
+            frequency: 100,
+            emitting: true,
+            gravityY: -20,
+            alpha: { start: 0.8, end: 0 }
+        });
+        celebration.setDepth(UI_DEPTH + 3);
+        
+        // Stop and cleanup
+        this.scene.time.delayedCall(3000, () => {
+            celebration.stop();
+        });
+        
+        this.scene.time.delayedCall(5000, () => {
+            celebration.destroy();
+        });
+    }
+    
+    // Update the simple particle method to be more spectacular
+    private createCombinationParticles(x: number, y: number): void {
+        // This method is kept for backward compatibility but enhanced
+        this.createCelebrationParticles(x, y);
+    }
+
+    // ------ Helper Methods for Weapon Information ------
+    
+    private getWeaponAssetKey(weaponType: AttackType): string {
+        // Handle AttackType objects by accessing their tag property
+        const weaponTag = typeof weaponType === 'object' && weaponType.tag ? weaponType.tag : weaponType;
+        return WEAPON_ASSET_MAP[weaponTag] || 'white_pixel';
+    }
+    
+    private getWeaponDisplayName(weaponType: AttackType): string {
+        // Handle AttackType objects by accessing their tag property
+        const weaponTag = typeof weaponType === 'object' && weaponType.tag ? weaponType.tag : weaponType;
+        return WEAPON_NAME_MAP[weaponTag] || 'Unknown Weapon';
+    }
+
+    // ------ Debug and Safety Methods ----__
+    
+    /**
+     * Force the combination container to be visible for debugging
+     */
+    public forceCombinationVisible(): void {
+        console.log("Forcing combination container visibility...");
+        
+        const camera = this.scene.cameras.main;
+        const { width, height } = this.scene.scale;
+        
+        // Position in the center of the screen
+        this.combinationContainer.x = camera.scrollX + width / 2;
+        this.combinationContainer.y = camera.scrollY + height / 2;
+        
+        // Force visibility and high depth
+        this.combinationContainer.setVisible(true);
+        this.combinationContainer.setAlpha(1);
+        this.combinationContainer.setDepth(UI_DEPTH + 20);
+        
+        console.log(`Combination container forced to position: ${this.combinationContainer.x}, ${this.combinationContainer.y}`);
+        console.log(`Combination container properties: visible=${this.combinationContainer.visible}, alpha=${this.combinationContainer.alpha}, depth=${this.combinationContainer.depth}`);
+    }
+    
+    /**
+     * Check if the combination container is properly set up
+     */
+    public debugCombinationContainer(): void {
+        console.log("=== Combination Container Debug Info ===");
+        console.log(`Container exists: ${!!this.combinationContainer}`);
+        console.log(`Container visible: ${this.combinationContainer?.visible}`);
+        console.log(`Container alpha: ${this.combinationContainer?.alpha}`);
+        console.log(`Container depth: ${this.combinationContainer?.depth}`);
+        console.log(`Container position: x=${this.combinationContainer?.x}, y=${this.combinationContainer?.y}`);
+        console.log(`Container children count: ${this.combinationContainer?.list?.length || 0}`);
+        
+        const camera = this.scene.cameras.main;
+        if (camera) {
+            console.log(`Camera position: scrollX=${camera.scrollX}, scrollY=${camera.scrollY}`);
+            console.log(`Camera size: width=${camera.width}, height=${camera.height}`);
+        }
+        
+        // Check if container is within camera bounds
+        if (this.combinationContainer && camera) {
+            const containerInView = (
+                this.combinationContainer.x >= camera.scrollX - 100 &&
+                this.combinationContainer.x <= camera.scrollX + camera.width + 100 &&
+                this.combinationContainer.y >= camera.scrollY - 100 &&
+                this.combinationContainer.y <= camera.scrollY + camera.height + 100
+            );
+            console.log(`Container in camera view: ${containerInView}`);
+        }
+        console.log("=== End Debug Info ===");
     }
 
     // ------ UI Visibility Methods ------

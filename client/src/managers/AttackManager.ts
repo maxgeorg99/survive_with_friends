@@ -486,7 +486,9 @@ export class AttackManager {
                     const angle = Math.atan2(direction.y, direction.x);
                     
                     // Fix upside-down issue for all projectiles moving left
-                    if (attackGraphicData.attackType === 'Sword' || attackGraphicData.attackType === 'Knives') {
+                    if (attackGraphicData.attackType === 'Sword' || 
+                        attackGraphicData.attackType === 'Knives' || 
+                        attackGraphicData.attackType === 'FireSword') {
                         // For weapons that look wrong when flipped upside down
                         if (Math.abs(angle) > Math.PI/2) {
                             // Left-facing: set a base angle of 0 and flip the sprite horizontally

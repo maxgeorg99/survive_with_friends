@@ -45,12 +45,12 @@ public static partial class Module
     // List of defined weapon combinations
     private static readonly List<WeaponCombinationDef> WeaponCombinations = new List<WeaponCombinationDef>
     {
-        new WeaponCombinationDef { Weapon1 = AttackType.Sword, Weapon2 = AttackType.Knives, CombinedWeapon = AttackType.Shuriken, RequiredLevel = 1 },
-        new WeaponCombinationDef { Weapon1 = AttackType.Sword, Weapon2 = AttackType.Wand, CombinedWeapon = AttackType.FireSword, RequiredLevel = 1 },
-        new WeaponCombinationDef { Weapon1 = AttackType.Sword, Weapon2 = AttackType.Shield, CombinedWeapon = AttackType.HolyHammer, RequiredLevel = 1 },
-        new WeaponCombinationDef { Weapon1 = AttackType.Knives, Weapon2 = AttackType.Wand, CombinedWeapon = AttackType.MagicDagger, RequiredLevel = 1 },
-        new WeaponCombinationDef { Weapon1 = AttackType.Knives, Weapon2 = AttackType.Shield, CombinedWeapon = AttackType.ThrowingShield, RequiredLevel = 1 },
-        new WeaponCombinationDef { Weapon1 = AttackType.Wand, Weapon2 = AttackType.Shield, CombinedWeapon = AttackType.EnergyOrb, RequiredLevel = 1 },
+        new WeaponCombinationDef { Weapon1 = AttackType.Sword, Weapon2 = AttackType.Knives, CombinedWeapon = AttackType.Shuriken, RequiredLevel = 3 },
+        new WeaponCombinationDef { Weapon1 = AttackType.Sword, Weapon2 = AttackType.Wand, CombinedWeapon = AttackType.FireSword, RequiredLevel = 3 },
+        new WeaponCombinationDef { Weapon1 = AttackType.Sword, Weapon2 = AttackType.Shield, CombinedWeapon = AttackType.HolyHammer, RequiredLevel = 3 },
+        new WeaponCombinationDef { Weapon1 = AttackType.Knives, Weapon2 = AttackType.Wand, CombinedWeapon = AttackType.MagicDagger, RequiredLevel = 3 },
+        new WeaponCombinationDef { Weapon1 = AttackType.Knives, Weapon2 = AttackType.Shield, CombinedWeapon = AttackType.ThrowingShield, RequiredLevel = 3 },
+        new WeaponCombinationDef { Weapon1 = AttackType.Wand, Weapon2 = AttackType.Shield, CombinedWeapon = AttackType.EnergyOrb, RequiredLevel = 3 },
     };
 
     [SpacetimeDB.Table(Name = "upgrade_options", Public = true)]
@@ -1060,7 +1060,7 @@ public static partial class Module
             {
                 if (playerAttack == combo.CombinedWeapon)
                 {
-                    // Player has this combined weapon, exclude its base components
+                    // Player has this combined weapon, exclude its base components from upgrades
                     baseWeaponsToExclude.Add(combo.Weapon1);
                     baseWeaponsToExclude.Add(combo.Weapon2);
                     Log.Info($"Player has combined weapon {combo.CombinedWeapon}, excluding base weapons {combo.Weapon1} and {combo.Weapon2}");
@@ -1068,28 +1068,29 @@ public static partial class Module
             }
         }
 
-        // Remove upgrade types for attacks the player already has
-        // And also remove base weapons that have been used in combinations
+        // Remove upgrade types only if the base weapon was used in a combination
         List<UpgradeType> typesToRemove = new List<UpgradeType>();
         foreach (var upgradeType in allUpgradeTypes)
         {
-            // Skip non-attack upgrade types
+            // Skip non-attack upgrade types (MaxHp, HpRegen, Speed, Armor)
             if (!upgradeType.ToString().StartsWith("Attack")) continue;
             
-            // Check if this upgrade is for an attack the player already has
             AttackType attackType;
             try
             {
                 attackType = GetAttackTypeFromUpgrade(upgradeType);
-                
-                if (playerAttacks.ContainsKey(attackType) || baseWeaponsToExclude.Contains(attackType))
-                {
-                    typesToRemove.Add(upgradeType);
-                }
             }
             catch (Exception)
             {
                 // Skip any upgrade types that can't be converted to attack types
+                continue;
+            }
+
+            // Only remove if this base weapon was used in a combination
+            if (baseWeaponsToExclude.Contains(attackType))
+            {
+                typesToRemove.Add(upgradeType);
+                Log.Info($"Removing {upgradeType} because base weapon {attackType} was used in a combination");
             }
         }
         

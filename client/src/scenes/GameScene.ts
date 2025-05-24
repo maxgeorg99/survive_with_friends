@@ -2934,56 +2934,93 @@ export default class GameScene extends Phaser.Scene {
      */
     private checkForOtherPlayerScorpionDamage(playerSprite: Phaser.GameObjects.Sprite, container: Phaser.GameObjects.Container): void {
         // Skip if player is already poisoned
-        if (container.getData('isPoisoned')) {
-            return;
-        }
+        if (container.getData('isPoisoned')) return;
         
-        if (!this.monsterManager || !this.spacetimeDBClient?.sdkConnection?.db) {
-            return;
-        }
+        if (!this.monsterManager || !this.spacetimeDBClient?.sdkConnection?.db) return;
         
         try {
-            // Check for nearby scorpions
-            const monsters = Array.from(this.spacetimeDBClient.sdkConnection.db.monsters.iter())
-                .filter(monster => monster.bestiaryId === MonsterType.Scorpion);
-                
-            if (monsters.length === 0) {
-                return; // No scorpions present
-            }
-                
-            // Get the player position
-            const playerX = playerSprite.x;
-            const playerY = playerSprite.y;
+            // Get the entity ID for this player container
+            const entityId = container.getData('entityId');
+            if (!entityId) return;
             
-            // Check if any scorpion is close enough to have caused the damage
-            let scorpionHit = false;
-            for (const scorpion of monsters) {
-                const scorpionEntity = this.spacetimeDBClient.sdkConnection.db.entity.entityId.find(scorpion.entityId);
-                if (scorpionEntity) {
-                    // Calculate distance between player and scorpion
-                    const dx = playerX - scorpionEntity.position.x;
-                    const dy = playerY - scorpionEntity.position.y;
-                    const distanceSquared = dx * dx + dy * dy;
+            // Check if there's a scorpion near this player's position
+            const playerX = container.x;
+            const playerY = container.y;
+            const detectionRadius = 60; // Detection radius for scorpion damage
+            
+            // Check all scorpions
+            for (const monster of this.spacetimeDBClient.sdkConnection.db.monsters.iter()) {
+                if (!monster.monsterType || monster.monsterType.tag !== 'Scorpion') continue;
+                
+                const monsterEntity = this.spacetimeDBClient.sdkConnection.db.entity.entityId.find(monster.entityId);
+                if (!monsterEntity) continue;
+                
+                // Calculate distance
+                const dx = playerX - monsterEntity.position.x;
+                const dy = playerY - monsterEntity.position.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance <= detectionRadius) {
+                    // Apply poison effect
+                    console.log(`Applying poison effect to other player at position (${playerX}, ${playerY})`);
+                    createScorpionPoisonEffect(this, playerSprite, container.x, container.y);
+                    container.setData('isPoisoned', true);
                     
-                    // Use a slightly larger range than the actual monster radius to account for lag
-                    const hitRange = scorpionEntity.radius * 1.5;
+                    // Remove poison effect after duration
+                    this.time.delayedCall(3000, () => {
+                        container.setData('isPoisoned', false);
+                    });
                     
-                    if (distanceSquared <= hitRange * hitRange) {
-                        scorpionHit = true;
-                        break;
-                    }
+                    break; // Only apply poison once per check
                 }
             }
-            
-            // If a scorpion hit the player, apply poison effect
-            if (scorpionHit) {
-                // Apply poison effect
-                createScorpionPoisonEffect(playerSprite, this);
-                
-                console.log("Other player poisoned by scorpion!");
-            }
         } catch (error) {
-            console.error("Error checking for scorpion damage:", error);
+            console.error("Error checking scorpion damage for other player:", error);
         }
+    }
+
+    // ------ Debug Methods ------
+    
+    /**
+     * Test the weapon combination animation with predefined weapons
+     * This can be called from the browser console for testing
+     */
+    public testCombinationAnimation(): void {
+        console.log("Testing weapon combination animation...");
+        
+        if (!this.upgradeUI) {
+            console.error("UpgradeUI not initialized - cannot test combination animation");
+            return;
+        }
+        
+        // Create mock AttackType objects for testing
+        const mockSword = { tag: 'Sword' };
+        const mockWand = { tag: 'Wand' };
+        const mockFireSword = { tag: 'FireSword' };
+        
+        // Show the combination animation
+        this.upgradeUI.handleWeaponCombination(
+            mockSword as any,
+            mockWand as any,
+            mockFireSword as any
+        );
+        
+        console.log("Combination animation test triggered!");
+    }
+    
+    /**
+     * Debug the combination container visibility
+     */
+    public debugCombinationVisibility(): void {
+        console.log("Debugging combination container visibility...");
+        
+        if (!this.upgradeUI) {
+            console.error("UpgradeUI not initialized");
+            return;
+        }
+        
+        // Call the debug methods
+        this.upgradeUI.debugCombinationContainer();
+        this.upgradeUI.forceCombinationVisible();
     }
 }
