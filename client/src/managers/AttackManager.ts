@@ -355,6 +355,7 @@ export class AttackManager {
         } else if (normalizedType === 'garlic') {
             sprite.setScale(0.1); // Small garlic AoE
         } else if (normalizedType === 'scorpionsting') {
+            sprite.tint = 0xe5d0ff; // Poisonous green tint
             sprite.setScale(0.8); // Slightly smaller scale for scorpion sting
         } else {
             sprite.setScale(1.0); // Normal scale for other attacks
