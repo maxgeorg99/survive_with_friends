@@ -33,9 +33,9 @@ const WEAPON_COMBINATIONS = [
 ];
 
 interface WeaponCombination {
-    w1: AttackType;
-    w2: AttackType;
-    result: AttackType;
+    w1: any;
+    w2: any;
+    result: any;
     requiredLevel: number;
 }
 
@@ -156,7 +156,7 @@ export default class WeaponCombinationsScene extends Phaser.Scene {
         this.modalOverlay.style.width = '100%';
         this.modalOverlay.style.height = '100%';
         this.modalOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-        this.modalOverlay.style.zIndex = '1000';
+        this.modalOverlay.style.zIndex = '3000'; // Increased to be above combinations container
         this.modalOverlay.style.display = 'none';
         
         this.modalOverlay.addEventListener('click', (e) => {
@@ -180,7 +180,7 @@ export default class WeaponCombinationsScene extends Phaser.Scene {
         this.detailsModal.style.border = '2px solid #3498db';
         this.detailsModal.style.padding = '25px';
         this.detailsModal.style.color = 'white';
-        this.detailsModal.style.zIndex = '1001';
+        this.detailsModal.style.zIndex = '3001'; // Increased to be above overlay
         this.detailsModal.style.width = isMobileDevice() ? '85%' : '500px';
         this.detailsModal.style.maxWidth = '600px';
         this.detailsModal.style.maxHeight = '85vh';
@@ -491,9 +491,9 @@ export default class WeaponCombinationsScene extends Phaser.Scene {
                 // Find the AttackType object that matches this tag
                 let selectedWeapon = null;
                 for (const key in AttackType) {
-                    if (typeof AttackType[key] === 'object' && AttackType[key] !== null) {
-                        const attackType = AttackType[key] as any;
-                        if (attackType.tag === weaponTypeTag) {
+                    if (AttackType.hasOwnProperty(key)) {
+                        const attackType = (AttackType as any)[key];
+                        if (typeof attackType === 'object' && attackType !== null && attackType.tag === weaponTypeTag) {
                             selectedWeapon = attackType;
                             break;
                         }
@@ -629,29 +629,32 @@ export default class WeaponCombinationsScene extends Phaser.Scene {
 }
 
 // Utility function to get weapon data from the maps using either an AttackType object or tag string
-function getWeaponData<T>(map: Record<string, T>, weapon: AttackType | string, defaultValue: T): T {
+function getWeaponData<T>(map: Record<string, T>, weapon: any, defaultValue: T): T {
     if (typeof weapon === 'string') {
         // If it's a string (tag), use it directly as the key
         return map[weapon] || defaultValue;
-    } else {
-        // If it's an AttackType object, use its tag property as the key
+    } else if (weapon && typeof weapon === 'object' && weapon.tag) {
+        // If it's an object with a tag property, use the tag as the key
         return map[weapon.tag] || defaultValue;
+    } else {
+        // Fallback to default value
+        return defaultValue;
     }
 }
 
 // Helper functions for each type of weapon data
-function getWeaponAsset(weapon: AttackType | string): string {
+function getWeaponAsset(weapon: any): string {
     return getWeaponData(WEAPON_ASSET_MAP, weapon, 'card_blank');
 }
 
-function getWeaponName(weapon: AttackType | string): string {
+function getWeaponName(weapon: any): string {
     return getWeaponData(localization.weaponNames, weapon, 'Unknown Weapon');
 }
 
-function getWeaponDescription(weapon: AttackType | string): string {
+function getWeaponDescription(weapon: any): string {
     return getWeaponData(localization.weaponDescriptions, weapon, 'No information available about this weapon.');
 }
 
-function getWeaponStats(weapon: AttackType | string): { damage: number, cooldown: number, range: number, special: string } {
+function getWeaponStats(weapon: any): { damage: number, cooldown: number, range: number, special: string } {
     return getWeaponData(localization.weaponStats, weapon, { damage: 0, cooldown: 0, range: 0, special: 'None' });
 }
