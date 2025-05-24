@@ -118,7 +118,7 @@ public static partial class Module
             PlayerClass = PlayerClass.Athlete,
             MaxHp = 110,
             Armor = 1,
-            Speed = 230.0f,
+            Speed = 200.0f,
             StartingAttackType = AttackType.Dumbbell
         });
 
@@ -129,7 +129,7 @@ public static partial class Module
             PlayerClass = PlayerClass.Gourmand,
             MaxHp = 120,
             Armor = 2,
-            Speed = 200.0f,
+            Speed = 160.0f,
             StartingAttackType = AttackType.Garlic
         });
         
