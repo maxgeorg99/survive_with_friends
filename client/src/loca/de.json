@@ -229,19 +229,23 @@
     "achievement.Survivor.title": "Ultimativer Überlebender",
     "achievement.Survivor.description": "Gewinne das Spiel",
     
-    "quest.survive.title": "Tils Herausforderung",
-    "quest.survive.description": "Tracke 5 Laufeinheiten",
-    "quest.survive.reward": "Schalte Fußball-Til frei",
+    "quest.til.title": "Tils Herausforderung",
+    "quest.til.description": "Tracke 5 Laufeinheiten",
+    "quest.til.reward": "Schalte Fußball-Til frei",
     
-    "quest.defeat.title": "Marcs Herausforderung",
-    "quest.defeat.description": "Gewinne eine Kartenspiel-Runde mit den Jungs",
-    "quest.defeat.reward": "Schalte Yugioh-Marc frei",
+    "quest.marc.title": "Marcs Herausforderung",
+    "quest.marc.description": "Gewinne eine Kartenspiel-Runde mit den Jungs",
+    "quest.marc.reward": "Schalte Yugioh-Marc frei",
     
-    "quest.level.title": "Max' Herausforderung",
-    "quest.level.description": "Tracke 5 Fitnessstudio-Besuche",
-    "quest.level.reward": "Schalte Fitness-Max frei",
+    "quest.max.title": "Max' Herausforderung",
+    "quest.max.description": "Tracke 5 Fitnessstudio-Besuche",
+    "quest.max.reward": "Schalte Fitness-Max frei",
     
-    "quest.gems.title": "Chris' Herausforderung",
-    "quest.gems.description": "Tracke die Ernährung für 5 Tage",
-    "quest.gems.reward": "Schalte Koch-Chris frei"
+    "quest.chris.title": "Chris' Herausforderung",
+    "quest.chris.description": "Tracke die Ernährung für 5 Tage",
+    "quest.chris.reward": "Schalte Koch-Chris frei",
+
+    "quest.reroll.title": "Tägliche Reroll Herausforderung",
+    "quest.reroll.description": "Besiege 10 Monster um einen Reroll zu erhalten",
+    "quest.reroll.reward": "Bis zu 10 Rerolls pro Tag"
 }

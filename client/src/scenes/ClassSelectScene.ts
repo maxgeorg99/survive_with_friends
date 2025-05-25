@@ -5,6 +5,7 @@ import PlayerClass from '../autobindings/player_class_type';
 import { GameEvents } from '../constants/GameEvents';
 import { localization } from '../utils/localization';
 import { isMobileDevice, getResponsiveFontSize, applyResponsiveStyles, getResponsiveCenteredPosition } from '../utils/responsive';
+import { QuestType } from '../autobindings';
 
 // Map player class to numeric class ID
 const CLASS_ID_MAP = {
@@ -606,6 +607,8 @@ export default class ClassSelectScene extends Phaser.Scene {
             textSpan.textContent = name;
             button.appendChild(textSpan);
 
+            // Remove the lock indicator from here - it will be added to the version toggle button instead
+
             // Add info button for mobile view
             if (isMobile) {
                 const infoBtn = document.createElement('button');
@@ -657,6 +660,9 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.classButtonsContainer.appendChild(this.rogueButton);
         this.classButtonsContainer.appendChild(this.mageButton);
         this.classButtonsContainer.appendChild(this.paladinButton);
+
+        // Check quest completion status after buttons are created
+        this.updateQuestLockStatus();
     }
     
     private createClassInfoPanel() {
@@ -800,6 +806,9 @@ export default class ClassSelectScene extends Phaser.Scene {
         const originalCharName = this.getOriginalCharacterName(characterName);
         const isAltVersion = this.selectedAltVersions[originalCharName] || false;
         
+        // Check if the quest for this character is completed
+        const isQuestCompleted = this.isCharacterQuestCompleted(originalCharName);
+        
         // Determine actual class to use based on the alt toggle state
         const currentClass = isAltVersion ? info.altClass : classType.tag;
         const currentName = isAltVersion ? info.altName : originalCharName;
@@ -837,25 +846,26 @@ export default class ClassSelectScene extends Phaser.Scene {
             textElement.textContent = currentName;
         }
 
-        // Create toggle button - with lock/unlock icon based on state
+        // Create toggle button - with lock icon if quest is not completed
         const toggleHtml = info.altClass ? `
             <button id="version-toggle" style="
                 position: absolute;
                 right: 10px;
-                background-color: #3498db;
+                background-color: ${isQuestCompleted ? '#3498db' : '#95a5a6'};
                 border: none;
                 border-radius: 15px;
                 padding: 6px 12px;
                 color: white;
-                cursor: pointer;
+                cursor: ${isQuestCompleted ? 'pointer' : 'not-allowed'};
                 display: flex;
                 align-items: center;
                 gap: 8px;
                 font-size: 14px;
                 transition: background-color 0.2s;
-            ">
+                opacity: ${isQuestCompleted ? '1' : '0.6'};
+            " ${!isQuestCompleted ? 'disabled' : ''}>
             <span>Version</span>
-            <span style="font-size: 18px;">🔁</span>
+            <span style="font-size: 18px;">${isQuestCompleted ? '🔁' : '🔒'}</span>
             </button>
         ` : '';
 
@@ -886,9 +896,9 @@ export default class ClassSelectScene extends Phaser.Scene {
             </p>
         `;
 
-        // Add event listener to toggle button
+        // Add event listener to toggle button only if quest is completed
         const toggleButton = document.getElementById('version-toggle');
-        if (toggleButton) {
+        if (toggleButton && isQuestCompleted) {
             toggleButton.addEventListener('click', () => {
                 // Toggle the alt version state for this character
                 this.selectedAltVersions[originalCharName] = !this.selectedAltVersions[originalCharName];
@@ -1410,5 +1420,92 @@ export default class ClassSelectScene extends Phaser.Scene {
         
         // Remove resize listener
         this.scale.off('resize', this.handleResize);
+    }
+
+    private updateQuestLockStatus() {
+        if (!this.spacetimeDBClient || !this.spacetimeDBClient.isConnected) {
+            return;
+        }
+
+        try {
+            const ctx = this.spacetimeDBClient.sdkConnection;
+            if (!ctx || !ctx.db) {
+                return;
+            }
+
+            const localIdentity = this.spacetimeDBClient.identity;
+            if (!localIdentity) {
+                return;
+            }
+
+            // Get all quests for the current player
+            const playerQuests: any[] = [];
+            try {
+                for (const quest of ctx.db.gameQuests.iter()) {
+                    if (quest.accountIdentity && quest.accountIdentity.isEqual(localIdentity)) {
+                        playerQuests.push(quest);
+                    }
+                }
+            } catch (err) {
+                console.error("Error getting player quests for lock status:", err);
+                return;
+            }
+
+            // Refresh the class info panel if it's currently showing to update lock status
+            if (this.selectedClass && this.classInfoPanel && this.classInfoPanel.style.display !== 'none') {
+                const baseClassName = CLASS_NAME_MAP[this.selectedClass.tag as keyof typeof CLASS_NAME_MAP];
+                const info = CLASS_INFO[baseClassName as ClassNames];
+                this.updateClassInfoPanel(baseClassName, this.selectedClass, info);
+            }
+
+        } catch (error) {
+            console.error("Error updating quest lock status:", error);
+        }
+    }
+
+    private isCharacterQuestCompleted(characterName: string): boolean {
+        if (!this.spacetimeDBClient || !this.spacetimeDBClient.isConnected) {
+            return false;
+        }
+
+        try {
+            const ctx = this.spacetimeDBClient.sdkConnection;
+            if (!ctx || !ctx.db) {
+                return false;
+            }
+
+            const localIdentity = this.spacetimeDBClient.identity;
+            if (!localIdentity) {
+                return false;
+            }
+
+            // Map character names to quest types
+            const questTypeMap: Record<string, string> = {
+                'Til': 'Til',
+                'Marc': 'Marc', 
+                'Max': 'Max',
+                'Chris': 'Chris'
+            };
+
+            const questTypeName = questTypeMap[characterName];
+            if (!questTypeName) {
+                return false;
+            }
+
+            // Look for the specific quest for this character
+            for (const quest of ctx.db.gameQuests.iter()) {
+                if (quest.accountIdentity && 
+                    quest.accountIdentity.isEqual(localIdentity) && 
+                    quest.questTypeType && 
+                    quest.questTypeType.tag === questTypeName) {
+                    return quest.isCompleted || false;
+                }
+            }
+
+            return false;
+        } catch (error) {
+            console.error('Error checking quest completion:', error);
+            return false;
+        }
     }
 }

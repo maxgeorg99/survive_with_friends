@@ -24,7 +24,7 @@ public enum AchievementType
 [Table(Name = "achievements", Public = true)]
 public partial struct AchievementDefinition
 {
-    [PrimaryKey]
+    [PrimaryKey, AutoInc]
     public uint AchievementsId;
 
     [SpacetimeDB.Index.BTree]

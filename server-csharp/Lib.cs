@@ -405,7 +405,7 @@ public static partial class Module
             speed = speed,
             armor = (uint)armor,
             unspent_upgrades = 0,
-            rerolls = 999
+            rerolls = 3 // Start with 3 rerolls instead of 999 for testing
         });
 
         // Check if player insertion failed
@@ -450,8 +450,11 @@ public static partial class Module
             };
             var insertedAccountOpt = ctx.Db.account.Insert(newAccount);
 
-            // Initialize achievements for the new account
+            // Initialize achievements for this account
             InitializePlayerAchievements(ctx, identity);
+            
+            // Initialize quests for this account
+            InitializePlayerQuests(ctx, identity);
         }
         else
         {

@@ -236,19 +236,23 @@
     "achievement.Survivor.title": "Ultimate Survivor",
     "achievement.Survivor.description": "Win the game",
     
-    "quest.survive.title": "Til's Challenge",
-    "quest.survive.description": "Track 5 Running Sessions",
-    "quest.survive.reward": "Unlock Football Til class",
+    "quest.til.title": "Til's Challenge",
+    "quest.til.description": "Track 5 Running Sessions",
+    "quest.til.reward": "Unlock Football Til class",
     
-    "quest.defeat.title": "Marc's Challenge",
-    "quest.defeat.description": "Win a Card Game Session with the boys",
-    "quest.defeat.reward": "Unlock Yugioh Marc class",
+    "quest.marc.title": "Marc's Challenge",
+    "quest.marc.description": "Win a Card Game Session with the boys",
+    "quest.marc.reward": "Unlock Yugioh Marc class",
     
-    "quest.level.title": "Max's Challenge",
-    "quest.level.description": "Track 5 Gym Sessions",
-    "quest.level.reward": "Unlock Gym Max class",
+    "quest.max.title": "Max's Challenge",
+    "quest.max.description": "Track 5 Gym Sessions",
+    "quest.max.reward": "Unlock Gym Max class",
     
-    "quest.gems.title": "Chris's Challenge",
-    "quest.gems.description": "Track Food for 5 days",
-    "quest.gems.reward": "Unlock Chef Chris class"
+    "quest.chris.title": "Chris's Challenge",
+    "quest.chris.description": "Track Food for 5 days",
+    "quest.chris.reward": "Unlock Chef Chris class",
+
+    "quest.reroll.title": "Daily reroll challenge",
+    "quest.reroll.description": "Defeat 10 monsters to get a reroll",
+    "quest.reroll.reward": "Up to 10 rerolls per day"
 }

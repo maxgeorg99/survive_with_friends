@@ -53,6 +53,9 @@ public static partial class Module
         var monsterTypeValue = (int)monsterType;
         Log.Info($"TrackMonsterKill: Player {identity} killed monster of type {monsterType} (value: {monsterTypeValue})");
 
+        // Track quest progress for reroll quest (kill any monster)
+        TrackRerollQuestProgress(ctx, identity);
+
         // Find achievement type based on monster type
         AchievementType? achievementType = null;
 

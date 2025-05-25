@@ -113,6 +113,7 @@ class SpacetimeDBClient {
                 "SELECT * FROM player_poison_effect",
                 "SELECT * FROM achievements",
                 "SELECT * FROM bestiary",
+                "SELECT * FROM game_quests",
             ]);
 
         // Register table event callbacks
