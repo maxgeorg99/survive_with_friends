@@ -378,10 +378,10 @@ pub fn game_tick(ctx: &ReducerContext, _timer: GameTickTimer) {
             // Get the last tick timestamp from world data
             let last_tick_timestamp = world.last_tick_time;
             
-            if last_tick_timestamp.timestamp_microseconds() > 0 {
-                // Calculate time difference using Duration
-                let time_duration = current_timestamp.duration_since(last_tick_timestamp);
-                time_since_last_tick_ms = time_duration.as_micros() as f64 / 1000.0; // Convert to milliseconds
+            // Calculate time difference using SpacetimeDB's duration_since method
+            if let Some(time_duration) = current_timestamp.duration_since(last_tick_timestamp) {
+                // Convert microseconds to milliseconds
+                time_since_last_tick_ms = time_duration.as_millis() as f64;
                 
                 // Update timing stats
                 if world.timing_samples_collected == 1 {
@@ -402,6 +402,11 @@ pub fn game_tick(ctx: &ReducerContext, _timer: GameTickTimer) {
                     // Use a weight of 0.1 for new samples to smooth out the average
                     world.average_tick_ms = (world.average_tick_ms * 0.9) + (time_since_last_tick_ms * 0.1);
                 }
+            } else {
+                // duration_since returned None, meaning current_timestamp is before last_tick_timestamp
+                // This shouldn't normally happen, but if it does, use the configured tick rate
+                log::warn!("Clock went backwards! Using configured tick rate as fallback.");
+                time_since_last_tick_ms = tick_rate as f64;
             }
         }
         
