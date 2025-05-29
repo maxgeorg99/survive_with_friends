@@ -1,11 +1,11 @@
-use spacetimedb::{reducer, Table, ReducerContext, Identity, Timestamp};
+use spacetimedb::{reducer, Table, ReducerContext, Identity, Timestamp, rand::Rng};
 use crate::{PlayerClass, DbVector2, WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_HEIGHT, WORLD_GRID_WIDTH, 
-           get_world_cell_from_position};
+           get_world_cell_from_position, player, config, class_data};
 
 const MAX_SPAWN_ATTEMPTS: i32 = 50;   // Maximum number of attempts to find a safe spawn position
 const MIN_SPAWN_DISTANCE: f32 = 200.0; // Minimum distance from monsters in pixels
 
-fn is_position_safe(ctx: &ReducerContext, position: DbVector2, radius: f32, collision_cache: &crate::CollisionCache) -> bool {
+fn is_position_safe(ctx: &ReducerContext, position: &DbVector2, radius: f32, collision_cache: &crate::CollisionCache) -> bool {
     // Get the cell key for this position
     let cell_key = get_world_cell_from_position(position.x, position.y);
     
@@ -58,15 +58,15 @@ fn find_safe_spawn_position(ctx: &ReducerContext, radius: f32, collision_cache: 
         .expect("FindSafeSpawnPosition: Could not find game configuration!");
 
     // Try to find a safe position
+    let mut rng = ctx.rng();
     for _attempt in 0..MAX_SPAWN_ATTEMPTS {
         // Generate random position within world bounds
-        use spacetimedb::Rng;
-        let x = ctx.rng.gen_range(radius..(config.world_size as f32 - radius));
-        let y = ctx.rng.gen_range(radius..(config.world_size as f32 - radius));
+        let x = rng.gen_range(radius..(config.world_size as f32 - radius));
+        let y = rng.gen_range(radius..(config.world_size as f32 - radius));
         let position = DbVector2::new(x, y);
 
         // Check if position is safe
-        if is_position_safe(ctx, position, radius, collision_cache) {
+        if is_position_safe(ctx, &position, radius, collision_cache) {
             return Some(position);
         }
     }
@@ -75,9 +75,9 @@ fn find_safe_spawn_position(ctx: &ReducerContext, radius: f32, collision_cache: 
     log::info!("Could not find safe spawn position, falling back to center with offset");
     let center_x = config.world_size as f32 / 2.0;
     let center_y = config.world_size as f32 / 2.0;
-    use spacetimedb::Rng;
-    let offset_x = ctx.rng.gen_range(-100.0..101.0);
-    let offset_y = ctx.rng.gen_range(-100.0..101.0);
+
+    let offset_x = rng.gen_range(-100.0..101.0);
+    let offset_y = rng.gen_range(-100.0..101.0);
     Some(DbVector2::new(center_x + offset_x, center_y + offset_y))
 }
 
@@ -115,11 +115,11 @@ pub fn spawn_bot(ctx: &ReducerContext) {
     log::info!("Creating bot player '{}' at position: {}, {}", bot_name, spawn_position.x, spawn_position.y);
     
     // Create the player with bot flag set
-    let new_player_opt = crate::create_new_player_with_position(ctx, &bot_name, player_class, spawn_position);
+    let new_player_opt = crate::create_new_player_with_position(ctx, &bot_name, player_class.clone(), spawn_position);
     let mut new_player = new_player_opt.expect("Failed to create new bot player!");
     
     new_player.is_bot = true;
     ctx.db.player().player_id().update(new_player);
 
-    log::info!("Created new bot player record with class {:?}", player_class);
+    log::info!("Created new bot player record with class {:?}", player_class.clone());
 } 

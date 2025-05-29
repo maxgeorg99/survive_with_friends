@@ -133,7 +133,7 @@ pub fn spawn_boss_phase_two(ctx: &ReducerContext, position: DbVector2) {
         .expect("SpawnBossPhaseTwo: Could not find bestiary entry for boss phase 2!");
     
     // Find the closest player to target
-    let closest_player_id = crate::monsters_def::get_closest_player(ctx, position.clone());
+    let closest_player_id = crate::monsters_def::get_closest_player(ctx, &position);
     
     // Create the phase 2 boss monster
     let monster_opt = ctx.db.monsters().insert(crate::Monsters {
@@ -193,7 +193,7 @@ pub fn handle_boss_defeated(ctx: &ReducerContext) {
             name: player.name.clone(),
             is_true_survivor: true,  // Mark as true survivor
         });
-        
+
         // Delete the player (entity will be cleaned up separately)
         ctx.db.player().player_id().delete(&player.player_id);
     }
