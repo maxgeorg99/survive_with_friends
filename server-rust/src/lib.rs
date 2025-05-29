@@ -1,0 +1,464 @@
+use spacetimedb::{rand::Rng, reducer, table, Identity, ReducerContext, ScheduleAt, SpacetimeType, Table, Timestamp};
+use std::time::Duration;
+
+// Module declarations
+pub mod config_def;
+pub mod class_data_def;
+pub mod monster_types_def;
+pub mod bestiary_def;
+pub mod player_def;
+pub mod reset_world;
+pub mod collision;
+pub mod bots_def;
+pub mod attack_utils;
+pub mod gems_def;
+pub mod boss_system;
+pub mod monsters_def;
+pub mod attacks_def;
+pub mod core_game;
+pub mod upgrades_def;
+
+// Re-export public items from modules
+pub use config_def::*;
+pub use class_data_def::*;
+pub use monster_types_def::*;
+pub use bestiary_def::*;
+pub use player_def::*;
+pub use reset_world::*;
+pub use collision::*;
+pub use bots_def::*;
+pub use attack_utils::*;
+pub use gems_def::*;
+pub use boss_system::*;
+pub use monsters_def::*;
+pub use attacks_def::*;
+pub use core_game::*;
+pub use upgrades_def::*;
+
+// --- Types ---
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum PlayerClass {
+    Fighter,
+    Rogue,
+    Mage,
+    Paladin,
+}
+
+// Attack type enum
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum AttackType {
+    Sword,
+    Wand,
+    Knives,
+    Shield,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub struct DbVector2 {
+    pub x: f32,
+    pub y: f32,
+}
+
+impl DbVector2 {
+    pub fn new(x: f32, y: f32) -> Self {
+        DbVector2 { x, y }
+    }
+    
+    // Get normalized vector (direction only)
+    pub fn normalize(&self) -> DbVector2 {
+        let d2 = self.x * self.x + self.y * self.y;
+        if d2 > 0.0 {
+            let inv_mag = 1.0 / d2.sqrt();
+            DbVector2::new(self.x * inv_mag, self.y * inv_mag)
+        } else {
+            DbVector2::new(0.0, 0.0)
+        }
+    }
+    
+    // Get magnitude (length) of vector
+    pub fn magnitude(&self) -> f32 {
+        (self.x * self.x + self.y * self.y).sqrt()
+    }
+}
+
+impl std::ops::Add for DbVector2 {
+    type Output = DbVector2;
+    
+    fn add(self, other: DbVector2) -> DbVector2 {
+        DbVector2::new(self.x + other.x, self.y + other.y)
+    }
+}
+
+impl std::ops::Mul<f32> for DbVector2 {
+    type Output = DbVector2;
+    
+    fn mul(self, scalar: f32) -> DbVector2 {
+        DbVector2::new(self.x * scalar, self.y * scalar)
+    }
+}
+
+// --- Game Constants ---
+pub const PLAYER_SPEED: f32 = 200.0; // Units per second
+pub const TICK_RATE: f32 = 20.0; // Updates per second (50ms)
+pub const DELTA_TIME: f32 = 1.0 / TICK_RATE; // Time between ticks in seconds
+
+// --- World Constants ---
+pub const WORLD_SIZE: u32 = 6400;
+pub const NUM_WORLD_CELLS: u16 = 40704;
+pub const WORLD_GRID_WIDTH: u16 = 157;
+pub const WORLD_GRID_HEIGHT: u16 = 157;
+pub const WORLD_CELL_SIZE: u16 = 128;
+pub const WORLD_CELL_BIT_SHIFT: u16 = 8;
+pub const WORLD_CELL_MASK: u16 = (1 << WORLD_CELL_BIT_SHIFT) - 1;
+pub const MAX_PLAYERS: u16 = 32;
+pub const MAX_MONSTERS: u16 = 1024;
+pub const MAX_GEM_COUNT: u16 = 1024;
+pub const MAX_ATTACK_COUNT: u16 = 4096;
+
+// --- Timer Table ---
+#[table(name = game_tick_timer, scheduled(game_tick))]
+pub struct GameTickTimer {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    pub scheduled_at: ScheduleAt,
+}
+
+// --- Tables ---
+#[table(name = entity, public)]
+pub struct Entity {
+    #[primary_key]
+    #[auto_inc]
+    pub entity_id: u32,
+
+    pub position: DbVector2,
+    
+    // Added direction and movement state directly to Entity
+    pub direction: DbVector2,   // Direction vector (normalized)
+    pub is_moving: bool,        // Whether entity is actively moving
+    pub radius: f32,            // Collision radius for this entity
+    
+    // Added waypoint for tap-to-move
+    pub waypoint: DbVector2,    // Target position for movement
+    pub has_waypoint: bool,     // Whether entity has an active waypoint
+}
+
+#[table(name = world, public)]
+pub struct World {
+    #[primary_key]
+    pub world_id: u32,
+
+    pub tick_count: u32,
+    
+    // Fields for tracking game tick timing
+    pub last_tick_time: Timestamp,      // Last timestamp when a game tick occurred
+    pub average_tick_ms: f64,            // Rolling average of tick intervals in milliseconds
+    pub min_tick_ms: f64,                // Minimum tick interval observed
+    pub max_tick_ms: f64,                // Maximum tick interval observed
+    pub timing_samples_collected: u32,   // Number of timing samples collected
+}
+
+#[table(name = account, public)]
+pub struct Account {
+    #[primary_key]
+    pub identity: Identity,
+
+    pub name: String,
+    
+    #[unique]
+    #[auto_inc]
+    pub current_player_id: u32,
+
+    pub last_login: Timestamp,
+}
+
+// --- Lifecycle Hooks ---
+#[reducer(init)]
+pub fn init(ctx: &ReducerContext) {
+    log::info!("Initializing game and scheduling game tick...");
+
+    // Initialize world        
+    if ctx.db.world().count() == 0 {
+        // Insert default configuration
+        ctx.db.world().insert(World {
+            world_id: 0,
+            tick_count: 0,
+            last_tick_time: ctx.timestamp,
+            average_tick_ms: 0.0,
+            min_tick_ms: 0.0,
+            max_tick_ms: 0.0,
+            timing_samples_collected: 0,
+        });
+    }
+    
+    // Initialize game configuration first
+    init_game_config(ctx);
+    
+    // TODO: Initialize game state
+    init_game_state(ctx);
+    
+    // TODO: Initialize class data
+    initialize_class_data(ctx);
+
+    let game_tick_rate = if let Some(config) = ctx.db.config().id().find(&0) {
+        config.game_tick_rate
+    } else {
+        50
+    };
+    
+    // Schedule first game tick as a one-off event
+    ctx.db.game_tick_timer().insert(GameTickTimer {
+        scheduled_id: 0,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(game_tick_rate as u64)),
+    });
+    
+    log::info!("Initial game tick scheduled successfully");
+    
+    // TODO: Initialize bestiary with monster data
+    init_bestiary(ctx);
+    
+    // Note: When adding new monster types to the Bestiary, remember to update the
+    // SpawnableMonsterTypes array in Monsters.rs if they should be part of normal spawning.
+    // Boss monsters should NOT be added to the spawnable list.
+    
+    // TODO: Initialize experience system
+    init_exp_system(ctx);
+    
+    // Initialize attack system
+    initialize_attack_system(ctx);
+    
+    // TODO: Initialize health regeneration system
+    init_health_regen_system(ctx);
+    
+    // Schedule monster spawning
+    schedule_monster_spawning(ctx);
+}
+
+#[reducer(client_connected)]
+pub fn client_connected(ctx: &ReducerContext) {
+    let identity = ctx.sender;
+    log::info!("Client connected: {}", identity);
+
+    // Check if account already exists - if so, reconnect them
+    if let Some(account) = ctx.db.account().identity().find(&identity) {
+        log::info!("Client has existing account: {} reconnected.", identity);
+        log::info!("Account details: Name={}, PlayerID={}", account.name, account.current_player_id);
+
+        // TODO: Check if player exists
+        // let player_opt = ctx.db.player().player_id().find(&account.current_player_id);
+        // if player_opt.is_none() {
+        //     log::info!("No living player found for account {}. Checking for dead players...", identity);
+        //     // TODO: Check for dead players
+        // } else {
+        //     log::info!("Found living player {} for account {}.", account.current_player_id, identity);
+        // }
+    } else {
+        // Create a new account
+        log::info!("New connection from {}. Creating a new account.", identity);
+        
+        if let Ok(_new_account) = ctx.db.account().try_insert(Account {
+            identity,
+            name: "Nameless".to_string(),
+            current_player_id: 0,
+            last_login: ctx.timestamp,
+        }) {
+            log::info!("Created new account for {}", identity);
+        }
+    }
+}
+
+// --- Reducers ---
+#[reducer]
+pub fn set_name(ctx: &ReducerContext, name: String) {
+    let identity = ctx.sender;
+    log::info!("SetName called by identity: {} with name: {}", identity, name);
+
+    // Basic validation
+    if name.trim().is_empty() || name.len() > 16 {
+        panic!("SetName: Invalid name provided by {}: '{}'. Name must be 1-16 characters.", identity, name);
+    }
+
+    // Find the account using the context's Db object and the primary key index (identity)
+    let mut account = ctx.db.account().identity().find(&identity)
+        .expect(&format!("SetName: Attempted to set name for non-existent account {}.", identity));
+
+    account.name = name.trim().to_string();
+    let account_name = account.name.clone(); // Clone before moving
+
+    ctx.db.account().identity().update(account);
+    log::info!("Account {} name set to {}.", identity, account_name);
+}
+
+#[reducer]
+pub fn update_last_login(ctx: &ReducerContext) {
+    let identity = ctx.sender;
+    
+    // Get account for the caller
+    let mut account = ctx.db.account().identity().find(&identity)
+        .expect(&format!("UpdateLastLogin: Account not found for identity {}", identity));
+    
+    // Update the last login time
+    account.last_login = ctx.timestamp;
+    ctx.db.account().identity().update(account);
+    
+    log::info!("Updated last login time for account {}", identity);
+}
+
+#[reducer]
+pub fn spawn_player(ctx: &ReducerContext, class_id: u32) {
+    let identity = ctx.sender;
+
+    log::info!("SpawnPlayer called by identity: {}", identity);
+
+    // Check if account exists
+    let account = ctx.db.account().identity().find(&identity)
+        .expect(&format!("SpawnPlayer: Account {} does not exist.", identity));
+
+    let player_id = account.current_player_id;
+
+    // Check if player already exists
+    if ctx.db.player().player_id().find(&player_id).is_some() {
+        panic!("SpawnPlayer: Player for {} already exists.", identity);
+    }
+
+    // Create a new player with a random class
+    let name = account.name.clone();
+
+    log::info!("Creating new player for {} with name: {}", identity, name);
+    
+    // Cast the class_id to a PlayerClass enum
+    let player_class = match class_id {
+        0 => PlayerClass::Fighter,
+        1 => PlayerClass::Rogue,
+        2 => PlayerClass::Mage,
+        3 => PlayerClass::Paladin,
+        _ => panic!("SpawnPlayer: Invalid class ID provided by {}: {}. Must be between 0 and 3.", identity, class_id),
+    };
+    
+    // Create the player and entity
+    let new_player = create_new_player(ctx, &name, player_class.clone())
+        .expect(&format!("Failed to create new player for {}!", identity));
+
+    // Update the account to point to the new player
+    let mut updated_account = account;
+    updated_account.current_player_id = new_player.player_id;
+    ctx.db.account().identity().update(updated_account);
+
+    log::info!("Created new player record for {} with class {:?}", identity, player_class);
+    
+    // Check if this is the first player - if so, schedule boss spawn
+    if ctx.db.player().count() == 1 {
+        log::info!("First player spawned - scheduling boss timer for new world");
+        // TODO: Clear any existing boss spawn timers first
+        // TODO: Schedule a new boss spawn
+        // schedule_boss_spawn(ctx);
+    }
+}
+
+// Helper function to create a new player with an associated entity
+fn create_new_player(ctx: &ReducerContext, name: &str, player_class: PlayerClass) -> Option<Player> {
+    // Get game configuration to determine world center
+    let config = ctx.db.config().id().find(&0);
+    if config.is_none() {
+        log::error!("CreateNewPlayer: Could not find game configuration!");
+        // Fall back to a reasonable default if config not found
+        return create_new_player_with_position(ctx, name, player_class, DbVector2::new(1000.0, 1000.0));
+    }
+
+    // Calculate center position based on world size
+    let config = config.unwrap();
+    let center_x = config.world_size as f32 / 2.0;
+    let center_y = config.world_size as f32 / 2.0;
+    
+    // Add a small random offset (±100 pixels) to avoid all new players stacking exactly at center
+    let mut rng = ctx.rng();
+    let offset_x = rng.gen_range(-100.0..101.0);
+    let offset_y = rng.gen_range(-100.0..101.0);
+    
+    let center_position  = DbVector2::new(center_x + offset_x, center_y + offset_y);
+    log::info!("Placing new player '{}' at position: {}, {}", name, center_position.x, center_position.y);
+    
+    create_new_player_with_position(ctx, name, player_class, center_position)
+}
+
+// Helper function that takes a position parameter
+pub fn create_new_player_with_position(ctx: &ReducerContext, name: &str, player_class: PlayerClass, position: DbVector2) -> Option<Player> {
+    // Look up class data to use for stats
+    let class_data = ctx.db.class_data().class_id().find(&(player_class as u32));
+    
+    // Define default stats in case class data isn't found
+    let (max_hp, armor, speed, starting_attack_type) = if let Some(class_data) = class_data {
+        (class_data.max_hp as f32, class_data.armor, class_data.speed, class_data.starting_attack_type)
+    } else {
+        log::error!("CreateNewPlayerWithPosition: No class data found for {:?}", player_class);
+        // Fall back to default values if class data not found
+        (100.0, 0, PLAYER_SPEED, AttackType::Sword)
+    };
+
+    let shield_count = if starting_attack_type == AttackType::Shield { 2 } else { 0 };
+    
+    let initial_exp_needed = calculate_exp_for_level(ctx, 1);
+
+    let player_spawn_grace_period = if let Some(config) = ctx.db.config().id().find(&0) {
+        config.player_spawn_grace_period
+    } else {
+        5000
+    };
+
+    // Create the Player record
+    let new_player = ctx.db.player().insert(Player {
+        player_id: 0,
+        name: name.to_string(),
+        spawn_grace_period_remaining: player_spawn_grace_period,
+        player_class,
+        level: 1,
+        exp: 0,
+        exp_for_next_level: initial_exp_needed,
+        max_hp,
+        hp: max_hp,
+        hp_regen: 0,
+        speed,
+        armor: armor as u32,
+        unspent_upgrades: 0,
+        rerolls: 999,
+        shield_count,
+        position,
+        radius: 48.0,
+        is_bot: false,
+        waypoint: DbVector2::new(0.0, 0.0),
+        has_waypoint: false,
+    });
+
+    // Check if player insertion failed
+    if let Err(_) = new_player {
+        panic!("Failed to insert new player for {}! Insert returned error.", name);
+    }
+    
+    let new_player = new_player.unwrap();
+    
+    // Schedule the starting attack for this class
+    attacks_def::schedule_new_player_attack(ctx, new_player.player_id, starting_attack_type, 1);
+    log::info!("Scheduled starting attack type {:?} for player {}", starting_attack_type, new_player.player_id);
+
+    Some(new_player)
+}
+
+// TODO: Implement calculate_exp_for_level
+fn calculate_exp_for_level(ctx: &ReducerContext, level: u32) -> u32 {
+    // Use the real implementation from gems module
+    gems_def::calculate_exp_for_level(ctx, level)
+}
+
+// TODO: Implement remaining functions and placeholders for other modules:
+// - create_new_player_with_position
+// - game_tick (scheduled reducer)
+// - calculate_exp_for_level
+// - schedule_attack
+// - init_game_state
+// - initialize_class_data  
+// - init_bestiary
+// - init_exp_system
+// - initialize_attack_system
+// - init_health_regen_system
+// - schedule_monster_spawning
+// - schedule_boss_spawn

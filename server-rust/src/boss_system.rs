@@ -1,0 +1,321 @@
+use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, PrimaryKey, AutoInc, ScheduleAt, Duration};
+use crate::{DbVector2, MonsterType};
+
+// Game state table to track boss-related information
+#[table(name = "game_state", public)]
+pub struct GameState {
+    #[primarykey]
+    pub id: u32, // We'll use id=0 for the main game state
+    
+    pub boss_active: bool, // Whether a boss is currently active
+    pub boss_phase: u32, // 0 = no boss, 1 = phase 1, 2 = phase 2
+    pub boss_monster_id: u32, // ID of the current boss monster
+    pub normal_spawning_paused: bool, // Whether normal monster spawning is paused
+}
+
+// Timer for boss spawn (scheduled every 5 minutes)
+#[table(name = "boss_spawn_timer", scheduled = "spawn_boss_phase_one", public)]
+pub struct BossSpawnTimer {
+    #[primarykey]
+    #[autoinc]
+    pub scheduled_id: u64,
+    pub scheduled_at: ScheduleAt,
+}
+
+// Initialize the game state
+pub fn init_game_state(ctx: &ReducerContext) {
+    Log::info("Initializing game state...");
+    
+    // Only initialize if the state is empty
+    if ctx.db.game_state().count() > 0 {
+        Log::info("Game state already exists, skipping");
+        return;
+    }
+
+    // Insert default game state
+    ctx.db.game_state().insert(GameState {
+        id: 0,
+        boss_active: false,
+        boss_phase: 0,
+        boss_monster_id: 0,
+        normal_spawning_paused: false,
+    }).unwrap();
+
+    Log::info("Game state initialized successfully");
+    
+    // Schedule first boss spawn after 5 minutes
+    schedule_boss_spawn(ctx);
+}
+
+// Schedule the boss to spawn after 5 minutes
+pub fn schedule_boss_spawn(ctx: &ReducerContext) {
+    Log::info("Scheduling boss spawn after 5 minutes...");
+    
+    // Create timer that will trigger after 5 minutes
+    const BOSS_SPAWN_DELAY_MS: u64 = 5 * 60 * 1000; // 5 minutes in milliseconds
+    
+    ctx.db.boss_spawn_timer().insert(BossSpawnTimer {
+        scheduled_id: 0,
+        scheduled_at: ScheduleAt::time(ctx.timestamp + Duration::from_millis(BOSS_SPAWN_DELAY_MS)),
+    }).unwrap();
+    
+    Log::info(&format!("Boss spawn scheduled in {}ms", BOSS_SPAWN_DELAY_MS));
+}
+
+// Called when the boss spawn timer fires
+#[reducer]
+pub fn spawn_boss_phase_one(ctx: &ReducerContext, _timer: BossSpawnTimer) {
+    if ctx.sender != ctx.identity {
+        panic!("Reducer SpawnBossPhaseOne may not be invoked by clients, only via scheduling.");
+    }
+
+    Log::info("Boss phase 1 spawn timer triggered!");
+    
+    // Check if there are any players online
+    let player_count = ctx.db.player().count();
+    if player_count == 0 {
+        Log::info("No players online, not spawning boss. Rescheduling for later.");
+        schedule_boss_spawn(ctx);
+        return;
+    }
+    
+    // Get game configuration for world size
+    let config = ctx.db.config().id().find(&0)
+        .expect("SpawnBossPhaseOne: Could not find game configuration!");
+    
+    // Get game state to update boss status
+    let mut game_state = ctx.db.game_state().id().find(&0)
+        .expect("SpawnBossPhaseOne: Could not find game state!");
+    
+    // Update game state to indicate boss is active
+    game_state.boss_active = true;
+    game_state.boss_phase = 1;
+    game_state.normal_spawning_paused = true;
+    ctx.db.game_state().id().update(game_state);
+    
+    // Calculate position at center of map
+    let center_x = config.world_size as f32 / 2.0;
+    let center_y = config.world_size as f32 / 2.0;
+    let center_position = DbVector2::new(center_x, center_y);
+    
+    // Create a pre-spawner for the boss at the center of map
+    Log::info(&format!("Creating boss phase 1 pre-spawner at center of map ({}, {})", center_x, center_y));
+    
+    // Schedule the boss to spawn using the existing monster spawning system
+    schedule_boss_spawning(ctx, center_position);
+}
+
+// Schedule boss spawning using the existing monster spawning system
+fn schedule_boss_spawning(ctx: &ReducerContext, position: DbVector2) {
+    Log::info(&format!("Scheduling boss phase 1 spawn at position ({}, {})", position.x, position.y));
+    
+    // Use the existing monster spawner system, but for the boss
+    const BOSS_SPAWN_VISUALIZATION_DELAY_MS: u64 = 3000; // 3 seconds for pre-spawn animation
+    
+    // Create spawner for the boss
+    let spawner_opt = ctx.db.monster_spawners().insert(crate::MonsterSpawners {
+        scheduled_id: 0,
+        position,
+        monster_type: MonsterType::FinalBossPhase1,
+        scheduled_at: ScheduleAt::time(ctx.timestamp + Duration::from_millis(BOSS_SPAWN_VISUALIZATION_DELAY_MS)),
+    });
+    
+    if let Ok(_spawner) = spawner_opt {
+        Log::info("Created spawner for Phase 1 boss in spawners table");
+        // The game state will be updated when the monster is created in update_boss_monster_id reducer
+    } else {
+        Log::error("Failed to create boss spawner!");
+    }
+}
+
+// Called when phase 1 boss is defeated
+pub fn spawn_boss_phase_two(ctx: &ReducerContext, position: DbVector2) {
+    Log::info(&format!("Boss phase 1 defeated! Spawning phase 2 at position ({}, {})...", position.x, position.y));
+    
+    // Get game state
+    let game_state_opt = ctx.db.game_state().id().find(&0)
+        .expect("SpawnBossPhaseTwo: Could not find game state!");
+    
+    Log::info(&format!("Game state before update - Phase: {}, BossActive: {}, BossMonsterID: {}", 
+              game_state_opt.boss_phase, game_state_opt.boss_active, game_state_opt.boss_monster_id));
+    
+    // Update game state to indicate phase 2
+    let mut game_state = game_state_opt;
+    game_state.boss_phase = 2;
+    ctx.db.game_state().id().update(game_state);
+    
+    Log::info("Game state updated to phase 2");
+    
+    // Get boss stats from bestiary
+    let bestiary_entry = ctx.db.bestiary().bestiary_id().find(&(MonsterType::FinalBossPhase2 as u32))
+        .expect("SpawnBossPhaseTwo: Could not find bestiary entry for boss phase 2!");
+    
+    // Find the closest player to target
+    let closest_player_id = crate::monsters_def::get_closest_player(ctx, position);
+    
+    // Create the phase 2 boss monster
+    let monster_opt = ctx.db.monsters().insert(crate::Monsters {
+        monster_id: 0,
+        bestiary_id: MonsterType::FinalBossPhase2,
+        hp: bestiary_entry.max_hp,
+        max_hp: bestiary_entry.max_hp,
+        atk: bestiary_entry.atk,
+        speed: bestiary_entry.speed,
+        target_player_id: closest_player_id,
+        radius: bestiary_entry.radius,
+        spawn_position: position,
+    });
+    
+    if let Err(_) = monster_opt {
+        panic!("SpawnBossPhaseTwo: Failed to create boss monster!");
+    }
+    
+    let monster = monster_opt.unwrap();
+    
+    let boid_opt = ctx.db.monsters_boid().insert(crate::MonsterBoid {
+        monster_id: monster.monster_id,
+        position,
+    });
+    
+    if let Err(_) = boid_opt {
+        panic!("SpawnBossPhaseTwo: Failed to create boss boid!");
+    }
+    
+    Log::info(&format!("Created phase 2 boss monster with ID: {}", monster.monster_id));
+    
+    // Update game state with new boss monster ID
+    game_state.boss_monster_id = monster.monster_id;
+    game_state.boss_active = true;
+    
+    Log::info(&format!("FINAL Game state update - Phase: {}, BossActive: {}, BossMonsterID: {}", 
+              game_state.boss_phase, game_state.boss_active, game_state.boss_monster_id));
+    
+    ctx.db.game_state().id().update(game_state);
+    
+    Log::info(&format!("FINAL BOSS PHASE 2 SPAWNED! (monster: {})", monster.monster_id));
+}
+
+// Called when phase 2 boss is defeated - all players defeat the game!
+pub fn handle_boss_defeated(ctx: &ReducerContext) {
+    Log::info("FINAL BOSS DEFEATED! VICTORY!");
+    
+    // Get game state
+    let mut game_state = ctx.db.game_state().id().find(&0)
+        .expect("HandleBossDefeated: Could not find game state!");
+    
+    // Reset game state
+    game_state.boss_active = false;
+    game_state.boss_phase = 0;
+    game_state.boss_monster_id = 0;
+    game_state.normal_spawning_paused = false;
+    ctx.db.game_state().id().update(game_state);
+    
+    // Mark all players as "true survivors" and defeat them
+    let mut true_survivors_count = 0;
+    
+    let players_to_process: Vec<_> = ctx.db.player().iter().collect();
+    for player in players_to_process {
+        // Clean up all attack-related data for this player
+        cleanup_player_attacks(ctx, player.player_id);
+        
+        // Clean up all pending upgrade options for this player
+        cleanup_player_upgrade_options(ctx, player.player_id);
+        
+        // Store the player in the dead_players table with special flag
+        let dead_player_opt = ctx.db.dead_players().insert(crate::DeadPlayer {
+            player_id: player.player_id,
+            name: player.name.clone(),
+            is_true_survivor: true,  // Mark as true survivor
+        });
+        
+        if let Ok(_dead_player) = dead_player_opt {
+            true_survivors_count += 1;
+            
+            // Delete the player (entity will be cleaned up separately)
+            ctx.db.player().player_id().delete(&player.player_id);
+        }
+    }
+    
+    Log::info(&format!("{} players marked as True Survivors!", true_survivors_count));
+
+    // Clean up all gems and their entities
+    let gems_to_cleanup: Vec<_> = ctx.db.gems().iter().collect();
+    for gem in gems_to_cleanup {
+        ctx.db.entity().entity_id().delete(&gem.entity_id);
+        ctx.db.gems().gem_id().delete(&gem.gem_id);
+    }
+    Log::info("All gems cleaned up after boss defeat.");
+    
+    // Schedule the next boss spawn
+    schedule_boss_spawn(ctx);
+    
+    // Resume normal monster spawning
+    resume_monster_spawning(ctx);
+}
+
+// Resume normal monster spawning
+fn resume_monster_spawning(ctx: &ReducerContext) {
+    Log::info("Resuming normal monster spawning...");
+    
+    // Check if monster spawning is already scheduled
+    if ctx.db.monster_spawn_timer().count() == 0 {
+        // Schedule monster spawning
+        crate::monsters_def::schedule_monster_spawning(ctx);
+    } else {
+        Log::info("Monster spawning already scheduled");
+    }
+}
+
+// Test/debug utility to manually spawn the boss for testing
+#[reducer]
+pub fn spawn_boss_for_testing(ctx: &ReducerContext) {
+    Log::info("DEVELOPER TEST: Manually triggering boss spawn...");
+    
+    // Call the boss spawn method directly
+    // This bypasses the scheduling system for testing purposes
+    spawn_boss_phase_one(ctx, BossSpawnTimer { scheduled_id: 0, scheduled_at: ScheduleAt::time(ctx.timestamp) });
+    
+    Log::info("DEVELOPER TEST: Boss spawn triggered manually");
+}
+
+pub fn update_boss_monster_id(ctx: &ReducerContext, monster_id: u32) {
+    if ctx.sender != ctx.identity {
+        panic!("Reducer UpdateBossMonsterID may not be invoked by clients.");
+    }
+
+    // Get the monster from the monsters table
+    let monster_opt = ctx.db.monsters().monster_id().find(&monster_id);
+    if monster_opt.is_none() {
+        Log::info(&format!("UpdateBossMonsterID: Monster with ID {} not found!", monster_id));
+        return;
+    }
+
+    let monster = monster_opt.unwrap();
+    // Check if this is a boss monster (FinalBossPhase1)
+    if monster.bestiary_id == MonsterType::FinalBossPhase1 {
+        Log::info(&format!("BOSS PHASE 1 CREATED: Updating game state with boss_monster_id={}", monster_id));
+        
+        // Get game state
+        let mut game_state = ctx.db.game_state().id().find(&0)
+            .expect("UpdateBossMonsterID: Could not find game state!");
+        
+        // Update the boss_monster_id in the game state
+        game_state.boss_monster_id = monster_id;
+        ctx.db.game_state().id().update(game_state);
+        
+        Log::info(&format!("Game state updated with boss_monster_id={}, boss_active={}, boss_phase={}", 
+                  monster_id, game_state.boss_active, game_state.boss_phase));
+    }
+}
+
+// TODO: Placeholder functions - these will be implemented when other systems are ported
+
+fn cleanup_player_attacks(_ctx: &ReducerContext, player_id: u32) {
+    // TODO: Implement when attacks system is ported
+    Log::info(&format!("TODO: Cleanup player attacks for player {}", player_id));
+}
+
+fn cleanup_player_upgrade_options(_ctx: &ReducerContext, player_id: u32) {
+    // TODO: Implement when upgrades system is ported
+    Log::info(&format!("TODO: Cleanup player upgrade options for player {}", player_id));
+} 

@@ -5,8 +5,10 @@
     <RuntimeIdentifier>wasi-wasm</RuntimeIdentifier>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <WasmEnableSIMD>true</WasmEnableSIMD>
+    <WasmBuildNative>true</WasmBuildNative>
+    <RunAOTCompilation>true</RunAOTCompilation>
+    <WasmStripILAfterAOT>true</WasmStripILAfterAOT>
+    <EXPERIMENTAL_WASM_AOT>true</EXPERIMENTAL_WASM_AOT>
   </PropertyGroup>
 
   <ItemGroup>
