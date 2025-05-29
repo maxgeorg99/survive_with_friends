@@ -1,5 +1,7 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, ScheduleAt, rand::Rng};
-use crate::{account, collision, config, get_world_cell_from_position, DbVector2, PlayerClass, DELTA_TIME, WORLD_SIZE};
+use crate::{account, collision, config, get_world_cell_from_position, DbVector2, PlayerClass, DELTA_TIME, WORLD_SIZE, 
+           WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT, spatial_hash_collision_checker,
+           monsters};
 use std::{f32, u16};
 use std::time::Duration;
 
@@ -236,20 +238,133 @@ pub fn process_player_movement(ctx: &ReducerContext, tick_rate: u32, collision_c
     }
 }
 
-pub fn process_player_monster_collisions_spatial_hash(_ctx: &ReducerContext) {
-    // TODO: Implement spatial hash collision detection
-    // This needs the collision cache and spatial hash system to be implemented first
-    log::info!("TODO: Implement process_player_monster_collisions_spatial_hash");
+pub fn process_player_monster_collisions_spatial_hash(ctx: &ReducerContext, collision_cache: &mut collision::CollisionCache) {
+    if ctx.db.monsters().iter().next().is_none() {
+        return;
+    }
+
+    // Iterate through all players using spatial hash
+    for pid in 0..collision_cache.player.cached_count_players as usize {
+        let px = collision_cache.player.pos_x_player[pid];
+        let py = collision_cache.player.pos_y_player[pid];
+        let pr = collision_cache.player.radius_player[pid];
+
+        // Check against all monsters in the same spatial hash cell
+        let cell_key = get_world_cell_from_position(px, py);
+
+        let cx = (cell_key & WORLD_CELL_MASK) as i32;
+        let cy = (cell_key >> WORLD_CELL_BIT_SHIFT) as i32;
+
+        for dy in -1..=1 {
+            let ny = cy + dy;
+            if (ny as u32) >= WORLD_GRID_HEIGHT as u32 { continue; } // unsigned trick == clamp
+
+            let row_base = ny << WORLD_CELL_BIT_SHIFT;
+            for dx in -1..=1 {
+                let nx = cx + dx;
+                if (nx as u32) >= WORLD_GRID_WIDTH as u32 { continue; }
+
+                let test_cell_key = (row_base | nx) as usize;
+                let mut mid = collision_cache.monster.heads_monster[test_cell_key];
+                while mid != -1 {
+                    let mid_usize = mid as usize;
+                    let mx = collision_cache.monster.pos_x_monster[mid_usize];
+                    let my = collision_cache.monster.pos_y_monster[mid_usize];
+                    let mr = collision_cache.monster.radius_monster[mid_usize];
+
+                    if spatial_hash_collision_checker(px, py, pr, mx, my, mr) {
+                        collision_cache.player.damage_to_player[pid] += collision_cache.monster.atk_monster[mid_usize];
+                    }
+
+                    mid = collision_cache.monster.nexts_monster[mid_usize];
+                }
+            }
+        }
+    }
 }
 
-pub fn commit_player_damage(_ctx: &ReducerContext) {
-    // TODO: Implement player damage commitment
-    // This needs the damage arrays to be defined first
-    log::info!("TODO: Implement commit_player_damage");
+pub fn commit_player_damage(ctx: &ReducerContext, collision_cache: &collision::CollisionCache) {
+    for pid in 0..collision_cache.player.cached_count_players as usize {
+        if collision_cache.player.damage_to_player[pid] > 0.0 {
+            damage_player(ctx, collision_cache.player.keys_player[pid], collision_cache.player.damage_to_player[pid]);
+        }
+    }
 }
 
-pub fn damage_player(_ctx: &ReducerContext, _player_id: u32, _damage: f32) {
-    // TODO: Implement damage_player function
-    // This will handle applying damage to a specific player
-    log::info!("TODO: Implement damage_player");
+pub fn damage_player(ctx: &ReducerContext, player_id: u32, damage_amount: f32) -> bool {
+    // Find the player
+    let player_opt = ctx.db.player().player_id().find(&player_id);
+    if player_opt.is_none() {
+        log::warn!("DamagePlayer: Player {} not found", player_id);
+        return false;
+    }
+    
+    let mut player = player_opt.unwrap();
+    
+    log::info!("DamagePlayer: Applying {} damage to player {} ({})", damage_amount, player.name, player_id);
+    
+    // Check for spawn grace period
+    if player.spawn_grace_period_remaining > 0 {
+        // Player is still in spawn grace period - don't take damage
+        return false;
+    }
+    
+    // Apply armor damage reduction
+    // Formula: DR = armor/(armor+3)
+    // At 3 armor, they take 50% damage
+    // At 6 armor, they take 33% damage
+    let mut reduced_damage = damage_amount;
+    if player.armor > 0 {
+        let damage_reduction = player.armor as f32 / (player.armor as f32 + 3.0);
+        let remaining_damage_percent = 1.0 - damage_reduction;
+        reduced_damage = damage_amount * remaining_damage_percent;
+    }
+    
+    // Make sure we don't underflow
+    if player.hp <= reduced_damage {
+        // Player is dead - set HP to 0
+        player.hp = 0.0;
+        
+        // Update player record with 0 HP before we delete
+        ctx.db.player().player_id().update(player);
+        
+        // Log the death
+        log::info!("Player {} (ID: {}) has died!", player.name, player.player_id);
+        
+        // Store the player in the dead_players table before removing them
+        let dead_player_result = ctx.db.dead_players().try_insert(DeadPlayer {
+            player_id: player.player_id,
+            name: player.name.clone(),
+            is_true_survivor: false,
+        });
+
+        if dead_player_result.is_err() {
+            panic!("DamagePlayer: Player {} (ID: {}) could not be moved to dead_players table.", player.name, player.player_id);
+        }
+
+        log::info!("Player {} (ID: {}) moved to dead_players table.", player.name, player.player_id);
+        
+        // Clean up all attack-related data for this player
+        // TODO: Implement cleanup_player_attacks(ctx, player_id);
+        
+        // Clean up all pending upgrade options for this player
+        // TODO: Implement cleanup_player_upgrade_options(ctx, player_id);
+        
+        // Delete the player from the player table
+        // Note: The client will detect this deletion through the onDelete handler
+        ctx.db.player().player_id().delete(&player_id);
+        
+        // Check if all players are now dead
+        if ctx.db.player().iter().next().is_none() {
+            log::info!("Last player has died! Resetting the game world...");
+            // TODO: Implement reset_world(ctx);
+        }
+
+        return true;
+    } else {
+        // Player is still alive, update with reduced HP
+        player.hp -= reduced_damage;
+        ctx.db.player().player_id().update(player);
+        return false;
+    }
 } 

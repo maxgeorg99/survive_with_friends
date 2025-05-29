@@ -1,30 +1,6 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, rand::Rng};
 use crate::{AttackType, DbVector2};
 
-// TODO: These types will be defined when we port the attacks and monsters systems
-// Placeholder struct for PlayerScheduledAttack (from Attacks.cs)
-#[derive(Clone, Debug)]
-pub struct PlayerScheduledAttack {
-    pub attack_type: AttackType,
-    pub parameter_u: u32,
-    pub parameter_i: i32,
-    // ... other fields will be added when porting the full attack system
-}
-
-// Placeholder struct for AttackData (from Attacks.cs)
-#[derive(Clone, Debug)]
-pub struct AttackData {
-    pub projectiles: u32,
-    // ... other fields will be added when porting the full attack system
-}
-
-// Placeholder struct for MonsterBoid (from Monsters.cs) 
-#[derive(Clone, Debug)]
-pub struct MonsterBoid {
-    pub position: DbVector2,
-    // ... other fields will be added when porting the monsters system
-}
-
 // Utility functions for attack-related helper functions
 pub struct AttackUtils;
 

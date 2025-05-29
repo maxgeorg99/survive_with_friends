@@ -1,7 +1,7 @@
-use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, PrimaryKey, AutoInc, ScheduleAt, Duration, SpacetimeType, Index};
+use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, ScheduleAt, SpacetimeType};
 use crate::{DbVector2, MonsterType, MAX_MONSTERS, WORLD_SIZE, DELTA_TIME, 
            get_world_cell_from_position, spatial_hash_collision_checker,
-           WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT};
+           WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT, config, player};
 use std::collections::HashMap;
 
 // Define which monster types can spawn during normal gameplay (excludes bosses)
@@ -14,10 +14,10 @@ const SPAWNABLE_MONSTER_TYPES: &[MonsterType] = &[
 ];
 
 // Main monsters table
-#[table(name = "monsters", public)]
+#[table(name = monsters, public)]
 pub struct Monsters {
-    #[primarykey]
-    #[autoinc]
+    #[primary_key]
+    #[auto_inc]
     pub monster_id: u32,
 
     // monster attributes
@@ -33,27 +33,27 @@ pub struct Monsters {
 }
 
 // Monster position/boid table
-#[table(name = "monsters_boid", public)]
+#[table(name = monsters_boid, public)]
 pub struct MonsterBoid {
-    #[primarykey]
+    #[primary_key]
     pub monster_id: u32,
     pub position: DbVector2,
 }
 
 // Timer table for spawning monsters
-#[table(name = "monster_spawn_timer", scheduled = "pre_spawn_monster_wave", public)]
+#[table(name = monster_spawn_timer, scheduled(pre_spawn_monster_wave), public)]
 pub struct MonsterSpawnTimer {
-    #[primarykey]
-    #[autoinc]
+    #[primary_key]
+    #[auto_inc]
     pub scheduled_id: u64,
     pub scheduled_at: ScheduleAt,
 }
 
 // New table for monster spawners (scheduled)
-#[table(name = "monster_spawners", scheduled = "spawn_monster", public)]
+#[table(name = monster_spawners, scheduled(spawn_monster), public)]
 pub struct MonsterSpawners {
-    #[primarykey]
-    #[autoinc]
+    #[primary_key]
+    #[auto_inc]
     pub scheduled_id: u64,
     
     pub position: DbVector2,          // Where the monster will spawn
@@ -62,10 +62,10 @@ pub struct MonsterSpawners {
 }
 
 // Table to track which monsters have been hit by which attacks
-#[table(name = "monster_damage", public)]
+#[table(name = monster_damage, public)]
 pub struct MonsterDamage {
-    #[primarykey]
-    #[autoinc]
+    #[primary_key]
+    #[auto_inc]
     pub damage_id: u32,
     
     #[index(btree)]
@@ -76,10 +76,10 @@ pub struct MonsterDamage {
 }
 
 // Scheduled table for monster hit cleanup
-#[table(name = "monster_hit_cleanup", scheduled = "cleanup_monster_hit_record", public)]
+#[table(name = monster_hit_cleanup, scheduled(cleanup_monster_hit_record), public)]
 pub struct MonsterHitCleanup {
-    #[primarykey]
-    #[autoinc]
+    #[primary_key]
+    #[auto_inc]
     pub scheduled_id: u64,
     
     pub damage_id: u32,        // The damage record to clean up
@@ -104,7 +104,7 @@ pub fn get_collision_cache() -> &'static mut crate::collision::CollisionCache {
 
 #[reducer]
 pub fn pre_spawn_monster_wave(ctx: &ReducerContext, _timer: MonsterSpawnTimer) {
-    if ctx.sender != ctx.identity {
+    if ctx.sender != ctx.identity() {
         panic!("Reducer PreSpawnMonsterWave may not be invoked by clients, only via scheduling.");
     }
 
@@ -124,7 +124,7 @@ pub fn pre_spawn_monster_wave(ctx: &ReducerContext, _timer: MonsterSpawnTimer) {
 }
 
 pub fn pre_spawn_monster(ctx: &ReducerContext, _timer: MonsterSpawnTimer) {
-    if ctx.sender != ctx.identity {
+    if ctx.sender != ctx.identity() {
         panic!("Reducer PreSpawnMonster may not be invoked by clients, only via scheduling.");
     }
 
