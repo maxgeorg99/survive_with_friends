@@ -82,12 +82,3 @@ pub fn initialize_class_data(ctx: &ReducerContext) {
     
     log::info!("Class data initialization complete.");
 }
-
-// Helper method to schedule an attack for a player
-pub fn schedule_attack(ctx: &ReducerContext, player_id: u32, attack_type: AttackType) {
-    log::info!("Scheduling attack of type {:?} for player {}", attack_type, player_id);
-    
-    // Call the existing schedule_new_player_attack method from attacks module
-    // TODO: This will be implemented when we port the attacks module
-    // schedule_new_player_attack(ctx, player_id, attack_type);
-} 

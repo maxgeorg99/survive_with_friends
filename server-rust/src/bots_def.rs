@@ -102,9 +102,7 @@ pub fn spawn_bot(ctx: &ReducerContext) {
 
     log::info!("Selected random class: {:?}", player_class);
     
-    // TODO: Need to populate collision cache first before checking for safe spawn position
-    // For now, create a basic collision cache
-    let collision_cache = crate::CollisionCache::default();
+    let collision_cache = crate::monsters_def::get_collision_cache();
     
     // Find a safe spawn position
     let spawn_position = find_safe_spawn_position(ctx, 48.0, &collision_cache); // Using standard player radius

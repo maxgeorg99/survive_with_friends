@@ -221,16 +221,9 @@ pub fn init(ctx: &ReducerContext) {
     // SpawnableMonsterTypes array in Monsters.rs if they should be part of normal spawning.
     // Boss monsters should NOT be added to the spawnable list.
     
-    // TODO: Initialize experience system
     init_exp_system(ctx);
-    
-    // Initialize attack system
     initialize_attack_system(ctx);
-    
-    // TODO: Initialize health regeneration system
     init_health_regen_system(ctx);
-    
-    // Schedule monster spawning
     schedule_monster_spawning(ctx);
 }
 
@@ -349,9 +342,19 @@ pub fn spawn_player(ctx: &ReducerContext, class_id: u32) {
     // Check if this is the first player - if so, schedule boss spawn
     if ctx.db.player().count() == 1 {
         log::info!("First player spawned - scheduling boss timer for new world");
-        // TODO: Clear any existing boss spawn timers first
-        // TODO: Schedule a new boss spawn
-        // schedule_boss_spawn(ctx);
+        
+        // Clear any existing boss spawn timers first
+        let timers_to_delete: Vec<u64> = ctx.db.boss_spawn_timer()
+            .iter()
+            .map(|timer| timer.scheduled_id)
+            .collect();
+        
+        for scheduled_id in timers_to_delete {
+            ctx.db.boss_spawn_timer().scheduled_id().delete(&scheduled_id);
+        }
+        
+        // Schedule a new boss spawn
+        schedule_boss_spawn(ctx);
     }
 }
 
@@ -437,16 +440,3 @@ pub fn create_new_player_with_position(ctx: &ReducerContext, name: &str, player_
 
     Some(new_player)
 }
-
-// TODO: Implement remaining functions and placeholders for other modules:
-// - create_new_player_with_position
-// - game_tick (scheduled reducer)
-// - schedule_attack
-// - init_game_state
-// - initialize_class_data  
-// - init_bestiary
-// - init_exp_system
-// - initialize_attack_system
-// - init_health_regen_system
-// - schedule_monster_spawning
-// - schedule_boss_spawn

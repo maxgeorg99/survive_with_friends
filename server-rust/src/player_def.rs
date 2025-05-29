@@ -286,75 +286,7 @@ pub fn process_player_monster_collisions_spatial_hash(ctx: &ReducerContext, coll
 pub fn commit_player_damage(ctx: &ReducerContext, collision_cache: &collision::CollisionCache) {
     for pid in 0..collision_cache.player.cached_count_players as usize {
         if collision_cache.player.damage_to_player[pid] > 0.0 {
-            damage_player(ctx, collision_cache.player.keys_player[pid], collision_cache.player.damage_to_player[pid]);
+            crate::core_game::damage_player(ctx, collision_cache.player.keys_player[pid], collision_cache.player.damage_to_player[pid]);
         }
     }
 }
-
-pub fn damage_player(ctx: &ReducerContext, player_id: u32, damage_amount: f32) -> bool {
-    // Find the player
-    let player_opt = ctx.db.player().player_id().find(&player_id);
-    if player_opt.is_none() {
-        log::warn!("DamagePlayer: Player {} not found", player_id);
-        return false;
-    }
-    
-    let mut player = player_opt.unwrap();
-    
-    log::info!("DamagePlayer: Applying {} damage to player {} ({})", damage_amount, player.name, player_id);
-    
-    // Check for spawn grace period
-    if player.spawn_grace_period_remaining > 0 {
-        // Player is still in spawn grace period - don't take damage
-        return false;
-    }
-    
-    // Apply armor damage reduction
-    // Formula: DR = armor/(armor+3)
-    // At 3 armor, they take 50% damage
-    // At 6 armor, they take 33% damage
-    let mut reduced_damage = damage_amount;
-    if player.armor > 0 {
-        let damage_reduction = player.armor as f32 / (player.armor as f32 + 3.0);
-        let remaining_damage_percent = 1.0 - damage_reduction;
-        reduced_damage = damage_amount * remaining_damage_percent;
-    }
-    
-    // Make sure we don't underflow
-    if player.hp <= reduced_damage {        
-        // Log the death
-        log::info!("Player {} (ID: {}) has died!", player.name, player.player_id);
-        
-        // Store the player in the dead_players table before removing them
-        let _dead_player_result = ctx.db.dead_players().try_insert(DeadPlayer {
-            player_id: player.player_id,
-            name: player.name.clone(),
-            is_true_survivor: false,
-        });
-
-        log::info!("Player {} (ID: {}) moved to dead_players table.", player.name, player.player_id);
-        
-        // Clean up all attack-related data for this player
-        // TODO: Implement cleanup_player_attacks(ctx, player_id);
-        
-        // Clean up all pending upgrade options for this player
-        // TODO: Implement cleanup_player_upgrade_options(ctx, player_id);
-        
-        // Delete the player from the player table
-        // Note: The client will detect this deletion through the onDelete handler
-        ctx.db.player().player_id().delete(&player_id);
-        
-        // Check if all players are now dead
-        if ctx.db.player().iter().next().is_none() {
-            log::info!("Last player has died! Resetting the game world...");
-            // TODO: Implement reset_world(ctx);
-        }
-
-        return true;
-    } else {
-        // Player is still alive, update with reduced HP
-        player.hp -= reduced_damage;
-        ctx.db.player().player_id().update(player);
-        return false;
-    }
-} 

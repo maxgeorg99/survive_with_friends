@@ -138,9 +138,15 @@ pub fn reset_world(ctx: &ReducerContext) {
     log::info!("ResetWorld: Cleared {} monster damage records", monster_damage_count);
     
     // 12. Reschedule monster spawning
-    // TODO: Call schedule_monster_spawning when that module is ported
-    // schedule_monster_spawning(ctx);
-    log::info!("ResetWorld: TODO - Reschedule monster spawning (pending monster module port)");
+    log::info!("Resuming normal monster spawning...");
+    
+    // Check if monster spawning is already scheduled
+    if ctx.db.monster_spawn_timer().count() == 0 {
+        // Schedule monster spawning
+        crate::monsters_def::schedule_monster_spawning(ctx);
+    } else {
+        log::info!("Monster spawning already scheduled");
+    }
     
     log::info!("ResetWorld: Game world reset completed successfully");
 } 
