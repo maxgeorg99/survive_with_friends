@@ -1,5 +1,5 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, ScheduleAt, SpacetimeType, rand::Rng};
-use crate::{AttackType, Player, account, active_attack, active_attacks, entity, game_state, monsters, monsters_boid, gems, monster_spawners, boss_spawn_timer, monster_spawn_timer, monster_hit_cleanup, active_attack_cleanup, attack_burst_cooldowns, player_scheduled_attacks, monster_damage, player};
+use crate::{AttackType, Player, account, attack_data, active_attacks, entity, game_state, monsters, monsters_boid, gems, monster_spawners, boss_spawn_timer, monster_spawn_timer, monster_hit_cleanup, active_attack_cleanup, attack_burst_cooldowns, player_scheduled_attacks, monster_damage, player};
 use std::time::Duration;
 
 // Upgrade type enum
@@ -482,8 +482,8 @@ fn apply_player_upgrade(ctx: &ReducerContext, upgrade: &ChosenUpgradeData) {
         
         for attack in ctx.db.player_scheduled_attacks().player_id().filter(&player_id) {
             if attack.attack_type == attack_type {
-                existing_attack = Some(attack.clone());
                 scheduled_attack_id = attack.scheduled_id;
+                existing_attack = Some(attack);
                 break;
             }
         }
@@ -537,16 +537,10 @@ fn apply_player_upgrade(ctx: &ReducerContext, upgrade: &ChosenUpgradeData) {
             log::info!("Increased attack {:?} radius by {} to {}", attack_type, upgrade.radius, modified_attack.radius);
         }
         
-        // Update the scheduled attack record if any stats were changed
-        if update_scheduled_attack {
-            ctx.db.player_scheduled_attacks().scheduled_id().update(modified_attack.clone());
-            log::info!("Updated scheduled attack for player {}, attack type {:?}", player_id, attack_type);
-        }
-        
         // Handle cooldown reduction by updating the schedule interval
         if update_schedule_interval && cooldown_reduction > 0 {
             // Get base attack data to get original cooldown
-            if let Some(attack_data) = find_attack_data_by_type(ctx, attack_type) {
+            if let Some(attack_data) = find_attack_data_by_type(ctx, &attack_type) {
                 // Calculate new cooldown (apply percentage reduction)
                 let base_cooldown = attack_data.cooldown;
                 let reduction = base_cooldown * cooldown_reduction / 100;
@@ -559,7 +553,7 @@ fn apply_player_upgrade(ctx: &ReducerContext, upgrade: &ChosenUpgradeData) {
                 let new_scheduled_attack = crate::PlayerScheduledAttack {
                     scheduled_id: 0,
                     player_id,
-                    attack_type,
+                    attack_type: attack_type.clone(),
                     skill_level: modified_attack.skill_level,
                     parameter_u: modified_attack.parameter_u,
                     parameter_i: modified_attack.parameter_i,
@@ -574,10 +568,16 @@ fn apply_player_upgrade(ctx: &ReducerContext, upgrade: &ChosenUpgradeData) {
                     scheduled_at: ScheduleAt::Interval(Duration::from_millis(new_cooldown as u64).into()),
                 };
                 
-                ctx.db.player_scheduled_attacks().insert(new_scheduled_attack).unwrap();
+                ctx.db.player_scheduled_attacks().insert(new_scheduled_attack);
                 
                 log::info!("Updated attack cooldown: reduced from {}ms to {}ms", base_cooldown, new_cooldown);
             }
+        }
+
+        // Update the scheduled attack record if any stats were changed
+        if update_scheduled_attack {
+            ctx.db.player_scheduled_attacks().scheduled_id().update(modified_attack);
+            log::info!("Updated scheduled attack for player {}, attack type {:?}", player_id, attack_type);
         }
     }
 }
@@ -646,8 +646,8 @@ fn schedule_new_player_attack(ctx: &ReducerContext, player_id: u32, attack_type:
 }
 
 // Helper function to find attack data by type
-fn find_attack_data_by_type(ctx: &ReducerContext, attack_type: AttackType) -> Option<crate::AttackData> {
-    ctx.db.attack_data().attack_type().find(&attack_type)
+fn find_attack_data_by_type(ctx: &ReducerContext, attack_type: &AttackType) -> Option<crate::AttackData> {
+    ctx.db.attack_data().attack_type().find(attack_type)
 }
 
 // Helper function to clean up all pending upgrade options for a player

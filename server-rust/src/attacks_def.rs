@@ -1,6 +1,6 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, ScheduleAt, SpacetimeType};
 use crate::{DbVector2, AttackType, Entity, DELTA_TIME, get_world_cell_from_position, spatial_hash_collision_checker,
-           WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT, entity, monster_damage, player, AttackUtils};
+           WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT, entity, monster_damage, player};
 use std::f64::consts::PI;
 use std::time::Duration;
 
@@ -10,6 +10,7 @@ pub struct AttackData {
     #[primary_key]
     pub attack_id: u32,
     
+    #[unique]
     pub attack_type: AttackType,
     pub name: String,
     pub cooldown: u32,         // Time between server-scheduled attacks
@@ -220,7 +221,7 @@ fn trigger_attack_projectile(ctx: &ReducerContext, player_id: u32, attack_type: 
     let player_y = cache.player.pos_y_player[player_cache_idx];
     
     // Get attack direction using AttackUtils
-    let direction = crate::AttackUtils::determine_attack_direction(ctx, player_id, &attack_type, id_within_burst, parameter_u, parameter_i);
+    let direction = crate::attack_utils::determine_attack_direction(ctx, player_id, &attack_type, id_within_burst, parameter_u, parameter_i);
     
     // Create a new entity for the projectile and get its ID
     let projectile_entity = ctx.db.entity().insert(Entity {
@@ -333,7 +334,7 @@ pub fn server_trigger_attack(ctx: &ReducerContext, mut attack: PlayerScheduledAt
     }
 
     // Update the parameters for the attack
-    let parameter_u = crate::AttackUtils::get_parameter_u(ctx, &attack);
+    let parameter_u = crate::attack_utils::get_parameter_u(ctx, &attack);
     attack.parameter_u = parameter_u;
     
     // Handle case where we have multiple projectiles
