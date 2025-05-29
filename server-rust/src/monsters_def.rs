@@ -92,22 +92,18 @@ pub struct MonsterHitCleanup {
 
 // Global collision cache - this should be a static variable in a real implementation
 // For now, we'll pass it as needed or use the collision cache from collision.rs
-static mut COLLISION_CACHE: Option<crate::collision::CollisionCache> = None;
+static mut COLLISION_CACHE: Option<Box<crate::collision::CollisionCache>> = None;
 
 pub fn get_collision_cache() -> &'static mut crate::collision::CollisionCache {
-    log::info!("Getting collision cache...");
     unsafe {
         if COLLISION_CACHE.is_none() {
-            log::info!("Creating new collision cache...");
-            let mut cache = crate::collision::CollisionCache::default();    
-            log::info!("Clearing player key cache...");
+            log::info!("Initializing global collision cache for the first time (Boxed)...");
+            let mut cache = Box::new(crate::collision::CollisionCache::default());
             cache.player.player_id_to_cache_index.clear();
-            log::info!("Clearing monster key cache...");
             cache.monster.key_to_cache_index_monster.clear();
             COLLISION_CACHE = Some(cache);
         }
-        log::info!("Returning collision cache...");
-        COLLISION_CACHE.as_mut().unwrap()
+        COLLISION_CACHE.as_mut().unwrap().as_mut()
     }
 }
 
