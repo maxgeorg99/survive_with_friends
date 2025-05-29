@@ -1,4 +1,4 @@
-use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, ScheduleAt, Duration, SpacetimeType, Index};
+use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, ScheduleAt, SpacetimeType, Index};
 use crate::{DbVector2, AttackType, Entity, DELTA_TIME, get_world_cell_from_position, spatial_hash_collision_checker,
            WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT};
 use std::f64::consts::PI;

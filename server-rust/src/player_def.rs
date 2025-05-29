@@ -321,26 +321,16 @@ pub fn damage_player(ctx: &ReducerContext, player_id: u32, damage_amount: f32) -
     }
     
     // Make sure we don't underflow
-    if player.hp <= reduced_damage {
-        // Player is dead - set HP to 0
-        player.hp = 0.0;
-        
-        // Update player record with 0 HP before we delete
-        ctx.db.player().player_id().update(player);
-        
+    if player.hp <= reduced_damage {        
         // Log the death
         log::info!("Player {} (ID: {}) has died!", player.name, player.player_id);
         
         // Store the player in the dead_players table before removing them
-        let dead_player_result = ctx.db.dead_players().try_insert(DeadPlayer {
+        let _dead_player_result = ctx.db.dead_players().try_insert(DeadPlayer {
             player_id: player.player_id,
             name: player.name.clone(),
             is_true_survivor: false,
         });
-
-        if dead_player_result.is_err() {
-            panic!("DamagePlayer: Player {} (ID: {}) could not be moved to dead_players table.", player.name, player.player_id);
-        }
 
         log::info!("Player {} (ID: {}) moved to dead_players table.", player.name, player.player_id);
         

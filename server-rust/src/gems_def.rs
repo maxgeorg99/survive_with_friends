@@ -1,6 +1,6 @@
-use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, SpacetimeType};
+use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, SpacetimeType, rand::Rng};
 use crate::{DbVector2, MAX_GEM_COUNT, WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_HEIGHT, WORLD_GRID_WIDTH,
-           get_world_cell_from_position, spatial_hash_collision_checker, CollisionCache};
+           get_world_cell_from_position, spatial_hash_collision_checker, CollisionCache, entity, player};
 
 // Define the gem levels (1-4)
 #[derive(SpacetimeType, Clone, Debug, PartialEq)]
@@ -93,12 +93,7 @@ pub fn create_gem(ctx: &ReducerContext, position: DbVector2, level: GemLevel) ->
         has_waypoint: false,
     });
 
-    if let Err(_) = gem_entity_opt {
-        log::error!("Failed to create entity for gem at position {}, {}", position.x, position.y);
-        return 0;
-    }
-
-    let gem_entity = gem_entity_opt.unwrap();
+    let gem_entity = gem_entity_opt;
 
     // Create the gem and link it to the entity
     let gem_opt = ctx.db.gems().insert(Gem {
@@ -106,13 +101,6 @@ pub fn create_gem(ctx: &ReducerContext, position: DbVector2, level: GemLevel) ->
         entity_id: gem_entity.entity_id,
         level,
     });
-
-    if let Err(_) = gem_opt {
-        // If gem creation fails, clean up the entity
-        ctx.db.entity().entity_id().delete(&gem_entity.entity_id);
-        log::error!("Failed to create gem record for entity {}", gem_entity.entity_id);
-        return 0;
-    }
 
     let gem = gem_opt;
     //Log::info(&format!("Created {:?} gem (ID: {}) at position {}, {}", gem.level, gem.gem_id, position.x, position.y));
@@ -122,8 +110,8 @@ pub fn create_gem(ctx: &ReducerContext, position: DbVector2, level: GemLevel) ->
 // Helper method to spawn a gem with a random level at the given position
 pub fn spawn_random_gem(ctx: &ReducerContext, position: DbVector2) -> u32 {
     // Randomly select a gem level with weighted probabilities
-    use spacetimedb::Rng;
-    let random_value = ctx.rng.gen_range(1..=100); // 1-100
+    let mut rng = ctx.rng();
+    let random_value = rng.gen_range(1..=100); // 1-100
     let level = if random_value <= 79 {
         GemLevel::Small
     } else if random_value <= 94 {
@@ -150,8 +138,8 @@ pub fn spawn_gem_on_monster_death(ctx: &ReducerContext, monster_id: u32, positio
     let drop_chance = 1.0; // Default 100% drop chance for now
 
     // Roll for gem drop
-    use spacetimedb::Rng;
-    let roll = ctx.rng.gen_range(0.0..1.0);
+    let mut rng = ctx.rng();
+    let roll = rng.gen_range(0.0..1.0);
     if roll <= drop_chance {
         spawn_random_gem(ctx, position);
         //Log::info(&format!("Monster {} dropped a gem at position {}, {}", monster_id, position.x, position.y));

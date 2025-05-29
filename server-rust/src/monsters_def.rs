@@ -1,8 +1,9 @@
-use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, ScheduleAt, SpacetimeType};
+use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, ScheduleAt, SpacetimeType, rand::Rng};
 use crate::{DbVector2, MonsterType, MAX_MONSTERS, WORLD_SIZE, DELTA_TIME, 
            get_world_cell_from_position, spatial_hash_collision_checker,
-           WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT, config, player};
+           WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT, config, player, game_state, bestiary, ActiveAttack, active_attacks, entity};
 use std::collections::HashMap;
+use std::time::Duration;
 
 // Define which monster types can spawn during normal gameplay (excludes bosses)
 const SPAWNABLE_MONSTER_TYPES: &[MonsterType] = &[
@@ -118,12 +119,12 @@ pub fn pre_spawn_monster_wave(ctx: &ReducerContext, _timer: MonsterSpawnTimer) {
     for _player in players {
         // For each wave size, pre-spawn a monster
         for _i in 0..wave_size {
-            pre_spawn_monster(ctx, _timer.clone());
+            pre_spawn_monster(ctx, &_timer);
         }
     }
 }
 
-pub fn pre_spawn_monster(ctx: &ReducerContext, _timer: MonsterSpawnTimer) {
+pub fn pre_spawn_monster(ctx: &ReducerContext, _timer: &MonsterSpawnTimer) {
     if ctx.sender != ctx.identity() {
         panic!("Reducer PreSpawnMonster may not be invoked by clients, only via scheduling.");
     }
@@ -155,23 +156,24 @@ pub fn pre_spawn_monster(ctx: &ReducerContext, _timer: MonsterSpawnTimer) {
     }
     
     // Get a random monster type FROM THE SPAWNABLE LIST (not from all monster types)
-    let random_type_index = (ctx.rng.gen::<f32>() * SPAWNABLE_MONSTER_TYPES.len() as f32) as usize;
-    let monster_type = SPAWNABLE_MONSTER_TYPES[random_type_index];
+    let mut rng = ctx.rng();
+    let random_type_index = (rng.gen::<f32>() * SPAWNABLE_MONSTER_TYPES.len() as f32) as usize;
+    let monster_type = SPAWNABLE_MONSTER_TYPES[random_type_index].clone();
     
     //Log::info(&format!("Selected monster type {:?} from spawnable list (index {} of {} types)", monster_type, random_type_index, SPAWNABLE_MONSTER_TYPES.len()));
     
     // Get monster stats from bestiary using the monster type as numerical ID
-    let bestiary_entry = ctx.db.bestiary().bestiary_id().find(&(monster_type as u32))
+    let bestiary_entry = ctx.db.bestiary().bestiary_id().find(&(monster_type.clone() as u32))
         .expect(&format!("PreSpawnMonster: Could not find bestiary entry for monster type: {:?}", monster_type));
     
     // Choose a random player to spawn near
     let players: Vec<_> = ctx.db.player().iter().collect();
-    let random_skip = (ctx.rng.gen::<f32>() * players.len() as f32) as usize;
+    let random_skip = (rng.gen::<f32>() * players.len() as f32) as usize;
     let target_player = &players[random_skip];
     
     // Calculate spawn position near the player (random direction, within 300-800 pixel radius)
-    let spawn_radius = 300.0 + (ctx.rng.gen::<f32>() * 501.0); // Distance from player
-    let spawn_angle = ctx.rng.gen::<f32>() * std::f32::consts::PI * 2.0; // Random angle in radians
+    let spawn_radius = 300.0 + (rng.gen::<f32>() * 501.0); // Distance from player
+    let spawn_angle = rng.gen::<f32>() * std::f32::consts::PI * 2.0; // Random angle in radians
     
     // Calculate spawn position
     let mut position = DbVector2::new(
@@ -192,15 +194,15 @@ pub fn pre_spawn_monster(ctx: &ReducerContext, _timer: MonsterSpawnTimer) {
         scheduled_id: 0,
         position,
         monster_type,
-        scheduled_at: ScheduleAt::time(ctx.timestamp + Duration::from_millis(PRE_SPAWN_DELAY_MS)),
-    }).unwrap();
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(PRE_SPAWN_DELAY_MS)),
+    });
     
     //Log::info(&format!("PreSpawned {:?} monster for position ({}, {}) for player: {}. Will spawn in {}ms", monster_type, position.x, position.y, target_player.name, PRE_SPAWN_DELAY_MS));
 }
 
 #[reducer]
 pub fn spawn_monster(ctx: &ReducerContext, spawner: MonsterSpawners) {
-    if ctx.sender != ctx.identity {
+    if ctx.sender != ctx.identity() {
         panic!("Reducer SpawnMonster may not be invoked by clients, only via scheduling.");
     }
 
@@ -225,51 +227,43 @@ pub fn spawn_monster(ctx: &ReducerContext, spawner: MonsterSpawners) {
     }
     
     // Get monster stats from bestiary using the monster type as numerical ID
-    let bestiary_entry = ctx.db.bestiary().bestiary_id().find(&(spawner.monster_type as u32))
-        .expect(&format!("SpawnMonster: Could not find bestiary entry for monster type: {:?}", spawner.monster_type));
+    let bestiary_entry = ctx.db.bestiary().bestiary_id().find(&(spawner.monster_type.clone() as u32))
+        .expect(&format!("SpawnMonster: Could not find bestiary entry for monster type: {:?}", spawner.monster_type.clone()));
     
     // Find the closest player to target
-    let closest_player_id = get_closest_player(ctx, spawner.position);
+    let closest_player_id = get_closest_player(ctx, &spawner.position);
     
     // Create the monster
     let monster_opt = ctx.db.monsters().insert(Monsters {
         monster_id: 0,
-        bestiary_id: spawner.monster_type,
+        bestiary_id: spawner.monster_type.clone(),
         hp: bestiary_entry.max_hp,
         max_hp: bestiary_entry.max_hp,
         atk: bestiary_entry.atk,
         speed: bestiary_entry.speed,
         target_player_id: closest_player_id,
         radius: bestiary_entry.radius,
-        spawn_position: spawner.position,
+        spawn_position: spawner.position.clone(),
     });
-    
-    if let Err(_) = monster_opt {
-        panic!("SpawnMonster: Failed to create monster!");
-    }
 
-    let monster = monster_opt.unwrap();
+    let monster = monster_opt;
 
     // Create the boid
-    let boid_opt = ctx.db.monsters_boid().insert(MonsterBoid {
+    let _boid_opt = ctx.db.monsters_boid().insert(MonsterBoid {
         monster_id: monster.monster_id,
         position: spawner.position,
     }); 
 
-    if let Err(_) = boid_opt {
-        panic!("SpawnMonster: Failed to create boid!");
-    }
-
     //Log::info(&format!("Spawned {:?} monster. Total monsters: {}", spawner.monster_type, ctx.db.monsters().count()));
     
     // If this is a boss monster, update the game state with its ID
-    if spawner.monster_type == MonsterType::FinalBossPhase1 || spawner.monster_type == MonsterType::FinalBossPhase2 {
+    if spawner.monster_type.clone() == MonsterType::FinalBossPhase1 || spawner.monster_type.clone() == MonsterType::FinalBossPhase2 {
         log::info!("Boss monster of type {:?} created with ID {}", spawner.monster_type, monster.monster_id);
         crate::boss_system::update_boss_monster_id(ctx, monster.monster_id);
     }
 }
 
-pub fn get_closest_player(ctx: &ReducerContext, position: DbVector2) -> u32 {
+pub fn get_closest_player(ctx: &ReducerContext, position: &DbVector2) -> u32 {
     let mut closest_player_id = 0;
     let mut closest_distance = f32::MAX;
     
@@ -297,8 +291,8 @@ pub fn schedule_monster_spawning(ctx: &ReducerContext) {
     // Schedule monster spawning every 0.2 seconds
     ctx.db.monster_spawn_timer().insert(MonsterSpawnTimer {
         scheduled_id: 0,
-        scheduled_at: ScheduleAt::interval(Duration::from_millis(200)),
-    }).unwrap();
+        scheduled_at: ScheduleAt::Interval(Duration::from_millis(200).into()),
+    });
     
     log::info!("Monster spawning scheduled successfully");
 }
@@ -376,14 +370,14 @@ fn populate_monster_cache(ctx: &ReducerContext, cache: &mut crate::collision::Co
         cache.monster.atk_monster[idx] = monster.atk;
 
         let target_player_id = monster.target_player_id;
-        if cache.monster.player_id_to_cache_index.contains_key(&target_player_id) {
+        if cache.player.player_id_to_cache_index.contains_key(&target_player_id) {
             cache.monster.target_id_monster[idx] = target_player_id as i32;
         } else {
             cache.monster.target_id_monster[idx] = -1;
         }
 
         if cache.monster.target_id_monster[idx] != -1 {
-            if let Some(&player_cache_idx) = cache.monster.player_id_to_cache_index.get(&(target_player_id)) {
+            if let Some(&player_cache_idx) = cache.player.player_id_to_cache_index.get(&(target_player_id)) {
                 cache.monster.target_x_monster[idx] = cache.player.pos_x_player[player_cache_idx as usize];
                 cache.monster.target_y_monster[idx] = cache.player.pos_y_player[player_cache_idx as usize];
             }
@@ -432,7 +426,8 @@ fn reassign_monster_target(ctx: &ReducerContext, monster: Monsters) {
     }
     
     // Choose a random player as the new target
-    let random_index = (ctx.rng.gen::<f32>() * player_count as f32) as usize;
+    let mut rng = ctx.rng();
+    let random_index = (rng.gen::<f32>() * player_count as f32) as usize;
     let new_target = &players[random_index];
     
     // Update the monster with the new target
@@ -440,7 +435,7 @@ fn reassign_monster_target(ctx: &ReducerContext, monster: Monsters) {
     updated_monster.target_player_id = new_target.player_id;
     
     let cache = get_collision_cache();
-    if let Some(&monster_cache_idx) = cache.monster.key_to_cache_index_monster.get(&monster.monster_id) {
+    if let Some(&monster_cache_idx) = cache.monster.key_to_cache_index_monster.get(&updated_monster.monster_id) {
         cache.monster.target_id_monster[monster_cache_idx as usize] = new_target.player_id as i32;
     }
     
@@ -652,12 +647,7 @@ fn record_monster_hit_by_attack(ctx: &ReducerContext, monster_id: u32, attack_en
         attack_entity_id,
     });
     
-    if let Err(_) = damage_record {
-        log::error!("Failed to insert monster damage record for monster {}, attack {}", monster_id, attack_entity_id);
-        return;
-    }
-    
-    let damage_record = damage_record.unwrap();
+    let damage_record = damage_record;
     
     // Get cleanup delay from config
     let mut cleanup_delay = 500; // Default to 500ms if config not found
@@ -669,8 +659,8 @@ fn record_monster_hit_by_attack(ctx: &ReducerContext, monster_id: u32, attack_en
     ctx.db.monster_hit_cleanup().insert(MonsterHitCleanup {
         scheduled_id: 0,
         damage_id: damage_record.damage_id,
-        scheduled_at: ScheduleAt::time(ctx.timestamp + Duration::from_millis(cleanup_delay as u64)),
-    }).unwrap();
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(cleanup_delay as u64)),
+    });
     
     //Log::info(&format!("Recorded monster {} hit by attack {}, cleanup scheduled in {}ms", monster_id, attack_entity_id, cleanup_delay));
 }
@@ -678,7 +668,7 @@ fn record_monster_hit_by_attack(ctx: &ReducerContext, monster_id: u32, attack_en
 // Reducer to clean up a monster hit record
 #[reducer]
 pub fn cleanup_monster_hit_record(ctx: &ReducerContext, cleanup: MonsterHitCleanup) {
-    if ctx.sender != ctx.identity {
+    if ctx.sender != ctx.identity() {
         panic!("CleanupMonsterHitRecord may not be invoked by clients, only via scheduling.");
     }
     

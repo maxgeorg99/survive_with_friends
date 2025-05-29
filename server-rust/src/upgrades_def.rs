@@ -1,5 +1,6 @@
-use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, PrimaryKey, AutoInc, ScheduleAt, Duration, SpacetimeType, Index};
-use crate::{AttackType, Player};
+use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, ScheduleAt, SpacetimeType, rand::Rng};
+use crate::{AttackType, Player, account, active_attack, active_attacks, entity, game_state, monsters, monsters_boid, gems, monster_spawners, boss_spawn_timer, monster_spawn_timer, monster_hit_cleanup, active_attack_cleanup, attack_burst_cooldowns, player_scheduled_attacks, monster_damage, player};
+use std::time::Duration;
 
 // Upgrade type enum
 #[derive(SpacetimeType, Clone, Debug, PartialEq)]
@@ -25,10 +26,10 @@ pub enum AttackStat {
 }
 
 // Table for upgrade options offered to players
-#[table(name = "upgrade_options", public)]
+#[table(name = upgrade_options, public)]
 pub struct UpgradeOptionData {
-    #[primarykey]
-    #[autoinc]
+    #[primary_key]
+    #[auto_inc]
     pub upgrade_id: u32,
 
     #[index(btree)]
@@ -51,10 +52,10 @@ pub struct UpgradeOptionData {
 }
 
 // Table for chosen upgrades (permanent record)
-#[table(name = "chosen_upgrades", public)]
+#[table(name = chosen_upgrades, public)]
 pub struct ChosenUpgradeData {
-    #[primarykey]
-    #[autoinc]
+    #[primary_key]
+    #[auto_inc]
     pub chosen_upgrade_id: u32,
 
     #[index(btree)]
@@ -96,9 +97,11 @@ pub fn draw_upgrade_options(ctx: &ReducerContext, player_id: u32) {
     ];
     
     // Shuffle the list randomly using Fisher-Yates algorithm
+    let mut rng = ctx.rng();
     let mut shuffled_types = all_upgrade_types.clone();
-    for i in (1..shuffled_types.len()).rev() {
-        let j = (ctx.rng.gen::<f32>() * (i + 1) as f32) as usize;
+    for i in (1..shuffled_types.len()).rev() 
+    {
+        let j = rng.gen_range(0..=i);
         shuffled_types.swap(i, j);
     }
     
@@ -114,7 +117,7 @@ pub fn draw_upgrade_options(ctx: &ReducerContext, player_id: u32) {
         option.player_id = player_id;
         option.upgrade_index = i as u32;
         
-        ctx.db.upgrade_options().insert(option).unwrap();
+        ctx.db.upgrade_options().insert(option);
     }
 }
 
@@ -281,7 +284,8 @@ fn create_upgrade_option_data(ctx: &ReducerContext, upgrade_type: UpgradeType, p
 // Helper method to generate attack upgrades with specific stat improvements
 fn generate_attack_upgrade(ctx: &ReducerContext, attack_type: u32, possible_stats: Vec<(AttackStat, u32)>, upgrade_type: UpgradeType) -> UpgradeOptionData {
     // Choose a random stat to upgrade from the possible stats for this attack type
-    let chosen_index = (ctx.rng.gen::<f32>() * possible_stats.len() as f32) as usize;
+    let mut rng = ctx.rng();
+    let chosen_index = rng.gen_range(0..possible_stats.len());
     let (chosen_stat, upgrade_value) = &possible_stats[chosen_index];
     
     log::info!("Generated attack upgrade: {:?}, Stat: {:?}, Value: {}", upgrade_type, chosen_stat, upgrade_value);
@@ -374,11 +378,11 @@ pub fn choose_upgrade(ctx: &ReducerContext, player_id: u32, upgrade_index: u32) 
         is_new_attack: selected_upgrade.is_new_attack,
     };
 
-    // Insert the chosen upgrade
-    ctx.db.chosen_upgrades().insert(chosen_upgrade.clone()).unwrap();
-    
     // Apply the upgrade to the player
-    apply_player_upgrade(ctx, chosen_upgrade);
+    apply_player_upgrade(ctx, &chosen_upgrade);
+
+    // Insert the chosen upgrade
+    ctx.db.chosen_upgrades().insert(chosen_upgrade);
     
     log::info!("Player {} chose upgrade: {:?}, Order: {}", player_id, selected_upgrade.upgrade_type, upgrade_order);
 
@@ -398,18 +402,19 @@ pub fn choose_upgrade(ctx: &ReducerContext, player_id: u32, upgrade_index: u32) 
         if player.unspent_upgrades > 0 {
             // Decrement unspent upgrades
             player.unspent_upgrades -= 1;
-            ctx.db.player().player_id().update(player.clone());
-            
+
             // If player still has unspent upgrades, draw new options
             if player.unspent_upgrades > 0 {
                 draw_upgrade_options(ctx, player_id);
             }
+
+            ctx.db.player().player_id().update(player);
         }
     }
 }
 
 // Helper method to apply an upgrade to a player
-fn apply_player_upgrade(ctx: &ReducerContext, upgrade: ChosenUpgradeData) {
+fn apply_player_upgrade(ctx: &ReducerContext, upgrade: &ChosenUpgradeData) {
     let player_id = upgrade.player_id;
     
     // Get player data
@@ -566,7 +571,7 @@ fn apply_player_upgrade(ctx: &ReducerContext, upgrade: ChosenUpgradeData) {
                     radius: modified_attack.radius,
                     damage: modified_attack.damage,
                     armor_piercing: modified_attack.armor_piercing,
-                    scheduled_at: ScheduleAt::interval(Duration::from_millis(new_cooldown as u64)),
+                    scheduled_at: ScheduleAt::Interval(Duration::from_millis(new_cooldown as u64).into()),
                 };
                 
                 ctx.db.player_scheduled_attacks().insert(new_scheduled_attack).unwrap();
@@ -629,9 +634,7 @@ pub fn reroll_upgrades(ctx: &ReducerContext, player_id: u32) {
     
     // Decrement player's rerolls
     player.rerolls -= 1;
-    ctx.db.player().player_id().update(player.clone());
-    
-    log::info!("Player {} used a reroll. Remaining rerolls: {}", player_id, player.rerolls);
+    ctx.db.player().player_id().update(player);
     
     // Draw new upgrade options
     draw_upgrade_options(ctx, player_id);
