@@ -145,8 +145,7 @@ pub fn process_health_regen(ctx: &ReducerContext, _scheduler: HealthRegenSchedul
 }
 
 pub fn process_player_movement(ctx: &ReducerContext, tick_rate: u32, collision_cache: &mut collision::CollisionCache) {
-    // TODO: Implement collision cache updates
-    // cached_count_players = 0;
+    collision_cache.player.cached_count_players = 0;
     
     for player in ctx.db.player().iter() {
         let mut modified_player = player;

@@ -73,10 +73,6 @@ The Player structure has most functionality ported but missing some key features
 - ✅ process_player_movement function implemented
 - ✅ process_player_monster_collisions_spatial_hash function implemented
 - ✅ commit_player_damage and damage_player functions implemented
-- ❌ Missing TODO comments in damage_player for:
-  - cleanup_player_attacks integration
-  - cleanup_player_upgrade_options integration
-  - reset_world integration when last player dies
 
 ### 6. Bots.cs → bots_def.rs
 **Status**: ⚠️ Partially Ported
@@ -157,8 +153,6 @@ Boss system functionality is mostly complete but has missing placeholder functio
 - ✅ handle_boss_defeated function implemented
 - ✅ spawn_boss_for_testing reducer implemented
 - ✅ update_boss_monster_id function implemented
-- ❌ cleanup_player_attacks function has TODO comment (placeholder implementation)
-- ❌ cleanup_player_upgrade_options function has TODO comment (placeholder implementation)
 
 ### 13. Monsters.cs → monsters_def.rs
 **Status**: ✅ Fully Ported

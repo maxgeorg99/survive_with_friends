@@ -1,5 +1,6 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, ScheduleAt};
-use crate::{DbVector2, MonsterType, player, config, monster_spawners, bestiary, monsters, monsters_boid, entity, gems, dead_players, monster_spawn_timer};
+use crate::{DbVector2, MonsterType, player, config, monster_spawners, bestiary, monsters, monsters_boid, entity, gems, dead_players, monster_spawn_timer,
+    active_attacks, attack_burst_cooldowns, player_scheduled_attacks};
 use std::time::Duration;
 // Game state table to track boss-related information
 #[table(name = game_state, public)]
@@ -177,53 +178,32 @@ pub fn handle_boss_defeated(ctx: &ReducerContext) {
     game_state.normal_spawning_paused = false;
     ctx.db.game_state().id().update(game_state);
     
-    // Mark all players as "true survivors" and defeat them
-    
+    // Mark all players as "true survivors" and remove them
+    let mut true_survivors_count = 0;
     let players_to_process: Vec<_> = ctx.db.player().iter().collect();
+    
     for player in players_to_process {
-        // Clean up all attack-related data for this player
-        cleanup_player_attacks(ctx, player.player_id);
-        
-        // Clean up all pending upgrade options for this player
-        cleanup_player_upgrade_options(ctx, player.player_id);
-        
         // Store the player in the dead_players table with special flag
-        let _dead_player_opt = ctx.db.dead_players().insert(crate::DeadPlayer {
+        ctx.db.dead_players().insert(crate::DeadPlayer {
             player_id: player.player_id,
             name: player.name.clone(),
             is_true_survivor: true,  // Mark as true survivor
         });
-
-        // Delete the player (entity will be cleaned up separately)
+        
+        true_survivors_count += 1;
+        
+        // Delete the player
         ctx.db.player().player_id().delete(&player.player_id);
     }
-
-    // Clean up all gems and their entities
-    let gems_to_cleanup: Vec<_> = ctx.db.gems().iter().collect();
-    for gem in gems_to_cleanup {
-        ctx.db.entity().entity_id().delete(&gem.entity_id);
-        ctx.db.gems().gem_id().delete(&gem.gem_id);
-    }
-    log::info!("All gems cleaned up after boss defeat.");
+    
+    log::info!("{} players marked as True Survivors!", true_survivors_count);
+    
+    // Now that all players have been removed, call reset_world to clean up everything else
+    // This will clean up all monsters, gems, spawners, attacks, cooldowns, etc. and reschedule monster spawning
+    crate::reset_world::reset_world(ctx);
     
     // Schedule the next boss spawn
     schedule_boss_spawn(ctx);
-    
-    // Resume normal monster spawning
-    resume_monster_spawning(ctx);
-}
-
-// Resume normal monster spawning
-fn resume_monster_spawning(ctx: &ReducerContext) {
-    log::info!("Resuming normal monster spawning...");
-    
-    // Check if monster spawning is already scheduled
-    if ctx.db.monster_spawn_timer().count() == 0 {
-        // Schedule monster spawning
-        crate::monsters_def::schedule_monster_spawning(ctx);
-    } else {
-        log::info!("Monster spawning already scheduled");
-    }
 }
 
 // Test/debug utility to manually spawn the boss for testing
@@ -268,13 +248,3 @@ pub fn update_boss_monster_id(ctx: &ReducerContext, monster_id: u32) {
         ctx.db.game_state().id().update(game_state);
     }
 }
-
-// TODO: Placeholder functions - these will be implemented when other systems are ported
-
-fn cleanup_player_attacks(_ctx: &ReducerContext, player_id: u32) {
-    // TODO: Implement when attacks system is ported
-}
-
-fn cleanup_player_upgrade_options(_ctx: &ReducerContext, player_id: u32) {
-    // TODO: Implement when upgrades system is ported
-} 
