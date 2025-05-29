@@ -237,14 +237,35 @@ pub fn client_connected(ctx: &ReducerContext) {
         log::info!("Client has existing account: {} reconnected.", identity);
         log::info!("Account details: Name={}, PlayerID={}", account.name, account.current_player_id);
 
-        // TODO: Check if player exists
-        // let player_opt = ctx.db.player().player_id().find(&account.current_player_id);
-        // if player_opt.is_none() {
-        //     log::info!("No living player found for account {}. Checking for dead players...", identity);
-        //     // TODO: Check for dead players
-        // } else {
-        //     log::info!("Found living player {} for account {}.", account.current_player_id, identity);
-        // }
+        // Check if player exists
+        if account.current_player_id != 0 { // PlayerID 0 might indicate no active player record
+            let player_opt = ctx.db.player().player_id().find(&account.current_player_id);
+            if player_opt.is_none() {
+                log::info!(
+                    "No living player found for account {} (PlayerID: {}). Checking for dead players...", 
+                    identity, account.current_player_id
+                );
+                let dead_player_opt = ctx.db.dead_players().player_id().find(&account.current_player_id);
+                if dead_player_opt.is_none() {
+                    log::info!(
+                        "No dead player found for account {} (PlayerID: {}) either.", 
+                        identity, account.current_player_id
+                    );
+                } else {
+                    log::info!(
+                        "Found dead player {} for account {} (PlayerID: {}).", 
+                        dead_player_opt.unwrap().name, identity, account.current_player_id
+                    );
+                }
+            } else {
+                log::info!(
+                    "Found living player {} for account {} (PlayerID: {}).", 
+                    player_opt.unwrap().name, identity, account.current_player_id
+                );
+            }
+        } else {
+            log::info!("Account {} has no active PlayerID (current_player_id is 0).", identity);
+        }
     } else {
         // Create a new account
         log::info!("New connection from {}. Creating a new account.", identity);
@@ -252,10 +273,12 @@ pub fn client_connected(ctx: &ReducerContext) {
         if let Ok(_new_account) = ctx.db.account().try_insert(Account {
             identity,
             name: "Nameless".to_string(),
-            current_player_id: 0,
+            current_player_id: 0, // PlayerID 0 indicates no character yet
             last_login: ctx.timestamp,
         }) {
             log::info!("Created new account for {}", identity);
+        } else {
+            log::error!("Failed to create new account for {}.", identity);
         }
     }
 }

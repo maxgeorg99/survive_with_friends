@@ -140,7 +140,7 @@ Core game functionality has been completely ported with some beneficial changes:
 - The concern about "missing player cleanup integrations" seems largely addressed by the porting of `CleanupPlayerAttacks` and the delegation of `CleanupPlayerUpgradeOptions` within `DamagePlayer`.
 
 ### 11. Lib.cs → lib.rs
-**Status**: ⚠️ Partially Ported
+**Status**: ⚠️ Partially Ported (now 3 files with remaining issues)
 
 Main module setup, type definitions, and most reducers are ported, but with some differences and one key missing piece of logic:
 - ✅ All core type definitions (`PlayerClass`, `DbVector2`) and game constants are ported. (`AttackType` enum is defined here in Rust, versus `Attacks.cs` in C# - this is acceptable).
@@ -150,10 +150,11 @@ Main module setup, type definitions, and most reducers are ported, but with some
     - TODO comments in Rust `init` seem to be just comments, as calls follow them.
 - ✅ `set_name` and `update_last_login` reducers are correctly ported.
 - ✅ `spawn_player` reducer, including logic to create a new player (via `create_new_player` helpers) and schedule the initial boss spawn (via `schedule_boss_spawn` from `boss_system.rs`) for the first player, is correctly ported. Previous report items about missing `schedule_boss_spawn` here are outdated.
-    - The starting attack for a new player is scheduled by directly calling `attacks_def::schedule_new_player_attack`. This is a valid refactor from C# which used a `ClassData.ScheduleAttack` helper.
+- ✅ The starting attack for a new player is scheduled by directly calling `attacks_def::schedule_new_player_attack`. This is a valid refactor from C# which used a `ClassData.ScheduleAttack` helper.
 - ⚠️ `client_connected` reducer:
     - Logic for handling new connections and creating accounts is mostly ported (minor difference in default name and setting `last_login`).
-    - ❌ **Missing**: The C# version checks if a re-connecting client has an existing live or dead player and logs details. This functionality is currently commented out with TODOs in the Rust version and needs to be implemented.
+    - ✅ **Player Check Logic**: The C# version checks if a re-connecting client has an existing live or dead player and logs details. This functionality is now implemented in the Rust version.
+    - ⚠️ **One Minor Difference**: Rust version defaults new accounts to "Nameless" and sets `last_login`, C# used "" for name and didn't set `last_login` on initial creation.
 
 ### 12. BossSystem.cs → boss_system.rs
 **Status**: ⚠️ Partially Ported
@@ -170,7 +171,7 @@ Boss system functionality is mostly ported, but with a key difference in cleanup
 - ⚠️ `handle_boss_defeated` function (called on Phase 2 defeat):
     - ✅ Game state reset (boss_active=false, etc.) is ported.
     - ✅ Moving players to `DeadPlayer` table with `is_true_survivor = true` and deleting them from `Player` table is ported.
-    - ❌ **Missing Functionality**: The C# version calls `CleanupPlayerAttacks` and `CleanupPlayerUpgradeOptions` for each player *before* deleting them. These calls are missing in the Rust version of `handle_boss_defeated`. This means attack/upgrade data for victorious players might not be cleaned up properly.
+    - ✅ **Missing Functionality**: The C# version calls `CleanupPlayerAttacks` and `CleanupPlayerUpgradeOptions` for each player *before* deleting them. These calls are missing in the Rust version of `handle_boss_defeated`. This means attack/upgrade data for victorious players might not be cleaned up properly.
     - ⚠️ **Different Cleanup Strategy**: 
         - C# `HandleBossDefeated` performs targeted cleanup (gems) and then reschedules boss and monster spawning.
         - Rust `handle_boss_defeated` calls `crate::reset_world::reset_world(ctx)` after processing players. `reset_world` performs a full cleanup of monsters, gems, all timers, etc., and reschedules monster spawning. Then, Rust `handle_boss_defeated` *also* calls `schedule_boss_spawn(ctx)`. While `reset_world` is comprehensive, this broader cleanup and the sequence (reset then new boss schedule) differs from C#'s more specific handling for a victory scenario. The critical missing part is the player-specific attack/upgrade cleanup.
@@ -249,18 +250,17 @@ Gem/experience system has been completely ported:
 11. Upgrades.cs → upgrades_def.rs (cleanup_player_upgrade_options confirmed correct)
 12. Gems.cs → gems_def.rs (adapted to use explicit CollisionCache)
 
-### ⚠️ Partially Ported (3 files with remaining issues)
-1. ClassData.cs → class_data_def.rs (missing helper `ScheduleAttack` method - importance reduced due to refactoring in `lib.rs` player creation, but confirm if used elsewhere or can be considered fully superseded).
+### ⚠️ Partially Ported (now 3 files with remaining issues, 1 resolved)
+1. ~~ClassData.cs → class_data_def.rs (missing helper `ScheduleAttack` method - importance reduced due to refactoring in `lib.rs` player creation, but confirm if used elsewhere or can be considered fully superseded).~~ **Resolved**: The C# `ScheduleAttack` helper in `ClassData.cs` was only called during new player creation in `Lib.cs`. The Rust equivalent in `lib.rs` directly calls `attacks_def::schedule_new_player_attack`. Thus, the helper is not needed in `class_data_def.rs`.
 2. Bots.cs → bots_def.rs (Collision cache timing issue for `spawn_bot` using global cache; hardcoded class selection carried over from C#).
-3. Lib.cs → lib.rs (Missing player live/dead status check logic in `client_connected` reducer for re-connecting clients).
-4. BossSystem.cs → boss_system.rs (Missing player-specific cleanup calls for attacks/upgrades in `handle_boss_defeated`; different overall cleanup strategy post-victory using `reset_world`).
+3. Lib.cs → lib.rs (Player check logic in `client_connected` reducer now implemented. One minor difference: Rust version defaults new accounts to "Nameless" and sets `last_login`, C# used "" for name and didn't set `last_login` on initial creation.)
+4. BossSystem.cs → boss_system.rs (Missing player-specific `cleanup_player_attacks` call in `handle_boss_defeated`; `reset_world` now covers `upgrade_options`).
 
 ## Updated Key Issues Found
 
 1.  **Missing/Moved Functionality & Integrations**:
-    *   `ClassData.ScheduleAttack` helper (C#) is missing in `class_data_def.rs`. Its primary call site (new player starting attack) has been refactored in `lib.rs`. Confirm if this helper had other uses.
-    *   `lib.rs` (`client_connected` reducer): Missing logic to check for and log existing live/dead player status for re-connecting clients.
-    *   `BossSystem.rs` (`handle_boss_defeated` function): Missing calls to `cleanup_player_attacks` and `cleanup_player_upgrade_options` for victorious players before they are removed. This is a functional regression from C#.
+    *   ~~`ClassData.ScheduleAttack` helper (C#) is missing in `class_data_def.rs`. Its primary call site (new player starting attack) has been refactored in `lib.rs`. Confirm if this helper had other uses.~~ (Confirmed its only use was refactored; issue resolved.)
+    *   `BossSystem.rs` (`handle_boss_defeated` function): Still missing calls to `cleanup_player_attacks` for victorious players before they are removed. `cleanup_player_upgrade_options` is now handled by `reset_world`.
 
 2.  **Bot System Concerns**:
     *   **Collision Cache Dependency**: `bots_def.rs` (specifically `spawn_bot`) relies on `monsters_def::get_collision_cache()` being up-to-date.
@@ -280,13 +280,13 @@ Gem/experience system has been completely ported:
 
 1.  **High Priority Fixes (Address Missing Functionality/Regressions)**:
     *   **BossSystem (`handle_boss_defeated`)**: 
-        *   Since `reset_world.rs` now clears `upgrade_options`, the explicit call to `cleanup_player_upgrade_options` within `handle_boss_defeated` is no longer necessary *if `reset_world` is called after player processing*.
-        *   Consider adding a call to `crate::core_game::cleanup_player_attacks(ctx, player_id)` for each victorious player within `boss_system.rs::handle_boss_defeated` (before `reset_world`) to align more closely with C#'s immediate per-player attack data cleanup, though most underlying tables are eventually cleared by `reset_world`.
-    *   **Lib (`client_connected`)**: In `lib.rs`, implement the missing logic in the `client_connected` reducer to check for existing live/dead player status for re-connecting clients and log relevant details, similar to the C# version.
+        *   Consider adding a call to `crate::core_game::cleanup_player_attacks(ctx, player_id)` for each victorious player within `boss_system.rs::handle_boss_defeated` (before `reset_world`) to align more closely with C#'s immediate per-player attack data cleanup.
+    *   ~~**Lib (`client_connected`)**: In `lib.rs`, implement the missing logic in the `client_connected` reducer to check for existing live/dead player status for re-connecting clients and log relevant details, similar to the C# version.~~ (This is now implemented).
 
 2.  **Integration & Systemic Fixes**:
+    *   ~~**ClassData (`ScheduleAttack` helper)**: Determine if the C# `ClassData.ScheduleAttack` helper method had any other call sites apart from new player creation. If its only use was for scheduling the starting attack (which is now handled directly in `lib.rs::create_new_player_with_position`), then its absence in `class_data_def.rs` is acceptable. If it had other uses, those need to be ported or refactored in Rust.~~ (This is confirmed resolved).
     *   **Bots - Collision Cache**: Ensure that `monsters_def::get_collision_cache()` provides an up-to-date monster collision cache when `bots_def.rs::spawn_bot` is called. This might involve adjusting the call order in the main game loop or modifying how the cache is accessed/passed to `spawn_bot`.
-    *   **ClassData (`ScheduleAttack` helper)**: Determine if the C# `ClassData.ScheduleAttack` helper method had any other call sites apart from new player creation. If its only use was for scheduling the starting attack (which is now handled directly in `lib.rs::create_new_player_with_position`), then its absence in `class_data_def.rs` is acceptable. If it had other uses, those need to be ported or refactored in Rust.
+    *   **BossSystem - Cleanup Strategy**: After addressing the missing player-specific cleanups in `handle_boss_defeated`, the use of `reset_world()` in this context is acceptable, as it ensures a clean state. The sequence (player processing, then `reset_world`, then `schedule_boss_spawn`) is logical.
 
 3.  **Improvements & Refinements**:
     *   **Bots - Class Selection**: Enable random class selection for bots in `bots_def.rs`.
