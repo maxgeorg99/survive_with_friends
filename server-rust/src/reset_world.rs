@@ -1,5 +1,5 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp};
-use crate::{entity, monsters, monsters_boid, gems, monster_spawners, boss_spawn_timer, game_state, monster_spawn_timer, monster_hit_cleanup, active_attack_cleanup, attack_burst_cooldowns, player_scheduled_attacks, monster_damage, player};
+use crate::{entity, monsters, monsters_boid, gems, monster_spawners, boss_spawn_timer, game_state, monster_spawn_timer, monster_hit_cleanup, active_attack_cleanup, attack_burst_cooldowns, player_scheduled_attacks, monster_damage, player, upgrade_options};
 
 // ResetWorld reducer - clears all monsters, gems, monster spawners, and resets boss state
 // This should be called when the last player dies
@@ -136,8 +136,17 @@ pub fn reset_world(ctx: &ReducerContext) {
     }
     
     log::info!("ResetWorld: Cleared {} monster damage records", monster_damage_count);
+
+    // 12. Clean up all player upgrade options
+    let mut upgrade_options_count = 0;
+    let upgrade_options_to_delete: Vec<u32> = ctx.db.upgrade_options().iter().map(|uo| uo.upgrade_id).collect();
+    for upgrade_id in upgrade_options_to_delete {
+        ctx.db.upgrade_options().upgrade_id().delete(&upgrade_id);
+        upgrade_options_count += 1;
+    }
+    log::info!("ResetWorld: Cleared {} player upgrade options", upgrade_options_count);
     
-    // 12. Reschedule monster spawning
+    // 13. Reschedule monster spawning
     log::info!("Resuming normal monster spawning...");
     
     // Check if monster spawning is already scheduled

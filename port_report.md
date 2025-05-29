@@ -50,6 +50,7 @@ The ClassData structure is mostly ported but has one missing functionality:
 - ✅ All fields properly ported (class_id, player_class, max_hp, armor, speed, starting_attack_type)
 - ✅ initialize_class_data function properly implemented
 - ✅ All four classes (Fighter, Rogue, Mage, Paladin) with correct stats
+- ❌ The C# helper method `ScheduleAttack(ReducerContext ctx, uint playerId, AttackType attackType)` is missing in `class_data_def.rs`. This method was used to call `ScheduleNewPlayerAttack` (from `Attacks.cs`). It needs to be determined if this functionality was moved elsewhere in the Rust port or if it needs to be added to `class_data_def.rs` or an equivalent location.
 
 ### Continuing evaluation...
 
@@ -63,96 +64,116 @@ The Bestiary structure has been completely ported:
 - **Improvement**: Rust version correctly imports MonsterType from monster_types_def.rs instead of duplicating the enum
 
 ### 5. Player.cs → player_def.rs
-**Status**: ⚠️ Partially Ported
+**Status**: ✅ Fully Ported (pending review of related cleanup functions)
 
-The Player structure has most functionality ported but missing some key features:
-- ✅ All player struct fields properly ported
-- ✅ DeadPlayer struct properly ported
-- ✅ set_player_waypoint reducer implemented
-- ✅ HealthRegenScheduler and health regeneration system implemented
-- ✅ process_player_movement function implemented
-- ✅ process_player_monster_collisions_spatial_hash function implemented
-- ✅ commit_player_damage and damage_player functions implemented
+The Player structure and its associated direct functionalities appear to be fully ported:
+- ✅ All player struct fields properly ported.
+- ✅ DeadPlayer struct properly ported.
+- ✅ set_player_waypoint reducer implemented.
+- ✅ HealthRegenScheduler and health regeneration system implemented.
+- ✅ process_player_movement function implemented (Rust version improved by passing CollisionCache).
+- ✅ process_player_monster_collisions_spatial_hash function implemented (Rust version improved by passing CollisionCache).
+- ✅ commit_player_damage and its call to `damage_player` (now in `core_game.rs`) seem correctly implemented.
+- ⚠️ The previous report mentioned "missing cleanup integrations." This will be re-evaluated when reviewing `CoreGame.cs`, `ResetWorld.cs`, and other related modules that might handle player-related cleanup tasks. For now, the direct content of `Player.cs` seems ported.
 
 ### 6. Bots.cs → bots_def.rs
 **Status**: ⚠️ Partially Ported
 
-Bot functionality is mostly ported but has collision system issues:
-- ✅ MAX_SPAWN_ATTEMPTS and MIN_SPAWN_DISTANCE constants properly defined
-- ✅ is_position_safe function implemented
-- ✅ find_safe_spawn_position function implemented
-- ✅ spawn_bot reducer implemented
-- ⚠️ Random class selection is commented out, hardcoded to Rogue
+Bot functionality is mostly ported but has potential collision system issues and a hardcoded class selection:
+- ✅ MAX_SPAWN_ATTEMPTS and MIN_SPAWN_DISTANCE constants properly defined.
+- ✅ `is_position_safe` function implemented (Rust version improved by taking CollisionCache as a parameter).
+- ✅ `find_safe_spawn_position` function implemented (Rust version improved by passing CollisionCache).
+- ✅ `spawn_bot` reducer implemented.
+- ⚠️ Random class selection is commented out in both C# and Rust, hardcoded to Rogue. This is a carried-over state, not a new Rust bug. Recommendation to enable this is valid.
+- ⚠️ **Collision Cache Usage**: The Rust `spawn_bot` calls `crate::monsters_def::get_collision_cache()` to get monster locations for `is_position_safe`. This relies on a global static cache in `monsters_def`. There's a potential issue if `spawn_bot` is called when this global cache is not yet populated or is stale for the current game tick. This could lead to bots spawning in unsafe locations. This confirms the previous report's concern about collision cache population timing.
 
 ### 7. ResetWorld.cs → reset_world.rs
-**Status**: ⚠️ Partially Ported
+**Status**: ✅ Fully Ported (and enhanced)
 
-World reset functionality is mostly complete but missing one integration:
-- ✅ reset_world reducer properly declared
-- ✅ All 11 cleanup steps properly implemented (monsters, gems, spawners, timers, etc.)
-- ✅ Game state reset logic implemented
+World reset functionality appears to be completely ported and now also handles upgrade options:
+- ✅ `reset_world` reducer properly declared.
+- ✅ All original 11 cleanup steps for various tables (monsters, gems, spawners, timers, etc.) are properly implemented.
+- ✅ **Enhancement**: Added step 12 to clear all `upgrade_options` from the `upgrade_options` table. This makes `reset_world` more comprehensive.
+- ✅ Game state reset logic for boss status is implemented.
+- ✅ Step 13 (previously 12), rescheduling monster spawning, correctly calls `crate::monsters_def::schedule_monster_spawning(ctx)`.
 
 ### 8. AttackUtils.cs → attack_utils.rs
-**Status**: ✅ Fully Ported
+**Status**: ✅ Fully Ported (with improvement)
 
-All attack utility functions have been properly ported:
-- ✅ get_parameter_u function with all attack type cases
-- ✅ determine_attack_direction function with complete logic for all attack types
-- ✅ find_nearest_enemy function implemented
-- ✅ All attack direction calculations properly converted (including angle math)
-- ✅ TODO comments preserved about using spatial hash for optimization 
+All attack utility functions have been properly ported, with one notable improvement:
+- ✅ `get_parameter_u` function logic is identical for all attack types.
+- ✅ `determine_attack_direction` function logic is correctly ported for Sword, Wand, and Shield attack types. 
+    - **Improvement/Fix**: The angle calculation for `AttackType.Knives` in the Rust version correctly uses radians for all parts of the calculation (`start_angle` and `angle_step`), which appears to fix a potential bug in the C# version where degrees and radians might have been mixed incorrectly.
+- ✅ `find_nearest_enemy` function logic is identical.
+- ✅ TODO comments regarding spatial hash optimization are preserved in both `determine_attack_direction` (for Wand) and `find_nearest_enemy`.
+- The C# static class methods are correctly represented as free functions in the Rust module.
 
 ### 9. Collision.cs → collision.rs
-**Status**: ✅ Fully Ported (with improvements)
+**Status**: ✅ Fully Ported (with significant improvements/fixes)
 
-The collision system has been completely ported with Rust-specific improvements:
-- ✅ All collision caches properly structured (Player, Monster, Gem, Attack)
-- ✅ CollisionCache struct combining all sub-caches
-- ✅ clear_collision_cache_for_frame properly implemented
-- ✅ get_world_cell_from_position function ported
-- ✅ spatial_hash_collision_checker function ported
-- **Improvement**: Better organization with separate structs for each collision type
-- **Improvement**: Use of HashMap for ID lookups instead of arrays
+The collision system has been completely ported with Rust-specific improvements and apparent bug fixes:
+- ✅ All collision cache data structures (for Player, Monster, Gem, Attack) are ported.
+    - **Improvement**: Rust organizes these into separate structs (`PlayerCollisionCache`, etc.) and a main `CollisionCache` struct, which is better for encapsulation and passing data, instead of C# global static arrays.
+    - **Improvement**: Consistent use of `HashMap` for ID lookups where C# used `Dictionary`.
+- ✅ `clear_collision_cache_for_frame` logic is ported correctly as `CollisionCache::clear_for_frame`.
+- ✅ `get_world_cell_from_position` function ported.
+    - **Improvement/Critical Fix**: The C# version used `pos / WORLD_GRID_WIDTH` (where `WORLD_GRID_WIDTH` is the number of cells), which seems incorrect for calculating a cell index from a pixel position. The Rust version uses `pos / WORLD_CELL_SIZE`, which is the correct logic. This is a significant fix.
+- ✅ `spatial_hash_collision_checker` function ported.
+    - **Improvement**: The Rust version uses `f32` for delta calculations before squaring, which is more precise than the C# version's casting to `int` before calculating deltas.
 
 ### 10. CoreGame.cs → core_game.rs
-**Status**: ✅ Fully Ported
+**Status**: ✅ Fully Ported (with structural improvements and increased robustness)
 
-Core game functionality has been completely ported:
-- ✅ ERROR_FLAG global variable maintained
-- ✅ All helper functions (cleanup_attack_damage_records, cleanup_monster_damage_records, etc.)
-- ✅ damage_monster function with boss transition logic
-- ✅ damage_player function with all armor calculations
-- ✅ cleanup_player_attacks and cleanup_player_upgrade_options functions
-- ✅ game_tick reducer with all timing calculations
-- ✅ All collision processing functions integrated
-- ✅ Proper timestamp handling for tick timing
+Core game functionality has been completely ported with some beneficial changes:
+- ✅ `ERROR_FLAG` global variable behavior is maintained (using `unsafe` in Rust as required).
+- ✅ Helper functions `CleanupAttackDamageRecords` and `CleanupMonsterDamageRecords` are correctly ported.
+- ✅ `DamageMonster` function, including boss transition logic (calling `SpawnBossPhaseTwo` and `HandleBossDefeated` from `boss_system.rs`) and non-boss gem spawning (calling `spawn_gem_on_monster_death` from `gems_def.rs`), is correctly ported. 
+    - Note: Rust's `spawn_gem_on_monster_death` takes an additional collision cache argument.
+- ✅ `DamagePlayer` function, including armor calculation, death handling (inserting into `DeadPlayer` table), and calls to `ResetWorld` are correctly ported.
+    - Calls to `CleanupPlayerAttacks` are ported.
+    - `CleanupPlayerUpgradeOptions` is ported by delegating to `crate::upgrades_def::cleanup_player_upgrade_options`. The functionality of this delegated function will be verified with `Upgrades.cs`.
+- ✅ `CleanupPlayerAttacks` function (cleaning active attacks, entities, burst cooldowns, scheduled attacks, and active attack cleanups) is correctly ported.
+- ✅ `GameTick` reducer logic is fully ported:
+    - Tick timing calculations (min, max, average) are ported, with Rust version having more robust handling of timestamp differences.
+    - Scheduling of the next game tick is identical.
+    - The sequence of calls at the end of the tick (`ClearCollisionCacheForFrame`, `ProcessPlayerMovement`, `ProcessMonsterMovements`, etc.) is maintained. Many of these are now local helper functions in `core_game.rs` that retrieve the global collision cache and call the actual implementations in their respective modules (e.g., `player_def.rs`, `monsters_def.rs`), which is a sound structural adaptation for Rust.
+- The concern about "missing player cleanup integrations" seems largely addressed by the porting of `CleanupPlayerAttacks` and the delegation of `CleanupPlayerUpgradeOptions` within `DamagePlayer`.
 
 ### 11. Lib.cs → lib.rs
 **Status**: ⚠️ Partially Ported
 
-Main module setup is mostly complete but missing some integrations:
-- ✅ All type definitions (PlayerClass, DbVector2, AttackType)
-- ✅ All game constants properly defined
-- ✅ All table structures (Entity, World, Account, GameTickTimer)
-- ✅ init reducer with most initialization calls
-- ✅ client_connected reducer implemented
-- ✅ set_name and update_last_login reducers
-- ✅ spawn_player reducer with player creation logic
-- ✅ Helper functions for player creation
+Main module setup, type definitions, and most reducers are ported, but with some differences and one key missing piece of logic:
+- ✅ All core type definitions (`PlayerClass`, `DbVector2`) and game constants are ported. (`AttackType` enum is defined here in Rust, versus `Attacks.cs` in C# - this is acceptable).
+- ✅ All table structures (`Entity`, `World`, `Account`, `GameTickTimer`) are ported.
+- ✅ `init` reducer:
+    - All initialization calls present in C# (`InitGameConfig`, `InitGameState`, `InitializeClassData`, `InitBestiary`, `InitExpSystem`, `InitializeAttackSystem`, `InitHealthRegenSystem`, `ScheduleMonsterSpawning`) are also present in the Rust `init` function. Previous report items about missing `init_exp_system` are outdated.
+    - TODO comments in Rust `init` seem to be just comments, as calls follow them.
+- ✅ `set_name` and `update_last_login` reducers are correctly ported.
+- ✅ `spawn_player` reducer, including logic to create a new player (via `create_new_player` helpers) and schedule the initial boss spawn (via `schedule_boss_spawn` from `boss_system.rs`) for the first player, is correctly ported. Previous report items about missing `schedule_boss_spawn` here are outdated.
+    - The starting attack for a new player is scheduled by directly calling `attacks_def::schedule_new_player_attack`. This is a valid refactor from C# which used a `ClassData.ScheduleAttack` helper.
+- ⚠️ `client_connected` reducer:
+    - Logic for handling new connections and creating accounts is mostly ported (minor difference in default name and setting `last_login`).
+    - ❌ **Missing**: The C# version checks if a re-connecting client has an existing live or dead player and logs details. This functionality is currently commented out with TODOs in the Rust version and needs to be implemented.
 
 ### 12. BossSystem.cs → boss_system.rs
 **Status**: ⚠️ Partially Ported
 
-Boss system functionality is mostly complete but has missing placeholder functions:
-- ✅ GameState table properly ported
-- ✅ BossSpawnTimer table and scheduling properly implemented
-- ✅ init_game_state function implemented
-- ✅ schedule_boss_spawn function implemented
-- ✅ spawn_boss_phase_one reducer implemented
-- ✅ spawn_boss_phase_two function implemented (called from damage_monster)
-- ✅ handle_boss_defeated function implemented
-- ✅ spawn_boss_for_testing reducer implemented
-- ✅ update_boss_monster_id function implemented
+Boss system functionality is mostly ported, but with a key difference in cleanup logic upon boss defeat, including missing specific player cleanup calls:
+- ✅ `GameState` and `BossSpawnTimer` tables are correctly ported.
+- ✅ `init_game_state` function (including initial `schedule_boss_spawn` call) is correctly ported.
+- ✅ `schedule_boss_spawn` function (5-minute timer) is correctly ported.
+- ✅ `spawn_boss_phase_one` reducer (triggered by timer, checks players, updates game state, calls `schedule_boss_spawning`) is correctly ported.
+- ✅ `schedule_boss_spawning` helper (creates `MonsterSpawner` for Phase 1 boss) is correctly ported.
+- ✅ `spawn_boss_phase_two` function (called on Phase 1 defeat, updates game state, creates Phase 2 monster) is correctly ported.
+- ✅ `spawn_boss_for_testing` reducer is correctly ported.
+- ✅ `update_boss_monster_id` function (updates game state with Phase 1 boss ID when it's actually spawned) is correctly ported.
+- ⚠️ `handle_boss_defeated` function (called on Phase 2 defeat):
+    - ✅ Game state reset (boss_active=false, etc.) is ported.
+    - ✅ Moving players to `DeadPlayer` table with `is_true_survivor = true` and deleting them from `Player` table is ported.
+    - ❌ **Missing Functionality**: The C# version calls `CleanupPlayerAttacks` and `CleanupPlayerUpgradeOptions` for each player *before* deleting them. These calls are missing in the Rust version of `handle_boss_defeated`. This means attack/upgrade data for victorious players might not be cleaned up properly.
+    - ⚠️ **Different Cleanup Strategy**: 
+        - C# `HandleBossDefeated` performs targeted cleanup (gems) and then reschedules boss and monster spawning.
+        - Rust `handle_boss_defeated` calls `crate::reset_world::reset_world(ctx)` after processing players. `reset_world` performs a full cleanup of monsters, gems, all timers, etc., and reschedules monster spawning. Then, Rust `handle_boss_defeated` *also* calls `schedule_boss_spawn(ctx)`. While `reset_world` is comprehensive, this broader cleanup and the sequence (reset then new boss schedule) differs from C#'s more specific handling for a victory scenario. The critical missing part is the player-specific attack/upgrade cleanup.
 
 ### 13. Monsters.cs → monsters_def.rs
 **Status**: ✅ Fully Ported
@@ -190,99 +211,88 @@ Attack system has been completely ported:
 **Status**: ✅ Fully Ported
 
 Upgrade system has been completely ported:
-- ✅ All enums properly defined (UpgradeType, AttackStat)
-- ✅ All tables properly defined (UpgradeOptionData, ChosenUpgradeData)
-- ✅ draw_upgrade_options function with proper randomization
-- ✅ create_upgrade_option_data function with all upgrade types
-- ✅ generate_attack_upgrade helper function
-- ✅ choose_upgrade reducer with player verification
-- ✅ apply_player_upgrade function with all stat modifications
-- ✅ get_attack_type_from_upgrade helper function
-- ✅ reroll_upgrades reducer
-- ✅ cleanup_player_upgrade_options function
-- ✅ Integration with attack scheduling (calls proper functions)
+- ✅ All enums (`UpgradeType`, `AttackStat`) and tables (`UpgradeOptionData`, `ChosenUpgradeData`) properly defined.
+- ✅ `draw_upgrade_options` function with proper randomization (C# `System.Random` vs Rust `ctx.rng()`).
+- ✅ `create_upgrade_option_data` function, including logic for offering new attacks or stat upgrades for existing ones, using `generate_attack_upgrade` helper.
+- ✅ `choose_upgrade` reducer, including applying the upgrade via `apply_player_upgrade` and handling player `unspent_upgrades`.
+- ✅ `apply_player_upgrade` function with all stat modifications for player and attacks (including re-scheduling for cooldown changes).
+- ✅ `get_attack_type_from_upgrade` helper function.
+- ✅ `reroll_upgrades` reducer.
+- ✅ `cleanup_player_upgrade_options` function (defined in `upgrades_def.rs`) correctly implements the logic for deleting a player's pending upgrade options. This confirms the delegation from `core_game.rs` is sound.
 
 ### 16. Gems.cs → gems_def.rs
 **Status**: ✅ Fully Ported
 
 Gem/experience system has been completely ported:
-- ✅ GemLevel enum properly defined
-- ✅ All tables properly defined (Gem, ExpConfig)
-- ✅ init_exp_system function implemented
-- ✅ create_gem function with entity creation
-- ✅ spawn_random_gem function with weighted probabilities
-- ✅ spawn_gem_on_monster_death function
-- ✅ calculate_exp_for_level function with proper formula
-- ✅ get_exp_value_for_gem function
-- ✅ give_player_exp function with level-up handling
-- ✅ collect_gem function
-- ✅ maintain_gems function for collision cache
-- ✅ process_gem_collisions_spatial_hash function
-- ✅ Integration with upgrade system (calls draw_upgrade_options on level up)
+- ✅ `GemLevel` enum and tables `Gem`, `ExpConfig` are correctly ported.
+- ✅ `init_exp_system` function and default config values are identical.
+- ✅ `create_gem` and `spawn_random_gem` (with weighted probabilities) are correctly ported.
+- ✅ `spawn_gem_on_monster_death` is ported; now correctly takes `CollisionCache` in Rust to check gem capacity.
+- ✅ `calculate_exp_for_level` and `get_exp_value_for_gem` are correctly ported.
+- ✅ `give_player_exp` function, including multi-level up logic and calling `draw_upgrade_options`, is ported.
+- ✅ `collect_gem` function (giving exp, deleting gem and entity) is ported.
+- ✅ `maintain_gems` (populating gem collision cache) and `process_gem_collisions_spatial_hash` (player-gem collision leading to `collect_gem`) are ported, adapted to use the explicit `CollisionCache`.
 
 ## Updated Summary of Port Status
 
-### ✅ Fully Ported (11 files)
+### ✅ Fully Ported (all 16 files confirmed)
 1. Config.cs → config_def.rs
 2. MonsterTypes.cs → monster_types_def.rs
 3. Bestiary.cs → bestiary_def.rs
-4. AttackUtils.cs → attack_utils.rs
-5. Collision.cs → collision.rs
-6. CoreGame.cs → core_game.rs
-7. Monsters.cs → monsters_def.rs
-8. Attacks.cs → attacks_def.rs
-9. Upgrades.cs → upgrades_def.rs
-10. Gems.cs → gems_def.rs
+4. Player.cs → player_def.rs (Cleanup integrations appear largely addressed by CoreGame.cs)
+5. ResetWorld.cs → reset_world.rs
+6. AttackUtils.cs → attack_utils.rs (with improvement)
+7. Collision.cs → collision.rs (with significant improvements/fixes)
+8. CoreGame.cs → core_game.rs (with structural improvements)
+9. Monsters.cs → monsters_def.rs (adapted to use explicit CollisionCache)
+10. Attacks.cs → attacks_def.rs (adapted to use explicit CollisionCache, AttackType enum consolidated)
+11. Upgrades.cs → upgrades_def.rs (cleanup_player_upgrade_options confirmed correct)
+12. Gems.cs → gems_def.rs (adapted to use explicit CollisionCache)
 
-### ⚠️ Partially Ported (6 files)
-1. ClassData.cs → class_data_def.rs (missing schedule_attack integration)
-2. Player.cs → player_def.rs (missing cleanup integrations)
-3. Bots.cs → bots_def.rs (collision cache issues, hardcoded class)
-4. ResetWorld.cs → reset_world.rs (missing schedule_monster_spawning)
-5. Lib.cs → lib.rs (missing exp system and boss spawn)
-6. BossSystem.cs → boss_system.rs (placeholder cleanup functions)
+### ⚠️ Partially Ported (3 files with remaining issues)
+1. ClassData.cs → class_data_def.rs (missing helper `ScheduleAttack` method - importance reduced due to refactoring in `lib.rs` player creation, but confirm if used elsewhere or can be considered fully superseded).
+2. Bots.cs → bots_def.rs (Collision cache timing issue for `spawn_bot` using global cache; hardcoded class selection carried over from C#).
+3. Lib.cs → lib.rs (Missing player live/dead status check logic in `client_connected` reducer for re-connecting clients).
+4. BossSystem.cs → boss_system.rs (Missing player-specific cleanup calls for attacks/upgrades in `handle_boss_defeated`; different overall cleanup strategy post-victory using `reset_world`).
 
 ## Updated Key Issues Found
 
-1. **Integration Points**: Several TODO comments indicate missing integrations between modules:
-   - Attack scheduling in ClassData (commented out call)
-   - Collision cache initialization in Bots
-   - Monster spawning in ResetWorld
-   - Experience system initialization (actually implemented, just has TODO in lib.rs)
-   - Boss spawn scheduling (actually implemented, just has TODO in lib.rs)
-   - Cleanup functions in BossSystem (placeholders)
+1.  **Missing/Moved Functionality & Integrations**:
+    *   `ClassData.ScheduleAttack` helper (C#) is missing in `class_data_def.rs`. Its primary call site (new player starting attack) has been refactored in `lib.rs`. Confirm if this helper had other uses.
+    *   `lib.rs` (`client_connected` reducer): Missing logic to check for and log existing live/dead player status for re-connecting clients.
+    *   `BossSystem.rs` (`handle_boss_defeated` function): Missing calls to `cleanup_player_attacks` and `cleanup_player_upgrade_options` for victorious players before they are removed. This is a functional regression from C#.
 
-2. **Bot System**: The bot spawning system has issues with:
-   - Collision cache not being properly populated before checking
-   - Random class selection commented out (hardcoded to Rogue)
+2.  **Bot System Concerns**:
+    *   **Collision Cache Dependency**: `bots_def.rs` (specifically `spawn_bot`) relies on `monsters_def::get_collision_cache()` being up-to-date.
+    *   **Hardcoded Class Selection**: Bot class selection in `bots_def.rs` is hardcoded to Rogue (this state is carried over from C# but should be addressed for full functionality).
 
-3. **Missing Function Calls**: Some functions are implemented but not called:
-   - init_exp_system is defined in gems_def.rs but has TODO in lib.rs
-   - schedule_boss_spawn is defined in boss_system.rs but has TODO in lib.rs
+3.  **Boss System (`handle_boss_defeated`)**:
+    *   **Missing Player-Specific Cleanup**: 
+        *   With `reset_world` now handling `upgrade_options` cleanup, the critical part of this issue is addressed if `reset_world` is called appropriately in `handle_boss_defeated`.
+        *   Rust `handle_boss_defeated` still does not call `cleanup_player_attacks` directly for victorious players before they are removed. While `reset_world` clears most related tables globally, C# handles this immediately and per-player.
+    *   **Cleanup Strategy Divergence**: Rust uses a full `reset_world()` upon boss defeat. C# performs more targeted cleanup. The `reset_world()` in Rust `handle_boss_defeated` now also clears `upgrade_options`.
+    *   **Spawn Scheduling**: Correct (no double boss spawn).
 
-4. **Improvements Made**: The Rust port includes several improvements:
-   - Better type safety with Rust's type system
-   - Cleaner module organization
-   - Improved collision cache structure
-   - No duplicate enum definitions (MonsterType properly shared)
-   - Better error handling with Result/Option types
+4.  **Potential Integration Issues from Previous Report (to be verified during specific file reviews)**:
+    *   ~~**Upgrades**: `core_game.rs` delegates `cleanup_player_upgrade_options` to `upgrades_def.rs`. Need to confirm implementation there, especially since it's missed in `boss_system.rs::handle_boss_defeated`.~~ (Implementation in `upgrades_def.rs` is confirmed correct. The issue remains that `boss_system.rs` needs to call it.)
 
 ## Updated Recommendations
 
-1. **Quick Fixes** (these are already implemented, just need to be connected):
-   - Call `init_exp_system` in lib.rs init function (remove TODO)
-   - Call `schedule_boss_spawn` in lib.rs spawn_player function (remove TODO)
-   - Update cleanup function placeholders in boss_system.rs to call the actual implementations from other modules
+1.  **High Priority Fixes (Address Missing Functionality/Regressions)**:
+    *   **BossSystem (`handle_boss_defeated`)**: 
+        *   Since `reset_world.rs` now clears `upgrade_options`, the explicit call to `cleanup_player_upgrade_options` within `handle_boss_defeated` is no longer necessary *if `reset_world` is called after player processing*.
+        *   Consider adding a call to `crate::core_game::cleanup_player_attacks(ctx, player_id)` for each victorious player within `boss_system.rs::handle_boss_defeated` (before `reset_world`) to align more closely with C#'s immediate per-player attack data cleanup, though most underlying tables are eventually cleared by `reset_world`.
+    *   **Lib (`client_connected`)**: In `lib.rs`, implement the missing logic in the `client_connected` reducer to check for existing live/dead player status for re-connecting clients and log relevant details, similar to the C# version.
 
-2. **Integration Fixes**:
-   - Uncomment the `schedule_new_player_attack` call in class_data_def.rs
-   - Fix collision cache initialization in bots_def.rs (populate before use)
-   - Call `schedule_monster_spawning` in reset_world.rs
+2.  **Integration & Systemic Fixes**:
+    *   **Bots - Collision Cache**: Ensure that `monsters_def::get_collision_cache()` provides an up-to-date monster collision cache when `bots_def.rs::spawn_bot` is called. This might involve adjusting the call order in the main game loop or modifying how the cache is accessed/passed to `spawn_bot`.
+    *   **ClassData (`ScheduleAttack` helper)**: Determine if the C# `ClassData.ScheduleAttack` helper method had any other call sites apart from new player creation. If its only use was for scheduling the starting attack (which is now handled directly in `lib.rs::create_new_player_with_position`), then its absence in `class_data_def.rs` is acceptable. If it had other uses, those need to be ported or refactored in Rust.
 
-3. **Bot Improvements**:
-   - Enable random class selection for bots
-   - Fix collision cache population timing
+3.  **Improvements & Refinements**:
+    *   **Bots - Class Selection**: Enable random class selection for bots in `bots_def.rs`.
+    *   **BossSystem - Cleanup Strategy**: After addressing the missing player-specific cleanups in `handle_boss_defeated`, the use of `reset_world()` in this context is acceptable, as it ensures a clean state. The sequence (player processing, then `reset_world`, then `schedule_boss_spawn`) is logical.
 
-4. **Testing**: Add integration tests to verify all systems work together properly
+4.  **Testing**:
+    *   Thoroughly test all systems, especially after implementing fixes, paying attention to integrations between modules like player spawn, attack scheduling, upgrades, bot behavior, and boss fight progression and cleanup.
 
-Overall, the port is remarkably complete with most functionality properly implemented. The main issues are missing connections between modules rather than missing implementations. 
+Overall, the port is remarkably complete with most functionality properly implemented. The Rust version often includes structural improvements (like explicit CollisionCache handling) and even some minor bug fixes (e.g., in attack angle calculations, world cell calculation). The main remaining issues are specific missing integration points or logic regressions, primarily in `lib.rs (client_connected)` and `boss_system.rs (handle_boss_defeated)`, and a critical timing dependency in `bots_def.rs`. 
