@@ -1,5 +1,5 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, rand::Rng};
-use crate::{AttackType, DbVector2};
+use crate::{AttackType, DbVector2, PlayerScheduledAttack, MonsterBoid, AttackData, player};
 
 // Utility functions for attack-related helper functions
 pub struct AttackUtils;
@@ -35,7 +35,7 @@ impl AttackUtils {
     pub fn determine_attack_direction(
         ctx: &ReducerContext,
         player_id: u32,
-        attack_type: AttackType,
+        attack_type: &AttackType,
         id_within_burst: u32,
         parameter_u: u32,
         parameter_i: i32,

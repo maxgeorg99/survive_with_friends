@@ -53,7 +53,7 @@ pub enum AttackType {
     Shield,
 }
 
-#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+#[derive(SpacetimeType, Clone, Copy, Debug, PartialEq)]
 pub struct DbVector2 {
     pub x: f32,
     pub y: f32,
@@ -384,13 +384,13 @@ fn create_new_player(ctx: &ReducerContext, name: &str, player_class: PlayerClass
 // Helper function that takes a position parameter
 pub fn create_new_player_with_position(ctx: &ReducerContext, name: &str, player_class: PlayerClass, position: DbVector2) -> Option<Player> {
     // Look up class data to use for stats
-    let class_data = ctx.db.class_data().class_id().find(&(player_class as u32));
+    let class_data = ctx.db.class_data().class_id().find(&(player_class.clone() as u32));
     
     // Define default stats in case class data isn't found
     let (max_hp, armor, speed, starting_attack_type) = if let Some(class_data) = class_data {
         (class_data.max_hp as f32, class_data.armor, class_data.speed, class_data.starting_attack_type)
     } else {
-        log::error!("CreateNewPlayerWithPosition: No class data found for {:?}", player_class);
+        log::error!("CreateNewPlayerWithPosition: No class data found for {:?}", player_class.clone());
         // Fall back to default values if class data not found
         (100.0, 0, PLAYER_SPEED, AttackType::Sword)
     };
@@ -428,31 +428,19 @@ pub fn create_new_player_with_position(ctx: &ReducerContext, name: &str, player_
         waypoint: DbVector2::new(0.0, 0.0),
         has_waypoint: false,
     });
-
-    // Check if player insertion failed
-    if let Err(_) = new_player {
-        panic!("Failed to insert new player for {}! Insert returned error.", name);
-    }
     
-    let new_player = new_player.unwrap();
+    let new_player = new_player;
     
     // Schedule the starting attack for this class
-    attacks_def::schedule_new_player_attack(ctx, new_player.player_id, starting_attack_type, 1);
-    log::info!("Scheduled starting attack type {:?} for player {}", starting_attack_type, new_player.player_id);
+    attacks_def::schedule_new_player_attack(ctx, new_player.player_id, starting_attack_type.clone(), 1);
+    log::info!("Scheduled starting attack type {:?} for player {}", starting_attack_type.clone(), new_player.player_id);
 
     Some(new_player)
-}
-
-// TODO: Implement calculate_exp_for_level
-fn calculate_exp_for_level(ctx: &ReducerContext, level: u32) -> u32 {
-    // Use the real implementation from gems module
-    gems_def::calculate_exp_for_level(ctx, level)
 }
 
 // TODO: Implement remaining functions and placeholders for other modules:
 // - create_new_player_with_position
 // - game_tick (scheduled reducer)
-// - calculate_exp_for_level
 // - schedule_attack
 // - init_game_state
 // - initialize_class_data  
