@@ -1,5 +1,9 @@
-use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, PrimaryKey, AutoInc, ScheduleAt, Duration, SpacetimeType};
-use crate::{DbVector2, GameTickTimer, DeadPlayer, MonsterType};
+use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, ScheduleAt, SpacetimeType};
+use crate::{DbVector2, GameTickTimer, DeadPlayer, MonsterType, monsters_def, gems_def, boss_system, reset_world, 
+    monster_damage, monsters, monsters_boid, player, attack_utils, game_state, dead_players, active_attacks,
+    attack_burst_cooldowns, player_scheduled_attacks, active_attack_cleanup, entity, config, class_data, world,
+    game_tick_timer};
+use std::time::Duration;
 
 static mut ERROR_FLAG: bool = false;
 
@@ -166,11 +170,6 @@ pub fn damage_player(ctx: &ReducerContext, player_id: u32, damage_amount: f32) -
     
     // Make sure we don't underflow
     if player.hp <= reduced_damage {
-        // Player is dead - set HP to 0
-        player.hp = 0.0;
-        
-        // Update player record with 0 HP before we delete
-        ctx.db.player().player_id().update(player.clone());
         
         // Log the death
         log::info!("Player {} (ID: {}) has died!", player.name, player.player_id);
@@ -181,11 +180,6 @@ pub fn damage_player(ctx: &ReducerContext, player_id: u32, damage_amount: f32) -
             name: player.name.clone(),
             is_true_survivor: false,
         });
-
-        if let Err(_) = dead_player_opt {
-            unsafe { ERROR_FLAG = true; }
-            panic!("DamagePlayer: Player {} (ID: {}) could not be moved to dead_players table.", player.name, player.player_id);
-        }
 
         log::info!("Player {} (ID: {}) moved to dead_players table.", player.name, player.player_id);
         
@@ -311,7 +305,8 @@ fn clear_collision_cache_for_frame() {
 }
 
 fn process_player_movement(ctx: &ReducerContext, tick_rate: u32) {
-    crate::player_def::process_player_movement(ctx, tick_rate);
+    let collision_cache = crate::monsters_def::get_collision_cache();
+    crate::player_def::process_player_movement(ctx, tick_rate, collision_cache);
 }
 
 fn process_monster_movements(ctx: &ReducerContext) {
@@ -328,7 +323,8 @@ fn maintain_gems(ctx: &ReducerContext) {
 }
 
 fn process_player_monster_collisions_spatial_hash(ctx: &ReducerContext) {
-    crate::player_def::process_player_monster_collisions_spatial_hash(ctx);
+    let collision_cache = crate::monsters_def::get_collision_cache();
+    crate::player_def::process_player_monster_collisions_spatial_hash(ctx, collision_cache);
 }
 
 fn process_monster_attack_collisions_spatial_hash(ctx: &ReducerContext) {
@@ -340,16 +336,18 @@ fn process_player_attack_collisions_spatial_hash(ctx: &ReducerContext) {
 }
 
 fn commit_player_damage(ctx: &ReducerContext) {
-    crate::player_def::commit_player_damage(ctx);
+    let collision_cache = crate::monsters_def::get_collision_cache();
+    crate::player_def::commit_player_damage(ctx, collision_cache);
 }
 
 fn process_gem_collisions_spatial_hash(ctx: &ReducerContext) {
-    crate::gems_def::process_gem_collisions_spatial_hash(ctx);
+    let collision_cache = crate::monsters_def::get_collision_cache();
+    crate::gems_def::process_gem_collisions_spatial_hash(ctx, collision_cache);
 }
 
 #[reducer]
 pub fn game_tick(ctx: &ReducerContext, _timer: GameTickTimer) {
-    if ctx.sender != ctx.identity {
+    if ctx.sender != ctx.identity() {
         panic!("Reducer GameTick may not be invoked by clients, only via scheduling.");
     }
 
@@ -380,7 +378,7 @@ pub fn game_tick(ctx: &ReducerContext, _timer: GameTickTimer) {
             // Get the last tick timestamp from world data
             let last_tick_timestamp = world.last_tick_time;
             
-            if last_tick_timestamp.microseconds_since_unix_epoch > 0 {
+            if last_tick_timestamp.timestamp_microseconds() > 0 {
                 // Calculate time difference using Duration
                 let time_duration = current_timestamp.duration_since(last_tick_timestamp);
                 time_since_last_tick_ms = time_duration.as_micros() as f64 / 1000.0; // Convert to milliseconds
@@ -424,8 +422,8 @@ pub fn game_tick(ctx: &ReducerContext, _timer: GameTickTimer) {
     // Schedule the next game tick as a one-off event
     ctx.db.game_tick_timer().insert(GameTickTimer {
         scheduled_id: 0,
-        scheduled_at: ScheduleAt::time(ctx.timestamp + Duration::from_millis(tick_rate as u64)),
-    }).unwrap();
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(tick_rate as u64)),
+    });
 
     clear_collision_cache_for_frame();
 
