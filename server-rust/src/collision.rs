@@ -139,6 +139,7 @@ pub struct CollisionCache {
 
 impl Default for CollisionCache {
     fn default() -> Self {
+        log::info!("Creating new collision cache...");
         Self {
             player: PlayerCollisionCache::default(),
             monster: MonsterCollisionCache::default(),
@@ -150,6 +151,7 @@ impl Default for CollisionCache {
 
 impl CollisionCache {
     pub fn clear_for_frame(&mut self) {
+        log::info!("Clearing collision cache for frame...");
         // Clear player cache
         self.player.cached_count_players = 0;
         self.player.keys_player.fill(0);
@@ -162,6 +164,8 @@ impl CollisionCache {
         self.player.damage_to_player.fill(0.0);
         self.player.shield_count_player.fill(0);
         self.player.player_id_to_cache_index.clear();
+
+        log::info!("Player cache cleared for frame...");
 
         // Clear monster cache
         self.monster.cached_count_monsters = 0;
@@ -181,6 +185,8 @@ impl CollisionCache {
         self.monster.atk_monster.fill(0.0);
         self.monster.key_to_cache_index_monster.clear();
 
+        log::info!("Monster cache cleared for frame...");
+
         // Clear gem cache
         self.gem.cached_count_gems = 0;
         self.gem.keys_gem.fill(0);
@@ -190,6 +196,8 @@ impl CollisionCache {
         self.gem.pos_y_gem.fill(0.0);
         self.gem.radius_gem.fill(0.0);
 
+        log::info!("Gem cache cleared for frame...");
+
         // Clear attack cache
         self.attack.cached_count_attacks = 0;
         self.attack.keys_attack.fill(0);
@@ -198,6 +206,8 @@ impl CollisionCache {
         self.attack.pos_x_attack.fill(0.0);
         self.attack.pos_y_attack.fill(0.0);
         self.attack.radius_attack.fill(0.0);
+
+        log::info!("Attack cache cleared for frame...");
     }
 }
 

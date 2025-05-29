@@ -300,8 +300,11 @@ fn cleanup_player_upgrade_options(ctx: &ReducerContext, player_id: u32) {
 }
 
 fn clear_collision_cache_for_frame() {
+    log::info!("Clearing collision cache for frame...");
     let cache = crate::monsters_def::get_collision_cache();
+    log::info!("Collision cache clearing for frame...");
     cache.clear_for_frame();
+    log::info!("Collision cache cleared for frame...");
 }
 
 fn process_player_movement(ctx: &ReducerContext, tick_rate: u32) {
@@ -347,6 +350,8 @@ fn process_gem_collisions_spatial_hash(ctx: &ReducerContext) {
 
 #[reducer]
 pub fn game_tick(ctx: &ReducerContext, _timer: GameTickTimer) {
+
+    log::info!("--- GAME TICK START ---");
     if ctx.sender != ctx.identity() {
         panic!("Reducer GameTick may not be invoked by clients, only via scheduling.");
     }
@@ -368,6 +373,7 @@ pub fn game_tick(ctx: &ReducerContext, _timer: GameTickTimer) {
     }
 
     if let Some(world) = ctx.db.world().world_id().find(&0) {
+        log::info!("--- WORLD TICK START ---");
         let mut world = world;
         world.tick_count += 1;
         
@@ -425,21 +431,41 @@ pub fn game_tick(ctx: &ReducerContext, _timer: GameTickTimer) {
     }
     
     // Schedule the next game tick as a one-off event
+    log::info!("Scheduling next game tick...");
     ctx.db.game_tick_timer().insert(GameTickTimer {
         scheduled_id: 0,
         scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(tick_rate as u64)),
     });
 
+    log::info!("Clearing collision cache for frame...");
     clear_collision_cache_for_frame();
 
+    log::info!("Processing player movement...");
     process_player_movement(ctx, tick_rate);
+
+    log::info!("Processing monster movements...");
     process_monster_movements(ctx);
+
+    log::info!("Processing attack movements...");
     process_attack_movements(ctx);
+
+    log::info!("Maintaining gems...");
     maintain_gems(ctx);
 
+    log::info!("Processing player monster collisions spatial hash...");
     process_player_monster_collisions_spatial_hash(ctx);
+
+    log::info!("Processing monster attack collisions spatial hash...");
     process_monster_attack_collisions_spatial_hash(ctx);
+
+    log::info!("Processing player attack collisions spatial hash...");
     process_player_attack_collisions_spatial_hash(ctx);
+
+    log::info!("Committing player damage...");
     commit_player_damage(ctx);
+
+    log::info!("Processing gem collisions spatial hash...");
     process_gem_collisions_spatial_hash(ctx);
+
+    log::info!("--- GAME TICK END ---");
 } 

@@ -95,10 +95,18 @@ pub struct MonsterHitCleanup {
 static mut COLLISION_CACHE: Option<crate::collision::CollisionCache> = None;
 
 pub fn get_collision_cache() -> &'static mut crate::collision::CollisionCache {
+    log::info!("Getting collision cache...");
     unsafe {
         if COLLISION_CACHE.is_none() {
-            COLLISION_CACHE = Some(crate::collision::CollisionCache::default());
+            log::info!("Creating new collision cache...");
+            let mut cache = crate::collision::CollisionCache::default();    
+            log::info!("Clearing player key cache...");
+            cache.player.player_id_to_cache_index.clear();
+            log::info!("Clearing monster key cache...");
+            cache.monster.key_to_cache_index_monster.clear();
+            COLLISION_CACHE = Some(cache);
         }
+        log::info!("Returning collision cache...");
         COLLISION_CACHE.as_mut().unwrap()
     }
 }
