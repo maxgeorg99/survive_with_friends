@@ -30,7 +30,7 @@ pub fn init_game_config(ctx: &ReducerContext) {
         id: 0,
         world_size: super::WORLD_SIZE, // Default world size in pixels (10x larger)
         game_tick_rate: 50, // Default game tick rate in milliseconds
-        max_monsters: 160,  // Default maximum monsters
+        max_monsters: 1000,  // Default maximum monsters
         player_spawn_grace_period: 5000, // Default player spawn grace period in milliseconds
         monster_hit_cleanup_delay: 500, // Default monster hit cleanup delay in milliseconds
         monster_wave_size: 1 // Default monster wave size
