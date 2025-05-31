@@ -183,6 +183,9 @@ pub fn damage_player(ctx: &ReducerContext, player_id: u32, damage_amount: f32) -
 
         log::info!("Player {} (ID: {}) moved to dead_players table.", player.name, player.player_id);
         
+        // Transition the account to dead state and schedule return to character select
+        crate::transition_player_to_dead_state(ctx, player_id);
+        
         // Clean up all attack-related data for this player
         cleanup_player_attacks(ctx, player_id);
         

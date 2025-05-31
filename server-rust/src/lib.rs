@@ -44,6 +44,16 @@ pub enum PlayerClass {
     Paladin,
 }
 
+// Account state enum for player progression
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum AccountState {
+    ChoosingName,
+    ChoosingClass,
+    Playing,
+    Dead,
+    Winner,
+}
+
 // Attack type enum
 #[derive(SpacetimeType, Clone, Debug, PartialEq)]
 pub enum AttackType {
@@ -124,6 +134,26 @@ pub struct GameTickTimer {
     pub scheduled_at: ScheduleAt,
 }
 
+// Timer for transitioning dead players back to character select
+#[table(name = dead_player_transition_timer, scheduled(transition_dead_to_choosing_class))]
+pub struct DeadPlayerTransitionTimer {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    pub scheduled_at: ScheduleAt,
+    pub identity: Identity,  // Which player this timer is for
+}
+
+// Timer for transitioning winner players back to character select  
+#[table(name = winner_transition_timer, scheduled(transition_winner_to_choosing_class))]
+pub struct WinnerTransitionTimer {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    pub scheduled_at: ScheduleAt,
+    pub identity: Identity,  // Which player this timer is for
+}
+
 // --- Tables ---
 #[table(name = entity, public)]
 pub struct Entity {
@@ -170,6 +200,8 @@ pub struct Account {
     pub current_player_id: u32,
 
     pub last_login: Timestamp,
+    
+    pub state: AccountState,  // Current progression state
 }
 
 // --- Lifecycle Hooks ---
@@ -235,36 +267,48 @@ pub fn client_connected(ctx: &ReducerContext) {
     // Check if account already exists - if so, reconnect them
     if let Some(account) = ctx.db.account().identity().find(&identity) {
         log::info!("Client has existing account: {} reconnected.", identity);
-        log::info!("Account details: Name={}, PlayerID={}", account.name, account.current_player_id);
+        log::info!("Account details: Name={}, PlayerID={}, State={:?}", 
+                  account.name, account.current_player_id, account.state);
 
-        // Check if player exists
-        if account.current_player_id != 0 { // PlayerID 0 might indicate no active player record
-            let player_opt = ctx.db.player().player_id().find(&account.current_player_id);
-            if player_opt.is_none() {
-                log::info!(
-                    "No living player found for account {} (PlayerID: {}). Checking for dead players...", 
-                    identity, account.current_player_id
-                );
-                let dead_player_opt = ctx.db.dead_players().player_id().find(&account.current_player_id);
-                if dead_player_opt.is_none() {
-                    log::info!(
-                        "No dead player found for account {} (PlayerID: {}) either.", 
-                        identity, account.current_player_id
-                    );
+        // Handle reconnection based on account state
+        match account.state {
+            AccountState::ChoosingName => {
+                log::info!("Account {} reconnected in ChoosingName state", identity);
+            },
+            AccountState::ChoosingClass => {
+                log::info!("Account {} reconnected in ChoosingClass state", identity);
+            },
+            AccountState::Playing => {
+                // Check if player still exists
+                if account.current_player_id != 0 {
+                    let player_opt = ctx.db.player().player_id().find(&account.current_player_id);
+                    if player_opt.is_none() {
+                        log::info!(
+                            "Account {} was in Playing state but no living player found (PlayerID: {}). Transitioning to ChoosingClass.", 
+                            identity, account.current_player_id
+                        );
+                        let mut updated_account = account;
+                        updated_account.state = AccountState::ChoosingClass;
+                        ctx.db.account().identity().update(updated_account);
+                    } else {
+                        log::info!(
+                            "Found living player {} for account {} (PlayerID: {}) in Playing state.", 
+                            player_opt.unwrap().name, identity, account.current_player_id
+                        );
+                    }
                 } else {
-                    log::info!(
-                        "Found dead player {} for account {} (PlayerID: {}).", 
-                        dead_player_opt.unwrap().name, identity, account.current_player_id
-                    );
+                    log::info!("Account {} was in Playing state but has no PlayerID. Transitioning to ChoosingClass.", identity);
+                    let mut updated_account = account;
+                    updated_account.state = AccountState::ChoosingClass;
+                    ctx.db.account().identity().update(updated_account);
                 }
-            } else {
-                log::info!(
-                    "Found living player {} for account {} (PlayerID: {}).", 
-                    player_opt.unwrap().name, identity, account.current_player_id
-                );
-            }
-        } else {
-            log::info!("Account {} has no active PlayerID (current_player_id is 0).", identity);
+            },
+            AccountState::Dead => {
+                log::info!("Account {} reconnected in Dead state", identity);
+            },
+            AccountState::Winner => {
+                log::info!("Account {} reconnected in Winner state", identity);
+            },
         }
     } else {
         // Create a new account
@@ -275,8 +319,9 @@ pub fn client_connected(ctx: &ReducerContext) {
             name: "".to_string(),
             current_player_id: 0, // PlayerID 0 indicates no character yet
             last_login: ctx.timestamp,
+            state: AccountState::ChoosingName,
         }) {
-            log::info!("Created new account for {}", identity);
+            log::info!("Created new account for {} in ChoosingName state", identity);
         } else {
             log::error!("Failed to create new account for {}.", identity);
         }
@@ -298,11 +343,17 @@ pub fn set_name(ctx: &ReducerContext, name: String) {
     let mut account = ctx.db.account().identity().find(&identity)
         .expect(&format!("SetName: Attempted to set name for non-existent account {}.", identity));
 
+    // Check if account is in the correct state
+    if account.state != AccountState::ChoosingName {
+        panic!("SetName: Account {} is not in ChoosingName state. Current state: {:?}", identity, account.state);
+    }
+
     account.name = name.trim().to_string();
+    account.state = AccountState::ChoosingClass;  // Transition to choosing class
     let account_name = account.name.clone(); // Clone before moving
 
     ctx.db.account().identity().update(account);
-    log::info!("Account {} name set to {}.", identity, account_name);
+    log::info!("Account {} name set to {} and transitioned to ChoosingClass state.", identity, account_name);
 }
 
 #[reducer]
@@ -330,6 +381,11 @@ pub fn spawn_player(ctx: &ReducerContext, class_id: u32) {
     let account = ctx.db.account().identity().find(&identity)
         .expect(&format!("SpawnPlayer: Account {} does not exist.", identity));
 
+    // Check if account is in the correct state
+    if account.state != AccountState::ChoosingClass {
+        panic!("SpawnPlayer: Account {} is not in ChoosingClass state. Current state: {:?}", identity, account.state);
+    }
+
     let player_id = account.current_player_id;
 
     // Check if player already exists
@@ -355,12 +411,13 @@ pub fn spawn_player(ctx: &ReducerContext, class_id: u32) {
     let new_player = create_new_player(ctx, &name, player_class.clone())
         .expect(&format!("Failed to create new player for {}!", identity));
 
-    // Update the account to point to the new player
+    // Update the account to point to the new player and transition to playing state
     let mut updated_account = account;
     updated_account.current_player_id = new_player.player_id;
+    updated_account.state = AccountState::Playing;  // Transition to playing
     ctx.db.account().identity().update(updated_account);
 
-    log::info!("Created new player record for {} with class {:?}", identity, player_class);
+    log::info!("Created new player record for {} with class {:?} and transitioned to Playing state.", identity, player_class);
     
     // Check if this is the first player - if so, schedule boss spawn
     if ctx.db.player().count() == 1 {
@@ -462,4 +519,110 @@ pub fn create_new_player_with_position(ctx: &ReducerContext, name: &str, player_
     log::info!("Scheduled starting attack type {:?} for player {}", starting_attack_type.clone(), new_player.player_id);
 
     Some(new_player)
+}
+
+// Scheduled reducer to transition dead players back to choosing class
+#[reducer]
+pub fn transition_dead_to_choosing_class(ctx: &ReducerContext, timer: DeadPlayerTransitionTimer) {
+    if ctx.sender != ctx.identity() {
+        panic!("TransitionDeadToChoosingClass may not be invoked by clients, only via scheduling.");
+    }
+
+    let identity = timer.identity;
+    log::info!("Transitioning dead player {} back to choosing class", identity);
+
+    // Find the account
+    if let Some(mut account) = ctx.db.account().identity().find(&identity) {
+        if account.state == AccountState::Dead {
+            account.state = AccountState::ChoosingClass;
+            account.current_player_id = 0;  // Reset player ID
+            ctx.db.account().identity().update(account);
+            log::info!("Account {} transitioned from Dead to ChoosingClass", identity);
+        } else {
+            log::warn!("Account {} was not in Dead state when transition timer fired. Current state: {:?}", identity, account.state);
+        }
+    } else {
+        log::warn!("Account {} not found when dead transition timer fired", identity);
+    }
+}
+
+// Scheduled reducer to transition winner players back to choosing class
+#[reducer]
+pub fn transition_winner_to_choosing_class(ctx: &ReducerContext, timer: WinnerTransitionTimer) {
+    if ctx.sender != ctx.identity() {
+        panic!("TransitionWinnerToChoosingClass may not be invoked by clients, only via scheduling.");
+    }
+
+    let identity = timer.identity;
+    log::info!("Transitioning winner player {} back to choosing class", identity);
+
+    // Find the account
+    if let Some(mut account) = ctx.db.account().identity().find(&identity) {
+        if account.state == AccountState::Winner {
+            account.state = AccountState::ChoosingClass;
+            account.current_player_id = 0;  // Reset player ID
+            ctx.db.account().identity().update(account);
+            log::info!("Account {} transitioned from Winner to ChoosingClass", identity);
+        } else {
+            log::warn!("Account {} was not in Winner state when transition timer fired. Current state: {:?}", identity, account.state);
+        }
+    } else {
+        log::warn!("Account {} not found when winner transition timer fired", identity);
+    }
+}
+
+// Helper function to transition player to dead state and schedule return to choosing class
+pub fn transition_player_to_dead_state(ctx: &ReducerContext, player_id: u32) {
+    // Find the account associated with this player
+    if let Some(account) = ctx.db.account().current_player_id().find(&player_id) {
+        let identity = account.identity;
+        
+        // Update account state to dead
+        let mut updated_account = account;
+        updated_account.state = AccountState::Dead;
+        ctx.db.account().identity().update(updated_account);
+        
+        log::info!("Account {} transitioned to Dead state", identity);
+        
+        // Schedule transition back to choosing class after a few seconds
+        const DEAD_TRANSITION_DELAY_MS: u64 = 5000; // 5 seconds
+        
+        ctx.db.dead_player_transition_timer().insert(DeadPlayerTransitionTimer {
+            scheduled_id: 0,
+            scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(DEAD_TRANSITION_DELAY_MS)),
+            identity,
+        });
+        
+        log::info!("Scheduled transition from Dead to ChoosingClass for account {} in {} ms", identity, DEAD_TRANSITION_DELAY_MS);
+    } else {
+        log::warn!("Could not find account for player {} when transitioning to dead state", player_id);
+    }
+}
+
+// Helper function to transition player to winner state and schedule return to choosing class
+pub fn transition_player_to_winner_state(ctx: &ReducerContext, player_id: u32) {
+    // Find the account associated with this player
+    if let Some(account) = ctx.db.account().current_player_id().find(&player_id) {
+        let identity = account.identity;
+        
+        // Update account state to winner
+        let mut updated_account = account;
+        updated_account.state = AccountState::Winner;
+        ctx.db.account().identity().update(updated_account);
+        
+        log::info!("Account {} transitioned to Winner state", identity);
+        
+        // Schedule transition back to choosing class after a few seconds
+        const WINNER_TRANSITION_DELAY_MS: u64 = 10000; // 10 seconds to celebrate
+        
+        ctx.db.winner_transition_timer().insert(WinnerTransitionTimer {
+            scheduled_id: 0,
+            scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(WINNER_TRANSITION_DELAY_MS)),
+            identity,
+        });
+        
+        log::info!("Scheduled transition from Winner to ChoosingClass for account {} in {} ms", identity, WINNER_TRANSITION_DELAY_MS);
+    } else {
+        log::warn!("Could not find account for player {} when transitioning to winner state", player_id);
+    }
 }

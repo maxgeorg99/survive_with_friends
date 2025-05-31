@@ -513,7 +513,7 @@ pub fn process_monster_attack_collisions_spatial_hash(ctx: &ReducerContext) {
                         
                         // Apply damage to monster using the active attack's damage value
                         let damage = active_attack.damage;
-                        let _monster_killed = damage_monster(ctx, cache.monster.keys_monster[mid_usize], damage);
+                        let _monster_killed = crate::core_game::damage_monster(ctx, cache.monster.keys_monster[mid_usize], damage);
                         attack_hit_monster = true;
                         
                         // For non-piercing attacks, stop checking other monsters and destroy the attack
@@ -679,8 +679,3 @@ pub fn cleanup_monster_hit_record(ctx: &ReducerContext, cleanup: MonsterHitClean
     // Delete the damage record
     ctx.db.monster_damage().damage_id().delete(&cleanup.damage_id);
 }
-
-// TODO: This will be implemented when other systems are ported
-pub fn damage_monster(ctx: &ReducerContext, monster_id: u32, damage: u32) -> bool {
-    crate::core_game::damage_monster(ctx, monster_id, damage)
-} 

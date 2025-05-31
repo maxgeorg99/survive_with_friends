@@ -178,7 +178,7 @@ pub fn handle_boss_defeated(ctx: &ReducerContext) {
     game_state.normal_spawning_paused = false;
     ctx.db.game_state().id().update(game_state);
     
-    // Mark all players as "true survivors" and remove them
+    // Mark all players as "true survivors" and transition them to winner state
     let mut true_survivors_count = 0;
     let players_to_process: Vec<_> = ctx.db.player().iter().collect();
     
@@ -190,13 +190,16 @@ pub fn handle_boss_defeated(ctx: &ReducerContext) {
             is_true_survivor: true,  // Mark as true survivor
         });
         
+        // Transition the account to winner state and schedule return to character select
+        crate::transition_player_to_winner_state(ctx, player.player_id);
+        
         true_survivors_count += 1;
         
         // Delete the player
         ctx.db.player().player_id().delete(&player.player_id);
     }
     
-    log::info!("{} players marked as True Survivors!", true_survivors_count);
+    log::info!("{} players marked as True Survivors and transitioned to Winner state!", true_survivors_count);
     
     // Now that all players have been removed, call reset_world to clean up everything else
     // This will clean up all monsters, gems, spawners, attacks, cooldowns, etc. and reschedule monster spawning
