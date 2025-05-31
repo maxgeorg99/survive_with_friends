@@ -272,7 +272,7 @@ pub fn client_connected(ctx: &ReducerContext) {
         
         if let Ok(_new_account) = ctx.db.account().try_insert(Account {
             identity,
-            name: "Nameless".to_string(),
+            name: "".to_string(),
             current_player_id: 0, // PlayerID 0 indicates no character yet
             last_login: ctx.timestamp,
         }) {
