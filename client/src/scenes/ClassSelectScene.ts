@@ -216,46 +216,41 @@ export default class ClassSelectScene extends Phaser.Scene {
     }
     
     private registerEventListeners() {
-        // Listen for player related events
-        this.gameEvents.on(GameEvents.PLAYER_CREATED, this.handlePlayerCreated, this);
-        this.gameEvents.on(GameEvents.PLAYER_DIED, this.handlePlayerDied, this);
-        this.gameEvents.on(GameEvents.NAME_SET, this.handleNameSet, this);
+        // Listen for account updates to see if class was selected
+        this.gameEvents.on(GameEvents.ACCOUNT_UPDATED, this.handleAccountUpdated, this);
         
         // Listen for connection events
         this.gameEvents.on(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
+    }
+    
+    private handleAccountUpdated(ctx: any, oldAccount: any, newAccount: any) {
+        console.log("ClassSelectScene: Account updated event received");
+        console.log("ClassSelectScene: Old state:", oldAccount.state.tag, "New state:", newAccount.state.tag);
+        console.log("ClassSelectScene: Old player ID:", oldAccount.currentPlayerId, "New player ID:", newAccount.currentPlayerId);
         
-        // Listen for loading events
-        this.gameEvents.on(GameEvents.LOADING_ERROR, this.handleLoadingError, this);
-    }
-    
-    private handlePlayerCreated(player: any, isLocalPlayer = true) {
-        console.log("Player created event received in ClassSelectScene");
-        if (isLocalPlayer) {
-            // This will be handled by the LoadingScene transition
-            console.log("Our player was created. Will transition to GameScene.");
+        // Check if this is our account and state changed
+        if (newAccount.identity.isEqual(this.spacetimeDBClient.identity)) {
+            if (newAccount.state.tag !== 'ChoosingClass') {
+                console.log("ClassSelectScene: Account state changed from ChoosingClass to", newAccount.state.tag, "- navigating away");
+                
+                // Transition to LoadingScene which will evaluate the new state
+                this.scene.start('LoadingScene', { 
+                    message: 'Evaluating account state...', 
+                    waitingFor: 'account_evaluation'
+                });
+            } else {
+                console.log("ClassSelectScene: Account updated but still in ChoosingClass state");
+                // Check if player was created but state didn't change
+                if (newAccount.currentPlayerId !== oldAccount.currentPlayerId) {
+                    console.log("ClassSelectScene: Player ID changed but state didn't change. New player ID:", newAccount.currentPlayerId);
+                }
+            }
         }
-    }
-    
-    private handlePlayerDied(player: any) {
-        console.log("Player died event received in ClassSelectScene");
-        // The player might have died while we were in GameScene and then transitioned here
-        // So we should show a message that they died
-        this.subtitleText.setText('Your previous character died. Choose a new class...');
-    }
-    
-    private handleNameSet(account: any) {
-        console.log("Name set event received in ClassSelectScene", account.name);
-        // We might receive this if the name was just set and we were auto-transitioned here
     }
     
     private handleConnectionLost() {
         console.log("Connection lost event received in ClassSelectScene");
         this.showError('Connection to server lost. Please refresh the page.');
-    }
-    
-    private handleLoadingError(message: string) {
-        console.log("Loading error event received in ClassSelectScene", message);
-        this.showError(message);
     }
     
     private selectClass(classType: PlayerClass, button: HTMLButtonElement) {
@@ -282,49 +277,76 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.errorText.setVisible(false);
     }
     
-    private spawnPlayer() 
-    {
-        if (!this.selectedClass) 
-        {
+    private spawnPlayer() {
+        if (!this.selectedClass) {
             this.showError('Please select a class first');
             return;
         }
         
-        try 
-        {
-            if (this.spacetimeDBClient.sdkConnection?.reducers) 
-            {
+        console.log("ClassSelectScene: Starting spawnPlayer");
+        
+        // Check current account state before spawning
+        if (this.spacetimeDBClient.sdkConnection?.db && this.spacetimeDBClient.identity) {
+            const currentAccount = this.spacetimeDBClient.sdkConnection.db.account.identity.find(this.spacetimeDBClient.identity);
+            if (currentAccount) {
+                console.log("ClassSelectScene: Current account state:", currentAccount.state.tag);
+                console.log("ClassSelectScene: Current player ID:", currentAccount.currentPlayerId);
+                console.log("ClassSelectScene: Account name:", currentAccount.name);
+            }
+        }
+        
+        // Disable buttons to prevent double-clicking
+        this.confirmButton.disabled = true;
+        this.confirmButton.textContent = 'Creating...';
+        
+        [this.fighterButton, this.rogueButton, this.mageButton, this.paladinButton].forEach(btn => {
+            if (btn) btn.disabled = true;
+        });
+        
+        try {
+            if (this.spacetimeDBClient.sdkConnection?.reducers) {
                 // Get class ID from the PlayerClass tag
                 const classId = CLASS_ID_MAP[this.selectedClass.tag];
-                console.log(`Spawning player with class: ${this.selectedClass.tag} (ID: ${classId})`);
+                console.log(`ClassSelectScene: About to call spawnPlayer with class: ${this.selectedClass.tag} (ID: ${classId})`);
                 
-                // Try to clean up HTML elements immediately before transition
-                this.cleanupHTMLElements();
-
-                console.log("Spawning player with class: " + this.selectedClass.tag + " (ID: " + classId + ")");
+                // Add error handling for the reducer call
+                try {
+                    this.spacetimeDBClient.sdkConnection.reducers.spawnPlayer(classId);
+                    console.log("ClassSelectScene: spawnPlayer reducer call completed");
+                } catch (reducerError) {
+                    console.error("ClassSelectScene: Error calling spawnPlayer reducer:", reducerError);
+                    this.showError('Error calling spawnPlayer reducer: ' + (reducerError as Error).message);
+                    this.resetButtons();
+                    return;
+                }
                 
-                // Show loading scene while player is being spawned
+                console.log("ClassSelectScene: Transitioning to LoadingScene");
+                
+                // Show loading scene while waiting for account state change
                 this.scene.start('LoadingScene', { 
                     message: 'Creating your character...', 
-                    nextScene: 'GameScene',
-                    timeoutDuration: 30000 // 10 seconds timeout
+                    waitingFor: 'target_state',
+                    targetState: 'Playing'
                 });
-                
-                // Call the spawnPlayer reducer with the numeric class ID
-                this.spacetimeDBClient.sdkConnection.reducers.spawnPlayer(classId);
-                
-                // No need for timeout logic here as that's handled by LoadingScene
-            } 
-            else 
-            {
-                this.showError('Cannot spawn player: SpacetimeDB reducers not available');
+            } else {
+                console.error("ClassSelectScene: Cannot spawn player - no reducers available");
+                this.showError('Cannot spawn player: Server connection not available');
+                this.resetButtons();
             }
-        } 
-        catch (error) 
-        {
-            console.error('Error spawning player:', error);
-            this.showError('An error occurred while spawning your player');
+        } catch (error) {
+            console.error('ClassSelectScene: Error in spawnPlayer:', error);
+            this.showError('An error occurred while spawning your player: ' + (error as Error).message);
+            this.resetButtons();
         }
+    }
+    
+    private resetButtons() {
+        this.confirmButton.disabled = false;
+        this.confirmButton.textContent = 'Confirm Selection';
+        
+        [this.fighterButton, this.rogueButton, this.mageButton, this.paladinButton].forEach(btn => {
+            if (btn) btn.disabled = false;
+        });
     }
     
     // Add a dedicated cleanup method for HTML elements
@@ -389,11 +411,8 @@ export default class ClassSelectScene extends Phaser.Scene {
         
         // Remove event listeners
         this.events.off("shutdown", this.shutdown, this);
-        this.gameEvents.off(GameEvents.PLAYER_CREATED, this.handlePlayerCreated, this);
-        this.gameEvents.off(GameEvents.PLAYER_DIED, this.handlePlayerDied, this);
-        this.gameEvents.off(GameEvents.NAME_SET, this.handleNameSet, this);
+        this.gameEvents.off(GameEvents.ACCOUNT_UPDATED, this.handleAccountUpdated, this);
         this.gameEvents.off(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
-        this.gameEvents.off(GameEvents.LOADING_ERROR, this.handleLoadingError, this);
         
         // Use our dedicated cleanup method
         this.cleanupHTMLElements();

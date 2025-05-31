@@ -1,11 +1,14 @@
 import Phaser from 'phaser';
 import GameScene from './scenes/GameScene';
-import LoginScene from './scenes/LoginScene';
+import TitleScene from './scenes/TitleScene';
+import NameSelectScene from './scenes/NameSelectScene';
 import ClassSelectScene from './scenes/ClassSelectScene';
+import DeadScene from './scenes/DeadScene';
+import VictoryScene from './scenes/VictoryScene';
 import LoadingScene from './scenes/LoadingScene';
 import { Identity } from '@clockworklabs/spacetimedb-sdk';
 import SpacetimeDBClient from './SpacetimeDBClient';
-import { DbConnection, ErrorContext, Player, SubscriptionEventContext } from './autobindings';
+import { DbConnection, ErrorContext, SubscriptionEventContext } from './autobindings';
 import { GameEvents } from './constants/GameEvents';
 
 console.log("Main script loading...");
@@ -15,7 +18,7 @@ const gameEvents = new Phaser.Events.EventEmitter();
 // Make it accessible globally
 (window as any).gameEvents = gameEvents;
 
-// Add a global cleanup function accessible from anywhere, but make it less aggressive
+// Add a global cleanup function accessible from anywhere
 (window as any).cleanupDOMElements = () => {
     console.log("Global window.cleanupDOMElements called - only for manual use");
     cleanupDOMElements();
@@ -33,7 +36,7 @@ const config: Phaser.Types.Core.GameConfig = {
             // debug: true // Set to true for physics debugging
         }
     },
-    scene: [LoginScene, ClassSelectScene, GameScene, LoadingScene],
+    scene: [TitleScene, NameSelectScene, ClassSelectScene, GameScene, DeadScene, VictoryScene, LoadingScene],
     scale: {
         mode: Phaser.Scale.RESIZE,
         autoCenter: Phaser.Scale.CENTER_BOTH
@@ -48,16 +51,23 @@ const cleanupDOMElements = () => {
     console.log("Global DOM cleanup triggered");
     
     try {
-        // Clean up login scene elements
+        // Clean up name select scene elements
+        const nameInput = document.getElementById('name-select-input');
+        if (nameInput && nameInput.parentNode) {
+            console.log("Global cleanup: Removing name input");
+            nameInput.remove();
+        }
+        
+        // Clean up login scene elements (legacy)
         const loginInput = document.getElementById('login-name-input');
         if (loginInput && loginInput.parentNode) {
             console.log("Global cleanup: Removing login input");
             loginInput.remove();
         }
         
-        document.querySelectorAll('.login-button').forEach(el => {
+        document.querySelectorAll('.name-select-button, .login-button').forEach(el => {
             if (el && el.parentNode) {
-                console.log("Global cleanup: Removing login button");
+                console.log("Global cleanup: Removing button");
                 el.remove();
             }
         });
@@ -76,13 +86,16 @@ const cleanupDOMElements = () => {
             }
         });
         
-        // Generic cleanup for text inputs that could be from login
+        // Generic cleanup for text inputs that could be from any scene
         document.querySelectorAll('input[type="text"]').forEach(el => {
-            console.log("Global cleanup: Removing text input", el.id);
-            if (el.parentNode) el.remove();
+            const id = el.id;
+            if (id === 'name-select-input' || id === 'login-name-input') {
+                console.log("Global cleanup: Removing text input", id);
+                if (el.parentNode) el.remove();
+            }
         });
         
-        // Generic cleanup for buttons that could be from either scene
+        // Generic cleanup for buttons that could be from any scene
         document.querySelectorAll('button').forEach(el => {
             const content = (el as HTMLElement).textContent;
             if (content && (
@@ -123,111 +136,50 @@ const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
         console.log("Account inserted event received");
 
         // Check if account is local
-        if (account.identity.isEqual(localIdentity)) 
-        {
-            console.log("Local account inserted!");
+        if (account.identity.isEqual(localIdentity)) {
+            console.log("Local account inserted with state:", account.state.tag);
             
             // Emit account created event with the account data
             gameEvents.emit(GameEvents.ACCOUNT_CREATED, ctx, account);
             
-            // Automatically go to login scene if account has no name
-            if (!account.name) 
-            {
-                return;
-            } 
-            else 
-            {
-                // If account has a name but no player, go to ClassSelectScene
-                if (account.currentPlayerId === 0) 
-                {
-                    cleanupDOMElements(); // Clean up before transition
-                    game.scene.start('ClassSelectScene');
-                    return;
-                } 
-                else 
-                {
-                    // Check if the player exists and is alive
-                    const localPlayer = ctx.db?.player.playerId.find(account.currentPlayerId);
-                    if (localPlayer) 
-                    {
-                        cleanupDOMElements(); // Clean up before transition
-                        game.scene.start('GameScene');
-                    } 
-                    else 
-                    {
-                        cleanupDOMElements(); // Clean up before transition
-                        game.scene.start('ClassSelectScene');
-                    }
-                }
+            // Only auto-navigate if we're currently in TitleScene (fresh start)
+            // LoadingScene and other scenes should handle their own navigation
+            const currentScene = game.scene.getScenes(true)[0];
+            if (currentScene && currentScene.scene.key === 'TitleScene') {
+                console.log("Auto-navigating from account insert (from TitleScene)");
+                navigateBasedOnAccountState(account.state);
+            } else {
+                console.log("Account inserted but scene", currentScene?.scene.key || 'none', "is active, letting it handle navigation");
             }
-        }
-        else
-        {
+        } else {
             console.log("Another user has logged on: " + account.identity.toString());
         }
     });
 
     localDb.account.onUpdate((ctx, oldAccount, newAccount) => {
         console.log("Account updated event received");
-        console.log("- Account data: ", newAccount.name + " - " + newAccount.currentPlayerId + " - " + newAccount.lastLogin);
+        console.log("- Account state changed from", oldAccount.state.tag, "to", newAccount.state.tag);
 
         // Check if account is local
-        if (newAccount.identity.isEqual(localIdentity)) 
-        {
+        if (newAccount.identity.isEqual(localIdentity)) {
             console.log("Local account updated.");
             
             // Emit account updated event with old and new account data
             gameEvents.emit(GameEvents.ACCOUNT_UPDATED, ctx, oldAccount, newAccount);
             
-            // Check if name was just set (from null/empty to a value)
-            if ((!oldAccount.name || oldAccount.name === "") && newAccount.name) 
-            {
-                console.log("Name was set.");
-                
-                // Emit name set event
-                gameEvents.emit(GameEvents.NAME_SET, ctx, newAccount);
-                
-                // Complete loading if in LoadingScene
-                if (game.scene.isActive('LoadingScene')) 
-                {
-                    const loadingScene = game.scene.getScene('LoadingScene') as any;
-                    if (loadingScene.completeLoading) 
-                    {
-                        console.log("Completing loading for name set");
-                        loadingScene.completeLoading();
-                    }
-                }
-                
-                return;
-            }
-
-            // Check if playerId changed
-            if (oldAccount.currentPlayerId !== newAccount.currentPlayerId) 
-            {
-                console.log("Player ID changed from", oldAccount.currentPlayerId, "to", newAccount.currentPlayerId);
-                
-                // Check if the new player exists
-                if (newAccount.currentPlayerId > 0) {
-                    const player = ctx.db?.player.playerId.find(newAccount.currentPlayerId);
-                    if (player) 
-                    {
-                        // Emit player created event if in LoadingScene
-                        if (game.scene.isActive('LoadingScene')) 
-                        {
-                            const loadingScene = game.scene.getScene('LoadingScene') as any;
-                            if (loadingScene.completeLoading) 
-                            {
-                                console.log("Completing loading for player id change");
-                                loadingScene.completeLoading();
-                            }
-                        }
-                    }
+            // Let individual scenes handle state changes through ACCOUNT_UPDATED events
+            // Only auto-navigate if we're in TitleScene (meaning we weren't in a game flow)
+            if (oldAccount.state.tag !== newAccount.state.tag) {
+                const currentScene = game.scene.getScenes(true)[0];
+                if (currentScene && currentScene.scene.key === 'TitleScene') {
+                    console.log("Auto-navigating from account update - state changed (from TitleScene)");
+                    navigateBasedOnAccountState(newAccount.state);
+                } else {
+                    console.log("Account state changed but scene", currentScene?.scene.key || 'none', "is active, letting it handle the change via events");
                 }
             }
-        }
-        else
-        {
-            console.log("Another user has logged on: " + newAccount.identity.toString());
+        } else {
+            console.log("Another user's account updated: " + newAccount.identity.toString());
         }
     });
 
@@ -237,32 +189,17 @@ const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
         console.log("- Player data: " + player.name + " - " + player.playerId);
 
         const myAccount = ctx.db?.account.identity.find(localIdentity);
-        if (!myAccount) 
-        {
+        if (!myAccount) {
             console.log("No account found for local identity. Waiting for account.");
             return;
         }
 
-        if (myAccount.currentPlayerId === player.playerId) 
-        {
+        if (myAccount.currentPlayerId === player.playerId) {
             console.log("Local player inserted!");
             
             // Emit player created event
             gameEvents.emit(GameEvents.PLAYER_CREATED, ctx, player);
-            
-            // If we're in LoadingScene waiting for player creation, complete it
-            if (game.scene.isActive('LoadingScene')) 
-            {
-                const loadingScene = game.scene.getScene('LoadingScene') as any;
-                if (loadingScene.completeLoading) 
-                {
-                    console.log("Completing loading for player creation");
-                    loadingScene.completeLoading();
-                }
-            }
-        } 
-        else 
-        {
+        } else {
             console.log("Another player has logged on: " + player.name);
             
             // Emit player created event for other players too
@@ -272,7 +209,6 @@ const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
 
     // Listen for player updates
     localDb.player.onUpdate((ctx, oldPlayer, newPlayer) => {
-        
         const myAccount = ctx.db?.account.identity.find(localIdentity);
         const isLocalPlayer = myAccount && myAccount.currentPlayerId === newPlayer.playerId;
         
@@ -286,30 +222,27 @@ const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
         console.log("- Player data: ", player.name + " - " + player.playerId);
 
         const myAccount = ctx.db?.account.identity.find(localIdentity);
-        if (!myAccount) 
-        {
+        if (!myAccount) {
             console.log("No account found for local identity.");
             return;
         }
 
-        if (myAccount.currentPlayerId === player.playerId) 
-        {
+        if (myAccount.currentPlayerId === player.playerId) {
             console.log("Local player was deleted/died!");
             
             // Emit player died event
             gameEvents.emit(GameEvents.PLAYER_DIED, ctx, player);
             
-            // If we're in the GameScene, death handling will be done by the scene
-            // The scene will listen for PLAYER_DIED event
-        }
-        else {
+            // The server will handle transitioning the account to Dead state
+            // No need to manually navigate here
+        } else {
             // Emit player deleted event for other players
             gameEvents.emit(GameEvents.PLAYER_DELETED, ctx, player, false);
         }
     });
 
     // Entity event listeners
-    localDb.entity.onInsert((ctx, entity) => {        // Emit entity created event
+    localDb.entity.onInsert((ctx, entity) => {
         gameEvents.emit(GameEvents.ENTITY_CREATED, ctx, entity);
     });
 
@@ -348,53 +281,64 @@ const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
     });
 
     // Check initial state and load appropriate scene
-    console.log("Checking current account and player state...");
+    console.log("Checking current account state for initial navigation...");
     const myAccount = ctx.db?.account.identity.find(localIdentity);
     
     if (!myAccount) {
-        console.log("No account found for local identity. Waiting for account to be created.");
-        // Start with LoginScene (default)
+        console.log("No account found for local identity. Will wait for account creation.");
+        // Don't navigate here - let the account insert handler or LoadingScene handle it
         return;
     }
 
-    if (!myAccount.name) 
-    {
-        console.log("Account has no name. Going to LoginScene.");
-        return;
-    }
-
-    if (myAccount.currentPlayerId === 0) 
-    {
-        console.log("Account has name but no player. Going to ClassSelectScene.");
-        cleanupDOMElements(); // Clean up before transition
-        game.scene.start('ClassSelectScene');
-        return;
-    }
-
-    // Check if player exists and is alive
-    const localPlayer = ctx.db?.player.playerId.find(myAccount.currentPlayerId);
-    if (localPlayer) 
-    {
-        console.log("Account has name and living player. Going to GameScene.");
-        cleanupDOMElements(); // Clean up before transition
-        game.scene.start('GameScene');
-    }
-    else 
-    {
-        // Check if player is in dead_players table
-        const deadPlayer = ctx.db?.deadPlayers.playerId.find(myAccount.currentPlayerId);
-        if (deadPlayer) 
-        {
-            console.log("Player is dead. Going to ClassSelectScene.");
-        } 
-        else 
-        {
-            console.log("Player not found. Going to ClassSelectScene.");
-        }
-        cleanupDOMElements(); // Clean up before transition
-        game.scene.start('ClassSelectScene');
-    }
+    console.log("Found account with state:", myAccount.state.tag);
+    console.log("onSubscriptionApplied: Account exists, letting current scene or LoadingScene handle navigation");
+    
+    // Don't auto-navigate here - let LoadingScene or other scenes handle navigation
+    // This prevents conflicts between multiple navigation systems
 };
+
+// Helper function to navigate based on account state
+function navigateBasedOnAccountState(accountState: any) {
+    console.log("Navigating based on account state:", accountState.tag);
+    
+    // Double-check that we're still in TitleScene before navigating
+    // This prevents race conditions where button clicks and auto-navigation conflict
+    const currentScene = game.scene.getScenes(true)[0];
+    if (currentScene && currentScene.scene.key !== 'TitleScene') {
+        console.log("Navigation requested but no longer in TitleScene (current:", currentScene.scene.key, ") - aborting to prevent conflicts");
+        return;
+    }
+    
+    cleanupDOMElements(); // Clean up before any transition
+    
+    switch (accountState.tag) {
+        case 'ChoosingName':
+            game.scene.start('NameSelectScene');
+            break;
+            
+        case 'ChoosingClass':
+            game.scene.start('ClassSelectScene');
+            break;
+            
+        case 'Playing':
+            game.scene.start('GameScene');
+            break;
+            
+        case 'Dead':
+            game.scene.start('DeadScene');
+            break;
+            
+        case 'Winner':
+            game.scene.start('VictoryScene');
+            break;
+            
+        default:
+            console.warn("Unknown account state:", accountState.tag);
+            // Default to title scene if state is unrecognized
+            game.scene.start('TitleScene');
+            break;
+    }
+}
 
 const onConnect = (ctx: DbConnection, identity: Identity, token: string) => {
     console.log("SpacetimeDB connection established.");
@@ -413,4 +357,7 @@ const spacetimeDBClient = new SpacetimeDBClient(onSubscriptionApplied, onConnect
 // Ensure the client instance is accessible globally or passed to scenes as needed
 (window as any).spacetimeDBClient = spacetimeDBClient;
 
-console.log("Main script finished loading."); 
+console.log("Main script finished loading.");
+
+// Start with TitleScene by default
+game.scene.start('TitleScene'); 

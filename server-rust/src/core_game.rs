@@ -410,8 +410,8 @@ pub fn game_tick(ctx: &ReducerContext, _timer: GameTickTimer) {
         world.last_tick_time = current_timestamp;
         world.timing_samples_collected += 1;
         
-        // Log timing information every 20 ticks
-        if world.tick_count % 20 == 0 {
+        // Log timing information every 200 ticks
+        if world.tick_count % 200 == 0 {
             log::info!("Game tick: {} | Avg: {:.2}ms | Current: {:.2}ms | Min: {:.2}ms | Max: {:.2}ms", 
                      world.tick_count, world.average_tick_ms, time_since_last_tick_ms, 
                      world.min_tick_ms, world.max_tick_ms);

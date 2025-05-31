@@ -282,24 +282,31 @@ pub fn client_connected(ctx: &ReducerContext) {
                 // Check if player still exists
                 if account.current_player_id != 0 {
                     let player_opt = ctx.db.player().player_id().find(&account.current_player_id);
-                    if player_opt.is_none() {
+                    if player_opt.is_none() 
+                    {
                         log::info!(
                             "Account {} was in Playing state but no living player found (PlayerID: {}). Transitioning to ChoosingClass.", 
                             identity, account.current_player_id
                         );
                         let mut updated_account = account;
                         updated_account.state = AccountState::ChoosingClass;
+                        updated_account.current_player_id = 0;  // Reset player ID since no living player found
                         ctx.db.account().identity().update(updated_account);
-                    } else {
+                    } 
+                    else 
+                    {
                         log::info!(
                             "Found living player {} for account {} (PlayerID: {}) in Playing state.", 
                             player_opt.unwrap().name, identity, account.current_player_id
                         );
                     }
-                } else {
+                } 
+                else 
+                {
                     log::info!("Account {} was in Playing state but has no PlayerID. Transitioning to ChoosingClass.", identity);
                     let mut updated_account = account;
                     updated_account.state = AccountState::ChoosingClass;
+                    updated_account.current_player_id = 0;  // Ensure player ID is 0
                     ctx.db.account().identity().update(updated_account);
                 }
             },
@@ -577,12 +584,13 @@ pub fn transition_player_to_dead_state(ctx: &ReducerContext, player_id: u32) {
     if let Some(account) = ctx.db.account().current_player_id().find(&player_id) {
         let identity = account.identity;
         
-        // Update account state to dead
+        // Update account state to dead and reset player ID immediately
         let mut updated_account = account;
         updated_account.state = AccountState::Dead;
+        updated_account.current_player_id = 0;  // Reset player ID immediately to prevent conflicts
         ctx.db.account().identity().update(updated_account);
         
-        log::info!("Account {} transitioned to Dead state", identity);
+        log::info!("Account {} transitioned to Dead state and reset player ID to 0", identity);
         
         // Schedule transition back to choosing class after a few seconds
         const DEAD_TRANSITION_DELAY_MS: u64 = 5000; // 5 seconds
@@ -605,12 +613,13 @@ pub fn transition_player_to_winner_state(ctx: &ReducerContext, player_id: u32) {
     if let Some(account) = ctx.db.account().current_player_id().find(&player_id) {
         let identity = account.identity;
         
-        // Update account state to winner
+        // Update account state to winner and reset player ID immediately
         let mut updated_account = account;
         updated_account.state = AccountState::Winner;
+        updated_account.current_player_id = 0;  // Reset player ID immediately to prevent conflicts
         ctx.db.account().identity().update(updated_account);
         
-        log::info!("Account {} transitioned to Winner state", identity);
+        log::info!("Account {} transitioned to Winner state and reset player ID to 0", identity);
         
         // Schedule transition back to choosing class after a few seconds
         const WINNER_TRANSITION_DELAY_MS: u64 = 10000; // 10 seconds to celebrate
