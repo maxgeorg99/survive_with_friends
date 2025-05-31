@@ -359,6 +359,36 @@ export default class GameScene extends Phaser.Scene {
         if (this.spacetimeDBClient.identity && newAccount.identity.isEqual(this.spacetimeDBClient.identity)) 
         {
             console.log("GameScene: Local account updated");
+            
+            // Check if account state changed (this is critical for death transitions)
+            if (oldAccount.state.tag !== newAccount.state.tag) {
+                console.log("GameScene: Account state changed from", oldAccount.state.tag, "to", newAccount.state.tag);
+                
+                // If state changed to Dead, transition to DeadScene
+                if (newAccount.state.tag === 'Dead') {
+                    console.log("GameScene: Account state is now Dead - transitioning to DeadScene");
+                    this.scene.start('DeadScene');
+                    return; // Exit early since we're transitioning scenes
+                }
+                
+                // If state changed to Winner, transition to VictoryScene
+                if (newAccount.state.tag === 'Winner') {
+                    console.log("GameScene: Account state is now Winner - transitioning to VictoryScene");
+                    this.scene.start('VictoryScene');
+                    return; // Exit early since we're transitioning scenes
+                }
+                
+                // If state changed away from Playing to something else, handle appropriately
+                if (newAccount.state.tag !== 'Playing') {
+                    console.log("GameScene: Account state is no longer Playing - transitioning to LoadingScene");
+                    this.scene.start('LoadingScene', { 
+                        message: 'Evaluating account state...', 
+                        waitingFor: 'account_evaluation'
+                    });
+                    return; // Exit early since we're transitioning scenes
+                }
+            }
+            
             //Check if the login time was updated
             if (oldAccount.lastLogin.microsSinceUnixEpoch !== newAccount.lastLogin.microsSinceUnixEpoch) {
                 //If we're getting this, then that means we sent the updateLastLogin reducer
@@ -454,35 +484,22 @@ export default class GameScene extends Phaser.Scene {
             this.upgradeUI.hide();
         }
         
-        // Get the dead player record to check if this is a true survivor victory
-        const deadPlayerOpt = ctx.db?.deadPlayers.playerId.find(player.playerId);
-        console.log("Dead player record:", deadPlayerOpt);
-        
-        // Check specifically for the isTrueSurvivor property with detailed logging
-        let isTrueSurvivor = false;
-        
-        if (deadPlayerOpt) {
-            isTrueSurvivor = deadPlayerOpt.isTrueSurvivor;
-        }
-        
-        console.log("Final isTrueSurvivor value:", isTrueSurvivor);
-        
         //play death animation
         var center = this.localPlayerSprite?.getCenter();
         if (center) {
             this.createDeathEffects(center.x, center.y);
         }
         
-        // Show appropriate death screen
-        if (isTrueSurvivor) {
-            console.log("Showing TRUE SURVIVOR victory screen!");
-            this.showVictoryScreen();
-        } else {
-            console.log("Showing regular death screen");
-            this.showDeathScreen();
-        }
-
+        // Disable controls immediately 
+        this.disablePlayerControls();
+        
+        // Set game over flag
         this.gameOver = true;
+        
+        // Note: Scene transitions are now handled by the state-based system
+        // When the server sets the account state to Dead or Winner, 
+        // handleAccountUpdated will automatically transition to the appropriate scene
+        console.log("Player death effects complete. Waiting for server to update account state...");
     }
 
     private handleConnectionLost(_ctx:ErrorContext) {

@@ -48,17 +48,42 @@ export default class ClassSelectScene extends Phaser.Scene {
     }
 
     create() {
-        // Set up background
+        console.log("ClassSelectScene create() - ensuring clean transition from previous scene");
+        
+        // IMPORTANT: Ensure any previous scenes are fully stopped
+        // This is critical when transitioning from GameScene -> DeadScene -> ClassSelectScene
+        const gameScene = this.scene.get('GameScene');
+        if (gameScene && gameScene.scene.isActive()) {
+            console.log("ClassSelectScene: Stopping GameScene to prevent visual artifacts");
+            this.scene.stop('GameScene');
+        }
+        
+        const deadScene = this.scene.get('DeadScene');
+        if (deadScene && deadScene.scene.isActive()) {
+            console.log("ClassSelectScene: Stopping DeadScene");
+            this.scene.stop('DeadScene');
+        }
+        
+        // Set up background with explicit clearing
         const { width, height } = this.scale;
         
-        // Use a dark blue color if no background image
+        // Clear the camera and set a solid background color first
         this.cameras.main.setBackgroundColor('#042E64');
+        this.cameras.main.fadeIn(0); // Ensure immediate visibility
+        
+        // Clear any existing display objects
+        this.children.removeAll(true);
+        
+        // Add a full-screen rectangle to ensure complete background coverage
+        const backgroundRect = this.add.rectangle(width/2, height/2, width, height, 0x042E64);
+        backgroundRect.setDepth(-100); // Ensure it's behind everything
         
         try {
             if (this.textures.exists('title_bg')) {
-                this.add.image(width/2, height/2, 'title_bg')
+                const bgImage = this.add.image(width/2, height/2, 'title_bg')
                     .setDisplaySize(width, height)
-                    .setDepth(0);
+                    .setDepth(-50); // Behind UI elements but in front of background rect
+                console.log("ClassSelectScene: Background image loaded successfully");
             }
         } catch (error) {
             console.error("Error loading background:", error);
@@ -106,6 +131,8 @@ export default class ClassSelectScene extends Phaser.Scene {
         
         // Only clean up when the scene is actually shut down, not at scene start
         this.events.on('shutdown', this.shutdown, this);
+        
+        console.log("ClassSelectScene create() completed - clean background established");
     }
     
     private createClassButtons() {

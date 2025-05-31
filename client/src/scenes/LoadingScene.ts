@@ -35,20 +35,39 @@ export default class LoadingScene extends Phaser.Scene {
     }
 
     create() {
+        console.log("LoadingScene create() - ensuring clean transition from previous scene");
+        
+        // IMPORTANT: Ensure any previous scenes are fully stopped to prevent visual artifacts
+        const activeScenes = this.scene.manager.getScenes(true);
+        activeScenes.forEach(scene => {
+            if (scene.scene.key !== 'LoadingScene' && scene.scene.isActive()) {
+                console.log("LoadingScene: Stopping active scene:", scene.scene.key);
+                this.scene.stop(scene.scene.key);
+            }
+        });
+        
         // Global cleanup - remove any lingering UI elements from previous scenes
         this.cleanupLingeringUIElements();
         
         const { width, height } = this.scale;
         
-        // Set background color
+        // Clear the camera and set a solid background color
         this.cameras.main.setBackgroundColor('#042E64');
+        this.cameras.main.fadeIn(0); // Ensure immediate visibility
+        
+        // Clear any existing display objects
+        this.children.removeAll(true);
+        
+        // Add a full-screen rectangle to ensure complete background coverage
+        const backgroundRect = this.add.rectangle(width/2, height/2, width, height, 0x042E64);
+        backgroundRect.setDepth(-100); // Ensure it's behind everything
         
         // Add title background
         try {
             if (this.textures.exists('title_bg')) {
                 this.add.image(width/2, height/2, 'title_bg')
                     .setDisplaySize(width, height)
-                    .setDepth(0);
+                    .setDepth(-50); // Behind UI elements but in front of background rect
             }
         } catch (error) {
             console.error("Error loading background:", error);
@@ -108,6 +127,8 @@ export default class LoadingScene extends Phaser.Scene {
         
         // Handle window resize
         this.scale.on('resize', this.handleResize, this);
+        
+        console.log("LoadingScene create() completed - clean background established");
     }
     
     private registerEventListeners() {
