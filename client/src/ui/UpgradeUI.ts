@@ -40,7 +40,7 @@ const CARD_SCALE = 0.8;
 const UI_DEPTH = 100000; // Extremely high depth to ensure UI stays on top of all game elements
 
 // Hold mechanic constants
-const HOLD_DURATION_MS = 800; // Time required to hold for selection (800ms)
+const HOLD_DURATION_MS = 400; // Time required to hold for selection (800ms)
 const PROGRESS_BAR_WIDTH = CARD_WIDTH * CARD_SCALE * 0.8;
 const PROGRESS_BAR_HEIGHT = 8;
 const PROGRESS_BAR_Y_OFFSET = (CARD_HEIGHT * CARD_SCALE) / 2 - 35; // Moved down slightly more
