@@ -13,6 +13,59 @@ import { GameEvents } from './constants/GameEvents';
 
 console.log("Main script loading...");
 
+// Create loading overlay before Phaser initializes
+const createLoadingOverlay = () => {
+    const loadingOverlay = document.createElement('div');
+    loadingOverlay.id = 'loading-overlay';
+    loadingOverlay.style.position = 'fixed';
+    loadingOverlay.style.top = '0';
+    loadingOverlay.style.left = '0';
+    loadingOverlay.style.width = '100vw';
+    loadingOverlay.style.height = '100vh';
+    loadingOverlay.style.backgroundColor = '#333'; // Match index.html background
+    loadingOverlay.style.display = 'flex';
+    loadingOverlay.style.justifyContent = 'center';
+    loadingOverlay.style.alignItems = 'center';
+    loadingOverlay.style.zIndex = '-9999'; // As far back as possible
+    loadingOverlay.style.fontFamily = 'Arial, sans-serif';
+    
+    const loadingText = document.createElement('div');
+    loadingText.textContent = 'Loading';
+    loadingText.style.color = 'white'; // White text on dark background
+    loadingText.style.fontSize = '48px';
+    loadingText.style.fontWeight = 'bold';
+    loadingText.style.textAlign = 'center';
+    loadingText.style.textShadow = '2px 2px 4px rgba(0,0,0,0.8)'; // Better shadow for white text
+    
+    // Create animated dots
+    const dotsSpan = document.createElement('span');
+    dotsSpan.id = 'loading-dots';
+    dotsSpan.style.color = 'white';
+    
+    loadingText.appendChild(dotsSpan);
+    loadingOverlay.appendChild(loadingText);
+    document.body.appendChild(loadingOverlay);
+    
+    // Animate the dots
+    let dotCount = 0;
+    const animateDots = () => {
+        dotCount = (dotCount + 1) % 4; // 0, 1, 2, 3, then repeat
+        dotsSpan.textContent = '.'.repeat(dotCount);
+    };
+    
+    // Start animation
+    const dotInterval = setInterval(animateDots, 500); // Change every 500ms
+    
+    // Store interval ID for cleanup if needed
+    (loadingOverlay as any).dotInterval = dotInterval;
+    
+    console.log("Loading overlay created with animated dots");
+    return loadingOverlay;
+};
+
+// Create the overlay immediately
+const loadingOverlay = createLoadingOverlay();
+
 // Create a global event emitter for game-wide events
 const gameEvents = new Phaser.Events.EventEmitter();
 // Make it accessible globally
@@ -105,7 +158,8 @@ const cleanupDOMElements = () => {
                 content.includes('Rogue') ||
                 content.includes('Mage') ||
                 content.includes('Paladin') ||
-                content.includes('Confirm')
+                content.includes('Confirm') ||
+                content.includes('START GAME')
             )) {
                 console.log("Global cleanup: Removing button:", content);
                 if (el.parentNode) el.remove();
