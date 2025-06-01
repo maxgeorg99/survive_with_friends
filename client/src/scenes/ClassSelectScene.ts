@@ -48,12 +48,21 @@ export default class ClassSelectScene extends Phaser.Scene {
     }
 
     preload() {
-        // Load character class icons
+        // Load character class icons (these should already be loaded by LoadingScene, but ensure they're available)
         this.load.image('fighter_icon', '/assets/attack_sword.png');
         this.load.image('rogue_icon', '/assets/attack_knife.png');
         this.load.image('mage_icon', '/assets/attack_wand.png');
         this.load.image('paladin_icon', '/assets/attack_shield.png');
         this.load.image('title_bg', '/assets/title_bg.png');
+        
+        // Add load completion listener to ensure assets are ready
+        this.load.on('complete', () => {
+            console.log('ClassSelectScene: All assets loaded successfully');
+        });
+        
+        this.load.on('loaderror', (fileObj: any) => {
+            console.error('ClassSelectScene: Error loading asset:', fileObj.key, fileObj.url);
+        });
     }
 
     create() {
@@ -122,8 +131,21 @@ export default class ClassSelectScene extends Phaser.Scene {
             strokeThickness: 3
         }).setOrigin(0.5);
         
-        // Create HTML elements for class selection
-        this.createClassButtons();
+        // Wait for assets to be fully loaded before creating HTML elements
+        if (this.load.isLoading()) {
+            console.log('ClassSelectScene: Assets still loading, waiting for completion');
+            this.load.once('complete', () => {
+                this.createClassButtons();
+                this.positionHTMLElements(); // Position after creation
+            });
+        } else {
+            console.log('ClassSelectScene: Assets already loaded, creating buttons immediately');
+            // Small delay to ensure textures are registered
+            this.time.delayedCall(50, () => {
+                this.createClassButtons();
+                this.positionHTMLElements(); // Position after creation
+            });
+        }
         
         // Add error text (initially hidden)
         this.errorText = this.add.text(width/2, height * 0.85, '', {
@@ -139,8 +161,7 @@ export default class ClassSelectScene extends Phaser.Scene {
         // Handle window resize
         this.scale.on('resize', this.handleResize, this);
         
-        // Position HTML elements
-        this.positionHTMLElements();    
+        // Position HTML elements - REMOVED from here since buttons don't exist yet
         
         // Only clean up when the scene is actually shut down, not at scene start
         this.events.on('shutdown', this.shutdown, this);
@@ -185,15 +206,29 @@ export default class ClassSelectScene extends Phaser.Scene {
             
             // Add icon if available
             try {
-                if (this.textures.exists(iconName)) {
-                    // Left icon
+                const iconTexture = CLASS_ICON_MAP[iconName];
+                console.log(`ClassSelectScene: Checking icon for ${name}, iconName: ${iconName}, texture: ${iconTexture}`);
+                
+                if (this.textures.exists(iconName) && iconTexture) {
+                    // Wait a bit for texture to be fully processed
                     const leftIcon = document.createElement('img');
-                    const iconNameResult : string = CLASS_ICON_MAP[iconName];
-                    leftIcon.src = '/assets/' + iconNameResult + '.png';
+                    leftIcon.src = '/assets/' + iconTexture + '.png';
                     leftIcon.style.width = '50px';
                     leftIcon.style.height = '50px';
                     leftIcon.style.marginRight = '10px';
+                    
+                    // Add load event to ensure image displays
+                    leftIcon.onload = () => {
+                        console.log(`ClassSelectScene: Icon loaded successfully for ${name}`);
+                    };
+                    
+                    leftIcon.onerror = () => {
+                        console.error(`ClassSelectScene: Error loading icon for ${name}: ${leftIcon.src}`);
+                    };
+                    
                     button.appendChild(leftIcon);
+                } else {
+                    console.warn(`ClassSelectScene: Icon texture not available for ${name} (${iconName})`);
                 }
             } catch (error) {
                 console.error(`Error adding left icon for ${name}:`, error);
@@ -302,9 +337,17 @@ export default class ClassSelectScene extends Phaser.Scene {
         });
         
         this.classButtonsContainer.appendChild(this.confirmButton);
+        
+        console.log('ClassSelectScene: Class buttons created successfully');
     }
     
     private positionHTMLElements() {
+        // Add null check to prevent crashes
+        if (!this.classButtonsContainer) {
+            console.warn('ClassSelectScene: Cannot position HTML elements - classButtonsContainer not created yet');
+            return;
+        }
+        
         const { width, height } = this.scale;
         
         // Position class select container

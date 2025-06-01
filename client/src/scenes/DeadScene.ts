@@ -22,6 +22,14 @@ export default class DeadScene extends Phaser.Scene {
     preload() {
         // Load assets needed for the dead screen
         this.load.image('loss_screen', '/assets/loss_screen.png');
+        
+        // Preload class icons to keep them cached for ClassSelectScene transition
+        this.load.image('fighter_icon', '/assets/attack_sword.png');
+        this.load.image('rogue_icon', '/assets/attack_knife.png');
+        this.load.image('mage_icon', '/assets/attack_wand.png');
+        this.load.image('paladin_icon', '/assets/attack_shield.png');
+        
+        console.log('DeadScene: Preloading class icons for ClassSelectScene');
     }
 
     create() {

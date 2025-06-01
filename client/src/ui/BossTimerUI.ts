@@ -100,32 +100,18 @@ export default class BossTimerUI {
     }
 
     private handleBossTimerCreated(ctx: any, timer: any): void {
-        console.log("Boss timer created event received");
-        console.log("Raw timer in event:", timer); 
-        console.log("Timer type:", typeof timer);
-        
-        if (timer?.scheduledAt?.value) {
-            console.log("Timer value direct access:", timer.scheduledAt.value);
-            console.log("Value type:", typeof timer.scheduledAt.value);
-        }
-        
         // Extract the timestamp using our helper
         const timestamp = this.extractTimestampFromTimer(timer);
         if (timestamp) {
-            console.log("Successfully extracted timestamp:", timestamp);
-            console.log("Human readable date:", new Date(timestamp).toLocaleString());
             this.bossSpawnTime = timestamp;
             this.startTimer();
-            console.log("Started boss timer from timer creation event");
+            console.log("Boss timer started");
         } else {
-            console.log("Failed to extract timestamp from timer, trying fallbacks...");
-            
-            // Fallback 1: Try direct access to value if it exists
+            // Fallback: Try direct access to value if it exists
             if (timer?.scheduledAt?.value) {
                 const directValue = timer.scheduledAt.value;
                 if (typeof directValue === 'bigint' || !isNaN(Number(directValue))) {
                     const directTimestamp = Number(directValue) / 1000;
-                    console.log("Fallback 1: Direct value conversion:", directTimestamp);
                     this.bossSpawnTime = directTimestamp;
                     this.startTimer();
                     return;
@@ -135,7 +121,7 @@ export default class BossTimerUI {
             // Hide timer if no valid timestamp was found
             this.stopTimer();
             this.container.setVisible(false);
-            console.log("Could not extract valid timestamp from created timer, hiding boss timer UI");
+            console.warn("Could not extract valid timestamp from created timer");
         }
     }
 
@@ -175,10 +161,7 @@ export default class BossTimerUI {
             console.log("Boss spawn time is in the past, showing IMMINENT message");
             this.timerText.setText("End of the world: IMMINENT!");
             this.startWarningFlash(true);
-        }
-        
-        console.log(`Boss timer started. Boss will spawn at: ${new Date(this.bossSpawnTime).toLocaleTimeString()}`);
-        console.log(`Timer container properties: visible=${this.container.visible}, alpha=${this.container.alpha}, x=${this.container.x}, y=${this.container.y}`);
+        }  
     }
 
     public stopTimer(): void {
@@ -235,17 +218,6 @@ export default class BossTimerUI {
                                 this.startWarningFlash(true);
                             }
                         }
-                        
-                        // Log container state periodically
-                        if (time % 1000 < 16) { // Log roughly every second
-                            console.log('BossTimerUI state:', {
-                                containerVisible: this.container.visible,
-                                containerPosition: { x: this.container.x, y: this.container.y },
-                                containerDepth: this.container.depth,
-                                containerAlpha: this.container.alpha,
-                                timeRemaining: timeRemaining
-                            });
-                        }
                     }
                 } else {
                     this.container.setVisible(false);
@@ -301,50 +273,26 @@ export default class BossTimerUI {
     private checkForExistingBossTimer(): void {
         // Only if we have a connection
         if (this.spacetimeClient?.sdkConnection?.db) {
-            console.log("Checking for existing boss spawn timer...");
-            
             try {
                 // Try to find a boss timer in the database
                 const bossTimers = Array.from(this.spacetimeClient.sdkConnection.db.bossSpawnTimer.iter());
                 
-                console.log("Boss timers found:", bossTimers.length);
-                console.log("Raw timer data:", 
-                    JSON.stringify(bossTimers, (key, value) => 
-                        typeof value === 'bigint' ? value.toString() + 'n' : value
-                    )
-                );
-                
                 if (bossTimers.length > 0) {
                     // Timer exists, get the first one
                     const timer = bossTimers[0];
-                    console.log("Found existing boss timer:", timer);
-                    console.log("Timer properties:", Object.keys(timer));
                     
-                    if (timer?.scheduledAt?.value) {
-                        console.log("Direct value:", timer.scheduledAt.value);
-                        console.log("Value type:", typeof timer.scheduledAt.value);
-                    }
-                    
-                    // Extract spawn time - we need to safely extract it from the timer object
+                    // Extract spawn time
                     if (timer) {
-                        // Extract the timestamp using a more general approach
                         const timestamp = this.extractTimestampFromTimer(timer);
                         if (timestamp) {
-                            console.log("Successfully extracted timestamp:", timestamp);
-                            console.log("Human readable date:", new Date(timestamp).toLocaleString());
                             this.bossSpawnTime = timestamp;
                             this.startTimer();
-                            console.log("Started boss timer from existing database entry");
                         } else {
-                            console.log("Failed to extract timestamp using standard method, trying fallbacks...");
-                            
-                            // Fallback 1: Try direct access to value if it exists
+                            // Fallback: Try direct access to value if it exists
                             if (timer?.scheduledAt?.value) {
                                 const directValue = timer.scheduledAt.value;
                                 if (typeof directValue === 'bigint' || !isNaN(Number(directValue))) {
                                     const directTimestamp = Number(directValue) / 1000;
-                                    console.log("Fallback 1: Direct value conversion:", directTimestamp);
-                                    console.log("Human readable date:", new Date(directTimestamp).toLocaleString());
                                     this.bossSpawnTime = directTimestamp;
                                     this.startTimer();
                                     return;
@@ -354,11 +302,9 @@ export default class BossTimerUI {
                             // Hide timer if timestamp can't be extracted
                             this.stopTimer();
                             this.container.setVisible(false);
-                            console.log("Could not extract valid timestamp from timer, hiding boss timer UI");
                         }
                     }
                 } else {
-                    console.log("No existing boss spawn timer found, hiding timer UI");
                     // Ensure timer is hidden when no timer exists
                     this.stopTimer();
                     this.container.setVisible(false);
@@ -375,25 +321,8 @@ export default class BossTimerUI {
     // Helper method to extract timestamp from timer object
     private extractTimestampFromTimer(timer: any): number | null {
         try {
-            // Log the raw timer before JSON stringification
-            console.log("Raw timer before stringification:", timer);
-            console.log("Raw scheduledAt:", timer?.scheduledAt);
-            console.log("Raw value:", timer?.scheduledAt?.value);
-            
-            // Check the actual type of the value
-            if (timer?.scheduledAt?.value) {
-                console.log("Value type:", typeof timer.scheduledAt.value);
-                console.log("Is BigInt:", typeof timer.scheduledAt.value === 'bigint');
-            }
-            
-            // Log stringified version for reference
-            console.log("Extracting timestamp from timer:", JSON.stringify(timer, (key, value) => 
-                typeof value === 'bigint' ? value.toString() : value
-            ));
-            
             // First check if we have a scheduledAt property
             if (!timer || !timer.scheduledAt) {
-                console.log("Timer or scheduledAt property is missing");
                 return null;
             }
             
@@ -403,10 +332,8 @@ export default class BossTimerUI {
             // If scheduled_at has a microsSinceUnixEpoch property (common timestamp format)
             if (scheduledAt.microsSinceUnixEpoch !== undefined) {
                 // Convert microseconds to milliseconds for JS Date
-                // Handle both number and bigint cases
                 const microsValue = scheduledAt.microsSinceUnixEpoch;
                 if (typeof microsValue === 'bigint') {
-                    // Convert bigint to number safely
                     return Number(microsValue) / 1000;
                 } else if (typeof microsValue === 'number') {
                     return microsValue / 1000;
@@ -424,27 +351,22 @@ export default class BossTimerUI {
             if (typeof scheduledAt === 'object' && scheduledAt.tag && scheduledAt.value) {
                 if (scheduledAt.tag === 'Time') {
                     const timeValue = scheduledAt.value;
-                    console.log("Processing Time tag with value:", timeValue, "type:", typeof timeValue);
                     
                     // Direct BigInt handling
                     if (typeof timeValue === 'bigint') {
-                        console.log("Converting BigInt value to timestamp");
                         return Number(timeValue) / 1000;
                     }
                     
                     // Handle case where value is a string (could be with or without 'n')
                     if (typeof timeValue === 'string') {
-                        console.log("Found string timestamp:", timeValue);
                         // Check if it's a BigInt string (ends with 'n')
                         if (timeValue.endsWith('n')) {
                             // Remove the 'n' suffix and convert to number
                             const valueWithoutN = timeValue.slice(0, -1);
-                            console.log("Removed 'n' suffix, processing:", valueWithoutN);
                             // This is microseconds since epoch, convert to ms
                             return Number(valueWithoutN) / 1000;
                         } else {
                             // It's a regular string number, convert directly
-                            console.log("Processing as regular string number");
                             return Number(timeValue) / 1000;
                         }
                     }
@@ -466,20 +388,15 @@ export default class BossTimerUI {
                             : timeValue.timeMs;
                     }
 
-                    // Try direct conversion as a fallback - this is likely the case we're handling
+                    // Try direct conversion as a fallback
                     if (timeValue) {
-                        console.log("Attempting direct conversion of value");
                         const timestamp = Number(timeValue);
                         if (!isNaN(timestamp) && timestamp > 0) {
-                            console.log("Direct conversion succeeded:", timestamp);
                             return timestamp / 1000; // Convert microseconds to milliseconds
                         }
                     }
                 }
             }
-            
-            // Log the structure for debugging
-            console.log("Could not extract timestamp - unknown timer structure");
             
             return null;
         } catch (error) {

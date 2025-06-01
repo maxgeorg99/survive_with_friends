@@ -32,6 +32,14 @@ export default class LoadingScene extends Phaser.Scene {
     preload() {
         // Load title background
         this.load.image('title_bg', '/assets/title_bg.png');
+        
+        // Preload class icons early to prevent delays in ClassSelectScene
+        this.load.image('fighter_icon', '/assets/attack_sword.png');
+        this.load.image('rogue_icon', '/assets/attack_knife.png');
+        this.load.image('mage_icon', '/assets/attack_wand.png');
+        this.load.image('paladin_icon', '/assets/attack_shield.png');
+        
+        console.log('LoadingScene: Preloading class icons for ClassSelectScene');
     }
 
     create() {
