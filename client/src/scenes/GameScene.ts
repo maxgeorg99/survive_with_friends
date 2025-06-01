@@ -1402,14 +1402,14 @@ export default class GameScene extends Phaser.Scene {
             markerVisible: this.tapMarker.visible
         });
         
-        // Position marker at tap target and make visible
+        // Position marker at tap target
         // Add larger vertical offset to align with character feet (SHADOW_OFFSET_Y + 20)
         this.tapMarker.setPosition(this.tapTarget.x, this.tapTarget.y + SHADOW_OFFSET_Y + 20);
-        this.tapMarker.setVisible(true);
         
-        console.log("After setting visible:", {
-            markerVisible: this.tapMarker.visible
-        });
+        // Visibility is now handled in the update() method based on playerData.hasWaypoint
+        // console.log("After setting visible:", {
+        // markerVisible: this.tapMarker.visible
+        // });
         
         // Add a small animation to make it more noticeable
         this.tweens.add({
@@ -1497,6 +1497,11 @@ export default class GameScene extends Phaser.Scene {
             }
         }
         
+        // Update tap marker visibility based on hasWaypoint
+        if (this.tapMarker) {
+            this.tapMarker.setVisible(playerData.hasWaypoint);
+        }
+
         // If we have a waypoint and are moving, update predicted position
         if (playerData.hasWaypoint) {
             // Initialize predicted position if needed
@@ -1524,11 +1529,9 @@ export default class GameScene extends Phaser.Scene {
                 this.currentDirection.set(0, 0);
                 this.predictedPosition.set(playerData.waypoint.x, playerData.waypoint.y);
                 
-                // Clear tap target and marker
+                // Clear tap target 
                 this.tapTarget = null;
-                if (this.tapMarker) {
-                    this.tapMarker.setVisible(false);
-                }
+                // tapMarker visibility is handled above by playerData.hasWaypoint
             } else {
                 // Continue moving towards waypoint
                 this.isMoving = true;
@@ -1559,9 +1562,7 @@ export default class GameScene extends Phaser.Scene {
             this.predictedPosition = null; // Clear prediction when not moving
 
             this.tapTarget = null;
-            if (this.tapMarker) {
-                this.tapMarker.setVisible(false);
-            }
+            // tapMarker visibility is handled above by playerData.hasWaypoint
         }
 
         // Always update depth and UI after any position change
