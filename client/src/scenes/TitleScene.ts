@@ -24,6 +24,54 @@ export default class TitleScene extends Phaser.Scene {
     preload() {
         // Load assets needed for the title screen
         this.load.image('title_bg', '/assets/title_bg.png');
+        
+        // Preload game-over and victory assets to eliminate loading delays during transitions
+        this.load.image('victory_screen', '/assets/victory_screen.png');
+        this.load.image('loss_screen', '/assets/loss_screen.png');
+        
+        // Preload common effect assets used across scenes
+        this.load.image('white_pixel', '/assets/white_pixel.png');
+        
+        // Preload core game assets for faster initial gameplay
+        this.load.image('grass_background', '/assets/grass.png');
+        this.load.image('shadow', '/assets/shadow.png');
+        
+        // Preload player class sprites for faster character selection and gameplay
+        this.load.image('player_fighter', '/assets/class_fighter_1.png');
+        this.load.image('player_rogue', '/assets/class_rogue_1.png');
+        this.load.image('player_mage', '/assets/class_mage_1.png');
+        this.load.image('player_paladin', '/assets/class_paladin_1.png');
+        
+        // Preload class selection icons
+        this.load.image('fighter_icon', '/assets/attack_sword.png');
+        this.load.image('rogue_icon', '/assets/attack_knife.png');
+        this.load.image('mage_icon', '/assets/attack_wand.png');
+        this.load.image('paladin_icon', '/assets/attack_shield.png');
+        
+        // Preload upgrade UI assets to eliminate delays when leveling up
+        this.load.image('card_blank', '/assets/card_blank.png');
+        this.load.image('upgrade_maxHP', '/assets/upgrade_maxHP.png');
+        this.load.image('upgrade_regenHP', '/assets/upgrade_regenHP.png');
+        this.load.image('upgrade_speed', '/assets/upgrade_speed.png');
+        this.load.image('upgrade_armor', '/assets/upgrade_armor.png');
+        
+        // Preload gem assets for smooth gameplay experience
+        this.load.image('gem_1', '/assets/gem_1.png');
+        this.load.image('gem_2', '/assets/gem_2.png');
+        this.load.image('gem_3', '/assets/gem_3.png');
+        this.load.image('gem_4', '/assets/gem_4.png');
+        
+        // Preload monster assets for seamless gameplay
+        this.load.image('monster_rat', '/assets/monster_rat.png');
+        this.load.image('monster_slime', '/assets/monster_slime.png');
+        this.load.image('monster_orc', '/assets/monster_orc.png');
+        this.load.image('monster_spawn_indicator', '/assets/monster_spawn_indicator.png');
+        
+        // Preload boss assets for end-game experience
+        this.load.image('final_boss_phase1', '/assets/final_boss_phase_1.png');
+        this.load.image('final_boss_phase2', '/assets/final_boss_phase_2.png');
+        
+        console.log("TitleScene: Preloading ALL game assets for completely seamless gameplay experience");
     }
 
     create() {
@@ -63,6 +111,9 @@ export default class TitleScene extends Phaser.Scene {
         } else {
             console.log("TitleScene: Music loading disabled");
         }
+        
+        // Preload icons into browser cache for instant HTML img loading
+        this.preloadIconsForHTMLElements();
         
         // Set background
         this.cameras.main.setBackgroundColor('#042E64');
@@ -269,6 +320,45 @@ export default class TitleScene extends Phaser.Scene {
                 this.startButton.style.display = 'none';
             }
         }
+    }
+    
+    private preloadIconsForHTMLElements() {
+        console.log("TitleScene: Preloading icons into browser cache for HTML elements");
+        
+        const iconAssets = [
+            '/assets/attack_sword.png',
+            '/assets/attack_knife.png', 
+            '/assets/attack_wand.png',
+            '/assets/attack_shield.png'
+        ];
+        
+        // Create hidden img elements to preload assets into browser cache
+        iconAssets.forEach(src => {
+            const img = new Image();
+            img.src = src;
+            img.style.display = 'none';
+            img.style.position = 'absolute';
+            img.style.left = '-9999px';
+            
+            img.onload = () => {
+                console.log(`TitleScene: Successfully cached ${src} for HTML elements`);
+                // Remove the hidden element after loading
+                if (img.parentNode) {
+                    img.parentNode.removeChild(img);
+                }
+            };
+            
+            img.onerror = () => {
+                console.warn(`TitleScene: Failed to cache ${src}`);
+                // Remove the element even if loading failed
+                if (img.parentNode) {
+                    img.parentNode.removeChild(img);
+                }
+            };
+            
+            // Add to DOM to trigger loading
+            document.body.appendChild(img);
+        });
     }
     
     shutdown() {
