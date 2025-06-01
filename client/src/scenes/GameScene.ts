@@ -197,6 +197,9 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('gem_3', '/assets/gem_3.png');
         this.load.image('gem_4', '/assets/gem_4.png');
         this.load.image('soul', '/assets/soul.png');
+        this.load.image('fries', '/assets/fries.png');
+        this.load.image('dice', '/assets/dice.png');
+        this.load.image('booster_pack', '/assets/booster_pack.png');
         
         // Load a white pixel for particle effects
         this.load.image('white_pixel', '/assets/white_pixel.png');
@@ -266,6 +269,9 @@ export default class GameScene extends Phaser.Scene {
 
             // Add T key for triggering boss spawn testing
             this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.T).on('down', this.triggerBossSpawnerTest, this);
+
+            // Add G key for spawning debug special gems
+            this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.G).on('down', this.spawnDebugSpecialGem, this);
         }
         console.log("Keyboard input set up.");
 
@@ -2708,5 +2714,16 @@ export default class GameScene extends Phaser.Scene {
             console.log("Boss defeated! Hiding haze overlay");
             this.hideBossHaze();
         }
+    }
+
+    // Add the spawnDebugSpecialGem method
+    private spawnDebugSpecialGem(): void {
+        if (!this.spacetimeDBClient.sdkConnection?.db) {
+            console.log("Cannot spawn debug special gem: Connection not available");
+            return;
+        }
+        
+        console.log("Spawning debug special gem...");
+        this.spacetimeDBClient.sdkConnection.reducers.spawnDebugSpecialGem();
     }
 }

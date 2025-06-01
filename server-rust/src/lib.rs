@@ -511,7 +511,7 @@ pub fn create_new_player_with_position(ctx: &ReducerContext, name: &str, player_
         speed,
         armor: armor as u32,
         unspent_upgrades: 0,
-        rerolls: 999,
+        rerolls: 1,
         shield_count,
         position,
         radius: 48.0,

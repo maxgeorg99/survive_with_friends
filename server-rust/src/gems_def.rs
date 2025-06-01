@@ -1,15 +1,18 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, SpacetimeType, rand::Rng};
 use crate::{DbVector2, MAX_GEM_COUNT, WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_HEIGHT, WORLD_GRID_WIDTH,
-           get_world_cell_from_position, spatial_hash_collision_checker, CollisionCache, entity, player};
+           get_world_cell_from_position, spatial_hash_collision_checker, CollisionCache, entity, player, account};
 
-// Define the gem levels (1-4 + Soul)
+// Define the gem levels (1-4 + Soul + Special types)
 #[derive(SpacetimeType, Clone, Debug, PartialEq)]
 pub enum GemLevel {
-    Small,  // = 1
-    Medium, // = 2
-    Large,  // = 3
-    Huge,   // = 4
-    Soul,   // Special gem created from player deaths
+    Small,      // = 1
+    Medium,     // = 2
+    Large,      // = 3
+    Huge,       // = 4
+    Soul,       // Special gem created from player deaths
+    Fries,      // Special gem that heals 100 HP
+    Dice,       // Special gem that grants extra reroll
+    BoosterPack, // Special gem that grants immediate upgrade
 }
 
 // Table for storing gem objects in the game
@@ -91,6 +94,9 @@ pub fn create_gem(ctx: &ReducerContext, position: DbVector2, level: GemLevel) ->
         GemLevel::Large => config.exp_large_gem,
         GemLevel::Huge => config.exp_huge_gem,
         GemLevel::Soul => 0, // Soul gems have their value set separately
+        GemLevel::Fries => 0, // Special gems don't use exp values
+        GemLevel::Dice => 0, // Special gems don't use exp values
+        GemLevel::BoosterPack => 0, // Special gems don't use exp values
     };
 
     // Create an entity for the gem
@@ -190,8 +196,32 @@ pub fn spawn_gem_on_monster_death(ctx: &ReducerContext, monster_id: u32, positio
     let mut rng = ctx.rng();
     let roll = rng.gen_range(0.0..1.0);
     if roll <= drop_chance {
-        spawn_random_gem(ctx, position);
-        //Log::info(&format!("Monster {} dropped a gem at position {}, {}", monster_id, position.x, position.y));
+        // Small chance for special gems (2% total, 0.67% each)
+        let special_gem_roll = rng.gen_range(1..=100);
+        
+        if special_gem_roll == 1 {
+            let sub_special_gem_roll = rng.gen_range(1..=100);
+
+            // 1% chance for Fries
+            if sub_special_gem_roll <= 50 {
+                create_gem(ctx, position, GemLevel::Fries);
+                log::info!("Monster {} dropped special Fries gem at position {}, {}", monster_id, position.x, position.y);
+            }
+            // 1% chance for Dice
+            else if sub_special_gem_roll <= 90 {
+                create_gem(ctx, position, GemLevel::Dice);
+                log::info!("Monster {} dropped special Dice gem at position {}, {}", monster_id, position.x, position.y);
+            }
+            // 1% chance for BoosterPack
+            else{
+                create_gem(ctx, position, GemLevel::BoosterPack);
+                log::info!("Monster {} dropped special BoosterPack gem at position {}, {}", monster_id, position.x, position.y);
+            }
+        }
+        else {
+            // 97% chance for regular gem
+            spawn_random_gem(ctx, position);
+        }
     }
 }
 
@@ -218,6 +248,9 @@ pub fn get_exp_value_for_gem(ctx: &ReducerContext, level: &GemLevel) -> u32 {
             GemLevel::Large => 50,
             GemLevel::Huge => 100,
             GemLevel::Soul => 0, // Soul gems should have their value stored in the gem record
+            GemLevel::Fries => 0, // Special gems don't use exp values
+            GemLevel::Dice => 0, // Special gems don't use exp values
+            GemLevel::BoosterPack => 0, // Special gems don't use exp values
         };
     }
 
@@ -228,6 +261,9 @@ pub fn get_exp_value_for_gem(ctx: &ReducerContext, level: &GemLevel) -> u32 {
         GemLevel::Large => config.exp_large_gem,
         GemLevel::Huge => config.exp_huge_gem,
         GemLevel::Soul => 0, // Soul gems should have their value stored in the gem record
+        GemLevel::Fries => 0, // Special gems don't use exp values
+        GemLevel::Dice => 0, // Special gems don't use exp values
+        GemLevel::BoosterPack => 0, // Special gems don't use exp values
     }
 }
 
@@ -297,14 +333,60 @@ pub fn collect_gem(ctx: &ReducerContext, gem_id: u32, player_id: u32) {
     // Get the entity ID for the gem
     let gem_entity_id = gem.entity_id;
 
-    // Use the gem's stored value instead of calculating from level
-    let exp_value = gem.value;
-
-    // Give player exp
-    give_player_exp(ctx, player_id, exp_value);
-
-    // Log the collection
-    log::info!("Player {} collected a {:?} gem worth {} exp", player_id, gem.level, exp_value);
+    // Handle special gem types with unique behaviors
+    match gem.level {
+        GemLevel::Fries => {
+            // Fries heal the player by 100 HP (don't exceed max HP)
+            let player_opt = ctx.db.player().player_id().find(&player_id);
+            if let Some(mut player) = player_opt {
+                let heal_amount = 100.0;
+                let new_hp = (player.hp + heal_amount).min(player.max_hp);
+                let actual_heal = new_hp - player.hp;
+                let max_hp = player.max_hp; // Store max_hp before updating
+                
+                player.hp = new_hp;
+                ctx.db.player().player_id().update(player);
+                
+                log::info!("Player {} collected Fries gem, healed {:.1} HP (now {:.1}/{:.1})", 
+                          player_id, actual_heal, new_hp, max_hp);
+            }
+        },
+        GemLevel::Dice => {
+            // Dice grant an extra reroll
+            let player_opt = ctx.db.player().player_id().find(&player_id);
+            if let Some(mut player) = player_opt {
+                player.rerolls += 1;
+                let new_rerolls = player.rerolls; // Store new value before updating
+                ctx.db.player().player_id().update(player);
+                
+                log::info!("Player {} collected Dice gem, gained 1 reroll (now has {})", 
+                          player_id, new_rerolls);
+            }
+        },
+        GemLevel::BoosterPack => {
+            // BoosterPack grants an immediate upgrade point (without leveling up)
+            let player_opt = ctx.db.player().player_id().find(&player_id);
+            if let Some(mut player) = player_opt {
+                player.unspent_upgrades += 1;
+                let new_upgrades = player.unspent_upgrades; // Store new value before updating
+                ctx.db.player().player_id().update(player);
+                
+                log::info!("Player {} collected BoosterPack gem, gained 1 upgrade point (now has {})", 
+                          player_id, new_upgrades);
+                
+                // If this is their first unspent upgrade, draw upgrade options
+                if new_upgrades == 1 {
+                    crate::upgrades_def::draw_upgrade_options(ctx, player_id);
+                }
+            }
+        },
+        _ => {
+            // Regular gems (including Soul gems) give experience
+            let exp_value = gem.value;
+            give_player_exp(ctx, player_id, exp_value);
+            log::info!("Player {} collected a {:?} gem worth {} exp", player_id, gem.level, exp_value);
+        }
+    }
 
     // Delete the gem and its entity
     ctx.db.gems().gem_id().delete(&gem_id);
@@ -394,4 +476,56 @@ pub fn process_gem_collisions_spatial_hash(ctx: &ReducerContext, collision_cache
             }
         }
     }
+}
+
+// Debug reducer to spawn a random special gem near the calling player
+#[reducer]
+pub fn spawn_debug_special_gem(ctx: &ReducerContext) {
+    // Get the caller's identity
+    let caller_identity = ctx.sender;
+    
+    // Find the caller's account
+    let account_opt = ctx.db.account().identity().find(&caller_identity);
+    if account_opt.is_none() {
+        log::error!("spawn_debug_special_gem: Account not found for caller");
+        return;
+    }
+    
+    let account = account_opt.unwrap();
+    if account.current_player_id == 0 {
+        log::error!("spawn_debug_special_gem: Caller has no active player");
+        return;
+    }
+    
+    // Find the player
+    let player_opt = ctx.db.player().player_id().find(&account.current_player_id);
+    if player_opt.is_none() {
+        log::error!("spawn_debug_special_gem: Player {} not found", account.current_player_id);
+        return;
+    }
+    
+    let player = player_opt.unwrap();
+    
+    // Generate a random position near the player (within 100 units)
+    let mut rng = ctx.rng();
+    let offset_x = rng.gen_range(-100.0..100.0);
+    let offset_y = rng.gen_range(-100.0..100.0);
+    let spawn_position = DbVector2::new(
+        player.position.x + offset_x,
+        player.position.y + offset_y,
+    );
+    
+    // Randomly select a special gem type
+    let gem_type_roll = rng.gen_range(1..=3);
+    let gem_level = match gem_type_roll {
+        1 => GemLevel::Fries,
+        2 => GemLevel::Dice,
+        _ => GemLevel::BoosterPack,
+    };
+    
+    // Create the special gem
+    let gem_id = create_gem(ctx, spawn_position, gem_level.clone());
+    
+    log::info!("DEBUG: Player {} spawned {:?} gem (ID: {}) at position ({:.1}, {:.1})", 
+              player.name, gem_level, gem_id, spawn_position.x, spawn_position.y);
 } 
