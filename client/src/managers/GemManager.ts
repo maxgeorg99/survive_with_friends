@@ -307,6 +307,65 @@ export default class GemManager {
         
         // Emit a burst of particles (without creating a new emitter)
         this.particleEmitter.explode(GEM_ANIMATION.COLLECTION_PARTICLES);
+        
+        // Add special animated text for special gem types
+        this.createSpecialGemText(gemContainer, gemLevelTag);
+    }
+
+    /**
+     * Create animated text effects for special gem pickups
+     */
+    private createSpecialGemText(gemContainer: Phaser.GameObjects.Container, gemLevelTag: string) {
+        let specialText = '';
+        let textColor = '#ffffff';
+        
+        switch (gemLevelTag) {
+            case 'Fries':
+                specialText = 'Tasty!';
+                textColor = '#ffaa00'; // Orange to match fries
+                break;
+            case 'Dice':
+                specialText = '+1 Reroll';
+                textColor = '#00ffff'; // Cyan to match dice
+                break;
+            case 'BoosterPack':
+                specialText = 'Upgrade!';
+                textColor = '#ff6600'; // Orange-red to match booster pack
+                break;
+            default:
+                // No special text for regular gems
+                return;
+        }
+        
+        // Create the animated text
+        const animatedText = this.scene.add.text(
+            gemContainer.x,
+            gemContainer.y - 30, // Start above the gem
+            specialText,
+            {
+                fontFamily: 'Arial',
+                fontSize: '24px',
+                color: textColor,
+                stroke: '#000000',
+                strokeThickness: 4,
+                fontStyle: 'bold'
+            }
+        );
+        animatedText.setOrigin(0.5);
+        animatedText.setDepth(BASE_DEPTH + gemContainer.y + 100); // High depth to appear above everything
+        
+        // Animate the text: float up and fade out
+        this.scene.tweens.add({
+            targets: animatedText,
+            y: animatedText.y - 60, // Float upward
+            alpha: { from: 1, to: 0 }, // Fade out
+            scale: { from: 1, to: 1.5 }, // Grow slightly
+            duration: 1500,
+            ease: 'Power2',
+            onComplete: () => {
+                animatedText.destroy(); // Clean up when animation is done
+            }
+        });
     }
 
     // Remove a gem and play collection animation

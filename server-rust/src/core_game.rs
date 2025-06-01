@@ -181,7 +181,7 @@ pub fn damage_player(ctx: &ReducerContext, player_id: u32, damage_amount: f32) -
         log::info!("Created Soul gem worth {} exp at player {}'s death location", soul_gem_value, player.name);
         
         // Store the player in the dead_players table before removing them
-        let dead_player_opt = ctx.db.dead_players().insert(DeadPlayer {
+        let _dead_player_opt = ctx.db.dead_players().insert(DeadPlayer {
             player_id: player.player_id,
             name: player.name.clone(),
             is_true_survivor: false,
@@ -447,6 +447,8 @@ pub fn game_tick(ctx: &ReducerContext, _timer: GameTickTimer) {
     process_monster_attack_collisions_spatial_hash(ctx);
 
     process_player_attack_collisions_spatial_hash(ctx);
+
+    crate::monsters_def::commit_monster_damage(ctx);
 
     commit_player_damage(ctx);
 

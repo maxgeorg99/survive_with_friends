@@ -475,14 +475,19 @@ export default class GameScene extends Phaser.Scene {
     private handlePlayerUpdated(ctx: EventContext, oldPlayer: Player, newPlayer: Player, isLocalPlayer: boolean) {
         //console.log("Player updated:", newPlayer.playerId, "Local:", isLocalPlayer);
         
-        // If local player and unspent upgrades increased, check for upgrade options
-        if (isLocalPlayer && newPlayer.unspentUpgrades > oldPlayer.unspentUpgrades) {
-            console.log("Player level up: upgrade points available:", newPlayer.unspentUpgrades);
+        // If local player and level increased, show level up effect
+        if (isLocalPlayer && newPlayer.level > oldPlayer.level) {
+            console.log("Player level up: from level", oldPlayer.level, "to level", newPlayer.level);
             
             // Play level up effect
             if (this.localPlayerSprite) {
                 this.createLevelUpEffect(this.localPlayerSprite);
             }
+        }
+        
+        // If local player and unspent upgrades increased, check for upgrade options
+        if (isLocalPlayer && newPlayer.unspentUpgrades > oldPlayer.unspentUpgrades) {
+            console.log("Player gained upgrade points:", newPlayer.unspentUpgrades);
 
             // Initialize upgrade UI if not already done
             if (!this.upgradeUI && this.localPlayerId > 0) {
