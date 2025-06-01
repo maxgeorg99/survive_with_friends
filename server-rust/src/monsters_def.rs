@@ -295,7 +295,7 @@ pub fn schedule_monster_spawning(ctx: &ReducerContext) {
     // Schedule monster spawning every 0.2 seconds
     ctx.db.monster_spawn_timer().insert(MonsterSpawnTimer {
         scheduled_id: 0,
-        scheduled_at: ScheduleAt::Interval(Duration::from_millis(200).into()),
+        scheduled_at: ScheduleAt::Interval(Duration::from_millis(3000).into()),
     });
     
     log::info!("Monster spawning scheduled successfully");

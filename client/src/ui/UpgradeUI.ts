@@ -23,12 +23,28 @@ interface AttackGraphicData {
     attackType: string;
 }
 
+// Card hold state interface
+interface CardHoldState {
+    isHolding: boolean;
+    holdStartTime: number;
+    holdTimer: Phaser.Time.TimerEvent | null;
+    progressBar: Phaser.GameObjects.Rectangle | null;
+    progressBarBackground: Phaser.GameObjects.Rectangle | null;
+}
+
 // Constants
 const CARD_WIDTH = 200;
 const CARD_HEIGHT = 260;
 const CARD_SPACING = 20;
 const CARD_SCALE = 0.8;
 const UI_DEPTH = 100000; // Extremely high depth to ensure UI stays on top of all game elements
+
+// Hold mechanic constants
+const HOLD_DURATION_MS = 800; // Time required to hold for selection (800ms)
+const PROGRESS_BAR_WIDTH = CARD_WIDTH * CARD_SCALE * 0.8;
+const PROGRESS_BAR_HEIGHT = 8;
+const PROGRESS_BAR_Y_OFFSET = (CARD_HEIGHT * CARD_SCALE) / 2 - 35; // Moved down slightly more
+const NUMBER_TEXT_Y_OFFSET = (CARD_HEIGHT * CARD_SCALE) / 2 + 5; // Moved up closer to cards (was +15, now +5)
 
 // Define upgrade icon mapping
 const UPGRADE_ICON_MAP: { [key: string]: string } = {
@@ -52,6 +68,13 @@ export default class UpgradeUI {
     private isVisible: boolean = false;
     private keyListeners: Phaser.Input.Keyboard.Key[] = [];
     private rerollText: Phaser.GameObjects.Text | null = null;
+    private chooseUpgradeText: Phaser.GameObjects.Text | null = null;
+    
+    // Hold state tracking for each card
+    private cardHoldStates: CardHoldState[] = [];
+    
+    // Track which pointers are being handled by UI to prevent movement
+    private handledPointers: Set<number> = new Set();
 
     constructor(scene: Phaser.Scene, spacetimeClient: SpacetimeDBClient, localPlayerId: number) {
         this.scene = scene;
@@ -69,8 +92,19 @@ export default class UpgradeUI {
             this.scene.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.THREE)
         ].filter((key): key is Phaser.Input.Keyboard.Key => key !== undefined);
 
-        // Create reroll text with instruction
-        this.rerollText = this.scene.add.text(0, -CARD_HEIGHT / 2 - 40, "Press R to reroll (Available: 0)", {
+        // Create "Choose an upgrade" text - moved back down for proper distance from character
+        this.chooseUpgradeText = this.scene.add.text(0, -CARD_HEIGHT / 2 - 30, "Choose an upgrade", {
+            fontSize: '24px',
+            fontFamily: 'Arial',
+            color: '#ffff00', // Yellow color to make it stand out
+            stroke: '#000000',
+            strokeThickness: 4,
+        });
+        this.chooseUpgradeText.setOrigin(0.5);
+        this.container.add(this.chooseUpgradeText);
+
+        // Create reroll text with instruction - also moved down to maintain spacing
+        this.rerollText = this.scene.add.text(0, -CARD_HEIGHT / 2, "Press R to reroll (Available: 0)", {
             fontSize: '18px',
             fontFamily: 'Arial',
             color: '#ffffff',
@@ -80,18 +114,18 @@ export default class UpgradeUI {
         this.rerollText.setOrigin(0.5);
         this.container.add(this.rerollText);
 
-        console.log('UpgradeUI initialized');
+        console.log('UpgradeUI initialized with hold mechanics');
     }
 
     public update(time: number, delta: number): void {
         if (!this.isVisible) return;
 
-        // Position the container at the bottom of the camera
+        // Position the container at the bottom of the camera - moved up to be closer to text
         const camera = this.scene.cameras.main;
         if (camera) {
             this.container.setPosition(
                 camera.scrollX + camera.width / 2,
-                camera.scrollY + camera.height - CARD_HEIGHT / 2 - 20
+                camera.scrollY + camera.height - CARD_HEIGHT / 2 - 60 // Moved up from -20 to -60
             );
         }
 
@@ -104,7 +138,32 @@ export default class UpgradeUI {
             }
         }
 
-        // Check for number key presses
+        // Update progress bars for cards being held
+        this.cardHoldStates.forEach((holdState, index) => {
+            if (holdState.isHolding && holdState.progressBar && holdState.holdStartTime > 0) {
+                const elapsed = time - holdState.holdStartTime;
+                const progress = Math.min(elapsed / HOLD_DURATION_MS, 1);
+                
+                // Update progress bar width
+                holdState.progressBar.width = PROGRESS_BAR_WIDTH * progress;
+                
+                // Change color as it progresses
+                if (progress < 0.3) {
+                    holdState.progressBar.fillColor = 0xff4444; // Red
+                } else if (progress < 0.7) {
+                    holdState.progressBar.fillColor = 0xffaa00; // Orange
+                } else {
+                    holdState.progressBar.fillColor = 0x44ff44; // Green
+                }
+                
+                // Complete selection if progress is full
+                if (progress >= 1) {
+                    this.completeHoldSelection(index);
+                }
+            }
+        });
+
+        // Check for number key presses (immediate selection)
         for (let i = 0; i < this.keyListeners.length; i++) {
             if (Phaser.Input.Keyboard.JustDown(this.keyListeners[i])) {
                 this.chooseUpgrade(i);
@@ -128,20 +187,30 @@ export default class UpgradeUI {
     }
 
     private createUpgradeCards(): void {
-        // Clear any existing cards
+        // Clear any existing cards and hold states
         this.cards.forEach(card => card.destroy());
         this.cards = [];
+        this.cardHoldStates = [];
 
         // Calculate total width of all cards with spacing
         const totalWidth = (this.upgradeOptions.length * CARD_WIDTH) + ((this.upgradeOptions.length - 1) * CARD_SPACING);
         const startX = -totalWidth / 2 + CARD_WIDTH / 2;
 
-        // Create a card for each option
+        // Create a card for each option - moved up closer to text
         this.upgradeOptions.forEach((option, index) => {
             const x = startX + (index * (CARD_WIDTH + CARD_SPACING));
-            const card = this.createCard(x, 0, option, index);
+            const card = this.createCard(x, -20, option, index); // Moved up from y=0 to y=-30
             this.cards.push(card);
             this.container.add(card);
+            
+            // Initialize hold state for this card
+            this.cardHoldStates.push({
+                isHolding: false,
+                holdStartTime: 0,
+                holdTimer: null,
+                progressBar: null,
+                progressBarBackground: null
+            });
         });
     }
 
@@ -153,19 +222,91 @@ export default class UpgradeUI {
         background.setScale(CARD_SCALE);
         card.add(background);
         
-        // Make card interactive
-        background.setInteractive({ useHandCursor: true });
-        background.on('pointerdown', () => this.chooseUpgrade(index));
-        background.on('pointerover', () => background.setTint(0xdddddd));
-        background.on('pointerout', () => background.clearTint());
+        // Create progress bar background (initially hidden)
+        const progressBarBackground = this.scene.add.rectangle(
+            0, 
+            PROGRESS_BAR_Y_OFFSET, 
+            PROGRESS_BAR_WIDTH, 
+            PROGRESS_BAR_HEIGHT, 
+            0x333333, 
+            0.8
+        );
+        progressBarBackground.setVisible(false);
+        card.add(progressBarBackground);
         
-        // Add number text (1, 2, or 3)
-        const numberText = this.scene.add.text(0, background.height * CARD_SCALE, `${index + 1}`, {
-            fontSize: '48px',
+        // Create progress bar (initially hidden)
+        const progressBar = this.scene.add.rectangle(
+            -PROGRESS_BAR_WIDTH / 2, 
+            PROGRESS_BAR_Y_OFFSET, 
+            0, 
+            PROGRESS_BAR_HEIGHT, 
+            0xff4444, 
+            1
+        );
+        progressBar.setOrigin(0, 0.5);
+        progressBar.setVisible(false);
+        card.add(progressBar);
+        
+        // Store progress bar references
+        this.cardHoldStates[index] = {
+            isHolding: false,
+            holdStartTime: 0,
+            holdTimer: null,
+            progressBar: progressBar,
+            progressBarBackground: progressBarBackground
+        };
+        
+        // Make card interactive with proper input consumption
+        background.setInteractive({ useHandCursor: true });
+        
+        // Hover effects
+        background.on('pointerover', () => {
+            background.setTint(0xdddddd);
+            console.log(`Hovering over upgrade card ${index + 1}`);
+        });
+        
+        background.on('pointerout', () => {
+            background.clearTint();
+            // Cancel hold if pointer leaves the card
+            this.cancelHold(index);
+        });
+        
+        // CRITICAL: Use input manager to consume pointer events properly
+        background.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+            console.log(`Pointer down on upgrade card ${index + 1}, pointerId: ${pointer.id}`);
+            
+            // Mark this pointer as handled by UI
+            this.handledPointers.add(pointer.id);
+            
+            // Stop this pointer from being processed by other input handlers
+            this.scene.input.stopPropagation();
+            
+            this.startHold(index);
+            console.log(`Started holding upgrade card ${index + 1}`);
+        });
+        
+        background.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+            console.log(`Pointer up on upgrade card ${index + 1}, pointerId: ${pointer.id}`);
+            
+            // Remove this pointer from handled set
+            this.handledPointers.delete(pointer.id);
+            
+            this.cancelHold(index);
+            console.log(`Released upgrade card ${index + 1}`);
+        });
+        
+        // Also handle pointer leave to clean up handled pointers
+        background.on('pointerout', (pointer: Phaser.Input.Pointer) => {
+            this.handledPointers.delete(pointer.id);
+        });
+        
+        // Add number text (1, 2, or 3) - made smaller
+        const numberText = this.scene.add.text(0, NUMBER_TEXT_Y_OFFSET, `${index + 1}`, {
+            fontSize: '36px', // Reduced from 48px to 36px
             fontFamily: 'Arial',
             color: '#ffffff',
             stroke: '#000000',
-            strokeThickness: 4
+            strokeThickness: 3 // Reduced stroke thickness too
         });
         numberText.setOrigin(0.5);
         card.add(numberText);
@@ -194,6 +335,92 @@ export default class UpgradeUI {
         card.add(descText);
         
         return card;
+    }
+    
+    private startHold(index: number): void {
+        if (index >= this.cardHoldStates.length) return;
+        
+        const holdState = this.cardHoldStates[index];
+        holdState.isHolding = true;
+        holdState.holdStartTime = this.scene.time.now;
+        
+        // Show progress bars
+        if (holdState.progressBar && holdState.progressBarBackground) {
+            holdState.progressBarBackground.setVisible(true);
+            holdState.progressBar.setVisible(true);
+            holdState.progressBar.width = 0; // Reset width
+        }
+        
+        // Add visual feedback to the card
+        const card = this.cards[index];
+        if (card) {
+            // Add a subtle glow effect while holding
+            this.scene.tweens.add({
+                targets: card,
+                scaleX: 1.05,
+                scaleY: 1.05,
+                duration: 100,
+                ease: 'Power2'
+            });
+        }
+    }
+    
+    private cancelHold(index: number): void {
+        if (index >= this.cardHoldStates.length) return;
+        
+        const holdState = this.cardHoldStates[index];
+        holdState.isHolding = false;
+        holdState.holdStartTime = 0;
+        
+        // Clear any existing timer
+        if (holdState.holdTimer) {
+            holdState.holdTimer.destroy();
+            holdState.holdTimer = null;
+        }
+        
+        // Hide progress bars
+        if (holdState.progressBar && holdState.progressBarBackground) {
+            holdState.progressBarBackground.setVisible(false);
+            holdState.progressBar.setVisible(false);
+        }
+        
+        // Reset card scale
+        const card = this.cards[index];
+        if (card) {
+            this.scene.tweens.add({
+                targets: card,
+                scaleX: 1,
+                scaleY: 1,
+                duration: 100,
+                ease: 'Power2'
+            });
+        }
+    }
+    
+    private completeHoldSelection(index: number): void {
+        // Cancel the hold state first
+        this.cancelHold(index);
+        
+        // Flash the card to indicate selection
+        const card = this.cards[index];
+        if (card) {
+            this.scene.tweens.add({
+                targets: card,
+                alpha: 0.5,
+                duration: 100,
+                yoyo: true,
+                repeat: 1,
+                onComplete: () => {
+                    // Select the upgrade after the flash
+                    this.chooseUpgrade(index);
+                }
+            });
+        } else {
+            // Fallback if card doesn't exist
+            this.chooseUpgrade(index);
+        }
+        
+        console.log(`Completed hold selection for upgrade card ${index + 1}`);
     }
     
     private getUpgradeDescription(option: UpgradeOptionData): string {
@@ -332,11 +559,32 @@ export default class UpgradeUI {
         console.log("Hiding UpgradeUI");
         this.isVisible = false;
         this.container.setVisible(false);
+        
+        // Cancel any active holds when hiding
+        this.cardHoldStates.forEach((_, index) => {
+            this.cancelHold(index);
+        });
+        
+        // Clear all handled pointers when hiding
+        this.handledPointers.clear();
     }
 
     public destroy(): void {
+        // Cancel all holds and clean up timers
+        this.cardHoldStates.forEach((_, index) => {
+            this.cancelHold(index);
+        });
+        
+        // Clear handled pointers
+        this.handledPointers.clear();
+        
         this.keyListeners.forEach(key => key.destroy());
         this.cards.forEach(card => card.destroy());
         this.container.destroy();
+    }
+
+    // Add method to check if a pointer is handled by UI
+    public isPointerHandledByUI(pointerId: number): boolean {
+        return this.handledPointers.has(pointerId);
     }
 }

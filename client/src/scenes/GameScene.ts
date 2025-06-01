@@ -2502,6 +2502,12 @@ export default class GameScene extends Phaser.Scene {
     // Setup touch input
     private setupTouchInput() {        
         this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+            // Check if this pointer is being handled by the upgrade UI
+            if (this.upgradeUI && this.upgradeUI.isPointerHandledByUI && this.upgradeUI.isPointerHandledByUI(pointer.id)) {
+                console.log("Pointer is handled by upgrade UI - skipping movement command");
+                return;
+            }
+            
             if (this.localPlayerSprite) {
                 console.log("Pointer down - setting tap target");
                 const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
