@@ -12,6 +12,13 @@ const CLASS_ID_MAP = {
     "Paladin": 3
 };
 
+const CLASS_ICON_MAP : Record<string, string> = {
+    "fighter_icon": "attack_sword",
+    "rogue_icon": "attack_knife",
+    "mage_icon": "attack_wand",
+    "paladin_icon": "attack_shield"
+};
+
 export default class ClassSelectScene extends Phaser.Scene {
     private spacetimeDBClient: SpacetimeDBClient;
     private gameEvents: Phaser.Events.EventEmitter;
@@ -40,10 +47,10 @@ export default class ClassSelectScene extends Phaser.Scene {
 
     preload() {
         // Load character class icons
-        this.load.image('fighter_icon', '/assets/fighter_icon.png');
-        this.load.image('rogue_icon', '/assets/rogue_icon.png');
-        this.load.image('mage_icon', '/assets/mage_icon.png');
-        this.load.image('paladin_icon', '/assets/paladin_icon.png');
+        this.load.image('fighter_icon', '/assets/attack_sword.png');
+        this.load.image('rogue_icon', '/assets/attack_knife.png');
+        this.load.image('mage_icon', '/assets/attack_wand.png');
+        this.load.image('paladin_icon', '/assets/attack_shield.png');
         this.load.image('title_bg', '/assets/title_bg.png');
     }
 
@@ -165,7 +172,7 @@ export default class ClassSelectScene extends Phaser.Scene {
             button.style.cursor = 'pointer';
             button.style.fontFamily = 'Arial';
             button.style.fontSize = '18px';
-            button.style.textAlign = 'left';
+            button.style.textAlign = 'center';
             button.style.transition = 'background-color 0.2s, border-color 0.2s';
             button.style.display = 'flex';
             button.style.alignItems = 'center';
@@ -173,25 +180,64 @@ export default class ClassSelectScene extends Phaser.Scene {
             // Add icon if available
             try {
                 if (this.textures.exists(iconName)) {
-                    const icon = document.createElement('img');
-                    icon.src = '/assets/' + iconName + '.png';
-                    icon.style.width = '50px';
-                    icon.style.height = '50px';
-                    icon.style.marginRight = '10px';
-                    button.appendChild(icon);
+                    // Left icon
+                    const leftIcon = document.createElement('img');
+                    const iconNameResult : string = CLASS_ICON_MAP[iconName];
+                    leftIcon.src = '/assets/' + iconNameResult + '.png';
+                    leftIcon.style.width = '50px';
+                    leftIcon.style.height = '50px';
+                    leftIcon.style.marginRight = '10px';
+                    button.appendChild(leftIcon);
                 }
             } catch (error) {
-                console.error(`Error adding icon for ${name}:`, error);
+                console.error(`Error adding left icon for ${name}:`, error);
             }
             
             // Add text
             const textSpan = document.createElement('span');
             textSpan.textContent = name;
+            textSpan.style.position = 'absolute';
+            textSpan.style.left = '0';
+            textSpan.style.right = '0';
+            textSpan.style.textAlign = 'center';
             button.appendChild(textSpan);
+            
+            // Add right icon if available
+            try {
+                if (this.textures.exists(iconName)) {
+                    const rightIcon = document.createElement('img');
+                    const iconNameResult : string = CLASS_ICON_MAP[iconName];
+                    rightIcon.src = '/assets/' + iconNameResult + '.png';
+                    rightIcon.style.width = '50px';
+                    rightIcon.style.height = '50px';
+                    rightIcon.style.position = 'absolute';
+                    rightIcon.style.right = '10px';
+                    rightIcon.style.top = '50%';
+                    rightIcon.style.transform = 'translateY(-50%)';
+                    button.appendChild(rightIcon);
+                }
+            } catch (error) {
+                console.error(`Error adding right icon for ${name}:`, error);
+            }
             
             // Add event listener
             button.addEventListener('click', () => {
                 this.selectClass(classType, button);
+            });
+            
+            // Add hover effects
+            button.addEventListener('mouseenter', () => {
+                if (button.style.backgroundColor !== 'rgb(52, 152, 219)') { // Not selected (selected color is #3498db)
+                    button.style.backgroundColor = '#34495e';
+                    button.style.borderColor = '#4a6074';
+                }
+            });
+            
+            button.addEventListener('mouseleave', () => {
+                if (button.style.backgroundColor !== 'rgb(52, 152, 219)') { // Not selected
+                    button.style.backgroundColor = '#2c3e50';
+                    button.style.borderColor = '#34495e';
+                }
             });
             
             return button;
