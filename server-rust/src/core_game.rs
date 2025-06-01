@@ -215,7 +215,7 @@ pub fn damage_player(ctx: &ReducerContext, player_id: u32, damage_amount: f32) -
 }
 
 // Helper method to clean up all attack-related data for a player
-fn cleanup_player_attacks(ctx: &ReducerContext, player_id: u32) {
+pub fn cleanup_player_attacks(ctx: &ReducerContext, player_id: u32) {
     log::info!("Cleaning up all attack data for player {}", player_id);
     
     // Step 1: Clean up active attacks using filter on player_id

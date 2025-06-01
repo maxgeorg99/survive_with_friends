@@ -364,6 +364,23 @@ export default class GameScene extends Phaser.Scene {
             if (oldAccount.state.tag !== newAccount.state.tag) {
                 console.log("GameScene: Account state changed from", oldAccount.state.tag, "to", newAccount.state.tag);
                 
+                // IMMEDIATELY stop attack manager and disable controls when transitioning away from Playing
+                if (newAccount.state.tag !== 'Playing') {
+                    console.log("GameScene: Account leaving Playing state - stopping attacks and disabling controls");
+                    
+                    // Stop AttackManager immediately to prevent new attacks
+                    if (this.attackManager) {
+                        this.attackManager.shutdown();
+                        this.attackManager = null;
+                    }
+                    
+                    // Disable player controls immediately
+                    this.disablePlayerControls();
+                    
+                    // Set game over flag to prevent movement
+                    this.gameOver = true;
+                }
+                
                 // If state changed to Dead, transition to DeadScene
                 if (newAccount.state.tag === 'Dead') {
                     console.log("GameScene: Account state is now Dead - transitioning to DeadScene");
@@ -477,6 +494,13 @@ export default class GameScene extends Phaser.Scene {
         console.log("Player died event received in GameScene");
         // This is our local player that died
         console.log("Local player died:", player);
+        
+        // IMMEDIATELY stop attack manager to prevent new attacks
+        if (this.attackManager) {
+            console.log("GameScene: Player died - immediately stopping AttackManager");
+            this.attackManager.shutdown();
+            this.attackManager = null;
+        }
         
         // Clear any upgrade UI that may be open
         if (this.upgradeUI) {
@@ -1797,6 +1821,51 @@ export default class GameScene extends Phaser.Scene {
             this.monsterCounterUI.destroy();
             this.monsterCounterUI = null;
         }
+        
+        // DEFENSIVE CLEANUP: Remove any lingering game objects that might persist between scenes
+        console.log("GameScene: Performing defensive cleanup of lingering game objects");
+        
+        // Clean up any remaining sprites/images with attack-related textures
+        const attackTextures = ['attack_sword', 'attack_wand', 'attack_knife', 'attack_shield'];
+        this.children.list.forEach(child => {
+            if (child instanceof Phaser.GameObjects.Sprite || child instanceof Phaser.GameObjects.Image) {
+                if (attackTextures.includes(child.texture.key)) {
+                    console.log("GameScene: Removing lingering attack sprite with texture:", child.texture.key);
+                    child.destroy();
+                }
+            }
+        });
+        
+        // Clean up any remaining containers that might contain attack sprites
+        this.children.list.forEach(child => {
+            if (child instanceof Phaser.GameObjects.Container) {
+                // Check if container has attack-related children
+                const hasAttackSprites = child.list.some(subChild => {
+                    if (subChild instanceof Phaser.GameObjects.Sprite || subChild instanceof Phaser.GameObjects.Image) {
+                        return attackTextures.includes(subChild.texture.key);
+                    }
+                    return false;
+                });
+                
+                if (hasAttackSprites) {
+                    console.log("GameScene: Removing container with attack sprites");
+                    child.destroy();
+                }
+            }
+        });
+        
+        // Clean up any particles or effects that might be running
+        this.children.list.forEach(child => {
+            if (child instanceof Phaser.GameObjects.Particles.ParticleEmitter) {
+                console.log("GameScene: Stopping and removing lingering particle emitter");
+                child.stop();
+                child.destroy();
+            }
+        });
+        
+        // Clean up any tweens that might be running
+        this.tweens.killAll();
+        console.log("GameScene: Killed all running tweens");
         
         // Note: SpacetimeDB event handlers are managed by the SDK
         // The connection to the database will be cleaned up when the game is closed

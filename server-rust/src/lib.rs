@@ -288,6 +288,7 @@ pub fn client_connected(ctx: &ReducerContext) {
                             "Account {} was in Playing state but no living player found (PlayerID: {}). Transitioning to ChoosingClass.", 
                             identity, account.current_player_id
                         );
+                        
                         let mut updated_account = account;
                         updated_account.state = AccountState::ChoosingClass;
                         updated_account.current_player_id = 0;  // Reset player ID since no living player found

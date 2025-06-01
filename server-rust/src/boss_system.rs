@@ -193,6 +193,10 @@ pub fn handle_boss_defeated(ctx: &ReducerContext) {
         // Transition the account to winner state and schedule return to character select
         crate::transition_player_to_winner_state(ctx, player.player_id);
         
+        // IMPORTANT: Clean up all attack-related data for this player before deletion
+        // This was missing and causing orphaned attacks to persist in the database
+        crate::core_game::cleanup_player_attacks(ctx, player.player_id);
+        
         true_survivors_count += 1;
         
         // Delete the player
