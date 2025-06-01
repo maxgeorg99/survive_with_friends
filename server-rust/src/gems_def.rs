@@ -2,13 +2,14 @@ use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, Sp
 use crate::{DbVector2, MAX_GEM_COUNT, WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_HEIGHT, WORLD_GRID_WIDTH,
            get_world_cell_from_position, spatial_hash_collision_checker, CollisionCache, entity, player};
 
-// Define the gem levels (1-4)
+// Define the gem levels (1-4 + Soul)
 #[derive(SpacetimeType, Clone, Debug, PartialEq)]
 pub enum GemLevel {
     Small,  // = 1
     Medium, // = 2
     Large,  // = 3
-    Huge    // = 4
+    Huge,   // = 4
+    Soul,   // Special gem created from player deaths
 }
 
 // Table for storing gem objects in the game
@@ -21,7 +22,8 @@ pub struct Gem {
     #[unique]
     pub entity_id: u32, // Associated entity for this gem
 
-    pub level: GemLevel, // Level of the gem (1-4)
+    pub level: GemLevel, // Level of the gem (1-4 + Soul)
+    pub value: u32,      // Experience value of the gem
 }
 
 // Table for storing experience configuration
@@ -82,6 +84,15 @@ pub fn create_gem(ctx: &ReducerContext, position: DbVector2, level: GemLevel) ->
     let config = config.unwrap();
     let gem_radius = config.gem_radius;
 
+    // Calculate the gem value based on level
+    let gem_value = match level {
+        GemLevel::Small => config.exp_small_gem,
+        GemLevel::Medium => config.exp_medium_gem,
+        GemLevel::Large => config.exp_large_gem,
+        GemLevel::Huge => config.exp_huge_gem,
+        GemLevel::Soul => 0, // Soul gems have their value set separately
+    };
+
     // Create an entity for the gem
     let gem_entity_opt = ctx.db.entity().insert(crate::Entity {
         entity_id: 0,
@@ -100,16 +111,54 @@ pub fn create_gem(ctx: &ReducerContext, position: DbVector2, level: GemLevel) ->
         gem_id: 0,
         entity_id: gem_entity.entity_id,
         level,
+        value: gem_value,
     });
 
     let gem = gem_opt;
-    //Log::info(&format!("Created {:?} gem (ID: {}) at position {}, {}", gem.level, gem.gem_id, position.x, position.y));
+    gem.gem_id
+}
+
+// Creates a Soul gem with a specific value at the given position
+pub fn create_soul_gem(ctx: &ReducerContext, position: DbVector2, exp_value: u32) -> u32 {
+    let config = ctx.db.exp_config().config_id().find(&0);
+    if config.is_none() {
+        log::error!("Experience system not initialized");
+        return 0;
+    }
+
+    let config = config.unwrap();
+    let gem_radius = config.gem_radius;
+
+    // Create an entity for the gem
+    let gem_entity_opt = ctx.db.entity().insert(crate::Entity {
+        entity_id: 0,
+        position,
+        direction: DbVector2::new(0.0, 0.0), // Gems don't move
+        is_moving: false,
+        radius: gem_radius, // Fixed radius for gems
+        waypoint: DbVector2::new(0.0, 0.0),
+        has_waypoint: false,
+    });
+
+    let gem_entity = gem_entity_opt;
+
+    // Create the soul gem with the specified value
+    let gem_opt = ctx.db.gems().insert(Gem {
+        gem_id: 0,
+        entity_id: gem_entity.entity_id,
+        level: GemLevel::Soul,
+        value: exp_value,
+    });
+
+    let gem = gem_opt;
+    log::info!("Created Soul gem (ID: {}) worth {} exp at position {}, {}", gem.gem_id, gem.value, position.x, position.y);
     gem.gem_id
 }
 
 // Helper method to spawn a gem with a random level at the given position
+// Note: Soul gems cannot be spawned randomly - they are only created from player deaths
 pub fn spawn_random_gem(ctx: &ReducerContext, position: DbVector2) -> u32 {
-    // Randomly select a gem level with weighted probabilities
+    // Randomly select a gem level with weighted probabilities (excluding Soul gems)
     let mut rng = ctx.rng();
     let random_value = rng.gen_range(1..=100); // 1-100
     let level = if random_value <= 79 {
@@ -158,7 +207,7 @@ pub fn calculate_exp_for_level(ctx: &ReducerContext, level: u32) -> u32 {
     (config.base_exp_per_level as f32 * (level as f32).powf(config.level_exp_factor)) as u32
 }
 
-// Get exp value for a gem level
+// Get exp value for a gem level (now deprecated - use gem.value instead)
 pub fn get_exp_value_for_gem(ctx: &ReducerContext, level: &GemLevel) -> u32 {
     let config = ctx.db.exp_config().config_id().find(&0);
     if config.is_none() {
@@ -168,6 +217,7 @@ pub fn get_exp_value_for_gem(ctx: &ReducerContext, level: &GemLevel) -> u32 {
             GemLevel::Medium => 25,
             GemLevel::Large => 50,
             GemLevel::Huge => 100,
+            GemLevel::Soul => 0, // Soul gems should have their value stored in the gem record
         };
     }
 
@@ -177,6 +227,7 @@ pub fn get_exp_value_for_gem(ctx: &ReducerContext, level: &GemLevel) -> u32 {
         GemLevel::Medium => config.exp_medium_gem,
         GemLevel::Large => config.exp_large_gem,
         GemLevel::Huge => config.exp_huge_gem,
+        GemLevel::Soul => 0, // Soul gems should have their value stored in the gem record
     }
 }
 
@@ -246,14 +297,14 @@ pub fn collect_gem(ctx: &ReducerContext, gem_id: u32, player_id: u32) {
     // Get the entity ID for the gem
     let gem_entity_id = gem.entity_id;
 
-    // Calculate exp based on gem level
-    let exp_value = get_exp_value_for_gem(ctx, &gem.level);
+    // Use the gem's stored value instead of calculating from level
+    let exp_value = gem.value;
 
     // Give player exp
     give_player_exp(ctx, player_id, exp_value);
 
     // Log the collection
-    //Log::info(&format!("Player {} collected a {:?} gem worth {} exp", player_id, gem.level, exp_value));
+    log::info!("Player {} collected a {:?} gem worth {} exp", player_id, gem.level, exp_value);
 
     // Delete the gem and its entity
     ctx.db.gems().gem_id().delete(&gem_id);

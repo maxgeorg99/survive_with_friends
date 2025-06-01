@@ -60,6 +60,7 @@ export default class TitleScene extends Phaser.Scene {
         this.load.image('gem_2', '/assets/gem_2.png');
         this.load.image('gem_3', '/assets/gem_3.png');
         this.load.image('gem_4', '/assets/gem_4.png');
+        this.load.image('soul', '/assets/soul.png');
         
         // Preload monster assets for seamless gameplay
         this.load.image('monster_rat', '/assets/monster_rat.png');

@@ -7,7 +7,8 @@ export const GEM_ASSET_KEYS: { [key: string]: string } = {
     'Small': 'gem_1',  // Small gem
     'Medium': 'gem_2', // Medium gem
     'Large': 'gem_3',  // Large gem
-    'Huge': 'gem_4'    // Huge gem
+    'Huge': 'gem_4',   // Huge gem
+    'Soul': 'soul'     // Soul gem (created from player deaths)
 };
 
 // Animation configuration for gems
@@ -23,7 +24,8 @@ export const GEM_PARTICLE_COLORS: { [key: string]: number } = {
     'Small': 0xd1e8ff,  // Light blue for small gems
     'Medium': 0x59ff96, // Light green for medium gems
     'Large': 0xffd659,  // Yellow for large gems
-    'Huge': 0xff59a5    // Pink for huge gems
+    'Huge': 0xff59a5,   // Pink for huge gems
+    'Soul': 0x9966ff    // Purple for soul gems
 };
 
 // Sound configuration for gems
