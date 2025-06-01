@@ -51,8 +51,8 @@ export default class DeadScene extends Phaser.Scene {
         // Create a container for all dead UI elements
         this.deadContainer = this.add.container(width/2, height/2);
         
-        // Add "YOU DIED" text
-        const deadText = this.add.text(0, -100, 'YOU DIED', {
+        // Add "You are no survivor" text
+        const deadText = this.add.text(0, -100, 'YOU ARE NO SURVIVOR', {
             fontFamily: 'Arial Black',
             fontSize: '72px',
             color: '#ff3333',

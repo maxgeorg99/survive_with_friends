@@ -1716,11 +1716,11 @@ export default class GameScene extends Phaser.Scene {
             .setScrollFactor(0)  // Fix to camera
             .setDepth(100000);    // Increased depth - extremely high to ensure it's on top
             
-        // Add "You are no Survivor" text
+        // Add "Connection Lost" text
         const titleText = this.add.text(
             width / 2, 
             height / 2 - 50, 
-            "You are no Survivor", 
+            "Connection Lost", 
             {
                 fontFamily: 'Arial',
                 fontSize: '48px',
@@ -1738,7 +1738,7 @@ export default class GameScene extends Phaser.Scene {
         const subtitleText = this.add.text(
             width / 2, 
             height / 2 + 50, 
-            "Choose a new character", 
+            "Please refresh the page to reconnect", 
             {
                 fontFamily: 'Arial',
                 fontSize: '24px',
