@@ -15,10 +15,20 @@ export default class BossTimerUI {
     private timerBackground: Phaser.GameObjects.Rectangle;
     private gameEvents: Phaser.Events.EventEmitter;
     
+    // Boss nameplate elements
+    private bossNameContainer!: Phaser.GameObjects.Container;
+    private bossNameText!: Phaser.GameObjects.Text;
+    private bossNameBackground!: Phaser.GameObjects.Rectangle;
+    private bossNameAnimation: Phaser.Tweens.Tween | null = null;
+    
     // Timer tracking
     private bossSpawnTime: number | null = null;
     private isTimerActive: boolean = false;
     private flashAnimation: Phaser.Tweens.Tween | null = null;
+    
+    // Boss state tracking
+    private bossActive: boolean = false;
+    private currentBossType: string | null = null;
 
     constructor(scene: Phaser.Scene, spacetimeClient: SpacetimeDBClient) {
         this.scene = scene;
@@ -48,6 +58,9 @@ export default class BossTimerUI {
         // Add elements to container
         this.container.add([this.timerBackground, this.timerText]);
         
+        // Create boss nameplate container (initially hidden)
+        this.createBossNameplate();
+        
         // Set initial position at top center of camera view
         const camera = this.scene.cameras.main;
         if (camera) {
@@ -66,11 +79,107 @@ export default class BossTimerUI {
         // Check for existing boss timer in the database
         this.checkForExistingBossTimer();
         
-        console.log('BossTimerUI initialized', {
-            containerVisible: this.container.visible,
-            containerPosition: { x: this.container.x, y: this.container.y },
-            containerDepth: this.container.depth,
-            containerAlpha: this.container.alpha
+        console.log('BossTimerUI initialized');
+    }
+
+    private createBossNameplate(): void {
+        // Create boss nameplate container
+        this.bossNameContainer = this.scene.add.container(0, 0);
+        this.bossNameContainer.setDepth(UI_DEPTH + 1); // Higher than timer
+        this.bossNameContainer.setVisible(false);
+        
+        // Create dark background for dramatic effect - smaller size
+        this.bossNameBackground = this.scene.add.rectangle(0, 0, 650, 100, 0x000000, 0.8);
+        this.bossNameBackground.setStrokeStyle(3, 0xaa6c39, 0.9); // Dark gold border
+        this.bossNameBackground.setOrigin(0.5, 0.5);
+        
+        // Create boss name text with Dark Souls style
+        this.bossNameText = this.scene.add.text(0, 0, "", {
+            fontSize: '48px',
+            fontFamily: 'serif',
+            color: '#f4e4bc', // Parchment/gold color
+            stroke: '#2c1810', // Dark brown stroke
+            strokeThickness: 6,
+            align: 'center',
+            fontStyle: 'bold'
+        });
+        this.bossNameText.setOrigin(0.5, 0.5);
+        
+        // Add elements to nameplate container
+        this.bossNameContainer.add([this.bossNameBackground, this.bossNameText]);
+    }
+
+    private showBossNameplate(bossName: string): void {
+        // Set the boss name text
+        this.bossNameText.setText(bossName);
+        
+        // Track boss state
+        this.bossActive = true;
+        this.currentBossType = bossName.includes("Scion") ? "phase1" : "phase2";
+        
+        // Position closer to top of screen
+        const camera = this.scene.cameras.main;
+        if (camera) {
+            this.bossNameContainer.setPosition(
+                camera.scrollX + camera.width / 2,
+                camera.scrollY + 60 // Much closer to top
+            );
+        }
+        
+        // Stop any existing animation
+        if (this.bossNameAnimation) {
+            this.bossNameAnimation.stop();
+        }
+        
+        // Set initial state for animation
+        this.bossNameContainer.setVisible(true);
+        this.bossNameContainer.setAlpha(0);
+        this.bossNameContainer.setScale(0.5);
+        this.bossNameContainer.y -= 30; // Start slightly higher
+        
+        // Create dramatic entrance animation - full opacity
+        this.bossNameAnimation = this.scene.tweens.add({
+            targets: this.bossNameContainer,
+            alpha: { from: 0, to: 1 }, // Full opacity during entrance
+            scaleX: { from: 0.5, to: 1 },
+            scaleY: { from: 0.5, to: 1 },
+            y: this.bossNameContainer.y + 30, // Move to final position
+            duration: 2000,
+            ease: 'Power3.easeOut'
+            // Nameplate stays at full opacity (no fade to semi-transparent)
+        });
+        
+        // Add subtle pulsing glow effect
+        this.scene.tweens.add({
+            targets: this.bossNameBackground,
+            alpha: { from: 0.8, to: 0.6 },
+            duration: 1500,
+            ease: 'Sine.easeInOut',
+            yoyo: true,
+            repeat: 2
+        });
+        
+        console.log(`Boss nameplate shown: ${bossName}`);
+    }
+
+    private hideBossNameplate(): void {
+        if (this.bossNameAnimation) {
+            this.bossNameAnimation.stop();
+        }
+        
+        // Reset boss state
+        this.bossActive = false;
+        this.currentBossType = null;
+        
+        // Fade out animation
+        this.bossNameAnimation = this.scene.tweens.add({
+            targets: this.bossNameContainer,
+            alpha: { from: this.bossNameContainer.alpha, to: 0 },
+            duration: 1500,
+            ease: 'Power2.easeIn',
+            onComplete: () => {
+                this.bossNameContainer.setVisible(false);
+            }
         });
     }
 
@@ -92,9 +201,12 @@ export default class BossTimerUI {
             this.container.setVisible(false);
         }
         
-        // If boss becomes inactive and was previously active, prepare for new timer
+        // If boss becomes inactive and was previously active, hide nameplate and prepare for new timer
         if (oldState.bossActive && !newState.bossActive) {
-            // Boss fight ended, we'll wait for new timer to be created
+            // Boss fight ended, hide nameplate
+            if (this.bossActive) {
+                this.hideBossNameplate();
+            }
             this.bossSpawnTime = null;
         }
     }
@@ -126,12 +238,20 @@ export default class BossTimerUI {
     }
 
     private handleMonsterCreated(ctx: any, monster: any): void {
-        // If a boss monster is created, hide the timer
+        // If a boss monster is created, hide the timer and show nameplate
         if (monster.bestiaryId && monster.bestiaryId.tag) {
             const monsterType = monster.bestiaryId.tag;
-            if (monsterType === 'FinalBossPhase1' || monsterType === 'FinalBossPhase2') {
+            if (monsterType === 'FinalBossPhase1') {
                 this.stopTimer();
                 this.container.setVisible(false);
+                this.showBossNameplate("Ender, Scion of Ruin");
+            } else if (monsterType === 'FinalBossPhase2') {
+                // Hide any existing nameplate first
+                this.hideBossNameplate();
+                // Small delay before showing new nameplate for dramatic effect
+                this.scene.time.delayedCall(1000, () => {
+                    this.showBossNameplate("Ender, Host of Oblivion");
+                });
             } else {
                 // For regular monsters, recheck the boss timer to keep it in sync
                 this.checkForExistingBossTimer();
@@ -184,6 +304,14 @@ export default class BossTimerUI {
                 camera.scrollX + camera.width / 2,
                 camera.scrollY + 40 // Fixed distance from top of screen
             );
+            
+            // Update boss nameplate position as well - closer to top
+            if (this.bossNameContainer.visible) {
+                this.bossNameContainer.setPosition(
+                    camera.scrollX + camera.width / 2,
+                    camera.scrollY + 60 // Much closer to top
+                );
+            }
         }
         
         // Update timer text if game state exists
@@ -265,9 +393,13 @@ export default class BossTimerUI {
         if (this.flashAnimation) {
             this.flashAnimation.stop();
         }
+        if (this.bossNameAnimation) {
+            this.bossNameAnimation.stop();
+        }
         
-        // Destroy container and all children
+        // Destroy containers and all children
         this.container.destroy();
+        this.bossNameContainer.destroy();
     }
 
     private checkForExistingBossTimer(): void {

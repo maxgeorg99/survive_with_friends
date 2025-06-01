@@ -216,13 +216,29 @@ pub fn handle_boss_defeated(ctx: &ReducerContext) {
 // Test/debug utility to manually spawn the boss for testing
 #[reducer]
 pub fn spawn_boss_for_testing(ctx: &ReducerContext) {
-    log::info!("DEVELOPER TEST: Manually triggering boss spawn...");
+    log::info!("DEVELOPER TEST: Looking for existing boss spawn timer...");
     
-    // Call the boss spawn method directly
-    // This bypasses the scheduling system for testing purposes
-    spawn_boss_phase_one(ctx, BossSpawnTimer { scheduled_id: 0, scheduled_at: ScheduleAt::Time(ctx.timestamp) });
+    // Find the existing boss spawn timer
+    let timer_opt = ctx.db.boss_spawn_timer().iter().next();
     
-    log::info!("DEVELOPER TEST: Boss spawn triggered manually");
+    if let Some(timer) = timer_opt {
+        log::info!("DEVELOPER TEST: Found existing boss timer, updating to trigger in 5 seconds...");
+        
+        // Delete the old timer
+        ctx.db.boss_spawn_timer().scheduled_id().delete(&timer.scheduled_id);
+        
+        // Create a new timer that triggers in 5 seconds
+        const TEST_BOSS_SPAWN_DELAY_MS: u64 = 5000; // 5 seconds
+        
+        ctx.db.boss_spawn_timer().insert(BossSpawnTimer {
+            scheduled_id: 0,
+            scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(TEST_BOSS_SPAWN_DELAY_MS)),
+        });
+        
+        log::info!("DEVELOPER TEST: Boss timer updated to trigger in 5 seconds");
+    } else {
+        log::info!("DEVELOPER TEST: No existing boss timer found, doing nothing");
+    }
 }
 
 pub fn update_boss_monster_id(ctx: &ReducerContext, monster_id: u32) {

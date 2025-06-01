@@ -142,6 +142,9 @@ export default class GameScene extends Phaser.Scene {
     // Add monster counter UI
     private monsterCounterUI: MonsterCounterUI | null = null;
 
+    // Dark haze overlay for boss fights
+    private bossHazeOverlay: Phaser.GameObjects.Rectangle | null = null;
+
     constructor() {
         super('GameScene');
         this.spacetimeDBClient = (window as any).spacetimeDBClient;
@@ -259,6 +262,9 @@ export default class GameScene extends Phaser.Scene {
 
             // Add B key for spawning bots
             this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.B).on('down', this.spawnBot, this);
+
+            // Add T key for triggering boss spawn testing
+            this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.T).on('down', this.triggerBossSpawnerTest, this);
         }
         console.log("Keyboard input set up.");
 
@@ -353,6 +359,9 @@ export default class GameScene extends Phaser.Scene {
 
         // Monster events for boss music detection
         this.gameEvents.on(GameEvents.MONSTER_CREATED, this.handleMonsterCreatedForMusic, this);
+
+        // Listen for game state changes to hide haze when boss is defeated
+        this.gameEvents.on(GameEvents.GAME_STATE_UPDATED, this.handleGameStateUpdated, this);
 
         // Add table event handlers for upgrade options
         if (this.spacetimeDBClient.sdkConnection) {
@@ -555,12 +564,13 @@ export default class GameScene extends Phaser.Scene {
             const monsterType = monster.bestiaryId.tag;
             console.log("Monster created:", monsterType);
             
-            // If a boss monster spawns, switch to boss music
+            // If a boss monster spawns, switch to boss music and show dark haze
             if (monsterType === 'FinalBossPhase1' || monsterType === 'FinalBossPhase2') {
-                console.log("Boss detected! Switching to boss music");
+                console.log("Boss detected! Switching to boss music and showing dark haze");
                 if (this.musicManager) {
                     this.musicManager.playTrack('boss');
                 }
+                this.showBossHaze();
             }
         }
     }
@@ -1616,7 +1626,7 @@ export default class GameScene extends Phaser.Scene {
         this.minimap.playerDot.x = ratioX * minimapSize;
         this.minimap.playerDot.y = ratioY * minimapSize;
 
-        // Update bot dots
+        // Update bot dots and boss dots
         if (this.spacetimeDBClient.sdkConnection?.db) {
             // Clear existing bot dots
             this.minimap.botDotsContainer.removeAll(true);
@@ -1635,6 +1645,37 @@ export default class GameScene extends Phaser.Scene {
                         1
                     );
                     this.minimap.botDotsContainer.add(botDot);
+                }
+            }
+
+            // Add boss monsters as red dots
+            for (const monster of this.spacetimeDBClient.sdkConnection.db.monsters.iter()) {
+                const monsterType = monster.bestiaryId?.tag || monster.bestiaryId;
+                if (monsterType === 'FinalBossPhase1' || monsterType === 'FinalBossPhase2') {
+                    // Get monster position from boid data
+                    const boid = this.spacetimeDBClient.sdkConnection.db.monstersBoid.monsterId.find(monster.monsterId);
+                    if (boid) {
+                        const bossRatioX = boid.position.x / worldBounds.width;
+                        const bossRatioY = boid.position.y / worldBounds.height;
+                        
+                        const bossDot = this.add.circle(
+                            bossRatioX * minimapSize,
+                            bossRatioY * minimapSize,
+                            8, // Larger than other dots
+                            0xff0000, // Red color for boss
+                            1
+                        );
+                        // Add pulsing effect for boss
+                        this.tweens.add({
+                            targets: bossDot,
+                            alpha: { from: 1, to: 0.5 },
+                            duration: 1000,
+                            ease: 'Sine.easeInOut',
+                            yoyo: true,
+                            repeat: -1
+                        });
+                        this.minimap.botDotsContainer.add(bossDot);
+                    }
                 }
             }
         }
@@ -1916,6 +1957,7 @@ export default class GameScene extends Phaser.Scene {
         this.gameEvents.off(GameEvents.PLAYER_DIED, this.handlePlayerDied, this);
         this.gameEvents.off(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
         this.gameEvents.off(GameEvents.MONSTER_CREATED, this.handleMonsterCreatedForMusic, this);
+        this.gameEvents.off(GameEvents.GAME_STATE_UPDATED, this.handleGameStateUpdated, this);
 
         // Clean up MonsterManager event listeners
         if (this.monsterManager) {
@@ -1967,6 +2009,12 @@ export default class GameScene extends Phaser.Scene {
         if (this.minimap) {
             this.minimap.container.destroy();
             this.minimap = null;
+        }
+        
+        // Clean up boss haze overlay
+        if (this.bossHazeOverlay) {
+            this.bossHazeOverlay.destroy();
+            this.bossHazeOverlay = null;
         }
         
         console.log("GameScene shutdown complete.");
@@ -2585,5 +2633,74 @@ export default class GameScene extends Phaser.Scene {
         
         console.log("Spawning bot...");
         this.spacetimeDBClient.sdkConnection.reducers.spawnBot();
+    }
+
+    // Add the boss spawner test method
+    private triggerBossSpawnerTest(): void {
+        if (!this.spacetimeDBClient.sdkConnection?.db) {
+            console.log("Cannot trigger boss spawner test: Connection not available");
+            return;
+        }
+        
+        console.log("Triggering boss spawner test - boss timer will be updated to 5 seconds...");
+        this.spacetimeDBClient.sdkConnection.reducers.spawnBossForTesting();
+    }
+
+    // Show dark haze overlay during boss fights
+    private showBossHaze(): void {
+        if (this.bossHazeOverlay) {
+            // Already showing, just make sure it's visible
+            this.bossHazeOverlay.setVisible(true);
+            return;
+        }
+
+        const { width, height } = this.scale;
+        
+        // Create dark semi-transparent overlay
+        this.bossHazeOverlay = this.add.rectangle(0, 0, width, height, 0x000000, 0.25)
+            .setOrigin(0, 0)
+            .setScrollFactor(0) // Fix to camera
+            .setDepth(UI_DEPTH - 1); // Just below UI elements
+        
+        // Fade in the haze
+        this.bossHazeOverlay.setAlpha(0);
+        this.tweens.add({
+            targets: this.bossHazeOverlay,
+            alpha: 0.25,
+            duration: 2000,
+            ease: 'Power2.easeIn'
+        });
+        
+        console.log("Boss haze overlay shown");
+    }
+
+    // Hide dark haze overlay when boss is defeated
+    private hideBossHaze(): void {
+        if (!this.bossHazeOverlay) return;
+        
+        // Fade out the haze
+        this.tweens.add({
+            targets: this.bossHazeOverlay,
+            alpha: 0,
+            duration: 1500,
+            ease: 'Power2.easeOut',
+            onComplete: () => {
+                if (this.bossHazeOverlay) {
+                    this.bossHazeOverlay.destroy();
+                    this.bossHazeOverlay = null;
+                }
+            }
+        });
+        
+        console.log("Boss haze overlay hidden");
+    }
+
+    // Handle game state changes to hide haze when boss is defeated
+    private handleGameStateUpdated(ctx: EventContext, oldState: any, newState: any): void {
+        // Check if boss becomes inactive (defeated)
+        if (oldState.bossActive && !newState.bossActive) {
+            console.log("Boss defeated! Hiding haze overlay");
+            this.hideBossHaze();
+        }
     }
 }
