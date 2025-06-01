@@ -223,6 +223,13 @@ export default class GemManager {
         // Create gem sprite in the container
         const gemSprite = this.scene.add.image(0, 0, assetKey);
         
+        // Calculate scale for Soul gems based on their experience value
+        if (gemLevelTag === 'Soul' && gemData.value !== undefined) {
+            const soulScale = this.calculateSoulGemScale(gemData.value);
+            gemSprite.setScale(soulScale);
+            console.log(`Soul gem with ${gemData.value} exp scaled to ${soulScale.toFixed(2)}x`);
+        }
+        
         // Add only the gem sprite to the container (not the shadow)
         container.add(gemSprite);
         
@@ -239,21 +246,44 @@ export default class GemManager {
         // Store hover animation time offset with a random start time for variety
         container.setData('hoverOffset', Math.random() * Math.PI * 2);
         
-        // Create hover animation
-        this.scene.tweens.add({
-            targets: container,
-            scaleX: 1.0,
-            scaleY: 1.0,
-            duration: 1000,
-            yoyo: true,
-            repeat: -1,
-            ease: 'Sine.easeInOut'
-        });
+        // Note: Vertical hover animation is handled in the update() method for smooth performance
+        // This provides a consistent floating effect for all gems
         
         // Add the container to the gems map
         this.gems.set(gemData.gemId, container);
         
         return container;
+    }
+
+    /**
+     * Calculate the scale for Soul gems based on their experience value
+     * 1 exp = 0.5 scale, 250 exp = 1.0 scale, 2500 exp = 2.0 scale
+     */
+    private calculateSoulGemScale(expValue: number): number {
+        // Ensure minimum value of 1
+        const value = Math.max(1, expValue);
+        
+        // Define the scaling breakpoints
+        const minExp = 1;
+        const midExp = 250;
+        const maxExp = 2500;
+        
+        const minScale = 0.5;
+        const midScale = 1.0;
+        const maxScale = 2.0;
+        
+        if (value <= midExp) {
+            // Interpolate between minScale and midScale (1 to 250 exp)
+            const progress = (value - minExp) / (midExp - minExp);
+            return minScale + (midScale - minScale) * progress;
+        } else if (value <= maxExp) {
+            // Interpolate between midScale and maxScale (250 to 2500 exp)
+            const progress = (value - midExp) / (maxExp - midExp);
+            return midScale + (maxScale - midScale) * progress;
+        } else {
+            // Cap at maximum scale for values above 2500
+            return maxScale;
+        }
     }
     
     // Create particles effect when a gem is collected

@@ -13,8 +13,8 @@ export const GEM_ASSET_KEYS: { [key: string]: string } = {
 
 // Animation configuration for gems
 export const GEM_ANIMATION = {
-    HOVER_AMPLITUDE: 5,      // How high gems hover in pixels
-    HOVER_SPEED: 1.5,        // Speed of hover animation
+    HOVER_AMPLITUDE: 3,      // How high gems hover in pixels (increased from 5)
+    HOVER_SPEED: 1.2,        // Speed of hover animation (slightly slower for smoother effect)
     ROTATION_SPEED: 0.5,     // Speed of rotation (in degrees per frame)
     COLLECTION_PARTICLES: 8  // Number of particles when collected
 };

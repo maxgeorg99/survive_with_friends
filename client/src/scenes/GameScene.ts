@@ -1607,6 +1607,11 @@ export default class GameScene extends Phaser.Scene {
             this.upgradeUI.update(time, delta);
         }
 
+        // Update gem manager for hover animations
+        if (this.gemManager) {
+            this.gemManager.update(time, delta);
+        }
+
         // Update minimap
         this.updateMinimap();
     }
