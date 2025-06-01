@@ -142,15 +142,8 @@ const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
             // Emit account created event with the account data
             gameEvents.emit(GameEvents.ACCOUNT_CREATED, ctx, account);
             
-            // Only auto-navigate if we're currently in TitleScene (fresh start)
-            // LoadingScene and other scenes should handle their own navigation
-            const currentScene = game.scene.getScenes(true)[0];
-            if (currentScene && currentScene.scene.key === 'TitleScene') {
-                console.log("Auto-navigating from account insert (from TitleScene)");
-                navigateBasedOnAccountState(account.state);
-            } else {
-                console.log("Account inserted but scene", currentScene?.scene.key || 'none', "is active, letting it handle navigation");
-            }
+            // Disable auto-navigation - let the Start Game button handle navigation instead
+            console.log("Account inserted but auto-navigation disabled - user must click Start Game button");
         } else {
             console.log("Another user has logged on: " + account.identity.toString());
         }
@@ -168,16 +161,8 @@ const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
             gameEvents.emit(GameEvents.ACCOUNT_UPDATED, ctx, oldAccount, newAccount);
             
             // Let individual scenes handle state changes through ACCOUNT_UPDATED events
-            // Only auto-navigate if we're in TitleScene (meaning we weren't in a game flow)
-            if (oldAccount.state.tag !== newAccount.state.tag) {
-                const currentScene = game.scene.getScenes(true)[0];
-                if (currentScene && currentScene.scene.key === 'TitleScene') {
-                    console.log("Auto-navigating from account update - state changed (from TitleScene)");
-                    navigateBasedOnAccountState(newAccount.state);
-                } else {
-                    console.log("Account state changed but scene", currentScene?.scene.key || 'none', "is active, letting it handle the change via events");
-                }
-            }
+            // Auto-navigation disabled - only Start Game button or scene-specific handlers should navigate
+            console.log("Account state updated but auto-navigation disabled - scenes handle their own transitions");
         } else {
             console.log("Another user's account updated: " + newAccount.identity.toString());
         }
@@ -291,9 +276,9 @@ const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
     }
 
     console.log("Found account with state:", myAccount.state.tag);
-    console.log("onSubscriptionApplied: Account exists, letting current scene or LoadingScene handle navigation");
+    console.log("onSubscriptionApplied: Account exists but auto-navigation disabled - user must click Start Game button");
     
-    // Don't auto-navigate here - let LoadingScene or other scenes handle navigation
+    // Auto-navigation disabled - only the Start Game button should trigger navigation
     // This prevents conflicts between multiple navigation systems
 };
 

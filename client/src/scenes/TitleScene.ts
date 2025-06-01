@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { GameEvents } from '../constants/GameEvents';
+import { Account } from '../autobindings';
 import MusicManager from '../managers/MusicManager';
 
 export default class TitleScene extends Phaser.Scene {
@@ -11,6 +12,7 @@ export default class TitleScene extends Phaser.Scene {
     // UI Elements
     private titleContainer!: Phaser.GameObjects.Container;
     private statusText!: Phaser.GameObjects.Text;
+    private startButton!: HTMLButtonElement;
 
     constructor() {
         super('TitleScene');
@@ -107,6 +109,9 @@ export default class TitleScene extends Phaser.Scene {
         }).setOrigin(0.5);
         this.titleContainer.add(this.statusText);
         
+        // Create start button (initially hidden)
+        this.createStartButton();
+        
         // Register event listeners
         this.registerEventListeners();
         
@@ -118,6 +123,110 @@ export default class TitleScene extends Phaser.Scene {
         this.events.on("shutdown", this.shutdown, this);
     }
     
+    private createStartButton() {
+        // Remove any existing start button
+        const existingButton = document.getElementById('title-start-button');
+        if (existingButton) existingButton.remove();
+        
+        // Create start button
+        this.startButton = document.createElement('button');
+        this.startButton.id = 'title-start-button';
+        this.startButton.textContent = 'START GAME';
+        this.startButton.style.position = 'absolute';
+        this.startButton.style.fontFamily = 'Arial Black';
+        this.startButton.style.fontSize = '24px';
+        this.startButton.style.padding = '15px 30px';
+        this.startButton.style.backgroundColor = '#27ae60';
+        this.startButton.style.color = 'white';
+        this.startButton.style.border = '3px solid #2c3e50';
+        this.startButton.style.borderRadius = '8px';
+        this.startButton.style.cursor = 'pointer';
+        this.startButton.style.fontWeight = 'bold';
+        this.startButton.style.transition = 'background-color 0.2s, border-color 0.2s, transform 0.1s';
+        this.startButton.style.display = 'none'; // Hidden initially
+        this.startButton.style.left = '50%';
+        this.startButton.style.transform = 'translateX(-50%)';
+        
+        // Add hover effects
+        this.startButton.addEventListener('mouseenter', () => {
+            this.startButton.style.backgroundColor = '#2ecc71';
+            this.startButton.style.borderColor = '#34495e';
+            this.startButton.style.transform = 'translateX(-50%) scale(1.05)';
+        });
+        
+        this.startButton.addEventListener('mouseleave', () => {
+            this.startButton.style.backgroundColor = '#27ae60';
+            this.startButton.style.borderColor = '#2c3e50';
+            this.startButton.style.transform = 'translateX(-50%) scale(1)';
+        });
+        
+        // Add click handler
+        this.startButton.addEventListener('click', () => {
+            this.handleStartGame();
+        });
+        
+        document.body.appendChild(this.startButton);
+        
+        // Position the button
+        this.positionStartButton();
+    }
+    
+    private positionStartButton() {
+        if (this.startButton) {
+            const { height } = this.scale;
+            this.startButton.style.top = `${height / 2 + 100}px`;
+        }
+    }
+    
+    private handleStartGame() {
+        console.log("Start Game button clicked");
+        
+        // Hide the button during transition
+        this.startButton.style.display = 'none';
+        this.statusText.setText('Loading...');
+        
+        // Check account state and navigate accordingly
+        if (this.spacetimeDBClient.sdkConnection?.db && this.spacetimeDBClient.identity) {
+            const account = this.spacetimeDBClient.sdkConnection.db.account.identity.find(this.spacetimeDBClient.identity) as Account;
+            
+            if (account) {
+                console.log("Found account with state:", account.state.tag);
+                
+                // Navigate based on account state
+                switch ((account.state as any).tag) {
+                    case 'ChoosingName':
+                        this.scene.start('NameSelectScene');
+                        break;
+                    case 'ChoosingClass':
+                        this.scene.start('ClassSelectScene');
+                        break;
+                    case 'Playing':
+                        this.scene.start('GameScene');
+                        break;
+                    case 'Dead':
+                        this.scene.start('DeadScene');
+                        break;
+                    case 'Winner':
+                        this.scene.start('VictoryScene');
+                        break;
+                    default:
+                        console.log("Unknown account state:", account.state.tag);
+                        this.scene.start('LoadingScene', { 
+                            message: 'Evaluating account state...', 
+                            waitingFor: 'account_evaluation'
+                        });
+                        break;
+                }
+            } else {
+                console.log("No account found, going to login");
+                this.scene.start('LoginScene');
+            }
+        } else {
+            console.log("No connection or identity, going to login");
+            this.scene.start('LoginScene');
+        }
+    }
+    
     private handleResize() {
         const { width, height } = this.scale;
         
@@ -125,6 +234,9 @@ export default class TitleScene extends Phaser.Scene {
         if (this.titleContainer) {
             this.titleContainer.setPosition(width/2, height/2);
         }
+        
+        // Update button position
+        this.positionStartButton();
     }
     
     private registerEventListeners() {
@@ -145,9 +257,17 @@ export default class TitleScene extends Phaser.Scene {
     
     private updateConnectionStatus() {
         if (this.spacetimeDBClient.isConnected) {
-            this.statusText.setText('Connected! Checking account status...');
+            this.statusText.setText('Connected! Ready to play.');
+            // Show the start button when connected
+            if (this.startButton) {
+                this.startButton.style.display = 'block';
+            }
         } else {
             this.statusText.setText('Connecting to server...');
+            // Hide the start button when not connected
+            if (this.startButton) {
+                this.startButton.style.display = 'none';
+            }
         }
     }
     
@@ -156,6 +276,15 @@ export default class TitleScene extends Phaser.Scene {
         if (this.musicManager) {
             this.musicManager.cleanup();
         }
+        
+        // Remove start button
+        if (this.startButton && this.startButton.parentNode) {
+            this.startButton.remove();
+        }
+        
+        // Clean up any lingering start button
+        const startButton = document.getElementById('title-start-button');
+        if (startButton) startButton.remove();
         
         // Remove event listeners
         this.events.off("shutdown", this.shutdown, this);
