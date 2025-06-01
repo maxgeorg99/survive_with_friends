@@ -1,10 +1,12 @@
 import Phaser from 'phaser';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { GameEvents } from '../constants/GameEvents';
+import MusicManager from '../managers/MusicManager';
 
 export default class NameSelectScene extends Phaser.Scene {
     private spacetimeDBClient: SpacetimeDBClient;
     private gameEvents: Phaser.Events.EventEmitter;
+    private musicManager!: MusicManager;
     
     // UI Elements
     private nameContainer!: Phaser.GameObjects.Container;
@@ -27,6 +29,10 @@ export default class NameSelectScene extends Phaser.Scene {
     create() {
         console.log("NameSelectScene create() called");
         const { width, height } = this.scale;
+        
+        // Initialize music manager and continue title music
+        this.musicManager = new MusicManager(this);
+        this.musicManager.playTrack('title');
         
         // Set background
         this.cameras.main.setBackgroundColor('#042E64');
@@ -281,6 +287,11 @@ export default class NameSelectScene extends Phaser.Scene {
     }
     
     shutdown() {
+        // Cleanup music manager
+        if (this.musicManager) {
+            this.musicManager.cleanup();
+        }
+        
         // Remove HTML elements
         try {
             if (this.nameInput && this.nameInput.parentNode) {

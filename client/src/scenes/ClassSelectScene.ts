@@ -3,6 +3,7 @@ import SpacetimeDBClient from '../SpacetimeDBClient';
 import { Account } from '../autobindings';
 import PlayerClass from '../autobindings/player_class_type';
 import { GameEvents } from '../constants/GameEvents';
+import MusicManager from '../managers/MusicManager';
 
 // Map player class to numeric class ID
 const CLASS_ID_MAP = {
@@ -22,6 +23,7 @@ const CLASS_ICON_MAP : Record<string, string> = {
 export default class ClassSelectScene extends Phaser.Scene {
     private spacetimeDBClient: SpacetimeDBClient;
     private gameEvents: Phaser.Events.EventEmitter;
+    private musicManager!: MusicManager;
     
     // UI Elements
     private titleText!: Phaser.GameObjects.Text;
@@ -56,6 +58,10 @@ export default class ClassSelectScene extends Phaser.Scene {
 
     create() {
         console.log("ClassSelectScene create() - ensuring clean transition from previous scene");
+        
+        // Initialize music manager and continue title music
+        this.musicManager = new MusicManager(this);
+        this.musicManager.playTrack('title');
         
         // IMPORTANT: Ensure any previous scenes are fully stopped
         // This is critical when transitioning from GameScene -> DeadScene -> ClassSelectScene
@@ -197,28 +203,25 @@ export default class ClassSelectScene extends Phaser.Scene {
             const textSpan = document.createElement('span');
             textSpan.textContent = name;
             textSpan.style.position = 'absolute';
-            textSpan.style.left = '0';
+            textSpan.style.left = '10px';
             textSpan.style.right = '0';
             textSpan.style.textAlign = 'center';
             button.appendChild(textSpan);
             
-            // Add right icon if available
-            try {
-                if (this.textures.exists(iconName)) {
-                    const rightIcon = document.createElement('img');
-                    const iconNameResult : string = CLASS_ICON_MAP[iconName];
-                    rightIcon.src = '/assets/' + iconNameResult + '.png';
-                    rightIcon.style.width = '50px';
-                    rightIcon.style.height = '50px';
-                    rightIcon.style.position = 'absolute';
-                    rightIcon.style.right = '10px';
-                    rightIcon.style.top = '50%';
-                    rightIcon.style.transform = 'translateY(-50%)';
-                    button.appendChild(rightIcon);
-                }
-            } catch (error) {
-                console.error(`Error adding right icon for ${name}:`, error);
-            }
+            // Add selection circle on the right
+            const selectionCircle = document.createElement('div');
+            selectionCircle.className = 'selection-circle';
+            selectionCircle.style.width = '20px';
+            selectionCircle.style.height = '20px';
+            selectionCircle.style.borderRadius = '50%';
+            selectionCircle.style.border = '2px solid #34495e';
+            selectionCircle.style.backgroundColor = 'transparent';
+            selectionCircle.style.position = 'absolute';
+            selectionCircle.style.right = '15px';
+            selectionCircle.style.top = '50%';
+            selectionCircle.style.transform = 'translateY(-50%)';
+            selectionCircle.style.transition = 'background-color 0.2s';
+            button.appendChild(selectionCircle);
             
             // Add event listener
             button.addEventListener('click', () => {
@@ -230,6 +233,12 @@ export default class ClassSelectScene extends Phaser.Scene {
                 if (button.style.backgroundColor !== 'rgb(52, 152, 219)') { // Not selected (selected color is #3498db)
                     button.style.backgroundColor = '#34495e';
                     button.style.borderColor = '#4a6074';
+                    // Fill the selection circle on hover
+                    const circle = button.querySelector('.selection-circle') as HTMLElement;
+                    if (circle) {
+                        circle.style.backgroundColor = '#5a6c7d';
+                        circle.style.borderColor = '#6a7a8a';
+                    }
                 }
             });
             
@@ -237,6 +246,12 @@ export default class ClassSelectScene extends Phaser.Scene {
                 if (button.style.backgroundColor !== 'rgb(52, 152, 219)') { // Not selected
                     button.style.backgroundColor = '#2c3e50';
                     button.style.borderColor = '#34495e';
+                    // Clear the selection circle on mouse leave
+                    const circle = button.querySelector('.selection-circle') as HTMLElement;
+                    if (circle) {
+                        circle.style.backgroundColor = 'transparent';
+                        circle.style.borderColor = '#34495e';
+                    }
                 }
             });
             
@@ -271,6 +286,19 @@ export default class ClassSelectScene extends Phaser.Scene {
         
         this.confirmButton.addEventListener('click', () => {
             this.spawnPlayer();
+        });
+        
+        // Add hover effects to confirm button
+        this.confirmButton.addEventListener('mouseenter', () => {
+            if (!this.confirmButton.disabled) {
+                this.confirmButton.style.backgroundColor = '#2ecc71';
+            }
+        });
+        
+        this.confirmButton.addEventListener('mouseleave', () => {
+            if (!this.confirmButton.disabled) {
+                this.confirmButton.style.backgroundColor = '#27ae60';
+            }
         });
         
         this.classButtonsContainer.appendChild(this.confirmButton);
@@ -332,12 +360,25 @@ export default class ClassSelectScene extends Phaser.Scene {
             if (btn) {
                 btn.style.backgroundColor = '#2c3e50';
                 btn.style.borderColor = '#34495e';
+                // Reset all selection circles
+                const circle = btn.querySelector('.selection-circle') as HTMLElement;
+                if (circle) {
+                    circle.style.backgroundColor = 'transparent';
+                    circle.style.borderColor = '#34495e';
+                }
             }
         });
         
         // Highlight selected button
         button.style.backgroundColor = '#3498db';
         button.style.borderColor = '#2980b9';
+        
+        // Update selected button's circle to match blue theme
+        const selectedCircle = button.querySelector('.selection-circle') as HTMLElement;
+        if (selectedCircle) {
+            selectedCircle.style.backgroundColor = '#5dade2';
+            selectedCircle.style.borderColor = '#3498db';
+        }
         
         // Set selected class
         this.selectedClass = classType;
@@ -481,6 +522,11 @@ export default class ClassSelectScene extends Phaser.Scene {
     
     shutdown() {
         console.log("ClassSelectScene shutdown called");
+        
+        // Cleanup music manager
+        if (this.musicManager) {
+            this.musicManager.cleanup();
+        }
         
         // Remove event listeners
         this.events.off("shutdown", this.shutdown, this);

@@ -11,6 +11,7 @@ import UpgradeUI from '../ui/UpgradeUI';
 import PlayerHUD from '../ui/PlayerHUD';
 import BossTimerUI from '../ui/BossTimerUI';
 import MonsterCounterUI from '../ui/MonsterCounterUI';
+import MusicManager from '../managers/MusicManager';
 
 // Constants
 const PLAYER_SPEED = 200;
@@ -67,6 +68,7 @@ const CLASS_ASSET_KEYS: Record<string, string> = {
 export default class GameScene extends Phaser.Scene {
     private spacetimeDBClient: SpacetimeDBClient;
     private gameEvents: Phaser.Events.EventEmitter;
+    private musicManager!: MusicManager;
     private playerInitialized = false;
     private localPlayerSprite: Phaser.Physics.Arcade.Sprite | null = null;
     private localPlayerNameText: Phaser.GameObjects.Text | null = null;
@@ -218,6 +220,10 @@ export default class GameScene extends Phaser.Scene {
     create() {
         console.log("GameScene create started.");
 
+        // Initialize music manager and start main music
+        this.musicManager = new MusicManager(this);
+        this.musicManager.playTrack('main');
+
         // Clean up any lingering UI elements from other scenes
         this.cleanupLingeringUIElements();
 
@@ -337,6 +343,9 @@ export default class GameScene extends Phaser.Scene {
         
         // Connection events
         this.gameEvents.on(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
+
+        // Monster events for boss music detection
+        this.gameEvents.on(GameEvents.MONSTER_CREATED, this.handleMonsterCreatedForMusic, this);
 
         // Add table event handlers for upgrade options
         if (this.spacetimeDBClient.sdkConnection) {
@@ -528,19 +537,25 @@ export default class GameScene extends Phaser.Scene {
 
     private handleConnectionLost(_ctx:ErrorContext) {
         console.log("Connection lost event received in GameScene");
-        // Show a connection lost message
-        const { width, height } = this.scale;
-        const connectionLostText = this.add.text(width/2, height/2, 'CONNECTION LOST\nPlease refresh the page', {
-            fontFamily: 'Arial',
-            fontSize: '32px',
-            color: '#ffffff',
-            align: 'center',
-            stroke: '#000000',
-            strokeThickness: 6
-        }).setOrigin(0.5);
         
-        // Disable controls
-        this.disablePlayerControls();
+        // Show the death screen
+        this.showDeathScreen();
+    }
+    
+    private handleMonsterCreatedForMusic(ctx: any, monster: any): void {
+        // Check if this is a boss monster
+        if (monster.bestiaryId && monster.bestiaryId.tag) {
+            const monsterType = monster.bestiaryId.tag;
+            console.log("Monster created:", monsterType);
+            
+            // If a boss monster spawns, switch to boss music
+            if (monsterType === 'FinalBossPhase1' || monsterType === 'FinalBossPhase2') {
+                console.log("Boss detected! Switching to boss music");
+                if (this.musicManager) {
+                    this.musicManager.playTrack('boss');
+                }
+            }
+        }
     }
 
     initializeGameWorld(ctx: EventContext) {
@@ -1784,6 +1799,19 @@ export default class GameScene extends Phaser.Scene {
     }
 
     shutdown() {
+        console.log("GameScene shutdown called");
+        
+        // Cleanup music manager
+        if (this.musicManager) {
+            this.musicManager.cleanup();
+        }
+        
+        // Important: Mark the scene as shutting down to prevent further updates
+        this.gameOver = true;
+
+        this.monsterManager?.shutdown();
+        
+        // Clean up MonsterSpawnerManager
         console.log("GameScene shutting down...");
 
         this.monsterManager?.shutdown();
@@ -1872,18 +1900,16 @@ export default class GameScene extends Phaser.Scene {
         // The connection to the database will be cleaned up when the game is closed
         // or when we move to a different scene
 
-        // Remove event listeners
+        // Remove scene event listeners
         this.events.off("shutdown", this.shutdown, this);
-
         this.gameEvents.off(GameEvents.ACCOUNT_UPDATED, this.handleAccountUpdated, this);
-
         this.gameEvents.off(GameEvents.PLAYER_CREATED, this.handlePlayerCreated, this);
         this.gameEvents.off(GameEvents.PLAYER_UPDATED, this.handlePlayerUpdated, this);
         this.gameEvents.off(GameEvents.PLAYER_DELETED, this.handlePlayerDeleted, this);
         this.gameEvents.off(GameEvents.PLAYER_DIED, this.handlePlayerDied, this);
-        
         this.gameEvents.off(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
-        
+        this.gameEvents.off(GameEvents.MONSTER_CREATED, this.handleMonsterCreatedForMusic, this);
+
         // Clean up MonsterManager event listeners
         if (this.monsterManager) {
             this.monsterManager.unregisterListeners();

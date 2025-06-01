@@ -1,10 +1,12 @@
 import Phaser from 'phaser';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { GameEvents } from '../constants/GameEvents';
+import MusicManager from '../managers/MusicManager';
 
 export default class DeadScene extends Phaser.Scene {
     private spacetimeDBClient: SpacetimeDBClient;
     private gameEvents: Phaser.Events.EventEmitter;
+    private musicManager!: MusicManager;
     
     // UI Elements
     private deadContainer!: Phaser.GameObjects.Container;
@@ -19,26 +21,32 @@ export default class DeadScene extends Phaser.Scene {
 
     preload() {
         // Load assets needed for the dead screen
-        this.load.image('title_bg', '/assets/title_bg.png');
+        this.load.image('loss_screen', '/assets/loss_screen.png');
     }
 
     create() {
         const { width, height } = this.scale;
         
-        // Set background to dark red
-        this.cameras.main.setBackgroundColor('#3D0000');
+        // Initialize music manager and play game over sting
+        this.musicManager = new MusicManager(this);
+        this.musicManager.playTrack('game_over_sting');
+        
+        // Set background to a neutral color
+        this.cameras.main.setBackgroundColor('#000000');
         
         try {
-            if (this.textures.exists('title_bg')) {
-                const bg = this.add.image(width/2, height/2, 'title_bg')
+            if (this.textures.exists('loss_screen')) {
+                const bg = this.add.image(width/2, height/2, 'loss_screen')
                     .setDisplaySize(width, height)
                     .setDepth(0);
-                // Tint the background red for death
-                bg.setTint(0x660000);
+                // No tinting to preserve the original loss screen appearance
             }
         } catch (error) {
-            console.error("Error loading background:", error);
+            console.error("Error loading loss background:", error);
         }
+        
+        // Add corner shading for better text readability
+        this.createCornerShading();
         
         // Create a container for all dead UI elements
         this.deadContainer = this.add.container(width/2, height/2);
@@ -58,8 +66,10 @@ export default class DeadScene extends Phaser.Scene {
         const flavorText = this.add.text(0, -20, 'The void has claimed another soul...', {
             fontFamily: 'Arial',
             fontSize: '24px',
-            color: '#ffaaaa',
-            align: 'center'
+            color: '#FFFFFF',
+            align: 'center',
+            stroke: '#000000',
+            strokeThickness: 4
         }).setOrigin(0.5);
         this.deadContainer.add(flavorText);
         
@@ -67,8 +77,10 @@ export default class DeadScene extends Phaser.Scene {
         this.statusText = this.add.text(0, 40, 'Returning to character select...', {
             fontFamily: 'Arial',
             fontSize: '20px',
-            color: '#ffffff',
-            align: 'center'
+            color: '#FFFFFF',
+            align: 'center',
+            stroke: '#000000',
+            strokeThickness: 3
         }).setOrigin(0.5);
         this.deadContainer.add(this.statusText);
         
@@ -144,6 +156,11 @@ export default class DeadScene extends Phaser.Scene {
     }
     
     shutdown() {
+        // Cleanup music manager
+        if (this.musicManager) {
+            this.musicManager.cleanup();
+        }
+        
         // Remove event listeners
         this.events.off("shutdown", this.shutdown, this);
         this.gameEvents.off(GameEvents.ACCOUNT_UPDATED, this.handleAccountUpdated, this);
@@ -153,5 +170,32 @@ export default class DeadScene extends Phaser.Scene {
         this.scale.off('resize', this.handleResize);
         
         console.log("DeadScene shutdown completed");
+    }
+    
+    private createCornerShading() {
+        const { width, height } = this.scale;
+        const cornerRadius = 150;
+        const shadowColor = 0x000000;
+        const shadowAlpha = 0.6;
+        
+        // Top-left corner
+        const topLeft = this.add.circle(0, 0, cornerRadius, shadowColor, shadowAlpha)
+            .setOrigin(1, 1)
+            .setDepth(1);
+            
+        // Top-right corner  
+        const topRight = this.add.circle(width, 0, cornerRadius, shadowColor, shadowAlpha)
+            .setOrigin(0, 1)
+            .setDepth(1);
+            
+        // Bottom-left corner
+        const bottomLeft = this.add.circle(0, height, cornerRadius, shadowColor, shadowAlpha)
+            .setOrigin(1, 0)
+            .setDepth(1);
+            
+        // Bottom-right corner
+        const bottomRight = this.add.circle(width, height, cornerRadius, shadowColor, shadowAlpha)
+            .setOrigin(0, 0)
+            .setDepth(1);
     }
 } 

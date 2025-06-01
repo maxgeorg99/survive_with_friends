@@ -1,10 +1,12 @@
 import Phaser from 'phaser';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { GameEvents } from '../constants/GameEvents';
+import MusicManager from '../managers/MusicManager';
 
 export default class TitleScene extends Phaser.Scene {
     private spacetimeDBClient: SpacetimeDBClient;
     private gameEvents: Phaser.Events.EventEmitter;
+    private musicManager!: MusicManager;
     
     // UI Elements
     private titleContainer!: Phaser.GameObjects.Container;
@@ -24,6 +26,41 @@ export default class TitleScene extends Phaser.Scene {
 
     create() {
         const { width, height } = this.scale;
+        
+        // Initialize music manager
+        this.musicManager = new MusicManager(this);
+        
+        // Preload music asynchronously after scene is active (can be disabled if music files are missing)
+        const ENABLE_MUSIC = true; // Set to false to disable music loading
+        if (ENABLE_MUSIC) {
+            try {
+                // Load music asynchronously so it doesn't block scene activation
+                this.load.audio('title', '/assets/music/title.mp3');
+                this.load.audio('main', '/assets/music/main.mp3');
+                this.load.audio('boss', '/assets/music/boss.mp3');
+                this.load.audio('game_over_sting', '/assets/music/game_over_sting.mp3');
+                this.load.audio('win_sting', '/assets/music/win_sting.mp3');
+                
+                // Add error handling for missing files
+                this.load.on('loaderror', (fileObj: any) => {
+                    if (fileObj.type === 'audio') {
+                        console.warn(`TitleScene: Failed to load audio file: ${fileObj.key} from ${fileObj.url}`);
+                    }
+                });
+                
+                // Start loading music files
+                this.load.start();
+                
+                // Play title music once it's loaded
+                this.load.once('complete', () => {
+                    this.musicManager.playTrack('title');
+                });
+            } catch (error) {
+                console.warn("TitleScene: Failed to setup music loading:", error);
+            }
+        } else {
+            console.log("TitleScene: Music loading disabled");
+        }
         
         // Set background
         this.cameras.main.setBackgroundColor('#042E64');
@@ -115,6 +152,11 @@ export default class TitleScene extends Phaser.Scene {
     }
     
     shutdown() {
+        // Cleanup music manager
+        if (this.musicManager) {
+            this.musicManager.cleanup();
+        }
+        
         // Remove event listeners
         this.events.off("shutdown", this.shutdown, this);
         this.gameEvents.off(GameEvents.CONNECTION_ESTABLISHED, this.handleConnectionEstablished, this);

@@ -1,10 +1,12 @@
 import Phaser from 'phaser';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { GameEvents } from '../constants/GameEvents';
+import MusicManager from '../managers/MusicManager';
 
 export default class VictoryScene extends Phaser.Scene {
     private spacetimeDBClient: SpacetimeDBClient;
     private gameEvents: Phaser.Events.EventEmitter;
+    private musicManager!: MusicManager;
     
     // UI Elements
     private victoryContainer!: Phaser.GameObjects.Container;
@@ -20,26 +22,32 @@ export default class VictoryScene extends Phaser.Scene {
 
     preload() {
         // Load assets needed for the victory screen
-        this.load.image('title_bg', '/assets/title_bg.png');
+        this.load.image('victory_screen', '/assets/victory_screen.png');
     }
 
     create() {
         const { width, height } = this.scale;
         
-        // Set background to golden yellow
-        this.cameras.main.setBackgroundColor('#FFD700');
+        // Initialize music manager and play victory sting
+        this.musicManager = new MusicManager(this);
+        this.musicManager.playTrack('win_sting');
+        
+        // Set background to a neutral color
+        this.cameras.main.setBackgroundColor('#000000');
         
         try {
-            if (this.textures.exists('title_bg')) {
-                const bg = this.add.image(width/2, height/2, 'title_bg')
+            if (this.textures.exists('victory_screen')) {
+                const bg = this.add.image(width/2, height/2, 'victory_screen')
                     .setDisplaySize(width, height)
                     .setDepth(0);
-                // Tint the background gold for victory
-                bg.setTint(0xFFD700);
+                // No tinting to preserve the original victory screen appearance
             }
         } catch (error) {
-            console.error("Error loading background:", error);
+            console.error("Error loading victory background:", error);
         }
+        
+        // Add corner shading for better text readability
+        this.createCornerShading();
         
         // Create a container for all victory UI elements
         this.victoryContainer = this.add.container(width/2, height/2);
@@ -50,7 +58,7 @@ export default class VictoryScene extends Phaser.Scene {
             fontSize: '84px',
             color: '#FFD700',
             align: 'center',
-            stroke: '#8B4513',
+            stroke: '#000000',
             strokeThickness: 8
         }).setOrigin(0.5);
         this.victoryContainer.add(victoryText);
@@ -62,7 +70,7 @@ export default class VictoryScene extends Phaser.Scene {
             color: '#FF6B35',
             align: 'center',
             stroke: '#000000',
-            strokeThickness: 4
+            strokeThickness: 6
         }).setOrigin(0.5);
         this.victoryContainer.add(survivorText);
         
@@ -70,8 +78,10 @@ export default class VictoryScene extends Phaser.Scene {
         const flavorText = this.add.text(0, 20, 'You have conquered the void and emerged victorious!', {
             fontFamily: 'Arial',
             fontSize: '24px',
-            color: '#8B4513',
-            align: 'center'
+            color: '#FFFFFF',
+            align: 'center',
+            stroke: '#000000',
+            strokeThickness: 4
         }).setOrigin(0.5);
         this.victoryContainer.add(flavorText);
         
@@ -79,8 +89,10 @@ export default class VictoryScene extends Phaser.Scene {
         this.statusText = this.add.text(0, 60, 'Basking in glory...', {
             fontFamily: 'Arial',
             fontSize: '20px',
-            color: '#654321',
-            align: 'center'
+            color: '#FFFFFF',
+            align: 'center',
+            stroke: '#000000',
+            strokeThickness: 3
         }).setOrigin(0.5);
         this.victoryContainer.add(this.statusText);
         
@@ -200,6 +212,11 @@ export default class VictoryScene extends Phaser.Scene {
     }
     
     shutdown() {
+        // Cleanup music manager
+        if (this.musicManager) {
+            this.musicManager.cleanup();
+        }
+        
         // Remove event listeners
         this.events.off("shutdown", this.shutdown, this);
         this.gameEvents.off(GameEvents.ACCOUNT_UPDATED, this.handleAccountUpdated, this);
@@ -209,5 +226,32 @@ export default class VictoryScene extends Phaser.Scene {
         this.scale.off('resize', this.handleResize);
         
         console.log("VictoryScene shutdown completed");
+    }
+    
+    private createCornerShading() {
+        const { width, height } = this.scale;
+        const cornerRadius = 150;
+        const shadowColor = 0x000000;
+        const shadowAlpha = 0.6;
+        
+        // Top-left corner
+        const topLeft = this.add.circle(0, 0, cornerRadius, shadowColor, shadowAlpha)
+            .setOrigin(1, 1)
+            .setDepth(1);
+            
+        // Top-right corner  
+        const topRight = this.add.circle(width, 0, cornerRadius, shadowColor, shadowAlpha)
+            .setOrigin(0, 1)
+            .setDepth(1);
+            
+        // Bottom-left corner
+        const bottomLeft = this.add.circle(0, height, cornerRadius, shadowColor, shadowAlpha)
+            .setOrigin(1, 0)
+            .setDepth(1);
+            
+        // Bottom-right corner
+        const bottomRight = this.add.circle(width, height, cornerRadius, shadowColor, shadowAlpha)
+            .setOrigin(0, 0)
+            .setDepth(1);
     }
 } 
