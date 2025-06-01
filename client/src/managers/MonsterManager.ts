@@ -322,6 +322,7 @@ export default class MonsterManager {
             case 2: return "Orc";
             case 3: return "FinalBossPhase1";
             case 4: return "FinalBossPhase2";
+            case 5: return "VoidChest";
             default: 
                 console.warn(`Unknown monster type: ${bestiaryId}`);
                 return "Unknown";

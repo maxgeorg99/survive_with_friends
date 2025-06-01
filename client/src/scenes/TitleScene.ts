@@ -75,6 +75,9 @@ export default class TitleScene extends Phaser.Scene {
         this.load.image('final_boss_phase1', '/assets/final_boss_phase_1.png');
         this.load.image('final_boss_phase2', '/assets/final_boss_phase_2.png');
         
+        // Load special monster assets
+        this.load.image('treasure_chest', '/assets/treasure_chest.png');
+        
         console.log("TitleScene: Preloading ALL game assets for completely seamless gameplay experience");
     }
 

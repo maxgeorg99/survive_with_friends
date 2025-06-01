@@ -172,6 +172,9 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('final_boss_phase1', '/assets/final_boss_phase_1.png');
         this.load.image('final_boss_phase2', '/assets/final_boss_phase_2.png');
         
+        // Load special monster assets
+        this.load.image('treasure_chest', '/assets/treasure_chest.png');
+        
         // Load attack assets
         this.load.image('attack_sword', '/assets/attack_sword.png');
         this.load.image('attack_wand', '/assets/attack_wand.png');
@@ -272,6 +275,9 @@ export default class GameScene extends Phaser.Scene {
 
             // Add G key for spawning debug special gems
             this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.G).on('down', this.spawnDebugSpecialGem, this);
+
+            // Add V key for spawning debug VoidChest
+            this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.V).on('down', this.spawnDebugVoidChest, this);
         }
         console.log("Keyboard input set up.");
 
@@ -2730,5 +2736,16 @@ export default class GameScene extends Phaser.Scene {
         
         console.log("Spawning debug special gem...");
         this.spacetimeDBClient.sdkConnection.reducers.spawnDebugSpecialGem();
+    }
+
+    // Add the spawnDebugVoidChest method
+    private spawnDebugVoidChest(): void {
+        if (!this.spacetimeDBClient.sdkConnection?.db) {
+            console.log("Cannot spawn debug VoidChest: Connection not available");
+            return;
+        }
+        
+        console.log("Spawning debug VoidChest...");
+        this.spacetimeDBClient.sdkConnection.reducers.spawnDebugVoidChest();
     }
 }

@@ -1,7 +1,7 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, ScheduleAt, SpacetimeType, rand::Rng};
 use crate::{DbVector2, MonsterType, MAX_MONSTERS, WORLD_SIZE, DELTA_TIME, 
            get_world_cell_from_position, spatial_hash_collision_checker,
-           WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT, config, player, game_state, bestiary, ActiveAttack, active_attacks, entity};
+           WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT, config, player, game_state, bestiary, ActiveAttack, active_attacks, entity, account};
 use std::collections::HashMap;
 use std::time::Duration;
 
@@ -161,10 +161,17 @@ pub fn pre_spawn_monster(ctx: &ReducerContext, _timer: &MonsterSpawnTimer) {
     
     // Get a random monster type FROM THE SPAWNABLE LIST (not from all monster types)
     let mut rng = ctx.rng();
-    let random_type_index = (rng.gen::<f32>() * SPAWNABLE_MONSTER_TYPES.len() as f32) as usize;
-    let monster_type = SPAWNABLE_MONSTER_TYPES[random_type_index].clone();
     
-    //Log::info(&format!("Selected monster type {:?} from spawnable list (index {} of {} types)", monster_type, random_type_index, SPAWNABLE_MONSTER_TYPES.len()));
+    // 5% chance to spawn a rare VoidChest instead of regular monsters
+    let rare_spawn_roll = rng.gen_range(1..=200);
+    let monster_type = if rare_spawn_roll <= 1 {
+        // Rare VoidChest spawn (5% chance)
+        MonsterType::VoidChest
+    } else {
+        // Regular monster spawn (95% chance)
+        let random_type_index = (rng.gen::<f32>() * SPAWNABLE_MONSTER_TYPES.len() as f32) as usize;
+        SPAWNABLE_MONSTER_TYPES[random_type_index].clone()
+    };
     
     // Get monster stats from bestiary using the monster type as numerical ID
     let bestiary_entry = ctx.db.bestiary().bestiary_id().find(&(monster_type.clone() as u32))
@@ -372,6 +379,13 @@ fn populate_monster_cache(ctx: &ReducerContext, cache: &mut crate::collision::Co
         cache.monster.radius_monster[idx] = monster.radius;
         cache.monster.speed_monster[idx] = monster.speed;
         cache.monster.atk_monster[idx] = monster.atk;
+        //Structures have their weight set to 0.0 to prevent them from being pushed around
+        if monster.bestiary_id == MonsterType::VoidChest {
+            cache.monster.push_ratio_monster[idx] = 0;
+        }
+        else {
+            cache.monster.push_ratio_monster[idx] = 1;
+        }
 
         let target_player_id = monster.target_player_id;
         if cache.player.player_id_to_cache_index.contains_key(&target_player_id) {
@@ -612,7 +626,11 @@ fn solve_monster_repulsion_spatial_hash(cache: &mut crate::collision::CollisionC
 
                     // Push the younger monster away from the older monster
                     let monster_id_b = cache.monster.keys_monster[i_b_usize];
-                    if monster_id_a > monster_id_b {
+
+                    let monster_a_push_value = cache.monster.push_ratio_monster[i_a] * monster_id_a;
+                    let monster_b_push_value = cache.monster.push_ratio_monster[i_b_usize] * monster_id_b;
+
+                    if monster_a_push_value > monster_b_push_value {
                         cache.monster.pos_x_monster[i_a] = (cache.monster.pos_x_monster[i_a] + push_x).clamp(r_a, WORLD_SIZE as f32 - r_a);
                         cache.monster.pos_y_monster[i_a] = (cache.monster.pos_y_monster[i_a] + push_y).clamp(r_a, WORLD_SIZE as f32 - r_a);
                     } else {
@@ -690,4 +708,95 @@ pub fn cleanup_monster_hit_record(ctx: &ReducerContext, cleanup: MonsterHitClean
     
     // Delete the damage record
     ctx.db.monster_damage().damage_id().delete(&cleanup.damage_id);
+}
+
+// Debug reducer to spawn a VoidChest near the calling player
+#[reducer]
+pub fn spawn_debug_void_chest(ctx: &ReducerContext) {
+    // Get the caller's identity
+    let caller_identity = ctx.sender;
+    
+    // Find the caller's account
+    let account_opt = ctx.db.account().identity().find(&caller_identity);
+    if account_opt.is_none() {
+        log::error!("spawn_debug_void_chest: Account not found for caller");
+        return;
+    }
+    
+    let account = account_opt.unwrap();
+    if account.current_player_id == 0 {
+        log::error!("spawn_debug_void_chest: Caller has no active player");
+        return;
+    }
+    
+    // Find the player
+    let player_opt = ctx.db.player().player_id().find(&account.current_player_id);
+    if player_opt.is_none() {
+        log::error!("spawn_debug_void_chest: Player not found for caller");
+        return;
+    }
+    
+    let player = player_opt.unwrap();
+    
+    // Get VoidChest stats from bestiary
+    let bestiary_entry_opt = ctx.db.bestiary().bestiary_id().find(&(MonsterType::VoidChest as u32));
+    if bestiary_entry_opt.is_none() {
+        log::error!("spawn_debug_void_chest: VoidChest not found in bestiary");
+        return;
+    }
+    
+    let bestiary_entry = bestiary_entry_opt.unwrap();
+    
+    // Calculate spawn position near the player (100-200 pixels away)
+    let mut rng = ctx.rng();
+    let spawn_distance = 100.0 + (rng.gen::<f32>() * 100.0); // 100-200 pixels from player
+    let spawn_angle = rng.gen::<f32>() * std::f32::consts::PI * 2.0; // Random angle
+    
+    let spawn_position = DbVector2::new(
+        player.position.x + spawn_distance * spawn_angle.cos(),
+        player.position.y + spawn_distance * spawn_angle.sin()
+    );
+    
+    // Get world boundaries from config
+    let config = ctx.db.config().id().find(&0);
+    let world_size = if let Some(config) = config {
+        config.world_size as f32
+    } else {
+        6400.0 // Default world size
+    };
+    
+    // Clamp to world boundaries
+    let monster_radius = bestiary_entry.radius;
+    let clamped_position = DbVector2::new(
+        spawn_position.x.clamp(monster_radius, world_size - monster_radius),
+        spawn_position.y.clamp(monster_radius, world_size - monster_radius)
+    );
+    
+    // Create the VoidChest monster directly
+    let monster = ctx.db.monsters().insert(Monsters {
+        monster_id: 0,
+        bestiary_id: MonsterType::VoidChest,
+        hp: bestiary_entry.max_hp,
+        max_hp: bestiary_entry.max_hp,
+        atk: bestiary_entry.atk,
+        speed: bestiary_entry.speed,
+        target_player_id: player.player_id,
+        radius: bestiary_entry.radius,
+        spawn_position: clamped_position.clone(),
+    });
+    
+    // Create the boid for movement
+    let _boid = ctx.db.monsters_boid().insert(MonsterBoid {
+        monster_id: monster.monster_id,
+        position: clamped_position,
+    });
+    
+    log::info!(
+        "Debug: Spawned VoidChest (ID: {}) at position ({:.1}, {:.1}) for player {} ({})",
+        monster.monster_id,
+        clamped_position.x,
+        clamped_position.y,
+        player.name,
+        player.player_id
+    );
 }

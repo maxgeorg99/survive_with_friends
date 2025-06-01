@@ -8,4 +8,5 @@ pub enum MonsterType {
     Orc = 2,
     FinalBossPhase1 = 3,
     FinalBossPhase2 = 4,
+    VoidChest = 5,
 } 

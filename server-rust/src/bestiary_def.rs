@@ -11,7 +11,6 @@ pub struct Bestiary {
     // monster attributes
     pub max_hp: u32,
     pub speed: f32,
-    pub exp: u32,
     pub atk: f32,  // monster attack power (damage per tick)
     pub radius: f32, // monster size/hitbox radius
 }
@@ -32,7 +31,6 @@ pub fn init_bestiary(ctx: &ReducerContext) {
         monster_type: MonsterType::Rat,
         max_hp: 10,
         speed: 80.0,
-        exp: 1,
         atk: 1.0,
         radius: 24.0,
     });
@@ -43,7 +41,6 @@ pub fn init_bestiary(ctx: &ReducerContext) {
         monster_type: MonsterType::Slime,
         max_hp: 25,
         speed: 50.0,
-        exp: 2,
         atk: 1.5,
         radius: 30.0,
     });
@@ -54,7 +51,6 @@ pub fn init_bestiary(ctx: &ReducerContext) {
         monster_type: MonsterType::Orc,
         max_hp: 50,
         speed: 70.0,
-        exp: 5,
         atk: 2.0,
         radius: 40.0,
     });
@@ -65,7 +61,6 @@ pub fn init_bestiary(ctx: &ReducerContext) {
         monster_type: MonsterType::FinalBossPhase1,
         max_hp: 500,
         speed: 100.0,
-        exp: 100,
         atk: 10.0,
         radius: 92.0,
     });
@@ -76,9 +71,18 @@ pub fn init_bestiary(ctx: &ReducerContext) {
         monster_type: MonsterType::FinalBossPhase2,
         max_hp: 500,
         speed: 130.0,
-        exp: 500,
         atk: 12.0,
         radius: 128.0,
+    });
+
+    // Insert VoidChest stats
+    ctx.db.bestiary().insert(Bestiary {
+        bestiary_id: MonsterType::VoidChest as u32,
+        monster_type: MonsterType::VoidChest,
+        max_hp: 200,
+        speed: 0.0,
+        atk: 0.0,
+        radius: 82.0,
     });
 
     log::info!("Bestiary initialization complete");

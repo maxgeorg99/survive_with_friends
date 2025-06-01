@@ -6,7 +6,8 @@ export const MONSTER_ASSET_KEYS: Record<string, string> = {
     "Slime": 'monster_slime',
     "Orc": 'monster_orc',
     "FinalBossPhase1": 'final_boss_phase1',
-    "FinalBossPhase2": 'final_boss_phase2'
+    "FinalBossPhase2": 'final_boss_phase2',
+    "VoidChest": 'treasure_chest'
 };
 
 // Shadow offset configurations for each monster type (vertical offset in pixels)
@@ -15,7 +16,8 @@ export const MONSTER_SHADOW_OFFSETS_X: Record<string, number> = {
     "Slime": -9,    // Very low to the ground
     "Orc": 0,      // Larger monster, bigger shadow offset
     "FinalBossPhase1": 0,  // Large boss, bigger shadow offset
-    "FinalBossPhase2": 0   // Even larger final form, largest shadow offset
+    "FinalBossPhase2": 0,   // Even larger final form, largest shadow offset
+    "VoidChest": 0    // Chest is centered
 };
 
 // Shadow offset configurations for each monster type (vertical offset in pixels)
@@ -24,7 +26,8 @@ export const MONSTER_SHADOW_OFFSETS_Y: Record<string, number> = {
     "Slime": -22,    // Very low to the ground
     "Orc": 0,      // Larger monster, bigger shadow offset
     "FinalBossPhase1": 16,  // Large boss, bigger shadow offset
-    "FinalBossPhase2": 20   // Even larger final form, largest shadow offset
+    "FinalBossPhase2": 20,   // Even larger final form, largest shadow offset
+    "VoidChest": 12    // Chest sits on the ground with small offset
 };
 
 // Debug helper to print monster configurations
