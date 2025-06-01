@@ -53,6 +53,7 @@ const HEALTH_BG_DEPTH_OFFSET = 1; // Just behind health bar but in front of spri
 const HEALTH_BAR_DEPTH_OFFSET = 1.1; // In front of background but behind name
 const EXP_BG_DEPTH_OFFSET = 1; // Same as health background
 const EXP_BAR_DEPTH_OFFSET = 1.1; // Same as health bar
+const UI_DEPTH = 100000; // Extremely high depth to ensure UI stays on top of all game elements
 
 // Movement and position constants
 const POSITION_CORRECTION_THRESHOLD = 49; // Distance squared threshold for position correction (7 pixels)
@@ -2368,6 +2369,9 @@ export default class GameScene extends Phaser.Scene {
         // Fix to camera so it doesn't move with world
         container.setScrollFactor(0);
         
+        // Set high depth to ensure minimap stays on top of monsters and other game elements
+        container.setDepth(UI_DEPTH);
+        
         // Set initial alpha
         container.setAlpha(MINIMAP_ALPHA);
         
@@ -2380,7 +2384,7 @@ export default class GameScene extends Phaser.Scene {
             botDotsContainer
         };
         
-        console.log("Minimap created");
+        console.log("Minimap created with depth:", UI_DEPTH);
     }
 
     // Show victory screen for True Survivors
