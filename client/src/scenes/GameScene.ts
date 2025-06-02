@@ -6,6 +6,7 @@ import MonsterSpawnerManager from '../managers/MonsterSpawnerManager';
 import { GameEvents } from '../constants/GameEvents';
 import { AttackManager } from '../managers/AttackManager';
 import GemManager from '../managers/GemManager';
+import LootCapsuleManager from '../managers/LootCapsuleManager';
 import { createPlayerDamageEffect, createMonsterDamageEffect } from '../utils/DamageEffects';
 import UpgradeUI from '../ui/UpgradeUI';
 import PlayerHUD from '../ui/PlayerHUD';
@@ -89,6 +90,9 @@ export default class GameScene extends Phaser.Scene {
     
     // Add gem manager for gem visualization
     private gemManager: GemManager | null = null;
+    
+    // Add loot capsule manager for loot capsule visualization
+    private lootCapsuleManager: LootCapsuleManager | null = null;
     
     // Add upgrade UI manager
     private upgradeUI: UpgradeUI | null = null;
@@ -204,6 +208,9 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('dice', '/assets/dice.png');
         this.load.image('booster_pack', '/assets/booster_pack.png');
         
+        // Load loot capsule assets
+        this.load.image('void_capsule', '/assets/void_capsule.png');
+        
         // Load a white pixel for particle effects
         this.load.image('white_pixel', '/assets/white_pixel.png');
         
@@ -278,6 +285,9 @@ export default class GameScene extends Phaser.Scene {
 
             // Add V key for spawning debug VoidChest
             this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.V).on('down', this.spawnDebugVoidChest, this);
+            
+            // Add L key for spawning debug loot capsules
+            this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.L).on('down', this.spawnDebugLootCapsule, this);
         }
         console.log("Keyboard input set up.");
 
@@ -354,6 +364,8 @@ export default class GameScene extends Phaser.Scene {
                 this.monsterCounterUI.toggleVisible();
             }
         });
+
+        console.log("Game world initialization complete.");
     }
 
     private registerEventListeners() {
@@ -658,6 +670,10 @@ export default class GameScene extends Phaser.Scene {
         // Create and initialize the gem manager
         this.gemManager = new GemManager(this, this.spacetimeDBClient);
         this.gemManager.initializeGems(ctx);
+
+        // Create and initialize the loot capsule manager
+        this.lootCapsuleManager = new LootCapsuleManager(this, this.spacetimeDBClient);
+        this.lootCapsuleManager.initializeLootCapsules(ctx);
 
         console.log("Game world initialization complete.");
     }
@@ -2747,5 +2763,16 @@ export default class GameScene extends Phaser.Scene {
         
         console.log("Spawning debug VoidChest...");
         this.spacetimeDBClient.sdkConnection.reducers.spawnDebugVoidChest();
+    }
+    
+    // Add the spawnDebugLootCapsule method
+    private spawnDebugLootCapsule(): void {
+        if (!this.spacetimeDBClient.sdkConnection?.db) {
+            console.log("Cannot spawn debug loot capsule: Connection not available");
+            return;
+        }
+        
+        console.log("Spawning debug loot capsule...");
+        this.spacetimeDBClient.sdkConnection.reducers.spawnDebugLootCapsule();
     }
 }

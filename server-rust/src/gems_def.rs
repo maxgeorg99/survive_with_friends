@@ -526,6 +526,18 @@ pub fn spawn_debug_special_gem(ctx: &ReducerContext) {
     // Create the special gem
     let gem_id = create_gem(ctx, spawn_position, gem_level.clone());
     
-    log::info!("DEBUG: Player {} spawned {:?} gem (ID: {}) at position ({:.1}, {:.1})", 
-              player.name, gem_level, gem_id, spawn_position.x, spawn_position.y);
+    log::info!(
+        "Debug: Spawned {} gem (ID: {}) at position ({:.1}, {:.1}) for player {} ({})",
+        match gem_level {
+            GemLevel::Fries => "Fries",
+            GemLevel::Dice => "Dice", 
+            GemLevel::BoosterPack => "BoosterPack",
+            _ => "Unknown"
+        },
+        gem_id,
+        spawn_position.x,
+        spawn_position.y,
+        player.name,
+        player.player_id
+    );
 } 

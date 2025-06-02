@@ -96,7 +96,8 @@ class SpacetimeDBClient {
                 "SELECT * FROM chosen_upgrades",
                 "SELECT * FROM monster_spawners",
                 "SELECT * FROM game_state",
-                "SELECT * FROM boss_spawn_timer"
+                "SELECT * FROM boss_spawn_timer",
+                "SELECT * FROM loot_capsules"
             ]);
 
         // Register table event callbacks
@@ -206,6 +207,28 @@ class SpacetimeDBClient {
             }
         } catch (e) {
             console.warn("Could not register gem event handlers - the gems table might not be in current bindings yet:", e);
+        }
+
+        // LootCapsule Events - Check if the loot_capsules table exists in the bindings
+        try {
+            // @ts-ignore - Ignore TS error since table might not exist in current bindings
+            if (connection.db.lootCapsules) {
+                // @ts-ignore
+                connection.db.lootCapsules.onInsert((ctx, capsule) => {
+                    this.gameEvents.emit(GameEvents.LOOT_CAPSULE_CREATED, ctx, capsule);
+                });
+                // @ts-ignore
+                connection.db.lootCapsules.onUpdate((ctx, oldCapsule, newCapsule) => {
+                    this.gameEvents.emit(GameEvents.LOOT_CAPSULE_UPDATED, ctx, oldCapsule, newCapsule);
+                });
+                // @ts-ignore
+                connection.db.lootCapsules.onDelete((ctx, capsule) => {
+                    this.gameEvents.emit(GameEvents.LOOT_CAPSULE_DELETED, ctx, capsule);
+                });
+                console.log("Registered loot capsule event handlers successfully");
+            }
+        } catch (e) {
+            console.warn("Could not register loot capsule event handlers - the loot_capsules table might not be in current bindings yet:", e);
         }
 
         if(connection.db.world) {

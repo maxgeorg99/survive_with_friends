@@ -40,6 +40,11 @@ export enum GameEvents {
     GEM_UPDATED = 'gem:updated',
     GEM_DELETED = 'gem:deleted',
     
+    // LootCapsule events
+    LOOT_CAPSULE_CREATED = 'loot_capsule:created',
+    LOOT_CAPSULE_UPDATED = 'loot_capsule:updated',
+    LOOT_CAPSULE_DELETED = 'loot_capsule:deleted',
+    
     // Loading events
     LOADING_COMPLETE = 'loading_complete',
     LOADING_ERROR = 'loading_error',
