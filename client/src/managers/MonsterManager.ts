@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { Monsters, EventContext, MonsterType, MonsterBoid} from "../autobindings";
 import SpacetimeDBClient from '../SpacetimeDBClient';
-import { MONSTER_ASSET_KEYS, MONSTER_SHADOW_OFFSETS_X, MONSTER_SHADOW_OFFSETS_Y} from '../constants/MonsterConfig';
+import { MONSTER_ASSET_KEYS, MONSTER_SHADOW_OFFSETS_X, MONSTER_SHADOW_OFFSETS_Y, MONSTER_SHADOW_SCALE} from '../constants/MonsterConfig';
 import { GameEvents } from '../constants/GameEvents';
 import { createMonsterDamageEffect } from '../utils/DamageEffects';
 
@@ -117,6 +117,7 @@ export default class MonsterManager {
             const shadowY = MONSTER_SHADOW_OFFSETS_Y[monsterTypeName] || 0;
             const shadow = this.scene.add.image(shadowX, shadowY, SHADOW_ASSET_KEY);
             shadow.setAlpha(SHADOW_ALPHA);
+            shadow.setScale(MONSTER_SHADOW_SCALE[monsterTypeName] || 1.0);
             shadow.setDepth(SHADOW_DEPTH_OFFSET);
             container.add(shadow);
 

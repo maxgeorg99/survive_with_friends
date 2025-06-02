@@ -15,9 +15,9 @@ export const MONSTER_SHADOW_OFFSETS_X: Record<string, number> = {
     "Rat": -6,     // Smaller monster, smaller shadow offset
     "Slime": -9,    // Very low to the ground
     "Orc": 0,      // Larger monster, bigger shadow offset
-    "FinalBossPhase1": 0,  // Large boss, bigger shadow offset
-    "FinalBossPhase2": 0,   // Even larger final form, largest shadow offset
-    "VoidChest": 0    // Chest is centered
+    "FinalBossPhase1": -26,  // Large boss, bigger shadow offset
+    "FinalBossPhase2": -68,   // Even larger final form, largest shadow offset
+    "VoidChest": -28    // Chest is centered
 };
 
 // Shadow offset configurations for each monster type (vertical offset in pixels)
@@ -25,11 +25,19 @@ export const MONSTER_SHADOW_OFFSETS_Y: Record<string, number> = {
     "Rat": -24,     // Smaller monster, smaller shadow offset
     "Slime": -22,    // Very low to the ground
     "Orc": 0,      // Larger monster, bigger shadow offset
-    "FinalBossPhase1": 16,  // Large boss, bigger shadow offset
-    "FinalBossPhase2": 20,   // Even larger final form, largest shadow offset
-    "VoidChest": 12    // Chest sits on the ground with small offset
+    "FinalBossPhase1": -4,  // Large boss, bigger shadow offset
+    "FinalBossPhase2": -78,   // Even larger final form, largest shadow offset
+    "VoidChest": -66    // Chest sits on the ground with small offset
 };
 
+export const MONSTER_SHADOW_SCALE: Record<string, number> = {
+    "Rat": 1.0,
+    "Slime": 1.0,
+    "Orc": 1.0,
+    "FinalBossPhase1": 2.0,
+    "FinalBossPhase2": 6.5,
+    "VoidChest": 2.75
+};
 // Debug helper to print monster configurations
 export function logMonsterConfigs() {
     console.log("=== Monster Configurations ===");
