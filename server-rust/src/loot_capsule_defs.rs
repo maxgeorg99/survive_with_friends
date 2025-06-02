@@ -3,12 +3,12 @@ use crate::{DbVector2, GemLevel, account, player, config, gems_def, MonsterType}
 use std::time::Duration;
 
 // Constants for the VoidChest pinata system
-const VOID_CHEST_DAMAGE_CAPSULE_CHANCE: f32 = 0.08; // 8% chance per game tick when damaged (reduced from 15%)
-const VOID_CHEST_DEATH_CAPSULE_COUNT: usize = 16; // Number of capsules on death (increased from 8)
+const VOID_CHEST_DAMAGE_CAPSULE_CHANCE: f32 = 0.1; // chance per game tick when damaged
+const VOID_CHEST_DEATH_CAPSULE_COUNT: usize = 16; // Number of capsules on death
 const CAPSULE_FLIGHT_DURATION_MS: u64 = 1000; // How long capsules take to arrive
 const MIN_RADIUS: f32 = 220.0; // Minimum radius for capsule spawn
-const MODERATE_RADIUS: f32 = 550.0; // Radius for damage-triggered capsules (much larger for dramatic effect)
-const LARGE_RADIUS: f32 = 650.0; // Radius for death-triggered capsules (doubled from 350)
+const MODERATE_RADIUS: f32 = 550.0; // Radius for damage-triggered capsules
+const LARGE_RADIUS: f32 = 650.0; // Radius for death-triggered capsules
 
 // Table for LootCapsules - scheduled gem spawners that move from start to end position
 #[table(name = loot_capsules, scheduled(spawn_loot_capsule), public)]
@@ -150,15 +150,15 @@ fn select_weighted_gem_type(rng: &mut impl Rng) -> GemLevel {
     
     match roll {
         // Regular gems (75% total)
-        1..=35 => GemLevel::Small,     // 35% chance
-        36..=55 => GemLevel::Medium,   // 20% chance  
-        56..=70 => GemLevel::Large,    // 15% chance
-        71..=75 => GemLevel::Huge,     // 5% chance
+        1..=20 => GemLevel::Small,     // 35% chance
+        21..=35 => GemLevel::Medium,   // 20% chance  
+        36..=45 => GemLevel::Large,    // 15% chance
+        46..=50 => GemLevel::Huge,     // 5% chance
         
         // Special items (25% total) 
-        76..=87 => GemLevel::Fries,    // 12% chance (food is common)
-        88..=96 => GemLevel::Dice,     // 9% chance (dice is common)
-        97..=100 => GemLevel::BoosterPack, // 4% chance (booster packs are rarer)
+        51..=70 => GemLevel::Fries,    // 12% chance (food is common)
+        71..=90 => GemLevel::Dice,     // 9% chance (dice is common)
+        91..=100 => GemLevel::BoosterPack, // 4% chance (booster packs are rarer)
         
         _ => GemLevel::Small, // Fallback (shouldn't happen)
     }
