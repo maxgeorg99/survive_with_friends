@@ -2,7 +2,7 @@ use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, Sc
 use crate::{DbVector2, GameTickTimer, DeadPlayer, MonsterType, monsters_def, gems_def, boss_system, reset_world, 
     monster_damage, monsters, monsters_boid, player, attack_utils, game_state, dead_players, active_attacks,
     attack_burst_cooldowns, player_scheduled_attacks, active_attack_cleanup, entity, config, class_data, world,
-    game_tick_timer};
+    game_tick_timer, loot_capsule_defs};
 use std::time::Duration;
 
 static mut ERROR_FLAG: bool = false;
@@ -37,19 +37,29 @@ pub fn damage_monster(ctx: &ReducerContext, monster_id: u32, damage_amount: u32)
         None => return false,
     };
     
+    // Get the monster's position from boid (we'll need this for pinata logic)
+    let boid_opt = ctx.db.monsters_boid().monster_id().find(&monster_id);
+    let position = match boid_opt {
+        Some(boid) => boid.position,
+        None => {
+            panic!("Monster {} has no boid record!", monster.monster_id);
+        }
+    };
+    
+    // Check if this is a VoidChest for pinata logic
+    let is_void_chest = monster.bestiary_id == MonsterType::VoidChest;
+    
     // Make sure we don't underflow
     if monster.hp <= damage_amount {
         // Monster is dead - log and delete
         //Log::info(&format!("Monster {} (type: {:?}) was killed!", monster.monster_id, monster.bestiary_id));
         
-        // Get the monster's position before deleting it
-        let boid_opt = ctx.db.monsters_boid().monster_id().find(&monster_id);
-        let position = match boid_opt {
-            Some(boid) => boid.position,
-            None => {
-                panic!("Monster {} has no boid record!", monster.monster_id);
-            }
-        };
+        // VoidChest death pinata - spawn multiple loot capsules in a large area
+        if is_void_chest {
+            log::info!("VoidChest {} destroyed! Triggering death pinata at ({:.1}, {:.1})", 
+                      monster.monster_id, position.x, position.y);
+            loot_capsule_defs::trigger_void_chest_death_pinata(ctx, position);
+        }
         
         // Clean up any monster damage records for this monster
         cleanup_monster_damage_records(ctx, monster_id);
@@ -120,9 +130,11 @@ pub fn damage_monster(ctx: &ReducerContext, monster_id: u32, damage_amount: u32)
         
         // For non-boss monsters or if game state not found, spawn a gem
         if !is_boss {
-            // Spawn a gem at the monster's position
-            let cache = crate::monsters_def::get_collision_cache();
-            crate::gems_def::spawn_gem_on_monster_death(ctx, monster_id, position, cache);
+            // Spawn a gem at the monster's position (but not for VoidChest since it already spawned capsules)
+            if !is_void_chest {
+                let cache = crate::monsters_def::get_collision_cache();
+                crate::gems_def::spawn_gem_on_monster_death(ctx, monster_id, position, cache);
+            }
             
             // Delete the monster
             ctx.db.monsters().monster_id().delete(&monster_id);
@@ -134,6 +146,11 @@ pub fn damage_monster(ctx: &ReducerContext, monster_id: u32, damage_amount: u32)
         // Monster is still alive, update with reduced HP
         monster.hp -= damage_amount;
         ctx.db.monsters().monster_id().update(monster);
+        
+        // VoidChest damage pinata - chance to spawn a loot capsule when damaged
+        if is_void_chest {
+            loot_capsule_defs::trigger_void_chest_damage_pinata(ctx, position);
+        }
         
         false
     }

@@ -1,6 +1,13 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, ScheduleAt, rand::Rng};
-use crate::{DbVector2, GemLevel, account, player, config, gems_def};
+use crate::{DbVector2, GemLevel, account, player, config, gems_def, MonsterType};
 use std::time::Duration;
+
+// Constants for the VoidChest pinata system
+const VOID_CHEST_DAMAGE_CAPSULE_CHANCE: f32 = 0.15; // 15% chance per game tick when damaged
+const VOID_CHEST_DEATH_CAPSULE_COUNT: usize = 8; // Number of capsules on death
+const CAPSULE_FLIGHT_DURATION_MS: u64 = 1000; // How long capsules take to arrive
+const MODERATE_RADIUS: f32 = 200.0; // Radius for damage-triggered capsules
+const LARGE_RADIUS: f32 = 350.0; // Radius for death-triggered capsules
 
 // Table for LootCapsules - scheduled gem spawners that move from start to end position
 #[table(name = loot_capsules, scheduled(spawn_loot_capsule), public)]
@@ -133,4 +140,112 @@ pub fn spawn_debug_loot_capsule(ctx: &ReducerContext) {
         lootdrop_id,
         CAPSULE_DELAY_MS
     );
+}
+
+// Helper function to select a weighted random gem type for VoidChest loot
+// About 25% special items, with food and dice being common, booster packs rarer
+fn select_weighted_gem_type(rng: &mut impl Rng) -> GemLevel {
+    let roll = rng.gen_range(1..=100);
+    
+    match roll {
+        // Regular gems (75% total)
+        1..=35 => GemLevel::Small,     // 35% chance
+        36..=55 => GemLevel::Medium,   // 20% chance  
+        56..=70 => GemLevel::Large,    // 15% chance
+        71..=75 => GemLevel::Huge,     // 5% chance
+        
+        // Special items (25% total) 
+        76..=87 => GemLevel::Fries,    // 12% chance (food is common)
+        88..=96 => GemLevel::Dice,     // 9% chance (dice is common)
+        97..=100 => GemLevel::BoosterPack, // 4% chance (booster packs are rarer)
+        
+        _ => GemLevel::Small, // Fallback (shouldn't happen)
+    }
+}
+
+// Helper function to spawn a single LootCapsule from start position to a random position within radius
+fn spawn_loot_capsule_in_radius(
+    ctx: &ReducerContext, 
+    start_position: DbVector2, 
+    radius: f32,
+    gem_type: GemLevel
+) {
+    let mut rng = ctx.rng();
+    
+    // Generate random position within radius
+    let distance = rng.gen_range(50.0..radius); // Minimum 50 units away
+    let angle = rng.gen_range(0.0..(2.0 * std::f32::consts::PI));
+    
+    let end_position = DbVector2::new(
+        start_position.x + distance * angle.cos(),
+        start_position.y + distance * angle.sin(),
+    );
+    
+    // Get world boundaries from config and clamp position
+    let config = ctx.db.config().id().find(&0);
+    let world_size = if let Some(config) = config {
+        config.world_size as f32
+    } else {
+        6400.0 // Default world size
+    };
+    
+    let margin = 100.0; // Margin from world edge
+    let clamped_end_position = DbVector2::new(
+        end_position.x.clamp(margin, world_size - margin),
+        end_position.y.clamp(margin, world_size - margin)
+    );
+    
+    // Create the loot capsule
+    let capsule = ctx.db.loot_capsules().insert(LootCapsules {
+        capsule_id: 0,
+        start_position,
+        end_position: clamped_end_position,
+        lootdrop_id: gem_type.clone(),
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(CAPSULE_FLIGHT_DURATION_MS)),
+    });
+    
+    log::info!(
+        "VoidChest pinata: Spawned LootCapsule {} with {:?} gem from ({:.1}, {:.1}) to ({:.1}, {:.1})",
+        capsule.capsule_id,
+        gem_type,
+        start_position.x,
+        start_position.y,
+        clamped_end_position.x,
+        clamped_end_position.y
+    );
+}
+
+// Public function to trigger VoidChest damage pinata (called when VoidChest takes damage)
+pub fn trigger_void_chest_damage_pinata(ctx: &ReducerContext, chest_position: DbVector2) {
+    let mut rng = ctx.rng();
+    
+    // Check if we should spawn a capsule (15% chance per damage tick)
+    let roll = rng.gen_range(0.0..1.0);
+    if roll <= VOID_CHEST_DAMAGE_CAPSULE_CHANCE {
+        let gem_type = select_weighted_gem_type(&mut rng);
+        spawn_loot_capsule_in_radius(ctx, chest_position, MODERATE_RADIUS, gem_type);
+        
+        log::info!("VoidChest damage pinata triggered at ({:.1}, {:.1})", chest_position.x, chest_position.y);
+    }
+}
+
+// Public function to trigger VoidChest death pinata (called when VoidChest is destroyed)
+pub fn trigger_void_chest_death_pinata(ctx: &ReducerContext, chest_position: DbVector2) {
+    let mut rng = ctx.rng();
+    
+    log::info!("VoidChest death pinata triggered! Spawning {} capsules around ({:.1}, {:.1})", 
+              VOID_CHEST_DEATH_CAPSULE_COUNT, chest_position.x, chest_position.y);
+    
+    // Spawn multiple capsules in a larger area
+    for i in 0..VOID_CHEST_DEATH_CAPSULE_COUNT {
+        let gem_type = select_weighted_gem_type(&mut rng);
+        
+        if i == 0 {
+            log::info!("First death capsule: {:?} gem", gem_type);
+        }
+        
+        spawn_loot_capsule_in_radius(ctx, chest_position, LARGE_RADIUS, gem_type);
+    }
+    
+    log::info!("VoidChest death pinata complete - {} capsules spawned", VOID_CHEST_DEATH_CAPSULE_COUNT);
 } 
