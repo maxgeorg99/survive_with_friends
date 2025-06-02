@@ -110,6 +110,37 @@ export default class LootCapsuleManager {
             return;
         }
 
+        // Calculate duration based on scheduled_at time (when the capsule should reach its destination)
+        const currentTime = Date.now();
+        let animationDuration = ANIMATION_DURATION; // Default fallback
+        
+        console.log(`Current time: ${currentTime}ms`);
+        console.log(`Capsule scheduledAt:`, capsule.scheduledAt);
+        
+        // Handle the scheduledAt union type
+        if (capsule.scheduledAt.tag === 'Time') {
+            // The value field directly contains the timestamp in microseconds
+            const scheduledTimeMicros = capsule.scheduledAt.value;
+            console.log(`Scheduled time (micros):`, scheduledTimeMicros);
+            
+            // Convert BigInt microseconds to milliseconds
+            const scheduledTimeMs = Number(scheduledTimeMicros) / 1000;
+            console.log(`Scheduled time (ms): ${scheduledTimeMs}`);
+            console.log(`Time difference: ${scheduledTimeMs - currentTime}ms`);
+            
+            const calculatedDuration = scheduledTimeMs - currentTime;
+            if (!isNaN(calculatedDuration) && calculatedDuration > 0) {
+                animationDuration = Math.max(100, calculatedDuration); // Ensure minimum 100ms duration
+            } else {
+                console.warn(`Invalid duration calculated (${calculatedDuration}), using default ${ANIMATION_DURATION}ms`);
+                animationDuration = ANIMATION_DURATION;
+            }
+        } else {
+            console.log(`ScheduledAt is not Time type (${capsule.scheduledAt.tag}), using default duration`);
+        }
+        
+        console.log(`Capsule ${capsuleIdKey} final animation duration: ${animationDuration}ms`);
+
         // Create a container for the capsule and effects
         const container = this.scene.add.container(
             capsule.startPosition.x,
@@ -127,7 +158,8 @@ export default class LootCapsuleManager {
         // Set depth based on start position
         container.setDepth(BASE_DEPTH + capsule.startPosition.y);
         
-        // Store the container
+        // Store the container with capsule ID for sparkle tracking
+        container.setData('capsuleId', capsuleIdKey);
         this.capsuleSprites.set(capsuleIdKey, container);
         
         // Calculate arc animation parameters
@@ -144,16 +176,24 @@ export default class LootCapsuleManager {
         const midX = (startX + endX) / 2;
         const midY = (startY + endY) / 2 - arcHeight;
         
+        console.log(`Animating capsule from (${startX}, ${startY}) to (${endX}, ${endY}) via (${midX}, ${midY}) over ${animationDuration}ms`);
+        
         // Start sparkle effect during flight
         this.startSparkleEffect(container);
         
-        // Create smooth arc animation using a bezier curve approximation
+        // Create smooth arc animation using direct property animation
+        const startTime = Date.now();
+        
+        // Create a simple object to animate that we can track
+        const animationTarget = { progress: 0 };
+        
         this.scene.tweens.add({
-            targets: container,
-            duration: ANIMATION_DURATION,
+            targets: animationTarget,
+            progress: 1,
+            duration: animationDuration,
             ease: 'Sine.InOut',
             onUpdate: (tween: Phaser.Tweens.Tween) => {
-                const progress = tween.progress;
+                const progress = animationTarget.progress;
                 
                 // Quadratic bezier curve: B(t) = (1-t)²P₀ + 2(1-t)tP₁ + t²P₂
                 const t = progress;
@@ -169,8 +209,20 @@ export default class LootCapsuleManager {
                 
                 // Slight rotation during flight for more dynamic feel
                 capsuleSprite.setRotation(Math.sin(progress * Math.PI * 4) * 0.1);
+                
+                // Update sparkle emitter position if it's still active and not destroyed
+                if (this.sparkleEmitter && this.sparkleEmitter.active) {
+                    try {
+                        this.sparkleEmitter.setPosition(x, y);
+                    } catch (e) {
+                        // Ignore errors if emitter is destroyed
+                        console.warn("Sparkle emitter error:", e);
+                    }
+                }
             },
             onComplete: () => {
+                console.log(`Capsule ${capsuleIdKey} animation completed`);
+                
                 // Stop sparkles when animation completes
                 this.stopSparkleEffect();
                 
@@ -198,23 +250,25 @@ export default class LootCapsuleManager {
 
     // Start sparkle effect following the capsule
     private startSparkleEffect(container: Phaser.GameObjects.Container) {
-        this.sparkleEmitter.setPosition(container.x, container.y);
-        this.sparkleEmitter.start();
-        
-        // Update sparkle position to follow the container during animation
-        const updateSparkles = () => {
-            if (this.sparkleEmitter.active && this.capsuleSprites.has(String(container.getData('capsuleId')))) {
+        if (this.sparkleEmitter) {
+            try {
                 this.sparkleEmitter.setPosition(container.x, container.y);
-                // Continue updating
-                this.scene.time.delayedCall(50, updateSparkles);
+                this.sparkleEmitter.start();
+            } catch (e) {
+                console.warn("Failed to start sparkle effect:", e);
             }
-        };
-        updateSparkles();
+        }
     }
 
     // Stop sparkle effect
     private stopSparkleEffect() {
-        this.sparkleEmitter.stop();
+        if (this.sparkleEmitter) {
+            try {
+                this.sparkleEmitter.stop();
+            } catch (e) {
+                console.warn("Failed to stop sparkle effect:", e);
+            }
+        }
     }
 
     // Remove a capsule sprite
