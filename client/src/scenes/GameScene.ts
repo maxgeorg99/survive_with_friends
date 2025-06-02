@@ -12,6 +12,7 @@ import UpgradeUI from '../ui/UpgradeUI';
 import PlayerHUD from '../ui/PlayerHUD';
 import BossTimerUI from '../ui/BossTimerUI';
 import MonsterCounterUI from '../ui/MonsterCounterUI';
+import VoidChestUI from '../ui/VoidChestUI';
 import MusicManager from '../managers/MusicManager';
 
 // Constants
@@ -149,6 +150,9 @@ export default class GameScene extends Phaser.Scene {
     // Dark haze overlay for boss fights
     private bossHazeOverlay: Phaser.GameObjects.Rectangle | null = null;
 
+    // Add VoidChest UI for alerts and directional arrow
+    private voidChestUI: VoidChestUI | null = null;
+
     constructor() {
         super('GameScene');
         this.spacetimeDBClient = (window as any).spacetimeDBClient;
@@ -211,6 +215,9 @@ export default class GameScene extends Phaser.Scene {
         // Load loot capsule assets
         this.load.image('void_capsule', '/assets/void_capsule.png');
         
+        // Load VoidChest UI assets
+        this.load.image('void_arrow', '/assets/void_arrow.png');
+        
         // Load a white pixel for particle effects
         this.load.image('white_pixel', '/assets/white_pixel.png');
         
@@ -234,6 +241,7 @@ export default class GameScene extends Phaser.Scene {
             console.log("attack_wand:", this.textures.exists('attack_wand'));
             console.log("attack_knife:", this.textures.exists('attack_knife'));
             console.log("attack_shield:", this.textures.exists('attack_shield'));
+            console.log("void_arrow:", this.textures.exists('void_arrow'));
             console.log(GRASS_ASSET_KEY + ":", this.textures.exists(GRASS_ASSET_KEY));
             console.log(SHADOW_ASSET_KEY + ":", this.textures.exists(SHADOW_ASSET_KEY));
         });
@@ -357,6 +365,9 @@ export default class GameScene extends Phaser.Scene {
 
         // Initialize monster counter UI
         this.monsterCounterUI = new MonsterCounterUI(this);
+
+        // Initialize VoidChest UI for alerts and directional arrow
+        this.voidChestUI = new VoidChestUI(this, this.spacetimeDBClient);
 
         // Add key listener for toggling monster counter UI
         this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.D).on('down', () => {
@@ -601,6 +612,14 @@ export default class GameScene extends Phaser.Scene {
                     this.musicManager.playTrack('boss');
                 }
                 this.showBossHaze();
+            }
+            
+            // If a VoidChest spawns, show the alert
+            if (monsterType === 'VoidChest') {
+                console.log("VoidChest detected! Showing alert");
+                if (this.voidChestUI) {
+                    this.voidChestUI.showVoidChestAlert();
+                }
             }
         }
     }
@@ -1645,6 +1664,11 @@ export default class GameScene extends Phaser.Scene {
             this.gemManager.update(time, delta);
         }
 
+        // Update VoidChest UI for directional arrow
+        if (this.voidChestUI) {
+            this.voidChestUI.update();
+        }
+
         // Update minimap
         this.updateMinimap();
     }
@@ -1966,6 +1990,12 @@ export default class GameScene extends Phaser.Scene {
         if (this.monsterCounterUI) {
             this.monsterCounterUI.destroy();
             this.monsterCounterUI = null;
+        }
+        
+        // Clean up VoidChest UI
+        if (this.voidChestUI) {
+            this.voidChestUI.destroy();
+            this.voidChestUI = null;
         }
         
         // DEFENSIVE CLEANUP: Remove any lingering game objects that might persist between scenes
