@@ -1,5 +1,5 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, ScheduleAt, rand::Rng};
-use crate::{DbVector2, GemLevel, account, player, config, gems_def, MonsterType};
+use crate::{DbVector2, GemLevel, account, player, config, gems_def, MonsterType, bestiary, monsters, monsters_boid};
 use std::time::Duration;
 
 // Constants for the VoidChest pinata system
@@ -21,6 +21,15 @@ pub struct LootCapsules {
     pub end_position: DbVector2,       // Where the capsule will spawn the gem
     pub lootdrop_id: GemLevel,         // The type of gem it will spawn
     pub scheduled_at: ScheduleAt,      // When the capsule will spawn the gem
+}
+
+// Table for scheduled guaranteed VoidChest spawns
+#[table(name = guaranteed_void_chest_spawns, scheduled(spawn_guaranteed_void_chest), public)]
+pub struct GuaranteedVoidChestSpawn {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    pub scheduled_at: ScheduleAt,
 }
 
 // Scheduled reducer to spawn a gem when a loot capsule arrives at its destination
@@ -46,6 +55,80 @@ pub fn spawn_loot_capsule(ctx: &ReducerContext, capsule: LootCapsules) {
         capsule.capsule_id,
         gem_id,
         capsule.lootdrop_id
+    );
+}
+
+// Scheduled reducer to spawn a guaranteed VoidChest at timed intervals
+#[reducer]
+pub fn spawn_guaranteed_void_chest(ctx: &ReducerContext, _spawn: GuaranteedVoidChestSpawn) {
+    if ctx.sender != ctx.identity() {
+        panic!("spawn_guaranteed_void_chest may not be invoked by clients, only via scheduling.");
+    }
+    
+    log::info!("Guaranteed VoidChest spawn triggered!");
+    
+    // Check if there are any players online
+    let player_count = ctx.db.player().count();
+    if player_count == 0 {
+        log::info!("No players online, skipping guaranteed VoidChest spawn.");
+        return;
+    }
+    
+    // Get VoidChest stats from bestiary
+    let bestiary_entry_opt = ctx.db.bestiary().bestiary_id().find(&(crate::MonsterType::VoidChest as u32));
+    if bestiary_entry_opt.is_none() {
+        log::error!("VoidChest not found in bestiary for guaranteed spawn");
+        return;
+    }
+    
+    let bestiary_entry = bestiary_entry_opt.unwrap();
+    
+    // Get world boundaries from config
+    let config = ctx.db.config().id().find(&0);
+    let world_size = if let Some(config) = config {
+        config.world_size as f32
+    } else {
+        6400.0 // Default world size
+    };
+    
+    // Generate a completely random position across the entire map
+    let mut rng = ctx.rng();
+    let margin = bestiary_entry.radius + 50.0; // Extra margin for safety
+    let spawn_area_size = world_size - (2.0 * margin);
+    
+    let spawn_position = DbVector2::new(
+        margin + (rng.gen::<f32>() * spawn_area_size),
+        margin + (rng.gen::<f32>() * spawn_area_size)
+    );
+    
+    // Find the closest player to target
+    let closest_player_id = crate::monsters_def::get_closest_player(ctx, &spawn_position);
+    
+    // Create the VoidChest monster directly
+    let monster = ctx.db.monsters().insert(crate::Monsters {
+        monster_id: 0,
+        bestiary_id: crate::MonsterType::VoidChest,
+        hp: bestiary_entry.max_hp,
+        max_hp: bestiary_entry.max_hp,
+        atk: bestiary_entry.atk,
+        speed: bestiary_entry.speed,
+        target_player_id: closest_player_id,
+        radius: bestiary_entry.radius,
+        spawn_position: spawn_position.clone(),
+    });
+    
+    // Create the boid for movement
+    let _boid = ctx.db.monsters_boid().insert(crate::MonsterBoid {
+        monster_id: monster.monster_id,
+        position: spawn_position,
+    });
+    
+    log::info!(
+        "Guaranteed VoidChest spawned! ID: {}, Position: ({:.1}, {:.1}), Target Player: {}",
+        monster.monster_id,
+        spawn_position.x,
+        spawn_position.y,
+        closest_player_id
     );
 }
 
@@ -249,4 +332,36 @@ pub fn trigger_void_chest_death_pinata(ctx: &ReducerContext, chest_position: DbV
     }
     
     log::info!("VoidChest death pinata complete - {} capsules spawned", VOID_CHEST_DEATH_CAPSULE_COUNT);
+}
+
+// Function to schedule guaranteed VoidChest spawns at game start
+pub fn schedule_guaranteed_void_chest_spawns(ctx: &ReducerContext) {
+    log::info!("Scheduling guaranteed VoidChest spawns...");
+    
+    // Schedule first guaranteed VoidChest at 90 seconds
+    ctx.db.guaranteed_void_chest_spawns().insert(GuaranteedVoidChestSpawn {
+        scheduled_id: 0,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_secs(90)),
+    });
+    
+    // Schedule second guaranteed VoidChest at 180 seconds (3 minutes)
+    ctx.db.guaranteed_void_chest_spawns().insert(GuaranteedVoidChestSpawn {
+        scheduled_id: 0,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_secs(180)),
+    });
+    
+    log::info!("Guaranteed VoidChest spawns scheduled for 90s and 180s");
+}
+
+// Function to clean up any pending guaranteed VoidChest spawns (called during world reset)
+pub fn cleanup_guaranteed_void_chest_spawns(ctx: &ReducerContext) {
+    log::info!("Cleaning up pending guaranteed VoidChest spawns...");
+    
+    // Delete all pending guaranteed void chest spawns
+    let spawns: Vec<_> = ctx.db.guaranteed_void_chest_spawns().iter().collect();
+    for spawn in spawns {
+        ctx.db.guaranteed_void_chest_spawns().scheduled_id().delete(&spawn.scheduled_id);
+    }
+    
+    log::info!("Guaranteed VoidChest spawns cleanup complete");
 } 

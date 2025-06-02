@@ -317,6 +317,9 @@ pub fn schedule_monster_spawning(ctx: &ReducerContext) {
         scheduled_at: ScheduleAt::Interval(Duration::from_millis(3000).into()),
     });
     
+    // Schedule guaranteed VoidChest spawns
+    crate::loot_capsule_defs::schedule_guaranteed_void_chest_spawns(ctx);
+    
     log::info!("Monster spawning scheduled successfully");
 }
 

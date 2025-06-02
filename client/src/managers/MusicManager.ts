@@ -1,3 +1,7 @@
+// Global music state to persist across scene transitions
+let globalCurrentTrack: Phaser.Sound.BaseSound | null = null;
+let globalCurrentTrackKey: string | null = null;
+
 export default class MusicManager {
     private scene: Phaser.Scene;
     private currentTrack: Phaser.Sound.BaseSound | null = null;
@@ -14,14 +18,22 @@ export default class MusicManager {
 
     constructor(scene: Phaser.Scene) {
         this.scene = scene;
-        console.log("MusicManager initialized");
+        
+        // Sync with global state on construction
+        this.currentTrack = globalCurrentTrack;
+        this.currentTrackKey = globalCurrentTrackKey;
+        
+        console.log("MusicManager initialized", { currentTrack: this.currentTrackKey });
     }
 
     // Play a track, stopping any currently playing track
     playTrack(trackKey: string, volume: number = 0.7): void {
-        // Don't restart the same track
-        if (this.currentTrackKey === trackKey && this.currentTrack?.isPlaying) {
-            console.log(`MusicManager: Track '${trackKey}' is already playing`);
+        // Don't restart the same track (check global state)
+        if (globalCurrentTrackKey === trackKey && globalCurrentTrack?.isPlaying) {
+            console.log(`MusicManager: Track '${trackKey}' is already playing globally - skipping restart`);
+            // Sync local state with global state
+            this.currentTrack = globalCurrentTrack;
+            this.currentTrackKey = globalCurrentTrackKey;
             return;
         }
 
@@ -51,6 +63,10 @@ export default class MusicManager {
             this.currentTrack.play();
             this.currentTrackKey = trackKey;
             
+            // Update global state
+            globalCurrentTrack = this.currentTrack;
+            globalCurrentTrackKey = trackKey;
+            
             console.log(`MusicManager: Playing '${trackKey}' (loop: ${config.loops}, volume: ${volume})`);
 
             // Add completion listener for non-looping tracks
@@ -59,6 +75,8 @@ export default class MusicManager {
                     console.log(`MusicManager: Non-looping track '${trackKey}' completed`);
                     this.currentTrack = null;
                     this.currentTrackKey = null;
+                    globalCurrentTrack = null;
+                    globalCurrentTrackKey = null;
                 });
             }
         } catch (error) {
@@ -68,13 +86,24 @@ export default class MusicManager {
 
     // Stop the currently playing track
     stopCurrentTrack(): void {
+        // Stop global track if it exists and is different from local
+        if (globalCurrentTrack && globalCurrentTrack !== this.currentTrack) {
+            console.log(`MusicManager: Stopping global track '${globalCurrentTrackKey}'`);
+            globalCurrentTrack.stop();
+            globalCurrentTrack.destroy();
+        }
+        
         if (this.currentTrack) {
             console.log(`MusicManager: Stopping current track '${this.currentTrackKey}'`);
             this.currentTrack.stop();
             this.currentTrack.destroy();
-            this.currentTrack = null;
-            this.currentTrackKey = null;
         }
+        
+        // Clear both local and global state
+        this.currentTrack = null;
+        this.currentTrackKey = null;
+        globalCurrentTrack = null;
+        globalCurrentTrackKey = null;
     }
 
     // Stop all music
@@ -83,27 +112,37 @@ export default class MusicManager {
         console.log("MusicManager: All music stopped");
     }
 
-    // Get current track info
-    getCurrentTrack(): string | null {
-        return this.currentTrackKey;
+    // Get information about currently playing track
+    getCurrentTrack(): { key: string | null, isPlaying: boolean } {
+        return {
+            key: globalCurrentTrackKey,
+            isPlaying: globalCurrentTrack?.isPlaying || false
+        };
     }
 
-    // Check if music is playing
-    isPlaying(): boolean {
-        return this.currentTrack?.isPlaying || false;
-    }
-
-    // Set volume for current track
-    setVolume(volume: number): void {
-        if (this.currentTrack) {
-            (this.currentTrack as any).volume = volume;
-            console.log(`MusicManager: Volume set to ${volume} for '${this.currentTrackKey}'`);
-        }
+    // Check if a specific track is currently playing
+    isTrackPlaying(trackKey: string): boolean {
+        return globalCurrentTrackKey === trackKey && (globalCurrentTrack?.isPlaying || false);
     }
 
     // Cleanup - call when scene shuts down
     cleanup(): void {
-        this.stopCurrentTrack();
-        console.log("MusicManager: Cleanup completed");
+        // For title music, preserve it across menu scene transitions
+        // Only stop if it's a different track or if we're transitioning to a non-menu scene
+        if (this.currentTrack === globalCurrentTrack && globalCurrentTrackKey === 'title') {
+            // Don't stop title music during menu transitions - just clear local references
+            this.currentTrack = null;
+            this.currentTrackKey = null;
+            console.log("MusicManager: Cleanup completed - preserving title music across scene transition");
+        } else if (this.currentTrack === globalCurrentTrack) {
+            // Stop non-title music normally
+            this.stopCurrentTrack();
+            console.log("MusicManager: Cleanup completed - stopped non-title music");
+        } else {
+            // Just clear local references without stopping global music
+            this.currentTrack = null;
+            this.currentTrackKey = null;
+            console.log("MusicManager: Cleanup completed - cleared local references only");
+        }
     }
 } 

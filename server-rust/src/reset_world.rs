@@ -1,5 +1,5 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp};
-use crate::{entity, monsters, monsters_boid, gems, monster_spawners, boss_spawn_timer, game_state, monster_spawn_timer, monster_hit_cleanup, active_attack_cleanup, attack_burst_cooldowns, player_scheduled_attacks, monster_damage, player, upgrade_options, active_attacks};
+use crate::{entity, monsters, monsters_boid, gems, monster_spawners, boss_spawn_timer, game_state, monster_spawn_timer, monster_hit_cleanup, active_attack_cleanup, attack_burst_cooldowns, player_scheduled_attacks, monster_damage, player, upgrade_options, active_attacks, loot_capsule_defs};
 
 // ResetWorld reducer - clears all monsters, gems, monster spawners, and resets boss state
 // This should be called when the last player dies
@@ -163,7 +163,10 @@ pub fn reset_world(ctx: &ReducerContext) {
     }
     log::info!("ResetWorld: Cleared {} player upgrade options", upgrade_options_count);
     
-    // 14. Reschedule monster spawning
+    // 14. Clean up any pending guaranteed VoidChest spawns
+    crate::loot_capsule_defs::cleanup_guaranteed_void_chest_spawns(ctx);
+    
+    // 15. Reschedule monster spawning
     log::info!("Resuming normal monster spawning...");
     
     // Check if monster spawning is already scheduled

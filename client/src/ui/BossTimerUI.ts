@@ -6,6 +6,7 @@ import { GameEvents } from '../constants/GameEvents';
 const UI_DEPTH = 100000; // Extremely high depth to ensure UI stays on top of all game elements
 const BOSS_SPAWN_DELAY_MS = 5 * 60 * 1000; // 5 minutes in milliseconds, same as server
 const WARNING_THRESHOLD = 60 * 1000; // Start warning animation at 1 minute remaining
+const OMINOUS_SILENCE_THRESHOLD = 1; // Stop music at 10 seconds remaining for ominous effect
 
 export default class BossTimerUI {
     private scene: Phaser.Scene;
@@ -25,6 +26,7 @@ export default class BossTimerUI {
     private bossSpawnTime: number | null = null;
     private isTimerActive: boolean = false;
     private flashAnimation: Phaser.Tweens.Tween | null = null;
+    private hasSilencedMusic: boolean = false; // Track if we've already stopped music for ominous effect
     
     // Boss state tracking
     private bossActive: boolean = false;
@@ -267,6 +269,7 @@ export default class BossTimerUI {
         }
         
         this.isTimerActive = true;
+        this.hasSilencedMusic = false; // Reset silence flag for new timer
         this.container.setVisible(true);
         
         // Ensure UI is properly visible
@@ -336,12 +339,33 @@ export default class BossTimerUI {
                         if (timeRemaining > 0) {
                             this.timerText.setText(`End of the world in: ${minutes}:${seconds.toString().padStart(2, '0')}`);
                             
+                            // Stop background music at 10 seconds for ominous silence before boss spawn
+                            if (timeRemaining <= OMINOUS_SILENCE_THRESHOLD && !this.hasSilencedMusic) {
+                                console.log("Boss timer: Stopping background music for ominous silence before boss spawn");
+                                const gameScene = this.scene.scene.get('GameScene') as any;
+                                if (gameScene && gameScene.musicManager) {
+                                    gameScene.musicManager.stopCurrentTrack();
+                                }
+                                this.hasSilencedMusic = true;
+                            }
+                            
                             // Start warning flash if time is running low
                             if (timeRemaining <= 60 && !this.flashAnimation) {
                                 this.startWarningFlash(timeRemaining <= 10);
                             }
                         } else {
                             this.timerText.setText("End of the world: IMMINENT!");
+                            
+                            // Ensure music is stopped when timer reaches 0
+                            if (!this.hasSilencedMusic) {
+                                console.log("Boss timer: Timer reached 0, ensuring music is stopped");
+                                const gameScene = this.scene.scene.get('GameScene') as any;
+                                if (gameScene && gameScene.musicManager) {
+                                    gameScene.musicManager.stopCurrentTrack();
+                                }
+                                this.hasSilencedMusic = true;
+                            }
+                            
                             if (!this.flashAnimation) {
                                 this.startWarningFlash(true);
                             }
