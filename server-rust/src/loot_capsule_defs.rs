@@ -110,8 +110,8 @@ pub fn spawn_debug_loot_capsule(ctx: &ReducerContext) {
     let random_index = rng.gen_range(0..gem_types.len());
     let lootdrop_id = gem_types[random_index].clone();
     
-    // Schedule the loot capsule to spawn in 3 seconds
-    const CAPSULE_DELAY_MS: u64 = 3000;
+    // Schedule the loot capsule to spawn in 1 second
+    const CAPSULE_DELAY_MS: u64 = 1000;
     
     let capsule = ctx.db.loot_capsules().insert(LootCapsules {
         capsule_id: 0,

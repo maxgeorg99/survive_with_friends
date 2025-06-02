@@ -5,9 +5,9 @@ import { GameEvents } from '../constants/GameEvents';
 
 // Constants for visual appearance and animation
 const VOID_CAPSULE_ASSET_KEY = 'void_capsule';
-const ANIMATION_DURATION = 3000; // Duration of arc movement in ms (matches server 3 second delay)
+const ANIMATION_DURATION = 1000; // Default fallback duration (server now uses 1 second)
 const ALPHA_VALUE = 0.8; // Transparency of the capsule
-const BASE_DEPTH = 900; // Just below monsters but above background
+const BASE_DEPTH = 50000; // High depth to appear above most game elements but below UI (100000)
 const SPARKLE_PARTICLE_COUNT = 3; // Number of sparkle particles trailing the capsule
 const AWARD_PARTICLE_COUNT = 12; // Number of particles when awarding
 
@@ -128,13 +128,12 @@ export default class LootCapsuleManager {
             console.log(`Scheduled time (ms): ${scheduledTimeMs}`);
             console.log(`Time difference: ${scheduledTimeMs - currentTime}ms`);
             
-            const calculatedDuration = scheduledTimeMs - currentTime;
-            if (!isNaN(calculatedDuration) && calculatedDuration > 0) {
-                animationDuration = Math.max(100, calculatedDuration); // Ensure minimum 100ms duration
-            } else {
-                console.warn(`Invalid duration calculated (${calculatedDuration}), using default ${ANIMATION_DURATION}ms`);
-                animationDuration = ANIMATION_DURATION;
-            }
+            // Instead of trying to sync client and server clocks, use a fixed duration
+            // The server is configured for 1000ms delay, so we use that minus a safety buffer
+            // This avoids the client/server clock synchronization problem entirely
+            const lagCompensation = 200; // Conservative buffer for network and processing delays
+            animationDuration = Math.max(100, ANIMATION_DURATION - lagCompensation);
+            console.log(`Using fixed duration with ${lagCompensation}ms lag compensation: ${animationDuration}ms`);
         } else {
             console.log(`ScheduledAt is not Time type (${capsule.scheduledAt.tag}), using default duration`);
         }
@@ -226,14 +225,25 @@ export default class LootCapsuleManager {
                 // Stop sparkles when animation completes
                 this.stopSparkleEffect();
                 
-                // The capsule should be deleted by the server at this point
-                // If not deleted within a reasonable time, clean it up
-                this.scene.time.delayedCall(500, () => {
-                    if (this.capsuleSprites.has(capsuleIdKey)) {
-                        console.warn(`Capsule ${capsuleIdKey} not deleted by server, cleaning up manually`);
-                        this.removeCapsuleSprite(capsuleIdKey, false);
+                // Check if the capsule still exists (might have been deleted by server already)
+                if (this.capsuleSprites.has(capsuleIdKey)) {
+                    // Show award effect at final position before cleanup
+                    const finalContainer = this.capsuleSprites.get(capsuleIdKey);
+                    if (finalContainer) {
+                        this.createAwardEffect(finalContainer.x, finalContainer.y);
                     }
-                });
+                    
+                    // The capsule should be deleted by the server at this point
+                    // If not deleted within a reasonable time, clean it up
+                    this.scene.time.delayedCall(300, () => {
+                        if (this.capsuleSprites.has(capsuleIdKey)) {
+                            console.warn(`Capsule ${capsuleIdKey} not deleted by server, cleaning up manually`);
+                            this.removeCapsuleSprite(capsuleIdKey, false); // Don't double-play award effect
+                        }
+                    });
+                } else {
+                    console.log(`Capsule ${capsuleIdKey} was already deleted by server during animation`);
+                }
             }
         });
         
@@ -274,36 +284,51 @@ export default class LootCapsuleManager {
     // Remove a capsule sprite
     private removeCapsuleSprite(capsuleId: string, playAwardEffect: boolean = false) {
         const container = this.capsuleSprites.get(capsuleId);
-        if (container) {
-            if (playAwardEffect) {
-                // Play award effect at the capsule's final position
-                this.createAwardEffect(container.x, container.y);
-            }
-            
-            // Fade out and destroy the container
-            this.scene.tweens.add({
-                targets: container,
-                alpha: 0,
-                scale: 0.1,
-                duration: 300,
-                ease: 'Power2',
-                onComplete: () => {
-                    container.destroy(true);
-                    this.capsuleSprites.delete(capsuleId);
-                }
-            });
+        if (!container) {
+            console.log(`Capsule ${capsuleId} already removed or not found`);
+            return;
         }
+        
+        if (playAwardEffect) {
+            // Play award effect at the capsule's current position
+            this.createAwardEffect(container.x, container.y);
+        }
+        
+        // Stop any active tweens for this container
+        this.scene.tweens.killTweensOf(container);
+        
+        // Fade out and destroy the container
+        this.scene.tweens.add({
+            targets: container,
+            alpha: 0,
+            scale: 0.1,
+            duration: 300,
+            ease: 'Power2',
+            onComplete: () => {
+                try {
+                    container.destroy(true);
+                } catch (e) {
+                    console.warn(`Error destroying capsule ${capsuleId} container:`, e);
+                }
+                this.capsuleSprites.delete(capsuleId);
+                console.log(`Capsule ${capsuleId} cleaned up successfully`);
+            }
+        });
     }
 
     // Create award particle effect when capsule delivers its payload
     private createAwardEffect(x: number, y: number) {
-        // Position the award emitter at the final position
-        this.awardEmitter.setPosition(x, y);
+        // Position the award emitter at the final position and emit particles if available
+        if (this.awardEmitter) {
+            try {
+                this.awardEmitter.setPosition(x, y);
+                this.awardEmitter.explode(AWARD_PARTICLE_COUNT);
+            } catch (e) {
+                console.warn("Failed to create award particle effect:", e);
+            }
+        }
         
-        // Emit a burst of golden particles
-        this.awardEmitter.explode(AWARD_PARTICLE_COUNT);
-        
-        // Create expanding ring effect
+        // Create expanding ring effect (this doesn't depend on the emitter)
         const ring = this.scene.add.circle(x, y, 10, 0xffff00, 0.6);
         ring.setDepth(BASE_DEPTH + y + 100); // High depth to appear above everything
         
@@ -323,19 +348,36 @@ export default class LootCapsuleManager {
     public shutdown() {
         console.log("Shutting down LootCapsuleManager", this.lootCapsuleManagerId);
         
+        // Stop all active tweens for capsules
+        this.capsuleSprites.forEach(container => {
+            this.scene.tweens.killTweensOf(container);
+        });
+        
         // Destroy all capsule sprites
         this.capsuleSprites.forEach(container => container.destroy(true));
         this.capsuleSprites.clear();
         
-        // Stop and destroy particle emitters
+        // Stop and destroy particle emitters safely
         if (this.sparkleEmitter) {
-            this.sparkleEmitter.stop();
-            this.sparkleEmitter.destroy();
+            try {
+                this.sparkleEmitter.stop();
+                this.sparkleEmitter.destroy();
+            } catch (e) {
+                console.warn("Error destroying sparkle emitter:", e);
+            }
+            this.sparkleEmitter = null as any;
         }
         
         if (this.awardEmitter) {
-            this.awardEmitter.stop();
-            this.awardEmitter.destroy();
+            try {
+                this.awardEmitter.stop();
+                this.awardEmitter.destroy();
+            } catch (e) {
+                console.warn("Error destroying award emitter:", e);
+            }
+            this.awardEmitter = null as any;
         }
+        
+        console.log("LootCapsuleManager shutdown complete");
     }
 } 

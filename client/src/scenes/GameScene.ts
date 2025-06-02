@@ -1914,6 +1914,10 @@ export default class GameScene extends Phaser.Scene {
         this.gemManager?.shutdown();
         this.gemManager = null;
         
+        // Clean up LootCapsuleManager
+        this.lootCapsuleManager?.shutdown();
+        this.lootCapsuleManager = null;
+        
         // Clean up UpgradeUI
         if (this.upgradeUI) {
             this.upgradeUI.destroy();
