@@ -155,8 +155,15 @@ export default class LootCapsuleManager {
         capsuleSprite.setAlpha(ALPHA_VALUE);
         capsuleSprite.setScale(0.8); // Slightly smaller than normal size
         
-        // Add the sprite to the container
-        container.add(capsuleSprite);
+        // Create shadow sprite - positioned below the capsule to simulate ground shadow
+        const shadowOffset = 15; // Distance below capsule for ground shadow (reduced from 60)
+        const shadowSprite = this.scene.add.image(0, shadowOffset, VOID_CAPSULE_ASSET_KEY);
+        shadowSprite.setAlpha(0.3); // Semi-transparent
+        shadowSprite.setScale(0.6); // Smaller than capsule
+        shadowSprite.setTint(0x000000); // Black tint for shadow
+        
+        // Add both sprites to the container
+        container.add([shadowSprite, capsuleSprite]); // Shadow first so it's behind capsule
         
         // Set depth based on start position
         container.setDepth(BASE_DEPTH + capsule.startPosition.y);
@@ -206,6 +213,12 @@ export default class LootCapsuleManager {
                 const y = invT * invT * startY + 2 * invT * t * midY + t * t * endY;
                 
                 container.setPosition(x, y);
+                
+                // Update shadow position - linear X movement, fixed Y offset from start
+                const shadowX = startX + (endX - startX) * progress; // Linear interpolation for X
+                const shadowY = startY + (endY - startY) * progress + shadowOffset; // Linear interpolation for Y + offset
+                const shadowSprite = container.list[0] as Phaser.GameObjects.Image; // Shadow is first in container
+                shadowSprite.setPosition(shadowX - x, shadowY - y); // Relative to container position
                 
                 // Update depth based on current Y position
                 container.setDepth(BASE_DEPTH + y);
