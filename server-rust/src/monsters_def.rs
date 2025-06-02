@@ -177,22 +177,34 @@ pub fn pre_spawn_monster(ctx: &ReducerContext, _timer: &MonsterSpawnTimer) {
     let bestiary_entry = ctx.db.bestiary().bestiary_id().find(&(monster_type.clone() as u32))
         .expect(&format!("PreSpawnMonster: Could not find bestiary entry for monster type: {:?}", monster_type));
     
-    // Choose a random player to spawn near
-    let players: Vec<_> = ctx.db.player().iter().collect();
-    let random_skip = (rng.gen::<f32>() * players.len() as f32) as usize;
-    let target_player = &players[random_skip];
-    
-    // Calculate spawn position near the player (random direction, within 300-800 pixel radius)
-    let spawn_radius = 300.0 + (rng.gen::<f32>() * 501.0); // Distance from player
-    let spawn_angle = rng.gen::<f32>() * std::f32::consts::PI * 2.0; // Random angle in radians
-    
     // Calculate spawn position
-    let mut position = DbVector2::new(
-        target_player.position.x + spawn_radius * spawn_angle.cos(),
-        target_player.position.y + spawn_radius * spawn_angle.sin()
-    );
+    let mut position = if monster_type == MonsterType::VoidChest {
+        // VoidChests spawn randomly across the entire map
+        let margin = bestiary_entry.radius + 50.0; // Extra margin for safety
+        let spawn_area_size = config.world_size as f32 - (2.0 * margin);
+        
+        DbVector2::new(
+            margin + (rng.gen::<f32>() * spawn_area_size),
+            margin + (rng.gen::<f32>() * spawn_area_size)
+        )
+    } else {
+        // Regular monsters spawn near players
+        // Choose a random player to spawn near
+        let players: Vec<_> = ctx.db.player().iter().collect();
+        let random_skip = (rng.gen::<f32>() * players.len() as f32) as usize;
+        let target_player = &players[random_skip];
+        
+        // Calculate spawn position near the player (random direction, within 300-800 pixel radius)
+        let spawn_radius = 300.0 + (rng.gen::<f32>() * 501.0); // Distance from player
+        let spawn_angle = rng.gen::<f32>() * std::f32::consts::PI * 2.0; // Random angle in radians
+        
+        DbVector2::new(
+            target_player.position.x + spawn_radius * spawn_angle.cos(),
+            target_player.position.y + spawn_radius * spawn_angle.sin()
+        )
+    };
     
-    // Clamp to world boundaries using monster radius
+    // Clamp to world boundaries using monster radius (safety check)
     let monster_radius = bestiary_entry.radius;
     position.x = position.x.clamp(monster_radius, config.world_size as f32 - monster_radius);
     position.y = position.y.clamp(monster_radius, config.world_size as f32 - monster_radius);

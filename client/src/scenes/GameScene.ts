@@ -1715,6 +1715,32 @@ export default class GameScene extends Phaser.Scene {
                         });
                         this.minimap.botDotsContainer.add(bossDot);
                     }
+                } else if (monsterType === 'VoidChest') {
+                    // Add VoidChests as purple boxes
+                    const boid = this.spacetimeDBClient.sdkConnection.db.monstersBoid.monsterId.find(monster.monsterId);
+                    if (boid) {
+                        const chestRatioX = boid.position.x / worldBounds.width;
+                        const chestRatioY = boid.position.y / worldBounds.height;
+                        
+                        const chestBox = this.add.rectangle(
+                            chestRatioX * minimapSize,
+                            chestRatioY * minimapSize,
+                            10, // Width of the box
+                            10, // Height of the box
+                            0x800080, // Purple color for VoidChest
+                            1
+                        );
+                        // Add subtle pulsing effect for VoidChest
+                        this.tweens.add({
+                            targets: chestBox,
+                            alpha: { from: 1, to: 0.7 },
+                            duration: 1500,
+                            ease: 'Sine.easeInOut',
+                            yoyo: true,
+                            repeat: -1
+                        });
+                        this.minimap.botDotsContainer.add(chestBox);
+                    }
                 }
             }
         }

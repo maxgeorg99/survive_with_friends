@@ -3,11 +3,12 @@ use crate::{DbVector2, GemLevel, account, player, config, gems_def, MonsterType}
 use std::time::Duration;
 
 // Constants for the VoidChest pinata system
-const VOID_CHEST_DAMAGE_CAPSULE_CHANCE: f32 = 0.15; // 15% chance per game tick when damaged
-const VOID_CHEST_DEATH_CAPSULE_COUNT: usize = 8; // Number of capsules on death
+const VOID_CHEST_DAMAGE_CAPSULE_CHANCE: f32 = 0.08; // 8% chance per game tick when damaged (reduced from 15%)
+const VOID_CHEST_DEATH_CAPSULE_COUNT: usize = 16; // Number of capsules on death (increased from 8)
 const CAPSULE_FLIGHT_DURATION_MS: u64 = 1000; // How long capsules take to arrive
-const MODERATE_RADIUS: f32 = 200.0; // Radius for damage-triggered capsules
-const LARGE_RADIUS: f32 = 350.0; // Radius for death-triggered capsules
+const MIN_RADIUS: f32 = 220.0; // Minimum radius for capsule spawn
+const MODERATE_RADIUS: f32 = 550.0; // Radius for damage-triggered capsules (much larger for dramatic effect)
+const LARGE_RADIUS: f32 = 650.0; // Radius for death-triggered capsules (doubled from 350)
 
 // Table for LootCapsules - scheduled gem spawners that move from start to end position
 #[table(name = loot_capsules, scheduled(spawn_loot_capsule), public)]
@@ -173,7 +174,7 @@ fn spawn_loot_capsule_in_radius(
     let mut rng = ctx.rng();
     
     // Generate random position within radius
-    let distance = rng.gen_range(50.0..radius); // Minimum 50 units away
+    let distance = rng.gen_range(MIN_RADIUS..radius);
     let angle = rng.gen_range(0.0..(2.0 * std::f32::consts::PI));
     
     let end_position = DbVector2::new(
