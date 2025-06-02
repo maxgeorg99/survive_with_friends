@@ -40,13 +40,17 @@ export default class LootCapsuleManager {
 
         // Initialize persistent particle emitters
         this.sparkleEmitter = this.scene.add.particles(0, 0, 'white_pixel', {
-            speed: { min: 20, max: 40 },
-            scale: { start: 0.3, end: 0 },
+            speed: { min: 30, max: 80 },
+            scale: { start: 0.6, end: 0.1 },
             blendMode: Phaser.BlendModes.ADD,
-            lifespan: 400,
-            tint: 0x88ffff, // Light cyan sparkles
-            quantity: 1,
-            frequency: 150 // Emit sparkles continuously while active
+            lifespan: 1500, // Much longer for proper comet tail
+            tint: [0x88ffff, 0xaaffff, 0xffffff, 0xccffff], // Various cyan/white tints for variety
+            quantity: 5, // More particles per emission for denser trail
+            frequency: 50, // Even more frequent emissions for continuous comet tail
+            alpha: { start: 1.0, end: 0 }, // Full brightness starting alpha
+            // Add some random movement for more organic feel
+            accelerationX: { min: -15, max: 15 },
+            accelerationY: { min: -15, max: 15 }
         });
         this.sparkleEmitter.stop();
 
