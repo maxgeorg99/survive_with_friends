@@ -2515,30 +2515,39 @@ export default class GameScene extends Phaser.Scene {
 
     // Show dark haze overlay during boss fights
     private showBossHaze(): void {
+        const hazeAlpha = 0.4; // Increased for testing
+        const hazeDepth = UI_DEPTH - 1; // Increased for testing
+
         if (this.bossHazeOverlay) {
-            // Already showing, just make sure it's visible
+            console.log("Boss haze overlay already exists. Setting visible and alpha.");
             this.bossHazeOverlay.setVisible(true);
+            this.bossHazeOverlay.setAlpha(hazeAlpha); // Use test alpha
+            this.bossHazeOverlay.setDepth(hazeDepth); // Ensure depth is also set here
             return;
         }
 
         const { width, height } = this.scale;
+        console.log(`Creating boss haze overlay with dimensions: ${width}x${height}`);
         
         // Create dark semi-transparent overlay
-        this.bossHazeOverlay = this.add.rectangle(0, 0, width, height, 0x000000, 0.25)
+        this.bossHazeOverlay = this.add.rectangle(0, 0, width, height, 0x1A1E40, hazeAlpha) // Initial alpha is testAlpha (though it's set to 0 next)
             .setOrigin(0, 0)
             .setScrollFactor(0) // Fix to camera
-            .setDepth(UI_DEPTH - 1); // Just below UI elements
+            .setDepth(hazeDepth); // Use test depth
         
         // Fade in the haze
-        this.bossHazeOverlay.setAlpha(0);
+        this.bossHazeOverlay.setAlpha(0); // Starts at alpha 0 for fade-in
         this.tweens.add({
             targets: this.bossHazeOverlay,
-            alpha: 0.25,
+            alpha: hazeAlpha, // Fades to test alpha
             duration: 2000,
-            ease: 'Power2.easeIn'
+            ease: 'Power2.easeIn',
+            onComplete: () => {
+                console.log("Boss haze fade-in tween complete. Alpha:", this.bossHazeOverlay?.alpha);
+            }
         });
         
-        console.log("Boss haze overlay shown");
+        console.log("Boss haze overlay creation initiated.");
     }
 
     // Hide dark haze overlay when boss is defeated
