@@ -14,6 +14,7 @@ import BossTimerUI from '../ui/BossTimerUI';
 import MonsterCounterUI from '../ui/MonsterCounterUI';
 import VoidChestUI from '../ui/VoidChestUI';
 import MusicManager from '../managers/MusicManager';
+import { DebugManager } from '../managers/DebugManager'; // Added import for DebugManager
 
 // Constants
 const PLAYER_SPEED = 200;
@@ -72,6 +73,7 @@ export default class GameScene extends Phaser.Scene {
     private spacetimeDBClient: SpacetimeDBClient;
     private gameEvents: Phaser.Events.EventEmitter;
     private musicManager!: MusicManager;
+    private debugManager!: DebugManager; // Added DebugManager property
     private playerInitialized = false;
     private localPlayerSprite: Phaser.Physics.Arcade.Sprite | null = null;
     private localPlayerNameText: Phaser.GameObjects.Text | null = null;
@@ -273,31 +275,22 @@ export default class GameScene extends Phaser.Scene {
         // Setup keyboard input
         this.cursors = this.input.keyboard?.createCursorKeys() ?? null;
         
-        // Setup WASD keys
-        if (this.input.keyboard) {
-            
-            // Add debug key to toggle attack circles (use backtick key)
-            this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.BACKTICK).on('down', this.toggleAttackDebugCircles, this);
-            
-            // Add R key for rerolling upgrades
+        // Initialize MonsterManager
+        this.monsterManager = new MonsterManager(this, this.spacetimeDBClient);
+        
+        // Initialize AttackManager
+        this.attackManager = new AttackManager(this, this.spacetimeDBClient);
+
+        // Initialize DebugManager AFTER AttackManager is created
+        this.debugManager = new DebugManager(this, this.spacetimeDBClient, this.attackManager);
+        this.debugManager.initializeDebugKeys();
+        console.log("DebugManager initialized in GameScene.");
+        
+        if (this.input.keyboard) 
+        {
             this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R).on('down', this.rerollUpgrades, this);
-
-            // Add B key for spawning bots
-            this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.B).on('down', this.spawnBot, this);
-
-            // Add T key for triggering boss spawn testing
-            this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.T).on('down', this.triggerBossSpawnerTest, this);
-
-            // Add G key for spawning debug special gems
-            this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.G).on('down', this.spawnDebugSpecialGem, this);
-
-            // Add V key for spawning debug VoidChest
-            this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.V).on('down', this.spawnDebugVoidChest, this);
-            
-            // Add L key for spawning debug loot capsules
-            this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.L).on('down', this.spawnDebugLootCapsule, this);
         }
-        console.log("Keyboard input set up.");
+        console.log("Keyboard input (excluding debug keys) set up.");
 
         // Initialize the boss timer UI
         this.bossTimerUI = new BossTimerUI(this, this.spacetimeDBClient);
@@ -594,9 +587,7 @@ export default class GameScene extends Phaser.Scene {
 
     private handleConnectionLost(_ctx:ErrorContext) {
         console.log("Connection lost event received in GameScene");
-        
-        // Show the death screen
-        this.showDeathScreen();
+        this.disablePlayerControls();
     }
     
     private handleMonsterCreatedForMusic(ctx: any, monster: any): void {
@@ -1842,76 +1833,6 @@ export default class GameScene extends Phaser.Scene {
         });
     }
     
-    // Show death screen for local player
-    private showDeathScreen() {
-        console.log("Showing death screen for local player");
-        
-        // Create dark overlay covering the entire screen
-        const { width, height } = this.scale;
-        const overlay = this.add.rectangle(0, 0, width, height, 0x000000, 0.7)
-            .setOrigin(0, 0)
-            .setScrollFactor(0)  // Fix to camera
-            .setDepth(100000);    // Increased depth - extremely high to ensure it's on top
-            
-        // Add "Connection Lost" text
-        const titleText = this.add.text(
-            width / 2, 
-            height / 2 - 50, 
-            "Connection Lost", 
-            {
-                fontFamily: 'Arial',
-                fontSize: '48px',
-                color: '#FF0000',
-                stroke: '#000000',
-                strokeThickness: 6,
-                align: 'center'
-            }
-        )
-        .setOrigin(0.5)
-        .setScrollFactor(0)
-        .setDepth(100001);
-        
-        // Add "Choose a new character" text (updated from "refresh to play again")
-        const subtitleText = this.add.text(
-            width / 2, 
-            height / 2 + 50, 
-            "Please refresh the page to reconnect", 
-            {
-                fontFamily: 'Arial',
-                fontSize: '24px',
-                color: '#FFFFFF',
-                stroke: '#000000',
-                strokeThickness: 4,
-                align: 'center'
-            }
-        )
-        .setOrigin(0.5)
-        .setScrollFactor(0)
-        .setDepth(100001);
-        
-        // Fade in effect
-        overlay.alpha = 0;
-        titleText.alpha = 0;
-        subtitleText.alpha = 0;
-        
-        this.tweens.add({
-            targets: [overlay, titleText, subtitleText],
-            alpha: 1,
-            duration: 1000,
-            ease: 'Power2',
-            onComplete: () => {
-                // Wait 3 seconds before transitioning to ClassSelectScene
-                this.time.delayedCall(3000, () => {
-                    console.log("Death screen timer complete, transitioning to ClassSelectScene");
-                    this.scene.start('ClassSelectScene');
-                });
-            }
-        });
-        
-        // Disable input and controls for local player
-        this.disablePlayerControls();
-    }
-    
     // Disable player controls after death
     private disablePlayerControls() {
         // Clear tap target and hide marker
@@ -1936,8 +1857,8 @@ export default class GameScene extends Phaser.Scene {
     }
 
     shutdown() {
-        console.log("GameScene shutdown called");
-        
+        console.log("GameScene shutdown initiated.");
+
         // Cleanup music manager
         if (this.musicManager) {
             this.musicManager.cleanup();
@@ -2093,16 +2014,11 @@ export default class GameScene extends Phaser.Scene {
         }
         
         // Remove debug key binding
-        if (this.input?.keyboard) {
-            try {
-                // Try different approach to remove the listener
-                this.input.keyboard.removeCapture(Phaser.Input.Keyboard.KeyCodes.BACKTICK);
-                // Just create a new key without listeners to replace the old one
-                this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.BACKTICK);
-            } catch (e) {
-                console.warn("Could not clean up debug key binding:", e);
-            }
+        if (this.input.keyboard) 
+        {
+            this.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.R);
         }
+        this.debugManager?.clearDebugKeys();
         
         // Clean up minimap
         if (this.minimap) {
@@ -2194,25 +2110,11 @@ export default class GameScene extends Phaser.Scene {
         };
     }
 
-    // Add a debug key binding to toggle attack circles visibility
-    private toggleAttackDebugCircles() {
-        if (this.attackManager) {
-            // Create a private variable in the class to track the current state
-            if (this.attackManager['debugCirclesEnabled'] === undefined) {
-                this.attackManager['debugCirclesEnabled'] = false;
-            }
-            
-            // Toggle the state
-            const newState = !this.attackManager['debugCirclesEnabled'];
-            this.attackManager['debugCirclesEnabled'] = newState;
-            
-            // Call the method to update the attack manager
-            this.attackManager.setDebugCirclesEnabled(newState);
-            
-            console.log(`Attack debug circles ${newState ? 'enabled' : 'disabled'}`);
-        } else {
-            console.log("Attack manager not initialized, can't toggle debug circles");
+    public getLocalPlayerPosition(): { x: number, y: number } | null {
+        if (this.localPlayerSprite) {
+            return { x: this.localPlayerSprite.x, y: this.localPlayerSprite.y };
         }
+        return null;
     }
 
     /**
@@ -2348,7 +2250,7 @@ export default class GameScene extends Phaser.Scene {
     /**
      * Handle rerolling upgrades when the 'R' key is pressed
      */
-    private rerollUpgrades(): void {
+    public rerollUpgrades(): void {
         if (!this.spacetimeDBClient.sdkConnection?.db || this.localPlayerId <= 0) {
             console.log("Cannot reroll: Connection not available or player not initialized");
             return;
@@ -2611,28 +2513,6 @@ export default class GameScene extends Phaser.Scene {
         }
     }
 
-    // Add the spawnBot method
-    private spawnBot(): void {
-        if (!this.spacetimeDBClient.sdkConnection?.db) {
-            console.log("Cannot spawn bot: Connection not available");
-            return;
-        }
-        
-        console.log("Spawning bot...");
-        this.spacetimeDBClient.sdkConnection.reducers.spawnBot();
-    }
-
-    // Add the boss spawner test method
-    private triggerBossSpawnerTest(): void {
-        if (!this.spacetimeDBClient.sdkConnection?.db) {
-            console.log("Cannot trigger boss spawner test: Connection not available");
-            return;
-        }
-        
-        console.log("Triggering boss spawner test - boss timer will be updated to 5 seconds...");
-        this.spacetimeDBClient.sdkConnection.reducers.spawnBossForTesting();
-    }
-
     // Show dark haze overlay during boss fights
     private showBossHaze(): void {
         if (this.bossHazeOverlay) {
@@ -2689,38 +2569,5 @@ export default class GameScene extends Phaser.Scene {
             console.log("Boss defeated! Hiding haze overlay");
             this.hideBossHaze();
         }
-    }
-
-    // Add the spawnDebugSpecialGem method
-    private spawnDebugSpecialGem(): void {
-        if (!this.spacetimeDBClient.sdkConnection?.db) {
-            console.log("Cannot spawn debug special gem: Connection not available");
-            return;
-        }
-        
-        console.log("Spawning debug special gem...");
-        this.spacetimeDBClient.sdkConnection.reducers.spawnDebugSpecialGem();
-    }
-
-    // Add the spawnDebugVoidChest method
-    private spawnDebugVoidChest(): void {
-        if (!this.spacetimeDBClient.sdkConnection?.db) {
-            console.log("Cannot spawn debug VoidChest: Connection not available");
-            return;
-        }
-        
-        console.log("Spawning debug VoidChest...");
-        this.spacetimeDBClient.sdkConnection.reducers.spawnDebugVoidChest();
-    }
-    
-    // Add the spawnDebugLootCapsule method
-    private spawnDebugLootCapsule(): void {
-        if (!this.spacetimeDBClient.sdkConnection?.db) {
-            console.log("Cannot spawn debug loot capsule: Connection not available");
-            return;
-        }
-        
-        console.log("Spawning debug loot capsule...");
-        this.spacetimeDBClient.sdkConnection.reducers.spawnDebugLootCapsule();
     }
 }
