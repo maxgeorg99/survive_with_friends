@@ -1,5 +1,5 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp};
-use crate::{MAX_PLAYERS, MAX_MONSTERS, MAX_GEM_COUNT, MAX_ATTACK_COUNT, NUM_WORLD_CELLS, 
+use crate::{MAX_PLAYERS, MAX_MONSTERS, MAX_GEM_COUNT, MAX_ATTACK_COUNT, MAX_MONSTER_ATTACK_COUNT, NUM_WORLD_CELLS, 
            WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT, WORLD_CELL_BIT_SHIFT, WORLD_CELL_MASK, WORLD_CELL_SIZE};
 use std::collections::HashMap;
 
@@ -133,6 +133,31 @@ impl Default for AttackCollisionCache {
     }
 }
 
+// --- Monster Attack Collision ---
+pub struct MonsterAttackCollisionCache {
+    pub keys_monster_attack: Box<[u32]>,
+    pub heads_monster_attack: Box<[i32]>,
+    pub nexts_monster_attack: Box<[i32]>,
+    pub pos_x_monster_attack: Box<[f32]>,
+    pub pos_y_monster_attack: Box<[f32]>,
+    pub radius_monster_attack: Box<[f32]>,
+    pub cached_count_monster_attacks: i32,
+}
+
+impl Default for MonsterAttackCollisionCache {
+    fn default() -> Self {
+        Self {
+            keys_monster_attack: vec![0; MAX_MONSTER_ATTACK_COUNT as usize].into_boxed_slice(),
+            heads_monster_attack: vec![-1; NUM_WORLD_CELLS as usize].into_boxed_slice(),
+            nexts_monster_attack: vec![-1; MAX_MONSTER_ATTACK_COUNT as usize].into_boxed_slice(),
+            pos_x_monster_attack: vec![0.0; MAX_MONSTER_ATTACK_COUNT as usize].into_boxed_slice(),
+            pos_y_monster_attack: vec![0.0; MAX_MONSTER_ATTACK_COUNT as usize].into_boxed_slice(),
+            radius_monster_attack: vec![0.0; MAX_MONSTER_ATTACK_COUNT as usize].into_boxed_slice(),
+            cached_count_monster_attacks: 0,
+        }
+    }
+}
+
 // --- Complete Collision Cache ---
 #[derive(Default)]
 pub struct CollisionCache {
@@ -140,6 +165,7 @@ pub struct CollisionCache {
     pub monster: MonsterCollisionCache,
     pub gem: GemCollisionCache,
     pub attack: AttackCollisionCache,
+    pub monster_attack: MonsterAttackCollisionCache,
 }
 
 impl CollisionCache {
@@ -194,6 +220,15 @@ impl CollisionCache {
         self.attack.pos_x_attack.fill(0.0);
         self.attack.pos_y_attack.fill(0.0);
         self.attack.radius_attack.fill(0.0);
+
+        // Clear monster attack cache
+        self.monster_attack.cached_count_monster_attacks = 0;
+        self.monster_attack.keys_monster_attack.fill(0);
+        self.monster_attack.heads_monster_attack.fill(-1);
+        self.monster_attack.nexts_monster_attack.fill(-1);
+        self.monster_attack.pos_x_monster_attack.fill(0.0);
+        self.monster_attack.pos_y_monster_attack.fill(0.0);
+        self.monster_attack.radius_monster_attack.fill(0.0);
     }
 }
 

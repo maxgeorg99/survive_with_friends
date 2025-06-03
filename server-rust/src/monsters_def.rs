@@ -475,8 +475,8 @@ fn reassign_monster_target(ctx: &ReducerContext, monster: Monsters) {
     ctx.db.monsters().monster_id().update(updated_monster);
 }
 
-// Helper method to process collisions between attacks and monsters using spatial hash
-pub fn process_monster_attack_collisions_spatial_hash(ctx: &ReducerContext) {
+// Helper method to process collisions between player attacks and monsters using spatial hash
+pub fn process_player_attack_monster_collisions_spatial_hash(ctx: &ReducerContext) {
     let cache = get_collision_cache();
     
     for aid in 0..cache.attack.cached_count_attacks {

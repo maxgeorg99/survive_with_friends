@@ -2,7 +2,7 @@ use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, Sc
 use crate::{DbVector2, GameTickTimer, DeadPlayer, MonsterType, monsters_def, gems_def, boss_system, reset_world, 
     monster_damage, monsters, monsters_boid, player, attack_utils, game_state, dead_players, active_attacks,
     attack_burst_cooldowns, player_scheduled_attacks, active_attack_cleanup, entity, config, class_data, world,
-    game_tick_timer, loot_capsule_defs};
+    game_tick_timer, loot_capsule_defs, monster_attacks_def};
 use std::time::Duration;
 
 static mut ERROR_FLAG: bool = false;
@@ -343,6 +343,10 @@ fn process_attack_movements(ctx: &ReducerContext) {
     crate::attacks_def::process_attack_movements(ctx);
 }
 
+fn process_monster_attack_movements(ctx: &ReducerContext) {
+    crate::monster_attacks_def::process_monster_attack_movements(ctx);
+}
+
 fn maintain_gems(ctx: &ReducerContext) {
     let cache = crate::monsters_def::get_collision_cache();
     crate::gems_def::maintain_gems(ctx, cache);
@@ -353,8 +357,12 @@ fn process_player_monster_collisions_spatial_hash(ctx: &ReducerContext) {
     crate::player_def::process_player_monster_collisions_spatial_hash(ctx, collision_cache);
 }
 
+fn process_player_attack_monster_collisions_spatial_hash(ctx: &ReducerContext) {
+    crate::monsters_def::process_player_attack_monster_collisions_spatial_hash(ctx);
+}
+
 fn process_monster_attack_collisions_spatial_hash(ctx: &ReducerContext) {
-    crate::monsters_def::process_monster_attack_collisions_spatial_hash(ctx);
+    crate::monster_attacks_def::process_monster_attack_collisions_spatial_hash(ctx);
 }
 
 fn process_player_attack_collisions_spatial_hash(ctx: &ReducerContext) {
@@ -457,9 +465,13 @@ pub fn game_tick(ctx: &ReducerContext, _timer: GameTickTimer) {
 
     process_attack_movements(ctx);
 
+    process_monster_attack_movements(ctx);
+
     maintain_gems(ctx);
 
     process_player_monster_collisions_spatial_hash(ctx);
+
+    process_player_attack_monster_collisions_spatial_hash(ctx);
 
     process_monster_attack_collisions_spatial_hash(ctx);
 

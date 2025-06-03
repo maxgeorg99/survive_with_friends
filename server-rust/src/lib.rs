@@ -16,6 +16,7 @@ pub mod loot_capsule_defs;
 pub mod boss_system;
 pub mod monsters_def;
 pub mod attacks_def;
+pub mod monster_attacks_def;
 pub mod core_game;
 pub mod upgrades_def;
 
@@ -34,6 +35,7 @@ pub use loot_capsule_defs::*;
 pub use boss_system::*;
 pub use monsters_def::*;
 pub use attacks_def::*;
+pub use monster_attacks_def::*;
 pub use core_game::*;
 pub use upgrades_def::*;
 
@@ -63,6 +65,16 @@ pub enum AttackType {
     Wand,
     Knives,
     Shield,
+}
+
+// Monster attack type enum
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum MonsterAttackType {
+    ImpBolt,
+    EnderBolt,
+    EnderScythe,
+    EnderClaw,
+    VoidZone,
 }
 
 #[derive(SpacetimeType, Clone, Copy, Debug, PartialEq)]
@@ -126,6 +138,7 @@ pub const MAX_PLAYERS: u16 = 32;
 pub const MAX_MONSTERS: u16 = 1024;
 pub const MAX_GEM_COUNT: u16 = 1024;
 pub const MAX_ATTACK_COUNT: u16 = 4096;
+pub const MAX_MONSTER_ATTACK_COUNT: u16 = 2048;
 
 // --- Timer Table ---
 #[table(name = game_tick_timer, scheduled(game_tick))]
