@@ -319,10 +319,7 @@ export class AttackManager {
         const player = this.spacetimeClient.sdkConnection.db.player.playerId.find(playerId);
         if (!player) return null;
         
-        const entity = this.spacetimeClient.sdkConnection.db.entity.entityId.find(player.entityId);
-        if (!entity) return null;
-        
-        return new Phaser.Math.Vector2(entity.position.x, entity.position.y);
+        return new Phaser.Math.Vector2(player.position.x, player.position.y);
     }
     
     public update(time?: number, delta?: number) {

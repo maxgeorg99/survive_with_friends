@@ -5,6 +5,7 @@ import MonsterManager from '../managers/MonsterManager';
 import MonsterSpawnerManager from '../managers/MonsterSpawnerManager';
 import { GameEvents } from '../constants/GameEvents';
 import { AttackManager } from '../managers/AttackManager';
+import { MonsterAttackManager } from '../managers/MonsterAttackManager';
 import GemManager from '../managers/GemManager';
 import LootCapsuleManager from '../managers/LootCapsuleManager';
 import { createPlayerDamageEffect, createMonsterDamageEffect } from '../utils/DamageEffects';
@@ -90,6 +91,9 @@ export default class GameScene extends Phaser.Scene {
     
     // Add attack manager for player attack visualization
     private attackManager: AttackManager | null = null;
+    
+    // Add monster attack manager for monster attack visualization
+    private monsterAttackManager: MonsterAttackManager | null = null;
     
     // Add gem manager for gem visualization
     private gemManager: GemManager | null = null;
@@ -192,6 +196,9 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('attack_wand', '/assets/attack_wand.png');
         this.load.image('attack_knife', '/assets/attack_knife.png');
         this.load.image('attack_shield', '/assets/attack_shield.png');
+        
+        // Load monster attack assets
+        this.load.image('monster_attack_firebolt', '/assets/monster_attack_firebolt.png');
         
         // Also load class icons with ClassSelectScene keys to keep them cached
         this.load.image('fighter_icon', '/assets/attack_sword.png');
@@ -680,6 +687,10 @@ export default class GameScene extends Phaser.Scene {
             this.attackManager.initializeAttacks(ctx);
             console.log("Existing attacks checked");
         }
+
+        // Create and initialize the monster attack manager
+        this.monsterAttackManager = new MonsterAttackManager(this, this.spacetimeDBClient);
+        this.monsterAttackManager.initializeMonsterAttacks(ctx);
 
         // Create and initialize the gem manager
         this.gemManager = new GemManager(this, this.spacetimeDBClient);
@@ -1659,6 +1670,11 @@ export default class GameScene extends Phaser.Scene {
             this.gemManager.update(time, delta);
         }
 
+        // Update monster attack manager for projectile movement
+        if (this.monsterAttackManager) {
+            this.monsterAttackManager.update(time, delta);
+        }
+
         // Update VoidChest UI for directional arrow
         if (this.voidChestUI) {
             this.voidChestUI.update();
@@ -1884,6 +1900,10 @@ export default class GameScene extends Phaser.Scene {
         
         // Clean up AttackManager properly
         this.attackManager?.shutdown();
+
+        // Clean up MonsterAttackManager
+        this.monsterAttackManager?.shutdown();
+        this.monsterAttackManager = null;
 
         // Clean up GemManager
         this.gemManager?.shutdown();

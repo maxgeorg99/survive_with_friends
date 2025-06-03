@@ -90,6 +90,7 @@ class SpacetimeDBClient {
                 "SELECT * FROM monsters",
                 "SELECT * FROM monsters_boid",
                 "SELECT * FROM active_attacks",
+                "SELECT * FROM active_monster_attacks",
                 "SELECT * FROM attack_data",
                 "SELECT * FROM gems",
                 "SELECT * FROM upgrade_options",
@@ -184,6 +185,19 @@ class SpacetimeDBClient {
             });
             connection.db.activeAttacks.onDelete((ctx, attack) => {
                 this.gameEvents.emit(GameEvents.ATTACK_DELETED, ctx, attack);
+            });
+        }
+
+        // Monster Attack Events
+        if (connection.db.activeMonsterAttacks) {
+            connection.db.activeMonsterAttacks.onInsert((ctx, attack) => {
+                this.gameEvents.emit(GameEvents.MONSTER_ATTACK_CREATED, ctx, attack);
+            });
+            connection.db.activeMonsterAttacks.onUpdate((ctx, oldAttack, newAttack) => {
+                this.gameEvents.emit(GameEvents.MONSTER_ATTACK_UPDATED, ctx, oldAttack, newAttack);
+            });
+            connection.db.activeMonsterAttacks.onDelete((ctx, attack) => {
+                this.gameEvents.emit(GameEvents.MONSTER_ATTACK_DELETED, ctx, attack);
             });
         }
 
