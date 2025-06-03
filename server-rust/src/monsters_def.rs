@@ -286,6 +286,11 @@ pub fn spawn_monster(ctx: &ReducerContext, spawner: MonsterSpawners) {
         log::info!("Boss monster of type {:?} created with ID {}", spawner.monster_type, monster.monster_id);
         crate::boss_system::update_boss_monster_id(ctx, monster.monster_id);
     }
+    
+    // If this is an Imp, start its attack schedule
+    if spawner.monster_type == MonsterType::Imp {
+        crate::monster_attacks_def::start_imp_attack_schedule(ctx, monster.monster_id);
+    }
 }
 
 pub fn get_closest_player(ctx: &ReducerContext, position: &DbVector2) -> u32 {

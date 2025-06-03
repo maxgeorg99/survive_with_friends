@@ -170,6 +170,7 @@ export default class MonsterManager {
         
         // Update monster data
         container.setData('monsterData', monsterData);
+        container.setData('monsterType', monsterTypeName);
         
         // Special handling for boss monsters
         if (monsterTypeName === "FinalBossPhase1" || monsterTypeName === "FinalBossPhase2") {
@@ -318,6 +319,8 @@ export default class MonsterManager {
             case 3: return "FinalBossPhase1";
             case 4: return "FinalBossPhase2";
             case 5: return "VoidChest";
+            case 6: return "Imp";
+            case 7: return "Zombie";
             default: 
                 console.warn(`Unknown monster type: ${bestiaryId}`);
                 return "Unknown";

@@ -1,7 +1,20 @@
-use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, ScheduleAt, SpacetimeType};
+use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, ScheduleAt, SpacetimeType, rand::Rng};
 use crate::{DbVector2, MonsterAttackType, DELTA_TIME, get_world_cell_from_position, spatial_hash_collision_checker,
-           WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT, player};
+           WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT, player, monsters, monsters_boid};
 use std::time::Duration;
+
+// Scheduled table for Imp attacks - Imps periodically fire ImpBolts at players
+#[table(name = imp_attack_scheduler, scheduled(trigger_imp_attack), public)]
+pub struct ImpAttackScheduler {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    
+    pub scheduled_at: ScheduleAt, // When the next attack should fire
+    
+    #[index(btree)]
+    pub imp_monster_id: u32,      // The Imp monster that will attack
+}
 
 // Active monster attacks - tracks currently active monster attacks in the game
 // This is a scheduled table that automatically expires attacks
@@ -209,7 +222,7 @@ pub fn spawn_imp_bolt(ctx: &ReducerContext, spawn_position: DbVector2, target_pl
         direction: direction_vector,
         monster_attack_type: MonsterAttackType::ImpBolt,
         piercing: false, // ImpBolt is not piercing
-        damage: 15, // ImpBolt damage
+        damage: 12, // ImpBolt damage
         radius: 16.0, // ImpBolt radius
         speed: 600.0, // ImpBolt speed
         parameter_u: target_player_id, // Store target player ID
@@ -221,4 +234,110 @@ pub fn spawn_imp_bolt(ctx: &ReducerContext, spawn_position: DbVector2, target_pl
               active_monster_attack.active_monster_attack_id, 
               spawn_position.x, spawn_position.y, 
               target_player_id, duration_ms);
+}
+
+// Reducer called when an Imp should fire an ImpBolt
+#[reducer]
+pub fn trigger_imp_attack(ctx: &ReducerContext, scheduler: ImpAttackScheduler) {
+    if ctx.sender != ctx.identity() {
+        panic!("TriggerImpAttack may not be invoked by clients, only via scheduling.");
+    }
+
+    // Check if the Imp monster still exists
+    let imp_opt = ctx.db.monsters().monster_id().find(&scheduler.imp_monster_id);
+    let imp = match imp_opt {
+        Some(monster) => monster,
+        None => {
+            // Imp is dead - don't reschedule, just log cleanup
+            log::info!("Imp {} no longer exists, removing attack scheduler", scheduler.imp_monster_id);
+            return;
+        }
+    };
+
+    // Get the Imp's current position from boid
+    let boid_opt = ctx.db.monsters_boid().monster_id().find(&scheduler.imp_monster_id);
+    let imp_position = match boid_opt {
+        Some(boid) => boid.position,
+        None => {
+            // No boid found - Imp is probably dead, don't reschedule
+            log::info!("Imp {} has no boid, removing attack scheduler", scheduler.imp_monster_id);
+            return;
+        }
+    };
+
+    // Check if the target player still exists
+    let target_player_opt = ctx.db.player().player_id().find(&imp.target_player_id);
+    let target_player = match target_player_opt {
+        Some(player) => player,
+        None => {
+            // Target player is gone - find a new target or skip this attack
+            let new_target_player = find_nearest_player(ctx, imp_position);
+            match new_target_player {
+                Some(player) => player,
+                None => {
+                    // No players found - don't attack but reschedule for later
+                    log::info!("No target players found for Imp {}, skipping attack", scheduler.imp_monster_id);
+                    schedule_next_imp_attack(ctx, scheduler.imp_monster_id);
+                    return;
+                }
+            }
+        }
+    };
+
+    // Spawn the ImpBolt attack
+    spawn_imp_bolt(ctx, imp_position, target_player.player_id);
+    
+    log::info!("Imp {} fired ImpBolt at player {} from position ({}, {})", 
+              scheduler.imp_monster_id, target_player.player_id, imp_position.x, imp_position.y);
+
+    // Schedule the next attack
+    schedule_next_imp_attack(ctx, scheduler.imp_monster_id);
+}
+
+// Helper function to schedule the next Imp attack
+fn schedule_next_imp_attack(ctx: &ReducerContext, imp_monster_id: u32) {
+    // Schedule next attack in 2-4 seconds (random interval)
+    let mut rng = ctx.rng();
+    let attack_delay_ms = 2000 + (rng.gen::<f32>() * 2000.0) as u64; // 2-4 seconds
+    
+    ctx.db.imp_attack_scheduler().insert(ImpAttackScheduler {
+        scheduled_id: 0,
+        imp_monster_id,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(attack_delay_ms)),
+    });
+}
+
+// Function to start Imp attack scheduling when an Imp spawns
+pub fn start_imp_attack_schedule(ctx: &ReducerContext, imp_monster_id: u32) {
+    // Schedule the first attack in 3-5 seconds to give players time to see the Imp
+    let mut rng = ctx.rng();
+    let initial_delay_ms = 3000 + (rng.gen::<f32>() * 2000.0) as u64; // 3-5 seconds
+    
+    ctx.db.imp_attack_scheduler().insert(ImpAttackScheduler {
+        scheduled_id: 0,
+        imp_monster_id,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(initial_delay_ms)),
+    });
+
+    log::info!("Started attack schedule for Imp {} (first attack in {}ms)", imp_monster_id, initial_delay_ms);
+}
+
+// Function to cleanup Imp attack schedule when an Imp dies
+pub fn cleanup_imp_attack_schedule(ctx: &ReducerContext, imp_monster_id: u32) {
+    // Find and delete all scheduled attacks for this Imp
+    let schedulers_to_delete: Vec<u64> = ctx.db.imp_attack_scheduler()
+        .imp_monster_id()
+        .filter(&imp_monster_id)
+        .map(|scheduler| scheduler.scheduled_id)
+        .collect();
+    
+    let count = schedulers_to_delete.len();
+    
+    for scheduled_id in schedulers_to_delete {
+        ctx.db.imp_attack_scheduler().scheduled_id().delete(&scheduled_id);
+    }
+
+    if count > 0 {
+        log::info!("Cleaned up {} attack schedulers for dead Imp {}", count, imp_monster_id);
+    }
 }

@@ -69,6 +69,8 @@ export default class TitleScene extends Phaser.Scene {
         this.load.image('monster_rat', '/assets/monster_rat.png');
         this.load.image('monster_slime', '/assets/monster_slime.png');
         this.load.image('monster_orc', '/assets/monster_orc.png');
+        this.load.image('monster_imp', '/assets/monster_imp.png');
+        this.load.image('monster_zombie', '/assets/monster_zombie.png');
         this.load.image('monster_spawn_indicator', '/assets/monster_spawn_indicator.png');
         
         // Preload boss assets for end-game experience

@@ -81,10 +81,15 @@ pub fn damage_monster(ctx: &ReducerContext, monster_id: u32, damage_amount: u32)
                     // Store the entity ID and position before deletion
                     let boss_position = position;
                     
-                    // Spawn phase 2 first, before deleting phase 1 monster
+                    // Spawn phase 2 first, before deleting phase 1
                     log::info!("Calling spawn_boss_phase_two now...");
                     crate::boss_system::spawn_boss_phase_two(ctx, boss_position);
                     log::info!("spawn_boss_phase_two completed successfully");
+                    
+                    // If this is an Imp boss (unlikely but for completeness), clean up its attack schedule
+                    if monster.bestiary_id == MonsterType::Imp {
+                        crate::monster_attacks_def::cleanup_imp_attack_schedule(ctx, monster_id);
+                    }
                     
                     // Only after successful spawn of phase 2, delete phase 1
                     ctx.db.monsters().monster_id().delete(&monster_id);
@@ -114,6 +119,11 @@ pub fn damage_monster(ctx: &ReducerContext, monster_id: u32, damage_amount: u32)
                     // Phase 2 boss defeated - VICTORY!
                     log::info!("BOSS PHASE 2 DEFEATED! GAME COMPLETE!");
                     
+                    // If this is an Imp boss (unlikely but for completeness), clean up its attack schedule
+                    if monster.bestiary_id == MonsterType::Imp {
+                        crate::monster_attacks_def::cleanup_imp_attack_schedule(ctx, monster_id);
+                    }
+                    
                     // Delete the monster and entity
                     ctx.db.monsters().monster_id().delete(&monster_id);
                     ctx.db.monsters_boid().monster_id().delete(&monster_id);
@@ -134,6 +144,11 @@ pub fn damage_monster(ctx: &ReducerContext, monster_id: u32, damage_amount: u32)
             if !is_void_chest {
                 let cache = crate::monsters_def::get_collision_cache();
                 crate::gems_def::spawn_gem_on_monster_death(ctx, monster_id, position, cache);
+            }
+            
+            // If this is an Imp, clean up its attack schedule
+            if monster.bestiary_id == MonsterType::Imp {
+                crate::monster_attacks_def::cleanup_imp_attack_schedule(ctx, monster_id);
             }
             
             // Delete the monster
