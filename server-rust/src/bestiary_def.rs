@@ -85,5 +85,25 @@ pub fn init_bestiary(ctx: &ReducerContext) {
         radius: 82.0,
     });
 
+    // Insert Imp stats - fast, magical creature with low-medium HP
+    ctx.db.bestiary().insert(Bestiary {
+        bestiary_id: MonsterType::Imp as u32,
+        monster_type: MonsterType::Imp,
+        max_hp: 18,        // Low-medium HP (between Rat and Slime)
+        speed: 50.0,       // Fast (faster than Rat)
+        atk: 1.0,          // Medium attack
+        radius: 34.0,      // Small radius (slightly larger than Rat)
+    });
+
+    // Insert Zombie stats - slow, tanky creature with high HP
+    ctx.db.bestiary().insert(Bestiary {
+        bestiary_id: MonsterType::Zombie as u32,
+        monster_type: MonsterType::Zombie,
+        max_hp: 100,        // High HP (between Slime and Orc)
+        speed: 54.0,       // Very slow (slower than Slime)
+        atk: 4.0,          // High attack (slightly higher than Orc)
+        radius: 42.0,      // Medium-large radius (between Slime and Orc)
+    });
+
     log::info!("Bestiary initialization complete");
 } 

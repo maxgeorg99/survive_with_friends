@@ -1,7 +1,6 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, ScheduleAt, SpacetimeType};
 use crate::{DbVector2, MonsterAttackType, DELTA_TIME, get_world_cell_from_position, spatial_hash_collision_checker,
-           WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT, player, account};
-use std::f64::consts::PI;
+           WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT, player};
 use std::time::Duration;
 
 // Active monster attacks - tracks currently active monster attacks in the game

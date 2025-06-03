@@ -9,4 +9,6 @@ pub enum MonsterType {
     FinalBossPhase1 = 3,
     FinalBossPhase2 = 4,
     VoidChest = 5,
+    Imp = 6,
+    Zombie = 7,
 } 

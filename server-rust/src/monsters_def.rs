@@ -10,6 +10,8 @@ const SPAWNABLE_MONSTER_TYPES: &[MonsterType] = &[
     MonsterType::Rat,
     MonsterType::Slime,
     MonsterType::Orc,
+    MonsterType::Imp,
+    MonsterType::Zombie,
     // Add new normal monster types here as they are created
     // Bosses are excluded from this list to prevent them from spawning randomly
 ];
