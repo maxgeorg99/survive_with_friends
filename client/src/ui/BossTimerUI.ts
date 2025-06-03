@@ -197,10 +197,17 @@ export default class BossTimerUI {
     }
 
     private handleGameStateUpdated(ctx: any, oldState: any, newState: any): void {
-        // If boss becomes active, hide the timer
+        // If boss becomes active, hide the timer and stop music immediately
         if (!oldState.bossActive && newState.bossActive) {
             this.stopTimer();
             this.container.setVisible(false);
+            
+            // Stop music immediately when boss becomes active for ominous silence
+            console.log("Boss active state detected! Stopping background music for ominous silence before boss spawn");
+            const gameScene = this.scene.scene.get('GameScene') as any;
+            if (gameScene && gameScene.musicManager) {
+                gameScene.musicManager.stopCurrentTrack();
+            }
         }
         
         // If boss becomes inactive and was previously active, hide nameplate and prepare for new timer

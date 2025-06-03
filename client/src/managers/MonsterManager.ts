@@ -286,9 +286,6 @@ export default class MonsterManager {
                 // Play the dark transformation effect
                 this.createBossTransformationEffect(monster.spawnPosition.x, monster.spawnPosition.y);
             }
-            
-            // Log all sprites to debug visibility issues
-            this.debugLogAllSprites();
         }
         
         // Use createOrUpdateMonster instead of directly creating the sprite
@@ -302,9 +299,6 @@ export default class MonsterManager {
             } else {
                 console.error(`Failed to find boss container after creation!`);
             }
-            
-            // Log all sprites again after creation
-            this.debugLogAllSprites();
         }
     }
     
@@ -393,28 +387,6 @@ export default class MonsterManager {
             ease: 'Power2',
             onComplete: () => {
                 text.destroy();
-            }
-        });
-    }
-    
-    // Add debug method to log all sprites on the scene
-    debugLogAllSprites() {
-        console.log("=== ALL SPRITES IN SCENE ===");
-        const allSprites = this.scene.children.list.filter(obj => 
-            obj instanceof Phaser.GameObjects.Sprite || 
-            obj instanceof Phaser.GameObjects.Container
-        );
-        
-        console.log(`Found ${allSprites.length} sprites/containers`);
-        allSprites.forEach((sprite, index) => {
-            if (sprite instanceof Phaser.GameObjects.Container) {
-                const container = sprite as Phaser.GameObjects.Container;
-                console.log(`Container #${index}: x=${container.x}, y=${container.y}, visible=${container.visible}, alpha=${container.alpha}, depth=${container.depth}`);
-                console.log(`  - Children: ${container.length}`);
-                console.log(`  - Data: ${JSON.stringify(container.data?.getAll())}`);
-            } else {
-                const gameObj = sprite as Phaser.GameObjects.Sprite;
-                console.log(`Sprite #${index}: name=${gameObj.name}, texture=${gameObj.texture.key}, x=${gameObj.x}, y=${gameObj.y}, visible=${gameObj.visible}, alpha=${gameObj.alpha}`);
             }
         });
     }

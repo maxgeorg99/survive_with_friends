@@ -258,7 +258,6 @@ pub fn init(ctx: &ReducerContext) {
     init_exp_system(ctx);
     initialize_attack_system(ctx);
     init_health_regen_system(ctx);
-    schedule_monster_spawning(ctx);
 }
 
 #[reducer(client_connected)]
@@ -396,11 +395,23 @@ pub fn spawn_player(ctx: &ReducerContext, class_id: u32) {
         panic!("SpawnPlayer: Account {} is not in ChoosingClass state. Current state: {:?}", identity, account.state);
     }
 
-    let player_id = account.current_player_id;
-
-    // Check if player already exists
-    if ctx.db.player().player_id().find(&player_id).is_some() {
-        panic!("SpawnPlayer: Player for {} already exists.", identity);
+    // Check if the account already has an active player (current_player_id should be 0 for accounts ready to create new characters)
+    if account.current_player_id != 0 {
+        // Double-check if the player actually exists (in case of data inconsistency)
+        if ctx.db.player().player_id().find(&account.current_player_id).is_some() {
+            panic!("SpawnPlayer: Account {} already has an active player (ID: {})", identity, account.current_player_id);
+        } else {
+            // Player ID is non-zero but player doesn't exist - reset the account state
+            log::warn!("SpawnPlayer: Account {} had non-zero player ID {} but no player exists. Resetting.", identity, account.current_player_id);
+            let fixed_account = Account {
+                identity,
+                name: account.name.clone(),
+                current_player_id: 0,
+                last_login: account.last_login,
+                state: AccountState::ChoosingClass,
+            };
+            ctx.db.account().identity().update(fixed_account);
+        }
     }
 
     // Create a new player with a random class
@@ -445,6 +456,25 @@ pub fn spawn_player(ctx: &ReducerContext, class_id: u32) {
         
         // Schedule a new boss spawn
         schedule_boss_spawn(ctx);
+        
+        // Also schedule monster spawning and guaranteed void chest spawns for the new world
+        log::info!("First player spawned - scheduling monster spawning for new world");
+        
+        // Clear any existing monster spawn timers first
+        let monster_timers_to_delete: Vec<u64> = ctx.db.monster_spawn_timer()
+            .iter()
+            .map(|timer| timer.scheduled_id)
+            .collect();
+        
+        for scheduled_id in monster_timers_to_delete {
+            ctx.db.monster_spawn_timer().scheduled_id().delete(&scheduled_id);
+        }
+        
+        // Clear any existing guaranteed void chest spawns
+        crate::loot_capsule_defs::cleanup_guaranteed_void_chest_spawns(ctx);
+        
+        // Schedule new monster spawning and guaranteed void chest spawns
+        schedule_monster_spawning(ctx);
     }
 }
 
