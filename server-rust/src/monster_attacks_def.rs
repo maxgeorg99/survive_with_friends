@@ -131,13 +131,10 @@ pub fn process_monster_attack_collisions_spatial_hash(ctx: &ReducerContext) {
                         
                         // Apply damage to player using the active monster attack's damage value
                         let mut damage = active_monster_attack.damage as f32;
-                        
-                        // If the attack is not piercing, remove it after hitting this player
-                        if !active_monster_attack.piercing {
-                            // Reduce damage because it will hit each tick
+                        if active_monster_attack.piercing {
                             damage /= 8.0;
-
-                            // Delete the active monster attack record (it's scheduled, so it removes itself)
+                        }
+                        else {
                             ctx.db.active_monster_attacks().active_monster_attack_id().delete(&active_monster_attack.active_monster_attack_id);
                         }
 
