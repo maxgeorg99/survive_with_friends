@@ -95,6 +95,15 @@ export class AttackManager {
     }
 
     private handleAttackInsert(ctx: EventContext, attack: ActiveAttack) {
+        // Play attack fire sound for local player attacks
+        // Note: 'attack_fire' is frame-throttled in SoundManager to limit to 1 play per frame
+        if (attack.playerId === this.localPlayerId) {
+            const soundManager = (window as any).soundManager;
+            if (soundManager) {
+                soundManager.playSound('attack_fire', 0.2); // Quiet sound as requested
+            }
+        }
+        
         this.createOrUpdateAttackGraphic(ctx, attack);
     }
 

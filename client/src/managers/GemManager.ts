@@ -368,12 +368,55 @@ export default class GemManager {
         });
     }
 
+    /**
+     * Play distance-based sound effects for gem collection
+     */
+    private playGemCollectionSound(gemContainer: Phaser.GameObjects.Container, gemLevelTag: string) {
+        // Get local player position from the scene
+        const gameScene = this.scene as any;
+        const localPlayerPosition = gameScene.getLocalPlayerPosition?.();
+        
+        if (!localPlayerPosition) {
+            return; // No local player or position available
+        }
+        
+        // Get sound manager
+        const soundManager = (window as any).soundManager;
+        if (!soundManager) {
+            return;
+        }
+        
+        // Determine sound key based on gem type
+        let soundKey = '';
+        let maxDistance = 250; // Default pickup sound distance
+        
+        switch (gemLevelTag) {
+            case 'Fries':
+                soundKey = 'food';
+                break;
+            case 'BoosterPack':
+                soundKey = 'booster_pack';
+                break;
+            default:
+                // No sound for regular gems
+                return;
+        }
+        
+        // Play distance-based sound
+        const gemPosition = { x: gemContainer.x, y: gemContainer.y };
+        soundManager.playDistanceBasedSound(soundKey, localPlayerPosition, gemPosition, maxDistance, 0.8);
+    }
+
     // Remove a gem and play collection animation
     removeGem(gemId: number) {
         const gemContainer = this.gems.get(gemId);
         if (gemContainer) {
             // Play collection effect
             this.createCollectionEffect(gemContainer);
+            
+            // Play distance-based sound effect based on gem type
+            const gemLevelTag = gemContainer.getData('gemLevel');
+            this.playGemCollectionSound(gemContainer, gemLevelTag);
             
             // Get the shadow associated with this gem
             const shadow = gemContainer.getData('shadow') as Phaser.GameObjects.Image;

@@ -435,7 +435,7 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.selectedClass = classType;
         console.log(`Selected class: ${classType.tag}`);
         
-        // Play choose sound effect when class is selected
+        // Play choose sound effect for confirming character (was incorrectly trying to play 'select')
         const soundManager = (window as any).soundManager;
         if (soundManager) {
             soundManager.playSound('choose', 0.8);
@@ -456,14 +456,10 @@ export default class ClassSelectScene extends Phaser.Scene {
         
         console.log("ClassSelectScene: Starting spawnPlayer");
         
-        // Check current account state before spawning
-        if (this.spacetimeDBClient.sdkConnection?.db && this.spacetimeDBClient.identity) {
-            const currentAccount = this.spacetimeDBClient.sdkConnection.db.account.identity.find(this.spacetimeDBClient.identity);
-            if (currentAccount) {
-                console.log("ClassSelectScene: Current account state:", currentAccount.state.tag);
-                console.log("ClassSelectScene: Current player ID:", currentAccount.currentPlayerId);
-                console.log("ClassSelectScene: Account name:", currentAccount.name);
-            }
+        // Play choose sound effect for confirming character (was incorrectly trying to play 'select')
+        const soundManager = (window as any).soundManager;
+        if (soundManager) {
+            soundManager.playSound('choose', 0.8);
         }
         
         // Disable buttons to prevent double-clicking
@@ -474,41 +470,61 @@ export default class ClassSelectScene extends Phaser.Scene {
             if (btn) btn.disabled = true;
         });
         
-        try {
-            if (this.spacetimeDBClient.sdkConnection?.reducers) {
-                // Get class ID from the PlayerClass tag
-                const classId = CLASS_ID_MAP[this.selectedClass.tag];
-                console.log(`ClassSelectScene: About to call spawnPlayer with class: ${this.selectedClass.tag} (ID: ${classId})`);
-                
-                // Add error handling for the reducer call
-                try {
-                    this.spacetimeDBClient.sdkConnection.reducers.spawnPlayer(classId);
-                    console.log("ClassSelectScene: spawnPlayer reducer call completed");
-                } catch (reducerError) {
-                    console.error("ClassSelectScene: Error calling spawnPlayer reducer:", reducerError);
-                    this.showError('Error calling spawnPlayer reducer: ' + (reducerError as Error).message);
-                    this.resetButtons();
-                    return;
+        // Add a small delay to let the sound start before scene transition
+        this.time.delayedCall(200, () => {
+            // Check current account state before spawning
+            if (this.spacetimeDBClient.sdkConnection?.db && this.spacetimeDBClient.identity) {
+                const currentAccount = this.spacetimeDBClient.sdkConnection.db.account.identity.find(this.spacetimeDBClient.identity);
+                if (currentAccount) {
+                    console.log("ClassSelectScene: Current account state:", currentAccount.state.tag);
+                    console.log("ClassSelectScene: Current player ID:", currentAccount.currentPlayerId);
+                    console.log("ClassSelectScene: Account name:", currentAccount.name);
                 }
-                
-                console.log("ClassSelectScene: Transitioning to LoadingScene");
-                
-                // Show loading scene while waiting for account state change
-                this.scene.start('LoadingScene', { 
-                    message: 'Creating your character...', 
-                    waitingFor: 'target_state',
-                    targetState: 'Playing'
-                });
-            } else {
-                console.error("ClassSelectScene: Cannot spawn player - no reducers available");
-                this.showError('Cannot spawn player: Server connection not available');
+            }
+            
+            try {
+                if (this.spacetimeDBClient.sdkConnection?.reducers) {
+                    // Check if selectedClass is still valid
+                    if (!this.selectedClass) {
+                        this.showError('Please select a class first');
+                        this.resetButtons();
+                        return;
+                    }
+                    
+                    // Get class ID from the PlayerClass tag
+                    const classId = CLASS_ID_MAP[this.selectedClass.tag];
+                    console.log(`ClassSelectScene: About to call spawnPlayer with class: ${this.selectedClass.tag} (ID: ${classId})`);
+                    
+                    // Add error handling for the reducer call
+                    try {
+                        this.spacetimeDBClient.sdkConnection.reducers.spawnPlayer(classId);
+                        console.log("ClassSelectScene: spawnPlayer reducer call completed");
+                    } catch (reducerError) {
+                        console.error("ClassSelectScene: Error calling spawnPlayer reducer:", reducerError);
+                        this.showError('Error calling spawnPlayer reducer: ' + (reducerError as Error).message);
+                        this.resetButtons();
+                        return;
+                    }
+                    
+                    console.log("ClassSelectScene: Transitioning to LoadingScene");
+                    
+                    // Show loading scene while waiting for account state change
+                    this.scene.start('LoadingScene', { 
+                        message: 'Creating your character...', 
+                        waitingFor: 'target_state',
+                        targetState: 'Playing'
+                    });
+                } else {
+                    console.error("ClassSelectScene: Cannot spawn player - no reducers available");
+                    this.showError('Cannot spawn player: Server connection not available');
+                    this.resetButtons();
+                }
+            } catch (error) {
+                console.error('ClassSelectScene: Error in spawnPlayer:', error);
+                this.showError('An error occurred while spawning your player: ' + (error as Error).message);
                 this.resetButtons();
             }
-        } catch (error) {
-            console.error('ClassSelectScene: Error in spawnPlayer:', error);
-            this.showError('An error occurred while spawning your player: ' + (error as Error).message);
-            this.resetButtons();
-        }
+        });
     }
     
     private resetButtons() {

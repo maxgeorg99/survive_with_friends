@@ -120,26 +120,26 @@ export default class TitleScene extends Phaser.Scene {
                 this.load.audio('boss_transform', '/assets/sounds/boss_transform.mp3');
                 this.load.audio('voice_boss_2', '/assets/sounds/voice_boss_2.mp3');
                 
-                // Load other common sound effects
-                this.load.audio('attack_fire', '/assets/sounds/attack_fire.mp3');
-                this.load.audio('attack_soft', '/assets/sounds/attack_soft.mp3');
-                this.load.audio('monster_death', '/assets/sounds/monster_death.mp3');
-                this.load.audio('exp_gem', '/assets/sounds/exp_gem.mp3');
-                this.load.audio('level_up', '/assets/sounds/level_up.mp3');
-                this.load.audio('choose', '/assets/sounds/choose.mp3');
-                this.load.audio('click', '/assets/sounds/click.mp3');
-                this.load.audio('food', '/assets/sounds/food.mp3');
-                this.load.audio('dice', '/assets/sounds/dice.mp3');
-                this.load.audio('booster_pack', '/assets/sounds/booster_pack.mp3');
-                this.load.audio('voice_level', '/assets/sounds/voice_level.mp3');
-                this.load.audio('voice_chest', '/assets/sounds/voice_chest.mp3');
-                this.load.audio('voice_win', '/assets/sounds/voice_win.mp3');
-                this.load.audio('voice_lose', '/assets/sounds/voice_lose.mp3');
-                this.load.audio('voice_class', '/assets/sounds/voice_class.mp3');
+                // Load UI and menu sound effects
                 this.load.audio('voice_name', '/assets/sounds/voice_name.mp3');
-                this.load.audio('voice_title', '/assets/sounds/voice_title.mp3');
-                this.load.audio('move_command', '/assets/sounds/move_command.mp3');
-                this.load.audio('boss_roar', '/assets/sounds/boss_roar.mp3');
+                this.load.audio('voice_class', '/assets/sounds/voice_class.mp3');
+                this.load.audio('voice_chest', '/assets/sounds/voice_chest.mp3');
+                this.load.audio('voice_lose', '/assets/sounds/voice_lose.mp3');
+                this.load.audio('voice_win', '/assets/sounds/voice_win.mp3');
+                this.load.audio('voice_level', '/assets/sounds/voice_level.mp3');
+                this.load.audio('choose', '/assets/sounds/choose.mp3');
+                
+                // Load gameplay sound effects
+                this.load.audio('level_up', '/assets/sounds/level_up.mp3');
+                this.load.audio('dice', '/assets/sounds/dice.mp3');
+                this.load.audio('exp_gem', '/assets/sounds/exp_gem.mp3');
+                this.load.audio('movement_command', '/assets/sounds/move_command.mp3');
+                this.load.audio('food', '/assets/sounds/food.mp3');
+                this.load.audio('booster_pack', '/assets/sounds/booster_pack.mp3');
+                this.load.audio('monster_death', '/assets/sounds/monster_death.mp3');
+                this.load.audio('attack_soft', '/assets/sounds/attack_soft.mp3');
+                this.load.audio('attack_fire', '/assets/sounds/attack_fire.mp3');
+                this.load.audio('alert_event', '/assets/sounds/alert_event.mp3');
                 
                 // Add error handling for missing files
                 this.load.on('loaderror', (fileObj: any) => {
@@ -153,8 +153,17 @@ export default class TitleScene extends Phaser.Scene {
                 
                 // Play title music once it's loaded
                 this.load.once('complete', () => {
-                    this.musicManager.playTrack('title');
                     console.log("TitleScene: All audio files loaded successfully");
+                    console.log("TitleScene: 'choose' exists:", this.cache.audio.exists('choose'));
+                    console.log("TitleScene: 'alert_event' exists:", this.cache.audio.exists('alert_event'));
+                    
+                    // Check if audio context is suspended (browser audio policy)
+                    const audioContext = (this.sound as any).context;
+                    if (audioContext && audioContext.state === 'suspended') {
+                        console.warn("TitleScene: Audio context is suspended - will need user interaction to resume");
+                    }
+                    
+                    this.musicManager.playTrack('title');
                 });
             } catch (error) {
                 console.warn("TitleScene: Failed to setup music loading:", error);
@@ -283,50 +292,73 @@ export default class TitleScene extends Phaser.Scene {
     private handleStartGame() {
         console.log("Start Game button clicked");
         
+        // Try to resume audio context if it's suspended (browser audio policy)
+        const audioContext = (this.sound as any).context;
+        if (audioContext && audioContext.state === 'suspended') {
+            audioContext.resume().then(() => {
+                this.playStartGameSound();
+            }).catch(() => {
+                this.playStartGameSound(); // Try anyway
+            });
+        } else {
+            this.playStartGameSound();
+        }
+    }
+    
+    private playStartGameSound() {
+        // Play choose sound effect
+        const soundManager = (window as any).soundManager;
+        if (soundManager) {
+            soundManager.playSound('choose', 0.8);
+        }
+        
         // Hide the button during transition
         this.startButton.style.display = 'none';
         this.statusText.setText('Loading...');
         
-        // Check account state and navigate accordingly
-        if (this.spacetimeDBClient.sdkConnection?.db && this.spacetimeDBClient.identity) {
-            const account = this.spacetimeDBClient.sdkConnection.db.account.identity.find(this.spacetimeDBClient.identity) as Account;
-            
-            if (account) {
-                console.log("Found account with state:", account.state.tag);
+        // Add a small delay to let the sound start before scene transition
+        this.time.delayedCall(200, () => {
+            // Check account state and navigate accordingly
+            if (this.spacetimeDBClient.sdkConnection?.db && this.spacetimeDBClient.identity) {
+                const account = this.spacetimeDBClient.sdkConnection.db.account.identity.find(this.spacetimeDBClient.identity) as Account;
                 
-                // Navigate based on account state
-                switch ((account.state as any).tag) {
-                    case 'ChoosingName':
-                        this.scene.start('NameSelectScene');
-                        break;
-                    case 'ChoosingClass':
-                        this.scene.start('ClassSelectScene');
-                        break;
-                    case 'Playing':
-                        this.scene.start('GameScene');
-                        break;
-                    case 'Dead':
-                        this.scene.start('DeadScene');
-                        break;
-                    case 'Winner':
-                        this.scene.start('VictoryScene');
-                        break;
-                    default:
-                        console.log("Unknown account state:", account.state.tag);
-                        this.scene.start('LoadingScene', { 
-                            message: 'Evaluating account state...', 
-                            waitingFor: 'account_evaluation'
-                        });
-                        break;
+                if (account) {
+                    console.log("Found account with state:", account.state.tag);
+                    
+                    // Navigate based on account state
+                    switch ((account.state as any).tag) {
+                        case 'ChoosingName':
+                            this.scene.start('NameSelectScene');
+                            break;
+                        case 'ChoosingClass':
+                            this.scene.start('ClassSelectScene');
+                            break;
+                        case 'Playing':
+                            this.scene.start('GameScene');
+                            break;
+                        case 'Dead':
+                            this.scene.start('DeadScene');
+                            break;
+                        case 'Winner':
+                            this.scene.start('VictoryScene');
+                            break;
+                        default:
+                            console.log("Unknown account state:", account.state.tag);
+                            this.scene.start('LoadingScene', { 
+                                message: 'Evaluating account state...', 
+                                waitingFor: 'account_evaluation'
+                            });
+                            break;
+                    }
+                } else {
+                    console.log("No account found, going to login");
+                    this.scene.start('LoginScene');
                 }
             } else {
-                console.log("No account found, going to login");
+                console.log("No connection or identity, going to login");
                 this.scene.start('LoginScene');
             }
-        } else {
-            console.log("No connection or identity, going to login");
-            this.scene.start('LoginScene');
-        }
+        });
     }
     
     private handleResize() {
@@ -337,7 +369,7 @@ export default class TitleScene extends Phaser.Scene {
             this.titleContainer.setPosition(width/2, height/2);
         }
         
-        // Update button position
+        // Update button positions
         this.positionStartButton();
     }
     

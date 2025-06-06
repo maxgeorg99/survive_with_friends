@@ -635,10 +635,11 @@ export default class GameScene extends Phaser.Scene {
                 if (this.voidChestUI) {
                     this.voidChestUI.showVoidChestAlert();
                 }
-                // Play voice chest sound effect
+                // Play voice chest sound effect and alert event sound
                 const soundManager = (window as any).soundManager;
                 if (soundManager) {
                     soundManager.playSound('voice_chest', 1.0);
+                    soundManager.playSound('alert_event', 0.8);
                 }
             }
         }
@@ -1590,6 +1591,12 @@ export default class GameScene extends Phaser.Scene {
 
     // Add the update method to handle player movement
     update(time: number, delta: number) {
+        // Update SoundManager frame counter for frame-based throttling
+        const soundManager = (window as any).soundManager;
+        if (soundManager && soundManager.updateFrame) {
+            soundManager.updateFrame();
+        }
+        
         // Skip if local player sprite isn't initialized yet
         if (!this.localPlayerSprite || !this.isPlayerDataReady) return;
 
@@ -2528,6 +2535,12 @@ export default class GameScene extends Phaser.Scene {
                 
                 // Send waypoint to server immediately
                 if(!this.gameOver && this.spacetimeDBClient?.sdkConnection?.db) {
+                    // Play movement command sound
+                    const soundManager = (window as any).soundManager;
+                    if (soundManager) {
+                        soundManager.playSound('movement_command', 0.9);
+                    }
+                    
                     this.spacetimeDBClient.sdkConnection.reducers.setPlayerWaypoint(
                         this.tapTarget.x,
                         this.tapTarget.y

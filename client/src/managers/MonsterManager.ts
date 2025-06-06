@@ -82,6 +82,9 @@ export default class MonsterManager {
                     const sprite = container.list.find(child => child instanceof Phaser.GameObjects.Sprite) as Phaser.GameObjects.Sprite;
                     if (sprite) {
                         createMonsterDamageEffect(sprite);
+                        
+                        // Play distance-based attack soft sound when monster takes damage
+                        this.playMonsterDamageSound(container);
                     }
                 }
             }
@@ -208,6 +211,9 @@ export default class MonsterManager {
         // Check if this was a boss monster before removing it
         const monsterContainer = this.monsters.get(monsterId);
         if (monsterContainer) {
+            // Play distance-based monster death sound
+            this.playMonsterDeathSound(monsterContainer);
+            
             const monsterType = monsterContainer.getData('monsterType');
             if (monsterType === 'FinalBossPhase1') {
                 console.log(`*** BOSS PHASE 1 DEFEATED (ID: ${monsterId})! Waiting for phase 2 to spawn... ***`);
@@ -640,5 +646,53 @@ export default class MonsterManager {
         
         // Add screen shake for dramatic effect
         this.scene.cameras.main.shake(300, 0.01);
+    }
+
+    // Add a method to play distance-based monster death sound
+    private playMonsterDeathSound(container: Phaser.GameObjects.Container) {
+        // Get local player position from the scene
+        const gameScene = this.scene as any;
+        const localPlayerPosition = gameScene.getLocalPlayerPosition?.();
+        
+        if (!localPlayerPosition) {
+            return; // No local player or position available
+        }
+        
+        // Get sound manager
+        const soundManager = (window as any).soundManager;
+        if (!soundManager) {
+            return;
+        }
+        
+        // Play distance-based monster death sound
+        const monsterPosition = { x: container.x, y: container.y };
+        const maxDistance = 500; // Monster death sounds travel further
+        soundManager.playDistanceBasedSound('monster_death', localPlayerPosition, monsterPosition, maxDistance, 1.0);
+        
+        console.log(`Playing monster death sound at position (${container.x}, ${container.y})`);
+    }
+
+    // Add a method to play distance-based attack soft sound when monster takes damage
+    private playMonsterDamageSound(container: Phaser.GameObjects.Container) {
+        // Get local player position from the scene
+        const gameScene = this.scene as any;
+        const localPlayerPosition = gameScene.getLocalPlayerPosition?.();
+        
+        if (!localPlayerPosition) {
+            return; // No local player or position available
+        }
+        
+        // Get sound manager
+        const soundManager = (window as any).soundManager;
+        if (!soundManager) {
+            return;
+        }
+        
+        // Play distance-based attack soft sound
+        const monsterPosition = { x: container.x, y: container.y };
+        const maxDistance = 400; // Attack sounds travel further
+        soundManager.playDistanceBasedSound('attack_soft', localPlayerPosition, monsterPosition, maxDistance, 0.4);
+        
+        console.log(`Playing monster damage sound at position (${container.x}, ${container.y})`);
     }
 } 

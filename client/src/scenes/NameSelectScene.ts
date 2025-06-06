@@ -265,11 +265,14 @@ export default class NameSelectScene extends Phaser.Scene {
                 
                 console.log("NameSelectScene: Transitioning to LoadingScene");
                 
-                // Show loading scene while waiting for account state change
-                this.scene.start('LoadingScene', { 
-                    message: 'Setting your name...', 
-                    waitingFor: 'target_state',
-                    targetState: 'ChoosingClass'
+                // Add a small delay to let the sound start before scene transition
+                this.time.delayedCall(200, () => {
+                    // Show loading scene while waiting for account state change
+                    this.scene.start('LoadingScene', { 
+                        message: 'Setting your name...', 
+                        waitingFor: 'target_state',
+                        targetState: 'ChoosingClass'
+                    });
                 });
             } else {
                 console.error("NameSelectScene: Cannot set name - no reducers available");
