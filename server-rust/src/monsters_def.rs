@@ -386,6 +386,13 @@ fn move_monsters(ctx: &ReducerContext, cache: &mut crate::collision::CollisionCa
             speed = speed.min(crate::monster_ai_defs::MAX_CHASE_SPEED);
             
             cache.monster.speed_monster[i] = speed; // Update cached speed for next frame
+
+            let real_monster = ctx.db.monsters().monster_id().find(&cache.monster.keys_monster[i]);
+            if let Some(monster) = real_monster {
+                let mut updated_monster = monster;
+                updated_monster.speed = speed;
+                ctx.db.monsters().monster_id().update(updated_monster);
+            }
         }
         
         let move_x = norm_x * speed * DELTA_TIME;

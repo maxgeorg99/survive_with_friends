@@ -288,7 +288,11 @@ export default class MonsterManager {
 
         console.log(`Boss ${newMonster.monsterId} AI state changed from ${oldStateTag} to ${newStateTag}`);
         
-        // Play appropriate sound based on the new state
+        // Get the boss container for visual effects
+        const bossContainer = this.monsters.get(newMonster.monsterId);
+        const bossSprite = bossContainer?.list.find(child => child instanceof Phaser.GameObjects.Sprite) as Phaser.GameObjects.Sprite;
+        
+        // Play appropriate sound and visual effects based on the new state
         switch (newStateTag) {
             case 'BossChase':
                 this.soundManager.playBossChaseSound();
@@ -298,9 +302,17 @@ export default class MonsterManager {
                 break;
             case 'BossVanish':
                 this.soundManager.playBossVanishSound();
+                // Play fadeout animation for vanish
+                if (bossContainer && bossSprite) {
+                    this.createBossVanishEffect(bossContainer, bossSprite);
+                }
                 break;
             case 'BossTeleport':
                 this.soundManager.playBossTeleportSound();
+                // Play teleport entry VFX
+                if (bossContainer && bossSprite) {
+                    this.createBossTeleportEffect(bossContainer, bossSprite);
+                }
                 break;
             case 'BossTransform':
                 this.soundManager.playBossTransformSound();
@@ -489,5 +501,135 @@ export default class MonsterManager {
         const healthPercent = currentHp / maxHp;
         healthBar.fillColor = this.getHealthBarColor(healthPercent);
         healthBar.width = MONSTER_HEALTH_BAR_WIDTH * healthPercent;
+    }
+    
+    // Create fadeout visual effect when boss vanishes
+    private createBossVanishEffect(bossContainer: Phaser.GameObjects.Container, bossSprite: Phaser.GameObjects.Sprite) {
+        console.log("Playing boss vanish fadeout effect");
+        
+        // Create a dark smoke/mist effect
+        const particles = this.scene.add.particles(bossContainer.x, bossContainer.y, 'shadow', {
+            speed: { min: 20, max: 60 },
+            scale: { start: 0.3, end: 1.2 },
+            alpha: { start: 0.8, end: 0 },
+            blendMode: 'MULTIPLY',
+            lifespan: 1500,
+            gravityY: -30, // Float upward like smoke
+            tint: 0x220022, // Dark purple tint
+            emitting: false
+        });
+        
+        particles.setDepth(bossContainer.depth + 1); // Above the boss
+        
+        // Emit smoke particles as boss fades
+        particles.explode(25, bossContainer.x, bossContainer.y);
+        
+        // Fade out the entire boss container
+        this.scene.tweens.add({
+            targets: bossContainer,
+            alpha: 0,
+            duration: 1000,
+            ease: 'Power2.easeIn',
+            onComplete: () => {
+                console.log("Boss vanish fadeout complete");
+            }
+        });
+        
+        // Add a subtle flash before fading
+        const flash = this.scene.add.circle(bossContainer.x, bossContainer.y, bossSprite.width / 2, 0x9900ff, 0.5);
+        flash.setDepth(bossContainer.depth + 2);
+        
+        this.scene.tweens.add({
+            targets: flash,
+            alpha: 0,
+            scale: 2,
+            duration: 800,
+            ease: 'Power2.easeOut',
+            onComplete: () => {
+                flash.destroy();
+            }
+        });
+        
+        // Clean up particles after effect
+        this.scene.time.delayedCall(2000, () => {
+            particles.destroy();
+        });
+    }
+    
+    // Create teleport entry visual effect when boss appears
+    private createBossTeleportEffect(bossContainer: Phaser.GameObjects.Container, bossSprite: Phaser.GameObjects.Sprite) {
+        console.log("Playing boss teleport entry effect");
+        
+        // Start with boss invisible and fade in
+        bossContainer.setAlpha(0);
+        
+        // Create dramatic entry flash
+        const flash = this.scene.add.circle(bossContainer.x, bossContainer.y, bossSprite.width, 0x00ffff, 0.8);
+        flash.setDepth(bossContainer.depth + 2);
+        flash.setScale(0.1);
+        
+        // Expand and fade the flash
+        this.scene.tweens.add({
+            targets: flash,
+            scale: 3,
+            alpha: 0,
+            duration: 600,
+            ease: 'Power2.easeOut',
+            onComplete: () => {
+                flash.destroy();
+            }
+        });
+        
+        // Create energy particles spiraling inward
+        const particles = this.scene.add.particles(bossContainer.x, bossContainer.y, 'white_pixel', {
+            speed: { min: 100, max: 200 },
+            scale: { start: 1, end: 0 },
+            alpha: { start: 1, end: 0 },
+            blendMode: 'ADD',
+            lifespan: 800,
+            tint: 0x00ffff, // Cyan energy
+            emitting: false,
+            emitCallback: (particle: Phaser.GameObjects.Particles.Particle) => {
+                // Create spiral effect by setting initial velocity in a circle
+                const angle = Math.random() * Math.PI * 2;
+                const radius = 150; // Start particles in a circle around the boss
+                const speed = Phaser.Math.Between(100, 200);
+                
+                // Position particle at radius distance
+                particle.x = bossContainer.x + Math.cos(angle) * radius;
+                particle.y = bossContainer.y + Math.sin(angle) * radius;
+                
+                // Set velocity toward the center (opposite direction)
+                particle.velocityX = -Math.cos(angle) * speed;
+                particle.velocityY = -Math.sin(angle) * speed;
+            }
+        });
+        
+        particles.setDepth(bossContainer.depth + 1);
+        
+        // Emit energy particles in a burst
+        particles.explode(40, bossContainer.x, bossContainer.y);
+        
+        // Boss appears with scaling effect
+        this.scene.tweens.add({
+            targets: bossContainer,
+            alpha: 1,
+            scaleX: { from: 0.5, to: 1 },
+            scaleY: { from: 0.5, to: 1 },
+            duration: 400,
+            ease: 'Back.easeOut',
+            delay: 200, // Slight delay to let flash start first
+            onComplete: () => {
+                console.log("Boss teleport entry complete");
+            }
+        });
+        
+        // Add screen shake for dramatic effect
+        this.scene.cameras.main.shake(300, 0.01);
+        
+        // Clean up particles after effect
+        this.scene.time.delayedCall(1200, () => {
+            particles.destroy();
+        });
     }
 } 

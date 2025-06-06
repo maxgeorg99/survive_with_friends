@@ -28,11 +28,11 @@ pub struct MonsterStateChange {
 }
 
 // Configuration constants for boss AI timing
-const BOSS_IDLE_DURATION_MS: u64 = 3000;        // 3 seconds idle
-const BOSS_CHASE_DURATION_MS: u64 = 8000;       // 8 seconds chase
-const BOSS_DANCE_DURATION_MS: u64 = 5000;       // 5 seconds dance
-const BOSS_VANISH_DURATION_MS: u64 = 2000;      // 2 seconds vanish
-const BOSS_TELEPORT_DURATION_MS: u64 = 500;     // 0.5 seconds teleport
+const BOSS_IDLE_DURATION_MS: u64 = 5000;        // 3 seconds idle
+const BOSS_CHASE_DURATION_MS: u64 = 15000;       // 8 seconds chase
+const BOSS_DANCE_DURATION_MS: u64 = 15000;       // 5 seconds dance
+const BOSS_VANISH_DURATION_MS: u64 = 4000;      // 2 seconds vanish
+const BOSS_TELEPORT_DURATION_MS: u64 = 1000;     // 0.5 seconds teleport
 const BOSS_TRANSFORM_DURATION_MS: u64 = 2000;   // 2 seconds transform
 
 // Speed multiplier for chase state
