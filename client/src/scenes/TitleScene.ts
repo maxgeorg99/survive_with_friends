@@ -156,6 +156,10 @@ export default class TitleScene extends Phaser.Scene {
                     console.log("TitleScene: All audio files loaded successfully");
                     console.log("TitleScene: 'choose' exists:", this.cache.audio.exists('choose'));
                     console.log("TitleScene: 'alert_event' exists:", this.cache.audio.exists('alert_event'));
+                    console.log("TitleScene: 'movement_command' exists:", this.cache.audio.exists('movement_command'));
+                    console.log("TitleScene: 'attack_soft' exists:", this.cache.audio.exists('attack_soft'));
+                    console.log("TitleScene: 'attack_fire' exists:", this.cache.audio.exists('attack_fire'));
+                    console.log("TitleScene: 'monster_death' exists:", this.cache.audio.exists('monster_death'));
                     
                     // Check if audio context is suspended (browser audio policy)
                     const audioContext = (this.sound as any).context;

@@ -232,6 +232,26 @@ export default class GameScene extends Phaser.Scene {
         // Load a white pixel for particle effects
         this.load.image('white_pixel', '/assets/white_pixel.png');
         
+        // Load audio files for gameplay sounds
+        this.load.audio('attack_fire', '/assets/sounds/attack_fire.mp3');
+        this.load.audio('attack_soft', '/assets/sounds/attack_soft.mp3');
+        this.load.audio('monster_death', '/assets/sounds/monster_death.mp3');
+        this.load.audio('level_up', '/assets/sounds/level_up.mp3');
+        this.load.audio('voice_level', '/assets/sounds/voice_level.mp3');
+        this.load.audio('voice_chest', '/assets/sounds/voice_chest.mp3');
+        this.load.audio('alert_event', '/assets/sounds/alert_event.mp3');
+        
+        // Load boss audio files
+        this.load.audio('boss_chase_cue', '/assets/sounds/boss_chase_cue.mp3');
+        this.load.audio('boss_bullet_cue', '/assets/sounds/boss_bullet_cue.mp3');
+        this.load.audio('boss_teleport_cue', '/assets/sounds/boss_teleport_cue.mp3');
+        this.load.audio('boss_vanish', '/assets/sounds/boss_vanish.mp3');
+        this.load.audio('boss_appear', '/assets/sounds/boss_appear.mp3');
+        this.load.audio('boss_teleport_attack', '/assets/sounds/boss_teleport_attack.mp3');
+        this.load.audio('boss_transform', '/assets/sounds/boss_transform.mp3');
+        this.load.audio('voice_boss', '/assets/sounds/voice_boss.mp3');
+        this.load.audio('voice_boss_2', '/assets/sounds/voice_boss_2.mp3');
+        
         // Add error handling for file loading errors
         this.load.on('loaderror', (fileObj: any) => {
             console.error(`Error loading asset: ${fileObj.key} (${fileObj.url})`, fileObj);
@@ -257,6 +277,17 @@ export default class GameScene extends Phaser.Scene {
             console.log("void_arrow:", this.textures.exists('void_arrow'));
             console.log(GRASS_ASSET_KEY + ":", this.textures.exists(GRASS_ASSET_KEY));
             console.log(SHADOW_ASSET_KEY + ":", this.textures.exists(SHADOW_ASSET_KEY));
+            
+            // Check audio assets
+            console.log("Audio assets loaded:");
+            console.log("attack_fire:", this.cache.audio.exists('attack_fire'));
+            console.log("attack_soft:", this.cache.audio.exists('attack_soft'));
+            console.log("monster_death:", this.cache.audio.exists('monster_death'));
+            console.log("level_up:", this.cache.audio.exists('level_up'));
+            console.log("voice_level:", this.cache.audio.exists('voice_level'));
+            console.log("voice_chest:", this.cache.audio.exists('voice_chest'));
+            console.log("boss_chase_cue:", this.cache.audio.exists('boss_chase_cue'));
+            console.log("voice_boss:", this.cache.audio.exists('voice_boss'));
         });
         
         console.log("GameScene preload finished. Started asset loading...");

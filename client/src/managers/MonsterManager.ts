@@ -26,6 +26,11 @@ export default class MonsterManager {
     // Map of monster ID to container
     private monsters: Map<number, Phaser.GameObjects.Container>;
     
+    // Add creation queue for smooth monster spawning
+    private creationQueue: Monsters[] = [];
+    private isProcessingQueue: boolean = false;
+    private maxMonstersPerFrame: number = 2; // Limit monster creation per frame
+    
     // Add a property for the game events
     private gameEvents: Phaser.Events.EventEmitter;
     
@@ -140,27 +145,31 @@ export default class MonsterManager {
             sprite.setDepth(0);
             container.add(sprite);
             
-            // Create health bar background
+            // Pre-calculate health bar position to avoid repeated calculations
+            const healthBarY = -sprite.height/2 - MONSTER_HEALTH_BAR_OFFSET_Y;
+            
+            // Create health bar background (dark background)
             const healthBarBg = this.scene.add.rectangle(
                 0,
-                -sprite.height/2 - MONSTER_HEALTH_BAR_OFFSET_Y,
+                healthBarY,
                 MONSTER_HEALTH_BAR_WIDTH,
                 MONSTER_HEALTH_BAR_HEIGHT,
-                0x000000,
-                0.7
+                0x000000, // Black background
+                0.8
             );
             healthBarBg.setDepth(HEALTH_BG_DEPTH_OFFSET);
             healthBarBg.setName('healthBarBg');
             container.add(healthBarBg);
 
-            // Update health bar if it exists
+            // Create health bar foreground (colored based on health)
+            const healthPercent = monsterData.hp / monsterData.maxHp;
             const healthBar = this.scene.add.rectangle(
                 0,
-                -sprite.height/2 - MONSTER_HEALTH_BAR_OFFSET_Y,
-                MONSTER_HEALTH_BAR_WIDTH,
+                healthBarY,
+                MONSTER_HEALTH_BAR_WIDTH * healthPercent,
                 MONSTER_HEALTH_BAR_HEIGHT,
-                0x000000,
-                0.7
+                this.getHealthBarColor(healthPercent), // Proper color based on health
+                1.0 // Full opacity for visibility
             );
             healthBar.setDepth(HEALTH_BAR_DEPTH_OFFSET);
             healthBar.setName('healthBar');
@@ -175,26 +184,19 @@ export default class MonsterManager {
                 sprite.setVisible(true);
             }
             
-            console.log(`Created new monster sprite for ${monsterTypeName} (ID: ${monsterData.monsterId})`);
+            // Only log regular monster creation in debug builds or for bosses
+            if (monsterTypeName.includes("Boss") || monsterTypeName === "VoidChest") {
+                console.log(`Created new ${monsterTypeName} sprite (ID: ${monsterData.monsterId})`);
+            }
         }
         
-        // Update health bar
-        var healthBarToUpdate = container.getByName('healthBar') as Phaser.GameObjects.Rectangle;
+        // Update health bar (only the foreground bar needs updating)
+        const healthBarToUpdate = container.getByName('healthBar') as Phaser.GameObjects.Rectangle;
         this.updateHealthBar(healthBarToUpdate, monsterData.hp, monsterData.maxHp);
         
         // Update monster data
         container.setData('monsterData', monsterData);
         container.setData('monsterType', monsterTypeName);
-        
-        // Special handling for boss monsters
-        if (monsterTypeName === "FinalBossPhase1" || monsterTypeName === "FinalBossPhase2") {
-            console.log(`Updating boss monster ${monsterTypeName} (ID: ${monsterData.monsterId}):`);
-            console.log(`- Position: (${monsterData.spawnPosition.x}, ${monsterData.spawnPosition.y})`);
-            console.log(`- HP: ${monsterData.hp}/${monsterData.maxHp}`);
-            console.log(`- Container visible: ${container.visible}`);
-            console.log(`- Container alpha: ${container.alpha}`);
-            console.log(`- Container depth: ${container.depth}`);
-        }
     }
     
     // Helper function to get health bar color based on health percentage
@@ -206,15 +208,18 @@ export default class MonsterManager {
     
     // Helper function to remove monster sprites
     removeMonster(monsterId: number) {
-        console.log(`Removing monster: ${monsterId}`);
-        
-        // Check if this was a boss monster before removing it
+        // Only log removal for bosses or when debugging
         const monsterContainer = this.monsters.get(monsterId);
+        const monsterType = monsterContainer?.getData('monsterType');
+        
+        if (monsterType?.includes("Boss") || monsterType === "VoidChest") {
+            console.log(`Removing ${monsterType}: ${monsterId}`);
+        }
+        
         if (monsterContainer) {
             // Play distance-based monster death sound
             this.playMonsterDeathSound(monsterContainer);
             
-            const monsterType = monsterContainer.getData('monsterType');
             if (monsterType === 'FinalBossPhase1') {
                 console.log(`*** BOSS PHASE 1 DEFEATED (ID: ${monsterId})! Waiting for phase 2 to spawn... ***`);
                 
@@ -273,6 +278,13 @@ export default class MonsterManager {
     
     shutdown() {
         this.unregisterListeners();
+        this.clearCreationQueue(); // Clear any pending monster creations
+        
+        // Clean up all existing monsters
+        this.monsters.forEach(container => container.destroy());
+        this.monsters.clear();
+        
+        console.log("MonsterManager shutdown complete");
     }
     
     // Add a method to check for boss AI state changes
@@ -333,9 +345,12 @@ export default class MonsterManager {
     handleMonsterCreated(ctx: EventContext, monster: Monsters) {
         const monsterTypeName = this.getMonsterTypeName(monster.bestiaryId);
         
-        console.log(`Monster created: ${monster.monsterId}, type: ${monsterTypeName}`);
+        // Only log creation for bosses, special monsters, or when debugging
+        if (monsterTypeName.includes("Boss") || monsterTypeName === "VoidChest") {
+            console.log(`Monster created: ${monster.monsterId}, type: ${monsterTypeName}`);
+        }
         
-        // Special handling for boss monsters
+        // Special handling for boss monsters - create immediately (no queue)
         if (monsterTypeName === "FinalBossPhase1" || monsterTypeName === "FinalBossPhase2") {
             console.log(`BOSS SPAWNED: ${monsterTypeName}`);
             console.log(`- Monster ID: ${monster.monsterId}`);
@@ -367,27 +382,97 @@ export default class MonsterManager {
                 // Play the dark transformation effect
                 this.createBossTransformationEffect(monster.spawnPosition.x, monster.spawnPosition.y);
             }
-        }
-        
-        // Use createOrUpdateMonster instead of directly creating the sprite
-        this.createOrUpdateMonster(monster);
-        
-        // For boss monsters, do an additional check after creation
-        if (monsterTypeName === "FinalBossPhase1" || monsterTypeName === "FinalBossPhase2") {
+            
+            // Create boss monsters immediately (bypassing queue)
+            this.createOrUpdateMonster(monster);
+            
+            // Additional check after creation
             const bossContainer = this.monsters.get(monster.monsterId);
             if (bossContainer) {
                 console.log(`Boss container after creation: visible=${bossContainer.visible}, alpha=${bossContainer.alpha}`);
             } else {
                 console.error(`Failed to find boss container after creation!`);
             }
+        } else {
+            // For regular monsters, add to creation queue for smooth spawning
+            this.addToCreationQueue(monster);
         }
+    }
+    
+    // Add monster to creation queue
+    private addToCreationQueue(monster: Monsters) {
+        this.creationQueue.push(monster);
+        // Only log queue size if it's getting large (potential performance issue)
+        if (this.creationQueue.length > 5) {
+            console.log(`Monster creation queue getting large: ${this.creationQueue.length} monsters queued`);
+        }
+        
+        // Start processing queue if not already processing
+        if (!this.isProcessingQueue) {
+            this.startQueueProcessing();
+        }
+    }
+    
+    // Start processing the creation queue
+    private startQueueProcessing() {
+        if (this.isProcessingQueue) return;
+        
+        this.isProcessingQueue = true;
+        // Reduce logging frequency for performance
+        if (this.creationQueue.length > 3) {
+            console.log(`Started monster creation queue processing (${this.creationQueue.length} monsters)`);
+        }
+        this.processCreationQueue();
+    }
+    
+    // Process monsters from creation queue (spread across frames)
+    private processCreationQueue() {
+        if (this.creationQueue.length === 0) {
+            this.isProcessingQueue = false;
+            // Only log completion if we processed a significant number
+            return;
+        }
+        
+        // Create up to maxMonstersPerFrame monsters this frame
+        const monstersToCreate = Math.min(this.maxMonstersPerFrame, this.creationQueue.length);
+        
+        for (let i = 0; i < monstersToCreate; i++) {
+            const monster = this.creationQueue.shift();
+            if (monster) {
+                this.createOrUpdateMonster(monster);
+                // Reduced logging - only log every few monsters or when queue is empty
+                if (this.creationQueue.length === 0 || this.creationQueue.length % 5 === 0) {
+                    console.log(`Processing monster queue: ${this.creationQueue.length} remaining`);
+                }
+            }
+        }
+        
+        // Continue processing on next frame if there are more monsters
+        if (this.creationQueue.length > 0) {
+            this.scene.time.delayedCall(16, () => { // ~60fps delay
+                this.processCreationQueue();
+            });
+        } else {
+            this.isProcessingQueue = false;
+            console.log("Monster creation queue processing complete");
+        }
+    }
+    
+    // Clear the creation queue (called during cleanup)
+    private clearCreationQueue() {
+        this.creationQueue.length = 0;
+        this.isProcessingQueue = false;
+        console.log("Monster creation queue cleared");
     }
     
     // Helper to get monster type name from bestiary ID
     private getMonsterTypeName(bestiaryId: any): string {
         // Check if bestiaryId is an object with a tag property (from autobindings)
         if (bestiaryId && typeof bestiaryId === 'object' && 'tag' in bestiaryId) {
-            console.log(`Getting monster type from tag: ${bestiaryId.tag}`);
+            // Only log unknown types or bosses for debugging
+            if (bestiaryId.tag.includes("Boss") || bestiaryId.tag === "Unknown") {
+                console.log(`Getting monster type from tag: ${bestiaryId.tag}`);
+            }
             return bestiaryId.tag;
         }
         

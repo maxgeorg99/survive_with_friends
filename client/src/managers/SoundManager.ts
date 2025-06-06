@@ -74,7 +74,7 @@ export default class SoundManager {
         }
 
         // Pool full and no available sounds, skip this sound
-        console.warn(`SoundManager: Pool full for '${soundKey}' and no available sounds`);
+        //console.warn(`SoundManager: Pool full for '${soundKey}' and no available sounds`);
         return null;
     }
 
@@ -115,12 +115,11 @@ export default class SoundManager {
         if (sound) {
             try {
                 sound.play();
-                console.log(`SoundManager: Playing sound '${soundKey}' (volume: ${volume})`);
             } catch (error) {
                 console.error(`SoundManager: Error playing sound '${soundKey}':`, error);
             }
         } else {
-            console.error(`SoundManager: Failed to get sound '${soundKey}' from pool`);
+            //console.error(`SoundManager: Failed to get sound '${soundKey}' from pool`);
         }
     }
 
@@ -150,31 +149,26 @@ export default class SoundManager {
     // Boss AI state change sound effects
     playBossChaseSound(): void {
         this.playSound('boss_chase_cue', 0.9);
-        console.log("SoundManager: Boss entered chase state");
     }
 
     playBossDanceSound(): void {
         this.playSound('boss_bullet_cue', 0.8);
-        console.log("SoundManager: Boss entered dance state");
     }
 
     playBossVanishSound(): void {
         // Play both sounds for vanish state
         this.playSound('boss_teleport_cue', 0.8);
         this.playSound('boss_vanish', 0.9);
-        console.log("SoundManager: Boss entered vanish state");
     }
 
     playBossTeleportSound(): void {
         // Play both sounds for teleport state
         this.playSound('boss_appear', 0.9);
         this.playSound('boss_teleport_attack', 0.8);
-        console.log("SoundManager: Boss entered teleport state");
     }
 
     playBossSpawnSound(): void {
         this.playSound('voice_boss', 1.0);
-        console.log("SoundManager: Boss first form spawned");
     }
 
     playBossTransformSound(): void {
@@ -183,7 +177,6 @@ export default class SoundManager {
             { key: 'boss_transform', volume: 0.9 },
             { key: 'voice_boss_2', delay: 1500, volume: 1.0 } // 1.5 second delay
         ]);
-        console.log("SoundManager: Boss transformation initiated");
     }
 
     // Enable/disable sound effects
@@ -235,7 +228,7 @@ export default class SoundManager {
         // Only play if volume is meaningful
         if (volume > 0.1) {
             this.playSound(soundKey, volume);
-            console.log(`Playing distance-based sound '${soundKey}' at volume ${volume.toFixed(2)} (distance: ${distance.toFixed(1)})`);
+            //console.log(`Playing distance-based sound '${soundKey}' at volume ${volume.toFixed(2)} (distance: ${distance.toFixed(1)})`);
         }
     }
     
@@ -269,12 +262,12 @@ export default class SoundManager {
     // Register a sound to be frame-throttled (only play once per frame)
     addFrameThrottledSound(soundKey: string): void {
         this.frameThrottledSounds.add(soundKey);
-        console.log(`SoundManager: Added '${soundKey}' to frame-throttled sounds`);
+        //console.log(`SoundManager: Added '${soundKey}' to frame-throttled sounds`);
     }
 
     // Remove a sound from frame-throttling
     removeFrameThrottledSound(soundKey: string): void {
         this.frameThrottledSounds.delete(soundKey);
-        console.log(`SoundManager: Removed '${soundKey}' from frame-throttled sounds`);
+        //console.log(`SoundManager: Removed '${soundKey}' from frame-throttled sounds`);
     }
 } 
