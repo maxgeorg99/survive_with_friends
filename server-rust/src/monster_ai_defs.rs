@@ -27,6 +27,15 @@ pub struct MonsterStateChange {
     pub scheduled_at: ScheduleAt,
 }
 
+// Table to track the last chosen pattern for each boss to avoid repetition
+#[table(name = boss_last_patterns, public)]
+pub struct BossLastPattern {
+    #[primary_key]
+    pub monster_id: u32,
+    
+    pub last_pattern: AIState,
+}
+
 // Configuration constants for boss AI timing
 const BOSS_IDLE_DURATION_MS: u64 = 5000;        // 3 seconds idle
 const BOSS_CHASE_DURATION_MS: u64 = 15000;       // 8 seconds chase
@@ -37,6 +46,9 @@ const BOSS_TRANSFORM_DURATION_MS: u64 = 2000;   // 2 seconds transform
 
 // Speed multiplier for chase state
 const BOSS_CHASE_SPEED_MULTIPLIER: f32 = 1.5;
+
+// Chase distance threshold (when boss gets this close, stop chasing and attack)
+const BOSS_CHASE_STOP_DISTANCE: f32 = 128.0; 
 
 // Chase acceleration per frame
 pub const CHASE_ACCELERATION_MULTIPLIER: f32 = 1.02; // 2% increase per frame
@@ -231,20 +243,58 @@ fn schedule_state_change(ctx: &ReducerContext, monster_id: u32, target_state: AI
     log::info!("Scheduled state change for monster {} to {:?} in {}ms", monster_id, target_state, delay_ms);
 }
 
+// Cancel all scheduled state changes for a monster
+fn cancel_scheduled_state_changes(ctx: &ReducerContext, monster_id: u32) {
+    // Find all scheduled state changes for this monster by iterating through all changes
+    let scheduled_changes: Vec<_> = ctx.db.monster_state_changes().iter()
+        .filter(|change| change.target_monster_id == monster_id)
+        .collect();
+    
+    // Delete each scheduled change
+    for change in scheduled_changes {
+        ctx.db.monster_state_changes().scheduled_id().delete(&change.scheduled_id);
+        log::info!("Cancelled scheduled state change for monster {} to {:?}", monster_id, change.target_state);
+    }
+}
+
 // Schedule a random boss pattern (chase, dance, or vanish)
 fn schedule_random_boss_pattern(ctx: &ReducerContext, monster_id: u32) {
     let mut rng = ctx.rng();
-    let random_pattern = rng.gen_range(0..3);
     
-    let target_state = match random_pattern {
-        0 => AIState::BossChase,
-        1 => AIState::BossDance,
-        2 => AIState::BossVanish,
-        _ => AIState::BossChase, // Fallback
+    // Get the last pattern for this boss (if any)
+    let last_pattern_opt = ctx.db.boss_last_patterns().monster_id().find(&monster_id);
+    let last_pattern = last_pattern_opt.as_ref().map(|p| p.last_pattern);
+    
+    // Create list of available patterns (excluding the last one used)
+    let all_patterns = vec![AIState::BossChase, AIState::BossDance, AIState::BossVanish];
+    let available_patterns: Vec<AIState> = all_patterns.into_iter()
+        .filter(|pattern| Some(*pattern) != last_pattern)
+        .collect();
+    
+    // Select random pattern from available options
+    let target_state = if available_patterns.is_empty() {
+        // Fallback (shouldn't happen, but just in case)
+        AIState::BossChase
+    } else {
+        let random_index = (rng.gen::<f32>() * available_patterns.len() as f32) as usize;
+        available_patterns[random_index]
     };
     
+    // Update the last pattern for this boss
+    if let Some(mut last_pattern_record) = last_pattern_opt {
+        last_pattern_record.last_pattern = target_state;
+        ctx.db.boss_last_patterns().monster_id().update(last_pattern_record);
+    } else {
+        // Create new record for this boss
+        ctx.db.boss_last_patterns().insert(BossLastPattern {
+            monster_id,
+            last_pattern: target_state,
+        });
+    }
+    
     schedule_state_change(ctx, monster_id, target_state, BOSS_IDLE_DURATION_MS);
-    log::info!("Scheduled random boss pattern {:?} for monster {} after {}ms", target_state, monster_id, BOSS_IDLE_DURATION_MS);
+    log::info!("Scheduled random boss pattern {:?} for monster {} after {}ms (avoiding repetition of {:?})", 
+               target_state, monster_id, BOSS_IDLE_DURATION_MS, last_pattern);
 }
 
 // Initialize boss AI state when a boss is spawned
@@ -295,5 +345,34 @@ pub fn movement_behavior_from_u8(value: u8) -> MovementBehavior {
         1 => MovementBehavior::Chase,
         2 => MovementBehavior::StandStill,
         _ => MovementBehavior::Normal, // Default fallback
+    }
+}
+
+// Check if boss should stop chasing when close to target
+pub fn check_boss_chase_distance(ctx: &ReducerContext, monster_id: u32, monster_position: &DbVector2, target_position: &DbVector2) {
+    // Calculate distance to target
+    let dx = target_position.x - monster_position.x;
+    let dy = target_position.y - monster_position.y;
+    let distance = (dx * dx + dy * dy).sqrt();
+    
+    // If boss is close enough, stop chasing and schedule new attack
+    if distance <= BOSS_CHASE_STOP_DISTANCE {
+        log::info!("Boss {} is close enough to target (distance: {:.1}), stopping chase and scheduling attack", monster_id, distance);
+        
+        // Cancel any existing scheduled state changes (like the original chase->idle transition)
+        cancel_scheduled_state_changes(ctx, monster_id);
+        
+        // Change state back to idle immediately
+        let monster_opt = ctx.db.monsters().monster_id().find(&monster_id);
+        if let Some(mut monster) = monster_opt {
+            monster.ai_state = AIState::BossIdle;
+            ctx.db.monsters().monster_id().update(monster.clone());
+            
+            // Reset speed to base bestiary speed since we're exiting chase mode
+            reset_monster_speed_to_bestiary(ctx, &monster);
+            
+            // Schedule new random boss pattern with short delay (immediate attack)
+            schedule_random_boss_pattern(ctx, monster_id);
+        }
     }
 } 

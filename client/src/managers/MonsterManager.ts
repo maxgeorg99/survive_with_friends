@@ -563,52 +563,66 @@ export default class MonsterManager {
         // Start with boss invisible and fade in
         bossContainer.setAlpha(0);
         
-        // Create dramatic entry flash
-        const flash = this.scene.add.circle(bossContainer.x, bossContainer.y, bossSprite.width, 0x00ffff, 0.8);
-        flash.setDepth(bossContainer.depth + 2);
-        flash.setScale(0.1);
-        
-        // Expand and fade the flash
-        this.scene.tweens.add({
-            targets: flash,
-            scale: 3,
-            alpha: 0,
-            duration: 600,
-            ease: 'Power2.easeOut',
-            onComplete: () => {
-                flash.destroy();
-            }
+        // Wait a small moment to let the boss position update, then create effects at the NEW position
+        this.scene.time.delayedCall(50, () => {
+            // Get the boss's current (new) position after teleportation
+            const newX = bossContainer.x;
+            const newY = bossContainer.y;
+            
+            console.log(`Creating teleport effect at new position: (${newX}, ${newY})`);
+            
+            // Create dramatic entry flash at the NEW position
+            const flash = this.scene.add.circle(newX, newY, bossSprite.width, 0x9900ff, 0.5);
+            flash.setDepth(bossContainer.depth + 2);
+            flash.setScale(0.1);
+            
+            // Expand and fade the flash
+            this.scene.tweens.add({
+                targets: flash,
+                scale: 3,
+                alpha: 0,
+                duration: 600,
+                ease: 'Power2.easeOut',
+                onComplete: () => {
+                    flash.destroy();
+                }
+            });
+            
+            // Create energy particles spiraling inward at the NEW position
+            const particles = this.scene.add.particles(newX, newY, 'white_pixel', {
+                speed: { min: 100, max: 200 },
+                scale: { start: 1, end: 0 },
+                alpha: { start: 0.7, end: 0 },
+                blendMode: 'ADD',
+                lifespan: 800,
+                tint: 0x9900ff, // Purple energy to match vanish effect
+                emitting: false,
+                emitCallback: (particle: Phaser.GameObjects.Particles.Particle) => {
+                    // Create spiral effect by setting initial velocity in a circle
+                    const angle = Math.random() * Math.PI * 2;
+                    const radius = 150; // Start particles in a circle around the boss
+                    const speed = Phaser.Math.Between(100, 200);
+                    
+                    // Position particle at radius distance from NEW position
+                    particle.x = newX + Math.cos(angle) * radius;
+                    particle.y = newY + Math.sin(angle) * radius;
+                    
+                    // Set velocity toward the center (opposite direction)
+                    particle.velocityX = -Math.cos(angle) * speed;
+                    particle.velocityY = -Math.sin(angle) * speed;
+                }
+            });
+            
+            particles.setDepth(bossContainer.depth + 1);
+            
+            // Emit energy particles in a burst at the NEW position
+            particles.explode(40, newX, newY);
+            
+            // Clean up particles after effect
+            this.scene.time.delayedCall(1200, () => {
+                particles.destroy();
+            });
         });
-        
-        // Create energy particles spiraling inward
-        const particles = this.scene.add.particles(bossContainer.x, bossContainer.y, 'white_pixel', {
-            speed: { min: 100, max: 200 },
-            scale: { start: 1, end: 0 },
-            alpha: { start: 1, end: 0 },
-            blendMode: 'ADD',
-            lifespan: 800,
-            tint: 0x00ffff, // Cyan energy
-            emitting: false,
-            emitCallback: (particle: Phaser.GameObjects.Particles.Particle) => {
-                // Create spiral effect by setting initial velocity in a circle
-                const angle = Math.random() * Math.PI * 2;
-                const radius = 150; // Start particles in a circle around the boss
-                const speed = Phaser.Math.Between(100, 200);
-                
-                // Position particle at radius distance
-                particle.x = bossContainer.x + Math.cos(angle) * radius;
-                particle.y = bossContainer.y + Math.sin(angle) * radius;
-                
-                // Set velocity toward the center (opposite direction)
-                particle.velocityX = -Math.cos(angle) * speed;
-                particle.velocityY = -Math.sin(angle) * speed;
-            }
-        });
-        
-        particles.setDepth(bossContainer.depth + 1);
-        
-        // Emit energy particles in a burst
-        particles.explode(40, bossContainer.x, bossContainer.y);
         
         // Boss appears with scaling effect
         this.scene.tweens.add({
@@ -626,10 +640,5 @@ export default class MonsterManager {
         
         // Add screen shake for dramatic effect
         this.scene.cameras.main.shake(300, 0.01);
-        
-        // Clean up particles after effect
-        this.scene.time.delayedCall(1200, () => {
-            particles.destroy();
-        });
     }
 } 

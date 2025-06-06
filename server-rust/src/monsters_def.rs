@@ -380,8 +380,32 @@ fn move_monsters(ctx: &ReducerContext, cache: &mut crate::collision::CollisionCa
 
         let mut speed = cache.monster.speed_monster[i];
         
-        // Apply chase acceleration if in chase mode
+        // Check if this is a boss in chase mode and close to target
         if movement_behavior == crate::monster_ai_defs::MovementBehavior::Chase {
+            // Check if this is a boss monster
+            let monster_id = cache.monster.keys_monster[i];
+            let real_monster = ctx.db.monsters().monster_id().find(&monster_id);
+            if let Some(monster) = real_monster {
+                let monster_type_name = get_monster_type_name(&monster.bestiary_id);
+                if monster_type_name == "FinalBossPhase1" || monster_type_name == "FinalBossPhase2" {
+                    // Check distance to target for boss monsters
+                    let monster_position = DbVector2::new(cache.monster.pos_x_monster[i], cache.monster.pos_y_monster[i]);
+                    let target_position = DbVector2::new(cache.monster.target_x_monster[i], cache.monster.target_y_monster[i]);
+                    
+                    crate::monster_ai_defs::check_boss_chase_distance(ctx, monster_id, &monster_position, &target_position);
+                    
+                    // Re-check if monster is still in chase mode (might have been changed by check_boss_chase_distance)
+                    let updated_monster = ctx.db.monsters().monster_id().find(&monster_id);
+                    if let Some(updated_monster) = updated_monster {
+                        let updated_behavior = crate::monster_ai_defs::get_movement_behavior_for_state(&updated_monster.ai_state);
+                        if updated_behavior != crate::monster_ai_defs::MovementBehavior::Chase {
+                            continue; // Skip movement if no longer chasing
+                        }
+                    }
+                }
+            }
+            
+            // Apply chase acceleration if still in chase mode
             speed *= crate::monster_ai_defs::CHASE_ACCELERATION_MULTIPLIER;
             speed = speed.min(crate::monster_ai_defs::MAX_CHASE_SPEED);
             
@@ -870,4 +894,18 @@ pub fn spawn_debug_void_chest(ctx: &ReducerContext) {
         player.name,
         player.player_id
     );
+}
+
+// Helper function to get monster type name from bestiary ID
+fn get_monster_type_name(bestiary_id: &MonsterType) -> &'static str {
+    match bestiary_id {
+        MonsterType::Rat => "Rat",
+        MonsterType::Slime => "Slime", 
+        MonsterType::Orc => "Orc",
+        MonsterType::FinalBossPhase1 => "FinalBossPhase1",
+        MonsterType::FinalBossPhase2 => "FinalBossPhase2",
+        MonsterType::VoidChest => "VoidChest",
+        MonsterType::Imp => "Imp",
+        MonsterType::Zombie => "Zombie",
+    }
 }
