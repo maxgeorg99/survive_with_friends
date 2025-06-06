@@ -306,6 +306,11 @@ export default class GameScene extends Phaser.Scene {
         this.musicManager = new MusicManager(this);
         this.musicManager.playTrack('main');
 
+        // Play welcome voice when entering the game
+        if (soundManager) {
+            soundManager.playSound('voice_welcome', 1.0);
+        }
+
         // Clean up any lingering UI elements from other scenes
         this.cleanupLingeringUIElements();
 

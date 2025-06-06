@@ -127,6 +127,7 @@ export default class TitleScene extends Phaser.Scene {
                 this.load.audio('voice_lose', '/assets/sounds/voice_lose.mp3');
                 this.load.audio('voice_win', '/assets/sounds/voice_win.mp3');
                 this.load.audio('voice_level', '/assets/sounds/voice_level.mp3');
+                this.load.audio('voice_welcome', '/assets/sounds/voice_welcome.mp3');
                 this.load.audio('choose', '/assets/sounds/choose.mp3');
                 
                 // Load gameplay sound effects
