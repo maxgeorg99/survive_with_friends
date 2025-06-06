@@ -265,6 +265,12 @@ export default class GameScene extends Phaser.Scene {
     create() {
         console.log("GameScene create started.");
 
+        // Set the global SoundManager's scene reference
+        const soundManager = (window as any).soundManager;
+        if (soundManager) {
+            soundManager.setScene(this);
+        }
+
         // Initialize music manager and start main music
         this.musicManager = new MusicManager(this);
         this.musicManager.playTrack('main');
@@ -512,6 +518,13 @@ export default class GameScene extends Phaser.Scene {
         if (isLocalPlayer && newPlayer.level > oldPlayer.level) {
             console.log("Player level up: from level", oldPlayer.level, "to level", newPlayer.level);
             
+            // Play level up sound effects
+            const soundManager = (window as any).soundManager;
+            if (soundManager) {
+                soundManager.playSound('level_up', 0.8);
+                soundManager.playSound('voice_level', 1.0);
+            }
+            
             // Play level up effect
             if (this.localPlayerSprite) {
                 this.createLevelUpEffect(this.localPlayerSprite);
@@ -618,9 +631,14 @@ export default class GameScene extends Phaser.Scene {
             
             // If a VoidChest spawns, show the alert
             if (monsterType === 'VoidChest') {
-                console.log("VoidChest detected! Showing alert");
+                console.log("VoidChest detected! Showing alert and playing voice");
                 if (this.voidChestUI) {
                     this.voidChestUI.showVoidChestAlert();
+                }
+                // Play voice chest sound effect
+                const soundManager = (window as any).soundManager;
+                if (soundManager) {
+                    soundManager.playSound('voice_chest', 1.0);
                 }
             }
         }
@@ -927,6 +945,21 @@ export default class GameScene extends Phaser.Scene {
      * Update local player attributes when server data changes
      */
     private updateLocalPlayerAttributes(ctx: EventContext, player: Player) {
+        // Check for reroll increase first (before updating anything else)
+        if (this.localPlayerSprite) {
+            const currentRerolls = this.localPlayerSprite.getData('rerolls');
+            if (currentRerolls !== undefined && player.rerolls > currentRerolls) {
+                // Play dice sound when rerolls increase
+                const soundManager = (window as any).soundManager;
+                if (soundManager) {
+                    soundManager.playSound('dice', 0.8);
+                }
+                console.log(`Player gained reroll(s): ${currentRerolls} -> ${player.rerolls}`);
+            }
+            // Store current rerolls for next comparison
+            this.localPlayerSprite.setData('rerolls', player.rerolls);
+        }
+        
         // Update player name if it changed
         const previousLevel = this.localPlayerNameText ? 
             parseInt(this.localPlayerNameText.text.split('(')[1].split(')')[0]) : player.level;
@@ -997,6 +1030,12 @@ export default class GameScene extends Phaser.Scene {
                     
                     // Briefly flash the exp bar when gaining exp
                     if (currentExp !== undefined && player.exp > currentExp) {
+                        // Play exp gain sound effect
+                        const soundManager = (window as any).soundManager;
+                        if (soundManager) {
+                            soundManager.playSound('exp_gem', 0.7);
+                        }
+                        
                         this.tweens.add({
                             targets: expBar,
                             fillColor: 0x00ffff, // Bright cyan
@@ -1408,6 +1447,12 @@ export default class GameScene extends Phaser.Scene {
                             
                             // Briefly flash the exp bar when gaining exp
                             if (playerData.exp > currentExp) {
+                                // Play exp gain sound effect
+                                const soundManager = (window as any).soundManager;
+                                if (soundManager) {
+                                    soundManager.playSound('exp_gem', 0.7);
+                                }
+                                
                                 this.tweens.add({
                                     targets: expBar,
                                     fillColor: 0x00ffff, // Bright cyan

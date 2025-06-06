@@ -66,9 +66,17 @@ export default class ClassSelectScene extends Phaser.Scene {
     }
 
     create() {
-        console.log("ClassSelectScene create() - ensuring clean transition from previous scene");
+        console.log("ClassSelectScene create() started - ensuring clean transition");
         
-        // Initialize music manager and continue title music
+        // Set the global SoundManager's scene reference
+        const soundManager = (window as any).soundManager;
+        if (soundManager) {
+            soundManager.setScene(this);
+            // Play voice class cue when entering class select
+            soundManager.playSound('voice_class', 0.9);
+        }
+        
+        // Initialize music manager
         this.musicManager = new MusicManager(this);
         this.musicManager.playTrack('title');
         
@@ -426,6 +434,12 @@ export default class ClassSelectScene extends Phaser.Scene {
         // Set selected class
         this.selectedClass = classType;
         console.log(`Selected class: ${classType.tag}`);
+        
+        // Play choose sound effect when class is selected
+        const soundManager = (window as any).soundManager;
+        if (soundManager) {
+            soundManager.playSound('choose', 0.8);
+        }
         
         // Show confirm button
         this.confirmButton.style.display = 'block';

@@ -55,6 +55,7 @@ pub struct MonsterCollisionCache {
     pub atk_monster: Box<[f32]>,
     pub damage_to_monster: Box<[f32]>,
     pub push_ratio_monster: Box<[u32]>,
+    pub movement_behavior: Box<[u8]>,  // Cache the MovementBehavior as u8 (0=Normal, 1=Chase, 2=StandStill)
     pub cached_count_monsters: i32,
 }
 
@@ -78,6 +79,7 @@ impl Default for MonsterCollisionCache {
             atk_monster: vec![0.0; MAX_MONSTERS as usize].into_boxed_slice(),
             damage_to_monster: vec![0.0; MAX_MONSTERS as usize].into_boxed_slice(),
             push_ratio_monster: vec![1; MAX_MONSTERS as usize].into_boxed_slice(),
+            movement_behavior: vec![0; MAX_MONSTERS as usize].into_boxed_slice(),
             cached_count_monsters: 0,
         }
     }
@@ -201,6 +203,7 @@ impl CollisionCache {
         self.monster.atk_monster.fill(0.0);
         self.monster.damage_to_monster.fill(0.0);
         self.monster.push_ratio_monster.fill(1);
+        self.monster.movement_behavior.fill(0);
         self.monster.key_to_cache_index_monster.clear();
 
         // Clear gem cache

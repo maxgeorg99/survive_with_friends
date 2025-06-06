@@ -35,6 +35,14 @@ export default class DeadScene extends Phaser.Scene {
     create() {
         const { width, height } = this.scale;
         
+        // Set the global SoundManager's scene reference
+        const soundManager = (window as any).soundManager;
+        if (soundManager) {
+            soundManager.setScene(this);
+            // Play voice lose cue when entering dead scene
+            soundManager.playSound('voice_lose', 1.0);
+        }
+        
         // Initialize music manager and play game over sting
         this.musicManager = new MusicManager(this);
         this.musicManager.playTrack('game_over_sting');

@@ -115,6 +115,7 @@ pub fn spawn_guaranteed_void_chest(ctx: &ReducerContext, _spawn: GuaranteedVoidC
         target_player_id: closest_player_id,
         radius: bestiary_entry.radius,
         spawn_position: spawn_position.clone(),
+        ai_state: crate::monster_ai_defs::AIState::Stationary,
     });
     
     // Create the boid for movement

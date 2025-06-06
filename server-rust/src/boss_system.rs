@@ -147,6 +147,7 @@ pub fn spawn_boss_phase_two(ctx: &ReducerContext, position: DbVector2) {
         target_player_id: closest_player_id,
         radius: bestiary_entry.radius,
         spawn_position: position.clone(),
+        ai_state: crate::monster_ai_defs::AIState::BossIdle,
     });
     
     let monster = monster_opt;

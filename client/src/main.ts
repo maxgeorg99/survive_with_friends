@@ -10,6 +10,7 @@ import { Identity } from '@clockworklabs/spacetimedb-sdk';
 import SpacetimeDBClient from './SpacetimeDBClient';
 import { DbConnection, ErrorContext, SubscriptionEventContext } from './autobindings';
 import { GameEvents } from './constants/GameEvents';
+import SoundManager from './managers/SoundManager';
 
 console.log("Main script loading...");
 
@@ -70,6 +71,11 @@ const loadingOverlay = createLoadingOverlay();
 const gameEvents = new Phaser.Events.EventEmitter();
 // Make it accessible globally
 (window as any).gameEvents = gameEvents;
+
+// Create a global SoundManager for game-wide audio effects
+const soundManager = new SoundManager();
+// Make it accessible globally
+(window as any).soundManager = soundManager;
 
 // Add a global cleanup function accessible from anywhere
 (window as any).cleanupDOMElements = () => {

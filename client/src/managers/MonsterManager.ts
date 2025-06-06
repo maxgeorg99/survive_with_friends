@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { Monsters, EventContext, MonsterType, MonsterBoid} from "../autobindings";
+import { Monsters, EventContext, MonsterType, MonsterBoid, AiState} from "../autobindings";
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { MONSTER_ASSET_KEYS, MONSTER_SHADOW_OFFSETS_X, MONSTER_SHADOW_OFFSETS_Y, MONSTER_SHADOW_SCALE} from '../constants/MonsterConfig';
 import { GameEvents } from '../constants/GameEvents';
@@ -35,11 +35,18 @@ export default class MonsterManager {
     private bossMonsterId: number = 0;
     private bossPosition: { x: number, y: number } | null = null;
     
+    // Add SoundManager for boss audio cues (using global instance)
+    private soundManager: any;
+    
+    // Track boss AI states to detect changes
+    private bossAiStates: Map<number, string> = new Map();
+    
     constructor(scene: Phaser.Scene, spacetimeDBClient: SpacetimeDBClient) {
         this.scene = scene;
         this.spacetimeDBClient = spacetimeDBClient;
         this.monsters = new Map();
         this.gameEvents = (window as any).gameEvents;
+        this.soundManager = (window as any).soundManager;
         console.log("MonsterManager constructed");
     }
     
@@ -78,6 +85,10 @@ export default class MonsterManager {
                     }
                 }
             }
+            
+            // Check for boss AI state changes
+            this.checkBossAiStateChange(oldMonster, newMonster);
+            
             this.createOrUpdateMonster(newMonster);
         });
 
@@ -258,6 +269,48 @@ export default class MonsterManager {
         this.unregisterListeners();
     }
     
+    // Add a method to check for boss AI state changes
+    private checkBossAiStateChange(oldMonster: Monsters, newMonster: Monsters) {
+        // Only check boss monsters
+        const monsterTypeName = this.getMonsterTypeName(newMonster.bestiaryId);
+        if (monsterTypeName !== "FinalBossPhase1" && monsterTypeName !== "FinalBossPhase2") {
+            return;
+        }
+
+        // Get the AI state tags
+        const oldStateTag = oldMonster.aiState.tag;
+        const newStateTag = newMonster.aiState.tag;
+        
+        // Check if the AI state actually changed
+        if (oldStateTag === newStateTag) {
+            return;
+        }
+
+        console.log(`Boss ${newMonster.monsterId} AI state changed from ${oldStateTag} to ${newStateTag}`);
+        
+        // Play appropriate sound based on the new state
+        switch (newStateTag) {
+            case 'BossChase':
+                this.soundManager.playBossChaseSound();
+                break;
+            case 'BossDance':
+                this.soundManager.playBossDanceSound();
+                break;
+            case 'BossVanish':
+                this.soundManager.playBossVanishSound();
+                break;
+            case 'BossTeleport':
+                this.soundManager.playBossTeleportSound();
+                break;
+            case 'BossTransform':
+                this.soundManager.playBossTransformSound();
+                break;
+            default:
+                // No sound for other states (BossIdle, Default, Stationary)
+                break;
+        }
+    }
+
     // Handles when a monster is created
     handleMonsterCreated(ctx: EventContext, monster: Monsters) {
         const monsterTypeName = this.getMonsterTypeName(monster.bestiaryId);
@@ -273,9 +326,18 @@ export default class MonsterManager {
             console.log(`- Texture exists: ${this.scene.textures.exists(MONSTER_ASSET_KEYS[monsterTypeName])}`);
             console.log(`- Position: (${monster.spawnPosition.x}, ${monster.spawnPosition.y})`);
             
+            // Play boss spawn sound for first form
+            if (monsterTypeName === "FinalBossPhase1") {
+                console.log("*** FIRST BOSS FORM SPAWNED! Playing voice cue... ***");
+                this.soundManager.playBossSpawnSound();
+            }
+            
             // If this is phase 2, it means phase 1 was defeated
             if (monsterTypeName === "FinalBossPhase2") {
                 console.log("*** PHASE 2 OF THE BOSS HAS BEGUN! ***");
+                
+                // Play transformation sound sequence
+                this.soundManager.playBossTransformSound();
                 
                 // Reset phase 1 tracking variables since phase 2 has spawned
                 if (this.bossPhase1Killed) {

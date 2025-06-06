@@ -36,6 +36,14 @@ export default class VictoryScene extends Phaser.Scene {
     create() {
         const { width, height } = this.scale;
         
+        // Set the global SoundManager's scene reference
+        const soundManager = (window as any).soundManager;
+        if (soundManager) {
+            soundManager.setScene(this);
+            // Play voice win cue when entering victory scene
+            soundManager.playSound('voice_win', 1.0);
+        }
+        
         // Initialize music manager and play victory sting
         this.musicManager = new MusicManager(this);
         this.musicManager.playTrack('win_sting');

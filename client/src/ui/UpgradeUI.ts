@@ -464,6 +464,12 @@ export default class UpgradeUI {
         
         console.log(`Choosing upgrade at index ${index}`);
         
+        // Play choose sound effect when upgrade is selected
+        const soundManager = (window as any).soundManager;
+        if (soundManager) {
+            soundManager.playSound('choose', 0.8);
+        }
+        
         // Get the upgrade option and index
         const option = this.upgradeOptions[index];
         if (!option) return;

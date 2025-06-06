@@ -89,6 +89,12 @@ export default class TitleScene extends Phaser.Scene {
     create() {
         const { width, height } = this.scale;
         
+        // Set the global SoundManager's scene reference
+        const soundManager = (window as any).soundManager;
+        if (soundManager) {
+            soundManager.setScene(this);
+        }
+        
         // Initialize music manager
         this.musicManager = new MusicManager(this);
         
@@ -103,6 +109,38 @@ export default class TitleScene extends Phaser.Scene {
                 this.load.audio('game_over_sting', '/assets/music/game_over_sting.mp3');
                 this.load.audio('win_sting', '/assets/music/win_sting.mp3');
                 
+                // Load sound effects for boss AI state changes and other game events
+                this.load.audio('boss_chase_cue', '/assets/sounds/boss_chase_cue.mp3');
+                this.load.audio('boss_bullet_cue', '/assets/sounds/boss_bullet_cue.mp3');
+                this.load.audio('boss_teleport_cue', '/assets/sounds/boss_teleport_cue.mp3');
+                this.load.audio('boss_vanish', '/assets/sounds/boss_vanish.mp3');
+                this.load.audio('boss_appear', '/assets/sounds/boss_appear.mp3');
+                this.load.audio('boss_teleport_attack', '/assets/sounds/boss_teleport_attack.mp3');
+                this.load.audio('voice_boss', '/assets/sounds/voice_boss.mp3');
+                this.load.audio('boss_transform', '/assets/sounds/boss_transform.mp3');
+                this.load.audio('voice_boss_2', '/assets/sounds/voice_boss_2.mp3');
+                
+                // Load other common sound effects
+                this.load.audio('attack_fire', '/assets/sounds/attack_fire.mp3');
+                this.load.audio('attack_soft', '/assets/sounds/attack_soft.mp3');
+                this.load.audio('monster_death', '/assets/sounds/monster_death.mp3');
+                this.load.audio('exp_gem', '/assets/sounds/exp_gem.mp3');
+                this.load.audio('level_up', '/assets/sounds/level_up.mp3');
+                this.load.audio('choose', '/assets/sounds/choose.mp3');
+                this.load.audio('click', '/assets/sounds/click.mp3');
+                this.load.audio('food', '/assets/sounds/food.mp3');
+                this.load.audio('dice', '/assets/sounds/dice.mp3');
+                this.load.audio('booster_pack', '/assets/sounds/booster_pack.mp3');
+                this.load.audio('voice_level', '/assets/sounds/voice_level.mp3');
+                this.load.audio('voice_chest', '/assets/sounds/voice_chest.mp3');
+                this.load.audio('voice_win', '/assets/sounds/voice_win.mp3');
+                this.load.audio('voice_lose', '/assets/sounds/voice_lose.mp3');
+                this.load.audio('voice_class', '/assets/sounds/voice_class.mp3');
+                this.load.audio('voice_name', '/assets/sounds/voice_name.mp3');
+                this.load.audio('voice_title', '/assets/sounds/voice_title.mp3');
+                this.load.audio('move_command', '/assets/sounds/move_command.mp3');
+                this.load.audio('boss_roar', '/assets/sounds/boss_roar.mp3');
+                
                 // Add error handling for missing files
                 this.load.on('loaderror', (fileObj: any) => {
                     if (fileObj.type === 'audio') {
@@ -116,6 +154,7 @@ export default class TitleScene extends Phaser.Scene {
                 // Play title music once it's loaded
                 this.load.once('complete', () => {
                     this.musicManager.playTrack('title');
+                    console.log("TitleScene: All audio files loaded successfully");
                 });
             } catch (error) {
                 console.warn("TitleScene: Failed to setup music loading:", error);

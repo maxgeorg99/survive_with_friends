@@ -30,6 +30,14 @@ export default class NameSelectScene extends Phaser.Scene {
         console.log("NameSelectScene create() called");
         const { width, height } = this.scale;
         
+        // Set the global SoundManager's scene reference
+        const soundManager = (window as any).soundManager;
+        if (soundManager) {
+            soundManager.setScene(this);
+            // Play voice name cue when entering name select
+            soundManager.playSound('voice_name', 0.9);
+        }
+        
         // Initialize music manager and continue title music
         this.musicManager = new MusicManager(this);
         this.musicManager.playTrack('title');
@@ -242,6 +250,12 @@ export default class NameSelectScene extends Phaser.Scene {
                 try {
                     this.spacetimeDBClient.sdkConnection.reducers.setName(name);
                     console.log("NameSelectScene: setName reducer call completed successfully");
+                    
+                    // Play choose sound effect when name is set
+                    const soundManager = (window as any).soundManager;
+                    if (soundManager) {
+                        soundManager.playSound('choose', 0.8);
+                    }
                 } catch (reducerError) {
                     console.error("NameSelectScene: Error calling setName reducer:", reducerError);
                     this.showError('Error calling setName reducer: ' + (reducerError as Error).message);

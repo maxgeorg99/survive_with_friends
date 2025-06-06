@@ -2,6 +2,7 @@ use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, Sc
 use crate::{DbVector2, MonsterType, MAX_MONSTERS, WORLD_SIZE, DELTA_TIME, 
            get_world_cell_from_position, spatial_hash_collision_checker,
            WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT, config, player, game_state, bestiary, ActiveAttack, active_attacks, entity, account};
+use crate::monster_ai_defs::AIState;
 use std::collections::HashMap;
 use std::time::Duration;
 
@@ -18,6 +19,7 @@ const SPAWNABLE_MONSTER_TYPES: &[MonsterType] = &[
 
 // Main monsters table
 #[table(name = monsters, public)]
+#[derive(Clone)]
 pub struct Monsters {
     #[primary_key]
     #[auto_inc]
@@ -30,6 +32,7 @@ pub struct Monsters {
     pub atk: f32,
     pub speed: f32,
     pub target_player_id: u32,
+    pub ai_state: AIState,  // AI state for boss behaviors
     // entity attributes
     pub radius: f32,
     pub spawn_position: DbVector2,
@@ -258,6 +261,16 @@ pub fn spawn_monster(ctx: &ReducerContext, spawner: MonsterSpawners) {
     // Find the closest player to target
     let closest_player_id = get_closest_player(ctx, &spawner.position);
     
+    // Determine initial AI state based on monster type
+    let initial_ai_state = if spawner.monster_type == MonsterType::FinalBossPhase1 || 
+                              spawner.monster_type == MonsterType::FinalBossPhase2 {
+        AIState::BossIdle
+    } else if spawner.monster_type == MonsterType::VoidChest {
+        AIState::Stationary
+    } else {
+        AIState::Default
+    };
+    
     // Create the monster
     let monster_opt = ctx.db.monsters().insert(Monsters {
         monster_id: 0,
@@ -269,6 +282,7 @@ pub fn spawn_monster(ctx: &ReducerContext, spawner: MonsterSpawners) {
         target_player_id: closest_player_id,
         radius: bestiary_entry.radius,
         spawn_position: spawner.position.clone(),
+        ai_state: initial_ai_state,
     });
 
     let monster = monster_opt;
@@ -281,10 +295,13 @@ pub fn spawn_monster(ctx: &ReducerContext, spawner: MonsterSpawners) {
 
     //Log::info(&format!("Spawned {:?} monster. Total monsters: {}", spawner.monster_type, ctx.db.monsters().count()));
     
-    // If this is a boss monster, update the game state with its ID
+    // If this is a boss monster, update the game state and initialize AI
     if spawner.monster_type.clone() == MonsterType::FinalBossPhase1 || spawner.monster_type.clone() == MonsterType::FinalBossPhase2 {
         log::info!("Boss monster of type {:?} created with ID {}", spawner.monster_type, monster.monster_id);
         crate::boss_system::update_boss_monster_id(ctx, monster.monster_id);
+        
+        // Initialize boss AI
+        crate::monster_ai_defs::initialize_boss_ai(ctx, monster.monster_id);
     }
     
     // If this is an Imp, start its attack schedule
@@ -343,6 +360,15 @@ pub fn process_monster_movements(ctx: &ReducerContext) {
 fn move_monsters(ctx: &ReducerContext, cache: &mut crate::collision::CollisionCache) {
     for i in 0..cache.monster.cached_count_monsters {
         let i = i as usize;
+        
+        // Get cached movement behavior
+        let movement_behavior = crate::monster_ai_defs::movement_behavior_from_u8(cache.monster.movement_behavior[i]);
+        
+        // Check if monster should stand still
+        if movement_behavior == crate::monster_ai_defs::MovementBehavior::StandStill {
+            continue; // Skip movement for this monster
+        }
+        
         let dist_x = cache.monster.target_x_monster[i] - cache.monster.pos_x_monster[i];
         let dist_y = cache.monster.target_y_monster[i] - cache.monster.pos_y_monster[i];
 
@@ -352,7 +378,16 @@ fn move_monsters(ctx: &ReducerContext, cache: &mut crate::collision::CollisionCa
         let norm_x = dist_x * inv_dist;
         let norm_y = dist_y * inv_dist;
 
-        let speed = cache.monster.speed_monster[i];
+        let mut speed = cache.monster.speed_monster[i];
+        
+        // Apply chase acceleration if in chase mode
+        if movement_behavior == crate::monster_ai_defs::MovementBehavior::Chase {
+            speed *= crate::monster_ai_defs::CHASE_ACCELERATION_MULTIPLIER;
+            speed = speed.min(crate::monster_ai_defs::MAX_CHASE_SPEED);
+            
+            cache.monster.speed_monster[i] = speed; // Update cached speed for next frame
+        }
+        
         let move_x = norm_x * speed * DELTA_TIME;
         let move_y = norm_y * speed * DELTA_TIME;
 
@@ -396,11 +431,17 @@ fn populate_monster_cache(ctx: &ReducerContext, cache: &mut crate::collision::Co
     
     for monster in ctx.db.monsters().iter() {
         let idx = cache.monster.cached_count_monsters as usize;
+        
         cache.monster.keys_monster[idx] = monster.monster_id;
         cache.monster.key_to_cache_index_monster.insert(monster.monster_id, cache.monster.cached_count_monsters as u32);
         cache.monster.radius_monster[idx] = monster.radius;
         cache.monster.speed_monster[idx] = monster.speed;
         cache.monster.atk_monster[idx] = monster.atk;
+        
+        // Cache movement behavior based on AI state
+        let movement_behavior = crate::monster_ai_defs::get_movement_behavior_for_state(&monster.ai_state);
+        cache.monster.movement_behavior[idx] = crate::monster_ai_defs::movement_behavior_to_u8(movement_behavior);
+        
         //Structures have their weight set to 0.0 to prevent them from being pushed around
         if monster.bestiary_id == MonsterType::VoidChest {
             cache.monster.push_ratio_monster[idx] = 0;
@@ -805,6 +846,7 @@ pub fn spawn_debug_void_chest(ctx: &ReducerContext) {
         target_player_id: player.player_id,
         radius: bestiary_entry.radius,
         spawn_position: clamped_position.clone(),
+        ai_state: AIState::Stationary,
     });
     
     // Create the boid for movement
