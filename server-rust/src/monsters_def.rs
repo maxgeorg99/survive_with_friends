@@ -473,8 +473,10 @@ fn populate_monster_cache(ctx: &ReducerContext, cache: &mut crate::collision::Co
         let movement_behavior = crate::monster_ai_defs::get_movement_behavior_for_state(&monster.ai_state);
         cache.monster.movement_behavior[idx] = crate::monster_ai_defs::movement_behavior_to_u8(movement_behavior);
         
-        //Structures have their weight set to 0.0 to prevent them from being pushed around
-        if monster.bestiary_id == MonsterType::VoidChest {
+        //Structures and bosses have their weight set to 0.0 to prevent them from being pushed around
+        if monster.bestiary_id == MonsterType::VoidChest || 
+           monster.bestiary_id == MonsterType::FinalBossPhase1 || 
+           monster.bestiary_id == MonsterType::FinalBossPhase2 {
             cache.monster.push_ratio_monster[idx] = 0;
         }
         else {

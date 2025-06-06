@@ -58,12 +58,11 @@ pub fn determine_attack_direction(
             }
         }
         AttackType::Wand => {
-            // Wands shoot at the nearest enemy
-            // TODO: can we use the spatial hash to speed this up?
-            if let Some(nearest_enemy) = find_nearest_enemy(ctx, player.position) {
-                // Calculate direction vector to the enemy
-                let dx = nearest_enemy.position.x - player.position.x;
-                let dy = nearest_enemy.position.y - player.position.y;
+            // Wands shoot at the nearest enemy (monster or player)
+            if let Some(target_position) = find_nearest_target(ctx, player.position, player_id) {
+                // Calculate direction vector to the target
+                let dx = target_position.x - player.position.x;
+                let dy = target_position.y - player.position.y;
                 DbVector2::new(dx, dy).normalize()
             } else {
                 // If no target, use player's direction
@@ -109,4 +108,41 @@ pub fn find_nearest_enemy(ctx: &ReducerContext, position: DbVector2) -> Option<M
     }
 
     nearest_enemy
+}
+
+// Find the nearest target (monster or player) to attack - used for Wand targeting
+pub fn find_nearest_target(ctx: &ReducerContext, attacker_position: DbVector2, attacker_player_id: u32) -> Option<DbVector2> {
+    let mut nearest_target_position: Option<DbVector2> = None;
+    let mut nearest_distance_squared = f32::MAX;
+
+    // Check all monsters
+    for boid in ctx.db.monsters_boid().iter() {
+        let dx = boid.position.x - attacker_position.x;
+        let dy = boid.position.y - attacker_position.y;
+        let distance_squared = dx * dx + dy * dy;
+
+        if distance_squared < nearest_distance_squared {
+            nearest_distance_squared = distance_squared;
+            nearest_target_position = Some(boid.position);
+        }
+    }
+
+    // Check all other players (excluding the attacker)
+    for player in ctx.db.player().iter() {
+        // Skip the attacking player
+        if player.player_id == attacker_player_id {
+            continue;
+        }
+
+        let dx = player.position.x - attacker_position.x;
+        let dy = player.position.y - attacker_position.y;
+        let distance_squared = dx * dx + dy * dy;
+
+        if distance_squared < nearest_distance_squared {
+            nearest_distance_squared = distance_squared;
+            nearest_target_position = Some(player.position);
+        }
+    }
+
+    nearest_target_position
 } 
