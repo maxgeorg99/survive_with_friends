@@ -19,7 +19,8 @@ const ENDER_BOLT_DAMAGE: u32 = 25;                   // Damage for EnderBolt att
 const ENDER_BOLT_SPEED: f32 = 800.0;                 // Movement speed for EnderBolt attacks
 const ENDER_BOLT_RADIUS: f32 = 27.0;                 // Collision radius for EnderBolt attacks
 const ENDER_BOLT_DURATION_MS: u64 = 4000;            // Duration before EnderBolt expires
-const ENDER_BOLT_FIRE_INTERVAL_MS: u64 = 1000;       // Time between EnderBolt attacks during dance
+const ENDER_BOLT_BASE_INTERVAL_MS: u64 = 1000;       // Base time between EnderBolt attacks (single player)
+const ENDER_BOLT_MIN_INTERVAL_MS: u64 = 50;         // Minimum time between EnderBolt attacks (many players)
 const ENDER_BOLT_INITIAL_DELAY_MS: u64 = 3500;       // Initial delay before first EnderBolt (after real scythes spawn)
 
 // Scheduled table for Imp attacks - Imps periodically fire ImpBolts at players
@@ -818,11 +819,30 @@ fn find_random_player(ctx: &ReducerContext) -> Option<crate::Player> {
     None
 }
 
-// Helper function to schedule the next EnderBolt attack
+// Helper function to schedule the next EnderBolt attack with player scaling
 fn schedule_next_ender_bolt_attack(ctx: &ReducerContext, boss_monster_id: u32) {
+    // Count the number of active players
+    let player_count = ctx.db.player().iter().count() as u64;
+    
+    // Calculate scaled interval based on player count
+    // 1 player = base interval, 4+ players = minimum interval
+    let fire_interval_ms = if player_count <= 1 {
+        ENDER_BOLT_BASE_INTERVAL_MS
+    } else if player_count >= 4 {
+        ENDER_BOLT_MIN_INTERVAL_MS
+    } else {
+        // Linear interpolation between base and minimum for 2-3 players
+        let scale_factor = (player_count - 1) as f64 / 3.0; // 0.0 at 1 player, 1.0 at 4 players
+        let interval_range = ENDER_BOLT_BASE_INTERVAL_MS - ENDER_BOLT_MIN_INTERVAL_MS;
+        ENDER_BOLT_BASE_INTERVAL_MS - (interval_range as f64 * scale_factor) as u64
+    };
+    
     ctx.db.ender_bolt_scheduler().insert(EnderBoltScheduler {
         scheduled_id: 0,
         boss_monster_id,
-        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(ENDER_BOLT_FIRE_INTERVAL_MS)),
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(fire_interval_ms)),
     });
+    
+    log::info!("Scheduled next EnderBolt for boss {} in {}ms ({} players active)", 
+              boss_monster_id, fire_interval_ms, player_count);
 }
