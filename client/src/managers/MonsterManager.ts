@@ -46,6 +46,12 @@ export default class MonsterManager {
     // Track boss AI states to detect changes
     private bossAiStates: Map<number, string> = new Map();
     
+    // After image VFX tracking for boss chase mode
+    private bossAfterImages: Phaser.GameObjects.Sprite[] = [];
+    private afterImageFrameCounter: number = 0;
+    private afterImageSpawnRate: number = 8; // Spawn after image every 8 frames during chase
+    private bossesInChaseMode: Set<number> = new Set(); // Track which bosses are chasing
+    
     constructor(scene: Phaser.Scene, spacetimeDBClient: SpacetimeDBClient) {
         this.scene = scene;
         this.spacetimeDBClient = spacetimeDBClient;
@@ -179,9 +185,16 @@ export default class MonsterManager {
             if (monsterTypeName === "FinalBossPhase1" || monsterTypeName === "FinalBossPhase2") {
                 console.log(`Setting up boss sprite: ${monsterTypeName} (ID: ${monsterData.monsterId})`);
                 console.log(`Boss data: HP=${monsterData.hp}/${monsterData.maxHp}`);
+                console.log(`Boss initial AI state: ${monsterData.aiState.tag}`);
                 sprite.setScale(1.0);
                 sprite.setAlpha(1);
                 sprite.setVisible(true);
+                
+                // Check if boss starts in chase mode
+                if (monsterData.aiState.tag === 'BossChase') {
+                    this.bossesInChaseMode.add(monsterData.monsterId);
+                    console.log(`Boss ${monsterData.monsterId} created in chase mode - after images activated`);
+                }
             }
             
             // Only log regular monster creation in debug builds or for bosses
@@ -214,6 +227,12 @@ export default class MonsterManager {
         
         if (monsterType?.includes("Boss") || monsterType === "VoidChest") {
             console.log(`Removing ${monsterType}: ${monsterId}`);
+        }
+        
+        // Clean up chase mode tracking for this monster
+        if (this.bossesInChaseMode.has(monsterId)) {
+            this.bossesInChaseMode.delete(monsterId);
+            console.log(`Removed boss ${monsterId} from chase mode tracking`);
         }
         
         if (monsterContainer) {
@@ -270,8 +289,8 @@ export default class MonsterManager {
     
     // Update method to be called from scene's update method
     update(time: number, delta: number) {
-        // Perform the boss transition check
-        this.checkForBossPhaseTransition();
+        // Handle boss after image effects during chase mode
+        this.updateBossAfterImages();
     }
     
     // Add method to clean up event listeners
@@ -292,6 +311,15 @@ export default class MonsterManager {
         this.monsters.forEach(container => container.destroy());
         this.monsters.clear();
         
+        // Clean up boss after images and chase mode tracking
+        this.bossAfterImages.forEach(afterImage => {
+            if (afterImage.active) {
+                afterImage.destroy();
+            }
+        });
+        this.bossAfterImages.length = 0; // Clear array
+        this.bossesInChaseMode.clear();
+        
         console.log("MonsterManager shutdown complete");
     }
     
@@ -307,17 +335,33 @@ export default class MonsterManager {
         const oldStateTag = oldMonster.aiState.tag;
         const newStateTag = newMonster.aiState.tag;
         
-        // Check if the AI state actually changed
+        // Only log AI states when they actually change
+        if (oldStateTag !== newStateTag) {
+            console.log(`*** Boss ${newMonster.monsterId} (${monsterTypeName}) AI state changed: ${oldStateTag} -> ${newStateTag} ***`);
+        }
+        
+        // Always check current state (not just changes) for chase mode tracking
+        if (newStateTag === 'BossChase') {
+            if (!this.bossesInChaseMode.has(newMonster.monsterId)) {
+                this.bossesInChaseMode.add(newMonster.monsterId);
+                console.log(`Boss ${newMonster.monsterId} entered chase mode - after images activated`);
+            }
+        } else {
+            if (this.bossesInChaseMode.has(newMonster.monsterId)) {
+                this.bossesInChaseMode.delete(newMonster.monsterId);
+                console.log(`Boss ${newMonster.monsterId} left chase mode - after images deactivated`);
+            }
+        }
+        
+        // Only play sounds/effects on actual state changes
         if (oldStateTag === newStateTag) {
             return;
         }
 
-        console.log(`Boss ${newMonster.monsterId} AI state changed from ${oldStateTag} to ${newStateTag}`);
-        
         // Get the boss container for visual effects
         const bossContainer = this.monsters.get(newMonster.monsterId);
         const bossSprite = bossContainer?.list.find(child => child instanceof Phaser.GameObjects.Sprite) as Phaser.GameObjects.Sprite;
-        
+
         // Play appropriate sound and visual effects based on the new state
         switch (newStateTag) {
             case 'BossChase':
@@ -563,30 +607,6 @@ export default class MonsterManager {
         });
     }
     
-    // Implement a method to check for boss state transitions
-    private checkForBossPhaseTransition() {
-        const now = Date.now();
-        
-        // If we've killed the phase 1 boss but haven't seen phase 2 after 5 seconds, log an error
-        if (this.bossPhase1Killed && (now - this.timeOfBossPhase1Death > 5000)) {
-            console.error(`ERROR: Boss phase 1 was killed ${(now - this.timeOfBossPhase1Death) / 1000} seconds ago, but phase 2 has not spawned!`);
-            console.log(`Boss phase 1 details - ID: ${this.bossMonsterId}, Position: (${this.bossPosition?.x}, ${this.bossPosition?.y})`);
-            
-            // Reset the flag to prevent continuous logging
-            this.bossPhase1Killed = false;
-            
-            // Dump all current monsters for debugging
-            console.log("Current active monsters:");
-            this.monsters.forEach((container, id) => {
-                const monsterType = container.getData('monsterType');
-                console.log(`- Monster ID: ${id}, Type: ${monsterType}, Position: (${container.x}, ${container.y})`);
-            });
-            
-            // Display an alert in-game that the boss is missing - development only!
-            console.log("BOSS PHASE 2 SPAWN FAILED - Please report this bug!");
-        }
-    }
-    
     private updateHealthBar(healthBar: Phaser.GameObjects.Rectangle, currentHp: number, maxHp: number) {
         const width = MONSTER_HEALTH_BAR_WIDTH;
         const height = MONSTER_HEALTH_BAR_HEIGHT;
@@ -783,5 +803,93 @@ export default class MonsterManager {
         soundManager.playDistanceBasedSound('attack_soft', localPlayerPosition, monsterPosition, maxDistance, 0.4);
         
         //console.log(`Playing monster damage sound at position (${container.x}, ${container.y})`);
+    }
+
+    // Update boss after image effects during chase mode
+    private updateBossAfterImages() {
+        // Increment frame counter
+        this.afterImageFrameCounter++;
+        
+        // Check if we should spawn after images this frame
+        if (this.afterImageFrameCounter >= this.afterImageSpawnRate) {
+            this.afterImageFrameCounter = 0;
+            
+            // Create after images for all bosses in chase mode
+            this.bossesInChaseMode.forEach(bossId => {
+                const bossContainer = this.monsters.get(bossId);
+                if (bossContainer) {
+                    this.createBossAfterImage(bossContainer);
+                } else {
+                    console.warn(`Boss container not found for ID ${bossId}`);
+                }
+            });
+        }
+        
+        // Clean up old after images (remove any that have been destroyed)
+        this.bossAfterImages = this.bossAfterImages.filter(afterImage => afterImage.active);
+    }
+
+    // Create an after image effect for a boss during chase mode
+    private createBossAfterImage(bossContainer: Phaser.GameObjects.Container) {
+        // Get the boss sprite from the container
+        const bossSprite = bossContainer.list.find(child => child instanceof Phaser.GameObjects.Sprite) as Phaser.GameObjects.Sprite;
+        if (!bossSprite) {
+            console.warn(`No boss sprite found in container for after image`);
+            return;
+        }
+        
+        // Create a copy of the boss sprite at the current position
+        const afterImage = this.scene.add.sprite(bossContainer.x, bossContainer.y, bossSprite.texture.key);
+        
+        // Set the after image properties for void effect
+        afterImage.setAlpha(0.5); // Semi-transparent
+        afterImage.setTint(0x4400ff); // Dark purple/void coloring
+        // Use a larger depth offset to ensure after images always stay behind the boss
+        afterImage.setDepth(bossContainer.depth - 256); // Larger offset to stay behind boss
+        afterImage.setScale(bossSprite.scaleX, bossSprite.scaleY); // Match boss scale
+        afterImage.setRotation(bossSprite.rotation); // Match boss rotation
+        afterImage.setVisible(true); // Ensure it's visible
+        
+        // Add to tracking array
+        this.bossAfterImages.push(afterImage);
+        
+        // Animate the after image to fade out quickly
+        this.scene.tweens.add({
+            targets: afterImage,
+            alpha: 0,
+            scaleX: afterImage.scaleX * 0.8, // Slightly shrink as it fades
+            scaleY: afterImage.scaleY * 0.8,
+            duration: 600, // Fade out over 600ms
+            ease: 'Power2.easeOut',
+            onComplete: () => {
+                // Remove from tracking array and destroy
+                const index = this.bossAfterImages.indexOf(afterImage);
+                if (index > -1) {
+                    this.bossAfterImages.splice(index, 1);
+                }
+                afterImage.destroy();
+            }
+        });
+        
+        // Add a slight blur/glow effect by creating a second darker copy underneath
+        const glowImage = this.scene.add.sprite(bossContainer.x, bossContainer.y, bossSprite.texture.key);
+        glowImage.setAlpha(0.2);
+        glowImage.setTint(0x220044); // Darker purple for glow
+        glowImage.setDepth(afterImage.depth - 1); // Just behind the main after image
+        glowImage.setScale(bossSprite.scaleX * 1.1, bossSprite.scaleY * 1.1); // Slightly larger for glow effect
+        glowImage.setRotation(bossSprite.rotation);
+        
+        // Fade out the glow image as well
+        this.scene.tweens.add({
+            targets: glowImage,
+            alpha: 0,
+            scaleX: glowImage.scaleX * 0.9,
+            scaleY: glowImage.scaleY * 0.9,
+            duration: 800, // Fade out slightly slower than main after image
+            ease: 'Power2.easeOut',
+            onComplete: () => {
+                glowImage.destroy();
+            }
+        });
     }
 } 

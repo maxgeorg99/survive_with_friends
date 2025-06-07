@@ -54,7 +54,7 @@ const BOSS_CHASE_STOP_DISTANCE: f32 = 128.0;
 pub const CHASE_ACCELERATION_MULTIPLIER: f32 = 1.02; // 2% increase per frame
 
 // Maximum chase speed multiplier (cap at 3x base speed)
-pub const MAX_CHASE_SPEED: f32 = 255.0;
+pub const MAX_CHASE_SPEED: f32 = 1000.0;
 
 // Scheduled reducer to change monster AI state
 #[reducer]

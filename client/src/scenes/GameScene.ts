@@ -1800,6 +1800,11 @@ export default class GameScene extends Phaser.Scene {
             this.monsterAttackManager.update(time, delta);
         }
 
+        // Update monster manager for after images and other effects
+        if (this.monsterManager) {
+            this.monsterManager.update(time, delta);
+        }
+
         // Update VoidChest UI for directional arrow
         if (this.voidChestUI) {
             this.voidChestUI.update();
