@@ -39,7 +39,7 @@ pub struct BossLastPattern {
 // Configuration constants for boss AI timing
 const BOSS_IDLE_DURATION_MS: u64 = 5000;        // 3 seconds idle
 const BOSS_CHASE_DURATION_MS: u64 = 15000;       // 8 seconds chase
-const BOSS_DANCE_DURATION_MS: u64 = 15000;       // 5 seconds dance
+pub const BOSS_DANCE_DURATION_MS: u64 = 15000;       // 5 seconds dance
 const BOSS_VANISH_DURATION_MS: u64 = 4000;      // 2 seconds vanish
 const BOSS_TELEPORT_DURATION_MS: u64 = 1000;     // 0.5 seconds teleport
 const BOSS_TRANSFORM_DURATION_MS: u64 = 2000;   // 2 seconds transform
@@ -110,6 +110,9 @@ fn execute_state_entry_behavior(ctx: &ReducerContext, monster: &crate::Monsters,
         
         AIState::BossDance => {
             log::info!("Monster {} entering BossDance state", monster.monster_id);
+            
+            // Schedule EnderScythe attack pattern
+            crate::monster_attacks_def::schedule_ender_scythe_attacks(ctx, monster.monster_id);
             
             // Schedule return to idle after dance duration
             schedule_state_change(ctx, monster.monster_id, AIState::BossIdle, BOSS_DANCE_DURATION_MS);
@@ -255,6 +258,9 @@ fn cancel_scheduled_state_changes(ctx: &ReducerContext, monster_id: u32) {
         ctx.db.monster_state_changes().scheduled_id().delete(&change.scheduled_id);
         log::info!("Cancelled scheduled state change for monster {} to {:?}", monster_id, change.target_state);
     }
+    
+    // Also cleanup any pending EnderScythe attacks for this boss
+    crate::monster_attacks_def::cleanup_ender_scythe_schedules(ctx, monster_id);
 }
 
 // Schedule a random boss pattern (chase, dance, or vanish)

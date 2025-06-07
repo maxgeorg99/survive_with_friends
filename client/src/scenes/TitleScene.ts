@@ -82,6 +82,7 @@ export default class TitleScene extends Phaser.Scene {
         
         // Load monster attack assets for seamless gameplay
         this.load.image('monster_attack_firebolt', '/assets/monster_attack_firebolt.png');
+        this.load.image('void_scythe', '/assets/void_scythe.png');
         
         console.log("TitleScene: Preloading ALL game assets for completely seamless gameplay experience");
     }

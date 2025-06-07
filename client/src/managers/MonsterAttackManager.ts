@@ -17,6 +17,8 @@ interface MonsterAttackGraphicData {
     attackType: string;
     parameterF: number; // Direction angle for rotation
     ticksElapsed: number;
+    // Add spin angle for fast visual rotation (separate from orbital movement)
+    spinAngle: number; // For EnderScythe fast spinning effect
 }
 
 // Constants for prediction behavior
@@ -25,6 +27,11 @@ const DELTA_TIME = 1/60; // Assume 60fps for client prediction (should match ser
 
 // Constants for monster attack graphics
 const MONSTER_ATTACK_ALPHA = 0.8; // Visibility for monster attacks
+const ENDER_SCYTHE_SPAWN_ALPHA = 0.7; // High alpha for warning phase
+const ENDER_SCYTHE_ALPHA = 1.0; // Full visibility for damaging phase
+
+// Constants for EnderScythe visual effects
+const ENDER_SCYTHE_SPIN_SPEED = 360.0; // Degrees per second for sprite spinning (much faster than orbital movement)
 
 export class MonsterAttackManager {
     private scene: Phaser.Scene;
@@ -97,7 +104,7 @@ export class MonsterAttackManager {
         // Get or create monster attack graphic data
         let attackGraphicData = this.attackGraphics.get(attack.activeMonsterAttackId);
         if (!attackGraphicData) {
-            // Create sprite using the firebolt asset for all monster attack types
+            // Create sprite using appropriate asset for the attack type
             const sprite = this.createMonsterAttackSprite(attackType, attack.position.x, attack.position.y);
             if (!sprite) {
                 console.error(`Failed to create sprite for monster attack type: ${attackType}`);
@@ -107,11 +114,19 @@ export class MonsterAttackManager {
             // Setup direction vector
             const direction = new Phaser.Math.Vector2(attack.direction.x, attack.direction.y);
             
+            // Determine alpha based on attack type
+            let alpha = MONSTER_ATTACK_ALPHA;
+            if (attackType === 'EnderScytheSpawn') {
+                alpha = ENDER_SCYTHE_SPAWN_ALPHA;
+            } else if (attackType === 'EnderScythe') {
+                alpha = ENDER_SCYTHE_ALPHA;
+            }
+            
             // Store the monster attack graphic data with prediction values
             attackGraphicData = {
                 sprite,
                 radius: attack.radius,
-                alpha: MONSTER_ATTACK_ALPHA,
+                alpha: alpha,
                 lastUpdateTime: this.gameTime,
                 predictedPosition: new Phaser.Math.Vector2(attack.position.x, attack.position.y),
                 serverPosition: new Phaser.Math.Vector2(attack.position.x, attack.position.y),
@@ -119,7 +134,8 @@ export class MonsterAttackManager {
                 speed: attack.speed,
                 attackType,
                 parameterF: attack.parameterF, // Store direction angle for rotation
-                ticksElapsed: attack.ticksElapsed
+                ticksElapsed: attack.ticksElapsed,
+                spinAngle: 0
             };
             
             this.attackGraphics.set(attack.activeMonsterAttackId, attackGraphicData);
@@ -153,8 +169,11 @@ export class MonsterAttackManager {
     }
 
     private createMonsterAttackSprite(attackType: string, x: number, y: number): Phaser.GameObjects.Sprite | null {
-        // Use the firebolt sprite for all monster attack types
-        const spriteKey = 'monster_attack_firebolt';
+        // Determine sprite key based on attack type
+        let spriteKey = 'monster_attack_firebolt'; // Default for most attacks
+        if (attackType === 'EnderScytheSpawn' || attackType === 'EnderScythe') {
+            spriteKey = 'void_scythe';
+        }
         
         // Verify the texture exists
         if (!this.scene.textures.exists(spriteKey)) {
@@ -166,8 +185,14 @@ export class MonsterAttackManager {
         const sprite = this.scene.add.sprite(x, y, spriteKey);
         sprite.setDepth(1.5); // Set depth higher than circles but below UI
         
-        // Set alpha for visibility
-        sprite.setAlpha(MONSTER_ATTACK_ALPHA);
+        // Set alpha based on attack type
+        let alpha = MONSTER_ATTACK_ALPHA;
+        if (attackType === 'EnderScytheSpawn') {
+            alpha = ENDER_SCYTHE_SPAWN_ALPHA;
+        } else if (attackType === 'EnderScythe') {
+            alpha = ENDER_SCYTHE_ALPHA;
+        }
+        sprite.setAlpha(alpha);
         
         return sprite;
     }
@@ -186,8 +211,17 @@ export class MonsterAttackManager {
                 sprite.setRotation(attackGraphicData.parameterF);
                 break;
                 
-            case 'EnderBolt':
+            case 'EnderScytheSpawn':
+                // EnderScytheSpawn is stationary - no rotation
+                sprite.setRotation(0);
+                break;
+                
             case 'EnderScythe':
+                // EnderScythe uses fast spinning effect (spinAngle) instead of orbital angle (parameterF)
+                sprite.setRotation(attackGraphicData.spinAngle);
+                break;
+                
+            case 'EnderBolt':
             case 'EnderClaw':
             case 'VoidZone':
                 // For other attack types, rotate based on direction vector
@@ -222,8 +256,29 @@ export class MonsterAttackManager {
             const attack = this.spacetimeClient.sdkConnection.db.activeMonsterAttacks.activeMonsterAttackId.find(attackId);
             if (!attack) continue;
             
-            // Normal projectile with directional movement
-            if (attackGraphicData.direction.length() > 0) {
+            // Update fast spinning effect for EnderScythe attacks
+            if (attackGraphicData.attackType === 'EnderScythe') {
+                // Increment spin angle for fast visual rotation (independent of orbital movement)
+                const spinSpeedRadians = ENDER_SCYTHE_SPIN_SPEED * Math.PI / 180.0; // Convert to radians
+                attackGraphicData.spinAngle += spinSpeedRadians * deltaTime;
+                
+                // Keep angle in 0-2π range to prevent overflow
+                if (attackGraphicData.spinAngle > 2 * Math.PI) {
+                    attackGraphicData.spinAngle -= 2 * Math.PI;
+                }
+            }
+            
+            // Handle movement prediction based on attack type
+            if (attackGraphicData.attackType === 'EnderScytheSpawn') {
+                // EnderScytheSpawn attacks are stationary - no movement prediction
+                // Just update the graphic without moving
+                this.updateMonsterAttackGraphic(attackGraphicData);
+            } else if (attackGraphicData.attackType === 'EnderScythe') {
+                // EnderScythe attacks have orbital movement around boss - rely on server updates
+                // Don't do linear prediction, just update rotation
+                this.updateMonsterAttackGraphic(attackGraphicData);
+            } else if (attackGraphicData.direction.length() > 0) {
+                // Normal projectile with directional movement
                 const moveDistance = attackGraphicData.speed * deltaTime;
                 attackGraphicData.predictedPosition.x += attackGraphicData.direction.x * moveDistance;
                 attackGraphicData.predictedPosition.y += attackGraphicData.direction.y * moveDistance;

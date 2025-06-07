@@ -3,6 +3,17 @@ use crate::{DbVector2, MonsterAttackType, DELTA_TIME, get_world_cell_from_positi
            WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT, player, monsters, monsters_boid};
 use std::time::Duration;
 
+// Configuration constants for EnderScythe attacks
+const ENDER_SCYTHE_RINGS: u32 = 8;                    // Number of rings around the boss
+const ENDER_SCYTHE_BASE_RADIUS: f32 = 256.0;          // Starting radius for first ring
+const ENDER_SCYTHE_RING_SPACING: f32 = 256.0;         // Distance between rings
+const ENDER_SCYTHE_BASE_COUNT: u32 = 4;              // Number of scythes in the inner ring
+const ENDER_SCYTHE_COUNT_INCREMENT: u32 = 4;         // Additional scythes per ring (6, 8, 10, 12)
+const ENDER_SCYTHE_SPAWN_DURATION_MS: u64 = 1500;     // Duration for EnderScytheSpawn (warning phase)
+const ENDER_SCYTHE_DAMAGE: u32 = 15;                 // Damage for EnderScythe attacks
+const ENDER_SCYTHE_SPEED: f32 = 24.0;                // Rotation speed (degrees per second)
+const ENDER_SCYTHE_RADIUS: f32 = 62.0;               // Collision radius for scythes
+
 // Scheduled table for Imp attacks - Imps periodically fire ImpBolts at players
 #[table(name = imp_attack_scheduler, scheduled(trigger_imp_attack), public)]
 pub struct ImpAttackScheduler {
@@ -14,6 +25,34 @@ pub struct ImpAttackScheduler {
     
     #[index(btree)]
     pub imp_monster_id: u32,      // The Imp monster that will attack
+}
+
+// Scheduled table for spawning EnderScytheSpawn attacks (warning phase)
+#[table(name = ender_scythe_spawn_scheduler, scheduled(spawn_ender_scythe_spawns), public)]
+pub struct EnderScytheSpawnScheduler {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    
+    pub scheduled_at: ScheduleAt, // When to spawn the warning scythes
+    
+    #[index(btree)]
+    pub boss_monster_id: u32,     // The boss monster that will spawn scythes
+    pub base_rotation: f32,       // Base rotation angle for the pattern
+}
+
+// Scheduled table for spawning EnderScythe attacks (actual damaging phase)
+#[table(name = ender_scythe_scheduler, scheduled(spawn_ender_scythes), public)]
+pub struct EnderScytheScheduler {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    
+    pub scheduled_at: ScheduleAt, // When to spawn the real scythes
+    
+    #[index(btree)]
+    pub boss_monster_id: u32,     // The boss monster that will spawn scythes
+    pub base_rotation: f32,       // Base rotation angle for the pattern
 }
 
 // Active monster attacks - tracks currently active monster attacks in the game
@@ -36,7 +75,7 @@ pub struct ActiveMonsterAttack {
     pub radius: f32,           // Radius of this attack (for area effects)
     pub speed: f32,            // Movement speed of projectiles
     pub parameter_u: u32,      // Additional parameter for the attack
-    pub parameter_f: f32,      // Additional parameter for the attack (direction angle in radians)
+    pub parameter_f: f32,      // Additional parameter for the attack 
     pub ticks_elapsed: u32,    // Number of ticks since the attack was created
 }
 
@@ -50,15 +89,28 @@ pub fn process_monster_attack_movements(ctx: &ReducerContext) {
         let mut updated_active_monster_attack = active_monster_attack;
         updated_active_monster_attack.ticks_elapsed += 1; 
 
-        // Regular projectile movement based on direction and speed
-        let move_speed = updated_active_monster_attack.speed;
-        
-        // Calculate movement based on direction, speed and time delta
-        let move_distance = move_speed * DELTA_TIME;
-        let move_offset = updated_active_monster_attack.direction * move_distance;
-        
-        // Update position directly
-        updated_active_monster_attack.position = updated_active_monster_attack.position + move_offset;
+        // Handle different movement patterns based on attack type
+        match updated_active_monster_attack.monster_attack_type {
+            MonsterAttackType::EnderScythe => {
+                // Only EnderScythe has orbital movement around the boss
+                handle_ender_scythe_orbital_movement(ctx, &mut updated_active_monster_attack);
+            },
+            MonsterAttackType::EnderScytheSpawn => {
+                // EnderScytheSpawn attacks stay completely still - no movement or rotation
+                // They are just warning indicators
+            },
+            _ => {
+                // Regular projectile movement based on direction and speed
+                let move_speed = updated_active_monster_attack.speed;
+                
+                // Calculate movement based on direction, speed and time delta
+                let move_distance = move_speed * DELTA_TIME;
+                let move_offset = updated_active_monster_attack.direction * move_distance;
+                
+                // Update position directly
+                updated_active_monster_attack.position = updated_active_monster_attack.position + move_offset;
+            }
+        }
 
         // Update collision cache
         let cache_idx = cache.monster_attack.cached_count_monster_attacks as usize;
@@ -76,6 +128,45 @@ pub fn process_monster_attack_movements(ctx: &ReducerContext) {
         // Update the active monster attack record
         ctx.db.active_monster_attacks().active_monster_attack_id().update(updated_active_monster_attack);
     }
+}
+
+// Helper function to handle orbital movement for EnderScythe attacks
+fn handle_ender_scythe_orbital_movement(ctx: &ReducerContext, attack: &mut ActiveMonsterAttack) {
+    // Get the boss monster ID from parameter_u
+    let boss_monster_id = attack.parameter_u;
+    
+    // Get boss position
+    let boss_boid_opt = ctx.db.monsters_boid().monster_id().find(&boss_monster_id);
+    let boss_position = match boss_boid_opt {
+        Some(boid) => boid.position,
+        None => {
+            // Boss is gone, stay still
+            return;
+        }
+    };
+    
+    // Calculate current angle relative to boss (stored in parameter_f)
+    let current_angle = attack.parameter_f;
+    
+    // Update angle based on rotation speed
+    let rotation_speed_radians = ENDER_SCYTHE_SPEED * std::f32::consts::PI / 180.0; // Convert degrees to radians
+    let new_angle = current_angle + (rotation_speed_radians * DELTA_TIME);
+    attack.parameter_f = new_angle;
+    
+    // Calculate orbital radius based on the original distance from boss
+    // We can derive this from the direction vector magnitude when the attack was created
+    let dx = attack.position.x - boss_position.x;
+    let dy = attack.position.y - boss_position.y;
+    let orbital_radius = (dx * dx + dy * dy).sqrt();
+    
+    // Calculate new position based on the updated angle
+    let new_x = boss_position.x + orbital_radius * new_angle.cos();
+    let new_y = boss_position.y + orbital_radius * new_angle.sin();
+    
+    attack.position = DbVector2::new(new_x, new_y);
+    
+    // Update direction to point tangent to the orbit (for visual rotation)
+    attack.direction = DbVector2::new(-new_angle.sin(), new_angle.cos());
 }
 
 // Helper method to process collisions between monster attacks and players using spatial hash
@@ -336,5 +427,214 @@ pub fn cleanup_imp_attack_schedule(ctx: &ReducerContext, imp_monster_id: u32) {
 
     if count > 0 {
         log::info!("Cleaned up {} attack schedulers for dead Imp {}", count, imp_monster_id);
+    }
+}
+
+// Reducer called when EnderScytheSpawn attacks should be spawned
+#[reducer]
+pub fn spawn_ender_scythe_spawns(ctx: &ReducerContext, scheduler: EnderScytheSpawnScheduler) {
+    if ctx.sender != ctx.identity() {
+        panic!("spawn_ender_scythe_spawns may not be invoked by clients, only via scheduling.");
+    }
+
+    // Check if the boss monster still exists
+    let boss_opt = ctx.db.monsters().monster_id().find(&scheduler.boss_monster_id);
+    let boss = match boss_opt {
+        Some(monster) => monster,
+        None => {
+            log::info!("Boss {} no longer exists, cancelling EnderScytheSpawn spawning", scheduler.boss_monster_id);
+            return;
+        }
+    };
+
+    // Get the boss's current position from boid
+    let boid_opt = ctx.db.monsters_boid().monster_id().find(&scheduler.boss_monster_id);
+    let boss_position = match boid_opt {
+        Some(boid) => boid.position,
+        None => {
+            log::info!("Boss {} has no boid, cancelling EnderScytheSpawn spawning", scheduler.boss_monster_id);
+            return;
+        }
+    };
+
+    log::info!("Spawning EnderScytheSpawn pattern for boss {} at position ({}, {})", 
+              scheduler.boss_monster_id, boss_position.x, boss_position.y);
+
+    // Spawn multiple rings of EnderScytheSpawn attacks
+    for ring in 0..ENDER_SCYTHE_RINGS {
+        let ring_radius = ENDER_SCYTHE_BASE_RADIUS + (ring as f32 * ENDER_SCYTHE_RING_SPACING);
+        let scythe_count = ENDER_SCYTHE_BASE_COUNT + (ring * ENDER_SCYTHE_COUNT_INCREMENT);
+        
+        // Calculate angle step for this ring
+        let angle_step = 2.0 * std::f32::consts::PI / scythe_count as f32;
+        
+        // Spawn each scythe in the ring
+        for scythe_index in 0..scythe_count {
+            let angle = scheduler.base_rotation + (scythe_index as f32 * angle_step);
+            
+            // Calculate spawn position
+            let spawn_x = boss_position.x + ring_radius * angle.cos();
+            let spawn_y = boss_position.y + ring_radius * angle.sin();
+            let spawn_position = DbVector2::new(spawn_x, spawn_y);
+            
+            // Calculate direction (tangent to the circle for rotation)
+            let direction = DbVector2::new(-angle.sin(), angle.cos());
+            
+            // Create active monster attack for EnderScytheSpawn (warning phase)
+            let active_monster_attack = ctx.db.active_monster_attacks().insert(ActiveMonsterAttack {
+                active_monster_attack_id: 0,
+                scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(ENDER_SCYTHE_SPAWN_DURATION_MS)),
+                position: spawn_position,
+                direction,
+                monster_attack_type: MonsterAttackType::EnderScytheSpawn,
+                piercing: true, // EnderScytheSpawn is piercing (warning phase)
+                damage: 0, // No damage for warning phase
+                radius: ENDER_SCYTHE_RADIUS,
+                speed: 0.0, // No linear movement, only orbital
+                parameter_u: scheduler.boss_monster_id, // Store boss ID for orbital movement
+                parameter_f: angle, // Store current angle for orbital movement
+                ticks_elapsed: 0,
+            });
+
+            log::info!("Spawned EnderScytheSpawn {} at ({:.1}, {:.1}) angle {:.2} for boss {}", 
+                      active_monster_attack.active_monster_attack_id, spawn_x, spawn_y, angle, scheduler.boss_monster_id);
+        }
+    }
+}
+
+// Reducer called when EnderScythe attacks should be spawned
+#[reducer]
+pub fn spawn_ender_scythes(ctx: &ReducerContext, scheduler: EnderScytheScheduler) {
+    if ctx.sender != ctx.identity() {
+        panic!("spawn_ender_scythes may not be invoked by clients, only via scheduling.");
+    }
+
+    // Check if the boss monster still exists
+    let boss_opt = ctx.db.monsters().monster_id().find(&scheduler.boss_monster_id);
+    let boss = match boss_opt {
+        Some(monster) => monster,
+        None => {
+            log::info!("Boss {} no longer exists, cancelling EnderScythe spawning", scheduler.boss_monster_id);
+            return;
+        }
+    };
+
+    // Get the boss's current position from boid
+    let boid_opt = ctx.db.monsters_boid().monster_id().find(&scheduler.boss_monster_id);
+    let boss_position = match boid_opt {
+        Some(boid) => boid.position,
+        None => {
+            log::info!("Boss {} has no boid, cancelling EnderScythe spawning", scheduler.boss_monster_id);
+            return;
+        }
+    };
+
+    log::info!("Spawning EnderScythe pattern for boss {} at position ({}, {})", 
+              scheduler.boss_monster_id, boss_position.x, boss_position.y);
+
+    // Calculate duration to match the dance behavior duration (minus the delays for spawning)
+    let scythe_duration_ms = crate::monster_ai_defs::BOSS_DANCE_DURATION_MS - 3000; // Dance duration minus spawn delays
+
+    // Spawn multiple rings of EnderScythe attacks
+    for ring in 0..ENDER_SCYTHE_RINGS {
+        let ring_radius = ENDER_SCYTHE_BASE_RADIUS + (ring as f32 * ENDER_SCYTHE_RING_SPACING);
+        let scythe_count = ENDER_SCYTHE_BASE_COUNT + (ring * ENDER_SCYTHE_COUNT_INCREMENT);
+        
+        // Calculate angle step for this ring
+        let angle_step = 2.0 * std::f32::consts::PI / scythe_count as f32;
+        
+        // Spawn each scythe in the ring
+        for scythe_index in 0..scythe_count {
+            let angle = scheduler.base_rotation + (scythe_index as f32 * angle_step);
+            
+            // Calculate spawn position
+            let spawn_x = boss_position.x + ring_radius * angle.cos();
+            let spawn_y = boss_position.y + ring_radius * angle.sin();
+            let spawn_position = DbVector2::new(spawn_x, spawn_y);
+            
+            // Calculate direction (tangent to the circle for rotation)
+            let direction = DbVector2::new(-angle.sin(), angle.cos());
+            
+            // Create active monster attack for EnderScythe (actual damaging attack)
+            let active_monster_attack = ctx.db.active_monster_attacks().insert(ActiveMonsterAttack {
+                active_monster_attack_id: 0,
+                scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(scythe_duration_ms)),
+                position: spawn_position,
+                direction,
+                monster_attack_type: MonsterAttackType::EnderScythe,
+                piercing: true, // EnderScythe is piercing
+                damage: ENDER_SCYTHE_DAMAGE,
+                radius: ENDER_SCYTHE_RADIUS,
+                speed: ENDER_SCYTHE_SPEED, // This will be used for rotation speed
+                parameter_u: scheduler.boss_monster_id, // Store boss ID for orbital movement
+                parameter_f: angle, // Store current angle for orbital movement
+                ticks_elapsed: 0,
+            });
+
+            log::info!("Spawned EnderScythe {} at ({:.1}, {:.1}) angle {:.2} for boss {}", 
+                      active_monster_attack.active_monster_attack_id, spawn_x, spawn_y, angle, scheduler.boss_monster_id);
+        }
+    }
+}
+
+// Function to schedule EnderScythe attacks when boss enters dance mode
+pub fn schedule_ender_scythe_attacks(ctx: &ReducerContext, boss_monster_id: u32) {
+    // Generate a random base rotation for the pattern to add variety
+    let mut rng = ctx.rng();
+    let base_rotation = rng.gen::<f32>() * 2.0 * std::f32::consts::PI; // Random angle 0-2π
+
+    log::info!("Scheduling EnderScythe attack pattern for boss {} with base rotation {:.2}", 
+              boss_monster_id, base_rotation);
+
+    // Schedule EnderScytheSpawn (warning phase) after 1 second
+    ctx.db.ender_scythe_spawn_scheduler().insert(EnderScytheSpawnScheduler {
+        scheduled_id: 0,
+        boss_monster_id,
+        base_rotation,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(1000)),
+    });
+
+    // Schedule EnderScythe (damaging phase) after 3 seconds
+    ctx.db.ender_scythe_scheduler().insert(EnderScytheScheduler {
+        scheduled_id: 0,
+        boss_monster_id,
+        base_rotation,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(1000 + ENDER_SCYTHE_SPAWN_DURATION_MS)),
+    });
+
+    log::info!("Scheduled EnderScythe pattern for boss {} (warning at 1s, attack at 3s)", boss_monster_id);
+}
+
+// Function to cleanup EnderScythe attack schedules when a boss dies or changes state
+pub fn cleanup_ender_scythe_schedules(ctx: &ReducerContext, boss_monster_id: u32) {
+    // Find and delete all scheduled EnderScytheSpawn attacks for this boss
+    let spawn_schedulers_to_delete: Vec<u64> = ctx.db.ender_scythe_spawn_scheduler()
+        .boss_monster_id()
+        .filter(&boss_monster_id)
+        .map(|scheduler| scheduler.scheduled_id)
+        .collect();
+    
+    let spawn_count = spawn_schedulers_to_delete.len();
+    
+    for scheduled_id in spawn_schedulers_to_delete {
+        ctx.db.ender_scythe_spawn_scheduler().scheduled_id().delete(&scheduled_id);
+    }
+    
+    // Find and delete all scheduled EnderScythe attacks for this boss
+    let scythe_schedulers_to_delete: Vec<u64> = ctx.db.ender_scythe_scheduler()
+        .boss_monster_id()
+        .filter(&boss_monster_id)
+        .map(|scheduler| scheduler.scheduled_id)
+        .collect();
+    
+    let scythe_count = scythe_schedulers_to_delete.len();
+    
+    for scheduled_id in scythe_schedulers_to_delete {
+        ctx.db.ender_scythe_scheduler().scheduled_id().delete(&scheduled_id);
+    }
+
+    if spawn_count > 0 || scythe_count > 0 {
+        log::info!("Cleaned up {} EnderScytheSpawn and {} EnderScythe schedulers for boss {}", 
+                  spawn_count, scythe_count, boss_monster_id);
     }
 }
