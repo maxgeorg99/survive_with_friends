@@ -81,6 +81,12 @@ export default class BossTimerUI {
         // Check for existing boss timer in the database
         this.checkForExistingBossTimer();
         
+        // Check for existing boss monsters (for reconnection cases)
+        // Add a small delay to ensure database connection is fully established
+        this.scene.time.delayedCall(100, () => {
+            this.checkForExistingBoss();
+        });
+        
         console.log('BossTimerUI initialized');
     }
 
@@ -566,5 +572,41 @@ export default class BossTimerUI {
             console.error("Error extracting timestamp:", error);
             return null;
         }
+    }
+
+    private checkForExistingBoss(): void {
+        // Check if there are any existing boss monsters when connecting
+        if (!this.spacetimeClient?.sdkConnection?.db) {
+            console.log("Database not ready yet, retrying boss check in 500ms...");
+            // Retry after a longer delay if database isn't ready
+            this.scene.time.delayedCall(500, () => {
+                this.checkForExistingBoss();
+            });
+            return;
+        }
+        
+        console.log("Checking for existing boss monsters on reconnect...");
+        
+        // Look for any existing boss monsters
+        for (const monster of this.spacetimeClient.sdkConnection.db.monsters.iter()) {
+            if (monster.bestiaryId && monster.bestiaryId.tag) {
+                const monsterType = monster.bestiaryId.tag;
+                if (monsterType === 'FinalBossPhase1') {
+                    console.log("Found existing boss phase 1 on reconnect - showing nameplate");
+                    this.stopTimer();
+                    this.container.setVisible(false);
+                    this.showBossNameplate("Ender, Scion of Ruin");
+                    return; // Only show one boss nameplate
+                } else if (monsterType === 'FinalBossPhase2') {
+                    console.log("Found existing boss phase 2 on reconnect - showing nameplate");
+                    this.stopTimer();
+                    this.container.setVisible(false);
+                    this.showBossNameplate("Ender, Host of Oblivion");
+                    return; // Only show one boss nameplate
+                }
+            }
+        }
+        
+        console.log("No existing boss monsters found on reconnect");
     }
 } 

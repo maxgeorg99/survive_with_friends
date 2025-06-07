@@ -168,13 +168,13 @@ export default class MonsterManager {
             container.add(healthBarBg);
 
             // Create health bar foreground (colored based on health)
-            const healthPercent = monsterData.hp / monsterData.maxHp;
+            // Start at full width and let updateHealthBar handle the positioning
             const healthBar = this.scene.add.rectangle(
                 0,
                 healthBarY,
-                MONSTER_HEALTH_BAR_WIDTH * healthPercent,
+                MONSTER_HEALTH_BAR_WIDTH,
                 MONSTER_HEALTH_BAR_HEIGHT,
-                this.getHealthBarColor(healthPercent), // Proper color based on health
+                0x00ff00, // Will be updated by updateHealthBar
                 1.0 // Full opacity for visibility
             );
             healthBar.setDepth(HEALTH_BAR_DEPTH_OFFSET);
@@ -608,14 +608,16 @@ export default class MonsterManager {
     }
     
     private updateHealthBar(healthBar: Phaser.GameObjects.Rectangle, currentHp: number, maxHp: number) {
-        const width = MONSTER_HEALTH_BAR_WIDTH;
-        const height = MONSTER_HEALTH_BAR_HEIGHT;
-        const x = healthBar.x;
-        const y = healthBar.y;
-        
         const healthPercent = currentHp / maxHp;
         healthBar.fillColor = this.getHealthBarColor(healthPercent);
-        healthBar.width = MONSTER_HEALTH_BAR_WIDTH * healthPercent;
+        
+        // Update width and position for left-aligned health bar
+        const newWidth = MONSTER_HEALTH_BAR_WIDTH * healthPercent;
+        healthBar.width = newWidth;
+        
+        // Set origin to left-center and position at left edge of background
+        healthBar.setOrigin(0, 0.5);
+        healthBar.x = -MONSTER_HEALTH_BAR_WIDTH / 2;
     }
     
     // Create fadeout visual effect when boss vanishes
