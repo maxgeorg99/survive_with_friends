@@ -244,6 +244,9 @@ export default class GameScene extends Phaser.Scene {
         this.load.audio('voice_chest', '/assets/sounds/voice_chest.mp3');
         this.load.audio('alert_event', '/assets/sounds/alert_event.mp3');
         this.load.audio('player_damage', '/assets/sounds/player_damage.mp3');
+        this.load.audio('void_capsule_spawned', '/assets/sounds/void_capsule_spawned.mp3');
+        this.load.audio('void_capsule_lands', '/assets/sounds/void_capsule_lands.mp3');
+        this.load.audio('void_chest_destroyed', '/assets/sounds/void_chest_destroyed.mp3');
         
         // Load boss audio files
         this.load.audio('boss_chase_cue', '/assets/sounds/boss_chase_cue.mp3');
@@ -291,6 +294,9 @@ export default class GameScene extends Phaser.Scene {
             console.log("voice_level:", this.cache.audio.exists('voice_level'));
             console.log("voice_chest:", this.cache.audio.exists('voice_chest'));
             console.log("player_damage:", this.cache.audio.exists('player_damage'));
+            console.log("void_capsule_spawned:", this.cache.audio.exists('void_capsule_spawned'));
+            console.log("void_capsule_lands:", this.cache.audio.exists('void_capsule_lands'));
+            console.log("void_chest_destroyed:", this.cache.audio.exists('void_chest_destroyed'));
             console.log("boss_chase_cue:", this.cache.audio.exists('boss_chase_cue'));
             console.log("voice_boss:", this.cache.audio.exists('voice_boss'));
         });
@@ -659,7 +665,7 @@ export default class GameScene extends Phaser.Scene {
         // Check if this is a boss monster
         if (monster.bestiaryId && monster.bestiaryId.tag) {
             const monsterType = monster.bestiaryId.tag;
-            console.log("Monster created:", monsterType);
+            //console.log("Monster created:", monsterType);
             
             // If a boss monster spawns, switch to boss music and show dark haze
             if (monsterType === 'FinalBossPhase1' || monsterType === 'FinalBossPhase2') {

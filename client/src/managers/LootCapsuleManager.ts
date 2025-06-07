@@ -172,6 +172,12 @@ export default class LootCapsuleManager {
         container.setData('capsuleId', capsuleIdKey);
         this.capsuleSprites.set(capsuleIdKey, container);
         
+        // Play void capsule spawned sound
+        const soundManager = (window as any).soundManager;
+        if (soundManager) {
+            soundManager.playSound('void_capsule_spawned', 0.8);
+        }
+        
         // Calculate arc animation parameters
         const startX = capsule.startPosition.x;
         const startY = capsule.startPosition.y;
@@ -309,6 +315,12 @@ export default class LootCapsuleManager {
         if (playAwardEffect) {
             // Play award effect at the capsule's current position
             this.createAwardEffect(container.x, container.y);
+            
+            // Play void capsule lands sound
+            const soundManager = (window as any).soundManager;
+            if (soundManager) {
+                soundManager.playSound('void_capsule_lands', 0.8);
+            }
         }
         
         // Stop any active tweens for this container

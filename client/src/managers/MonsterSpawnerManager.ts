@@ -35,7 +35,7 @@ export default class MonsterSpawnerManager {
 
     // Handle when a new monster spawner is inserted
     private handleSpawnerInsert(ctx: EventContext, spawner: MonsterSpawners) {
-        console.log(`New monster spawner at position (${spawner.position.x}, ${spawner.position.y}) for monster type: ${spawner.monsterType}`);
+        //console.log(`New monster spawner at position (${spawner.position.x}, ${spawner.position.y}) for monster type: ${spawner.monsterType}`);
         this.createSpawnerIndicator(spawner);
     }
 

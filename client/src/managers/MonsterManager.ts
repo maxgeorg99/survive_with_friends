@@ -220,6 +220,14 @@ export default class MonsterManager {
             // Play distance-based monster death sound
             this.playMonsterDeathSound(monsterContainer);
             
+            // Play void chest destroyed sound if this is a VoidChest
+            if (monsterType === 'VoidChest') {
+                const soundManager = (window as any).soundManager;
+                if (soundManager) {
+                    soundManager.playSound('void_chest_destroyed', 0.9);
+                }
+            }
+            
             if (monsterType === 'FinalBossPhase1') {
                 console.log(`*** BOSS PHASE 1 DEFEATED (ID: ${monsterId})! Waiting for phase 2 to spawn... ***`);
                 
@@ -347,7 +355,7 @@ export default class MonsterManager {
         
         // Only log creation for bosses, special monsters, or when debugging
         if (monsterTypeName.includes("Boss") || monsterTypeName === "VoidChest") {
-            console.log(`Monster created: ${monster.monsterId}, type: ${monsterTypeName}`);
+            //console.log(`Monster created: ${monster.monsterId}, type: ${monsterTypeName}`);
         }
         
         // Special handling for boss monsters - create immediately (no queue)
@@ -440,10 +448,6 @@ export default class MonsterManager {
             const monster = this.creationQueue.shift();
             if (monster) {
                 this.createOrUpdateMonster(monster);
-                // Reduced logging - only log every few monsters or when queue is empty
-                if (this.creationQueue.length === 0 || this.creationQueue.length % 5 === 0) {
-                    console.log(`Processing monster queue: ${this.creationQueue.length} remaining`);
-                }
             }
         }
         
@@ -454,7 +458,7 @@ export default class MonsterManager {
             });
         } else {
             this.isProcessingQueue = false;
-            console.log("Monster creation queue processing complete");
+            //console.log("Monster creation queue processing complete");
         }
     }
     
@@ -462,7 +466,7 @@ export default class MonsterManager {
     private clearCreationQueue() {
         this.creationQueue.length = 0;
         this.isProcessingQueue = false;
-        console.log("Monster creation queue cleared");
+        //console.log("Monster creation queue cleared");
     }
     
     // Helper to get monster type name from bestiary ID
@@ -754,7 +758,7 @@ export default class MonsterManager {
         const maxDistance = 500; // Monster death sounds travel further
         soundManager.playDistanceBasedSound('monster_death', localPlayerPosition, monsterPosition, maxDistance, 1.0);
         
-        console.log(`Playing monster death sound at position (${container.x}, ${container.y})`);
+        //console.log(`Playing monster death sound at position (${container.x}, ${container.y})`);
     }
 
     // Add a method to play distance-based attack soft sound when monster takes damage
@@ -778,6 +782,6 @@ export default class MonsterManager {
         const maxDistance = 400; // Attack sounds travel further
         soundManager.playDistanceBasedSound('attack_soft', localPlayerPosition, monsterPosition, maxDistance, 0.4);
         
-        console.log(`Playing monster damage sound at position (${container.x}, ${container.y})`);
+        //console.log(`Playing monster damage sound at position (${container.x}, ${container.y})`);
     }
 } 
