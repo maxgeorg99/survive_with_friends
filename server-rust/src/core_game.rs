@@ -183,8 +183,9 @@ pub fn damage_player(ctx: &ReducerContext, player_id: u32, damage_amount: f32) -
     let mut player = match player_opt {
         Some(player) => player,
         None => {
-            unsafe { ERROR_FLAG = true; }
-            panic!("DamagePlayer: Player {} does not exist.", player_id);
+            // Player no longer exists (likely cleaned up during victory/death) - this is safe to ignore
+            log::warn!("DamagePlayer: Player {} does not exist (likely cleaned up), skipping damage", player_id);
+            return false;
         }
     };
     
