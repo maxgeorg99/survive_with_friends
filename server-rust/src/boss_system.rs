@@ -184,6 +184,10 @@ pub fn spawn_boss_phase_two(ctx: &ReducerContext, position: DbVector2) {
     log::info!("Starting ChaosBall and VoidZone attacks for Phase 2 boss {}", monster.monster_id);
     crate::monster_attacks_def::start_chaos_ball_attacks(ctx, monster.monster_id);
     crate::monster_attacks_def::start_void_zone_attacks(ctx, monster.monster_id);
+    
+    // Start boss target switching for Phase 2 boss
+    log::info!("Starting boss target switching for Phase 2 boss {}", monster.monster_id);
+    crate::monster_attacks_def::start_boss_target_switching(ctx, monster.monster_id);
 }
 
 // Called when phase 2 boss is defeated - all players defeat the game!
@@ -204,6 +208,8 @@ pub fn handle_boss_defeated(ctx: &ReducerContext) {
         // Clean up ChaosBall and VoidZone attack schedules for Phase 2 boss
         crate::monster_attacks_def::cleanup_chaos_ball_schedules(ctx, game_state.boss_monster_id);
         crate::monster_attacks_def::cleanup_void_zone_schedules(ctx, game_state.boss_monster_id);
+        // Clean up boss target switching schedules for Phase 2 boss
+        crate::monster_attacks_def::cleanup_boss_target_switching(ctx, game_state.boss_monster_id);
     }
     
     // Reset game state

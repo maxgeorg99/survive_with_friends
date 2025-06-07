@@ -110,7 +110,7 @@ pub fn init_bestiary(ctx: &ReducerContext) {
         bestiary_id: MonsterType::EnderClaw as u32,
         monster_type: MonsterType::EnderClaw,
         max_hp: 100,        // High HP (slightly less than Zombie but still tough)
-        speed: 199.0,      // Very fast (faster than Phase 2 boss)
+        speed: 164.0,      // Very fast (faster than Phase 2 boss)
         atk: 6.0,          // Very high attack (higher than Zombie)
         radius: 48.0,      // Medium radius (similar to Orc)
     });

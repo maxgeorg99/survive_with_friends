@@ -262,6 +262,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.audio('boss_vanish', '/assets/sounds/boss_vanish.mp3');
         this.load.audio('boss_appear', '/assets/sounds/boss_appear.mp3');
         this.load.audio('boss_roar', '/assets/sounds/boss_roar.mp3');
+        this.load.audio('chaos_bolt_fire', '/assets/sounds/chaos_bolt_fire.mp3');
         this.load.audio('boss_teleport_attack', '/assets/sounds/boss_teleport_attack.mp3');
         this.load.audio('boss_transform', '/assets/sounds/boss_transform.mp3');
         this.load.audio('voice_boss', '/assets/sounds/voice_boss.mp3');

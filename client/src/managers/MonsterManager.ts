@@ -47,6 +47,9 @@ export default class MonsterManager {
     // Track boss AI states to detect changes
     private bossAiStates: Map<number, string> = new Map();
     
+    // Track boss target players to detect target changes
+    private bossTargets: Map<number, number> = new Map();
+    
     // After image VFX tracking for boss chase mode
     private bossAfterImages: Phaser.GameObjects.Sprite[] = [];
     private afterImageFrameCounter: number = 0;
@@ -103,6 +106,9 @@ export default class MonsterManager {
             
             // Check for boss AI state changes
             this.checkBossAiStateChange(oldMonster, newMonster);
+            
+            // Check for boss target changes
+            this.checkBossTargetChange(oldMonster, newMonster);
             
             this.createOrUpdateMonster(newMonster);
         });
@@ -264,6 +270,11 @@ export default class MonsterManager {
             console.log(`Removed boss ${monsterId} from chase mode tracking`);
         }
         
+        // Clean up target tracking for this monster
+        if (this.bossTargets.has(monsterId)) {
+            this.bossTargets.delete(monsterId);
+        }
+        
         if (monsterContainer) {
             // Play distance-based monster death sound
             this.playMonsterDeathSound(monsterContainer);
@@ -358,6 +369,7 @@ export default class MonsterManager {
         });
         this.bossAfterImages.length = 0; // Clear array
         this.bossesInChaseMode.clear();
+        this.bossTargets.clear(); // Clear boss target tracking
         
         // Reset boss transition state
         this.bossPhase1Killed = false;
@@ -433,6 +445,32 @@ export default class MonsterManager {
             default:
                 // No sound for other states (BossIdle, Default, Stationary)
                 break;
+        }
+    }
+
+    // Add a method to check for boss target changes
+    private checkBossTargetChange(oldMonster: Monsters, newMonster: Monsters) {
+        // Only check Phase 2 boss monsters
+        const monsterTypeName = this.getMonsterTypeName(newMonster.bestiaryId);
+        if (monsterTypeName !== "FinalBossPhase2") {
+            return;
+        }
+
+        // Get the current and previous target player IDs
+        const oldTargetId = oldMonster.targetPlayerId;
+        const newTargetId = newMonster.targetPlayerId;
+        
+        // Only process if the target actually changed
+        if (oldTargetId !== newTargetId) {
+            console.log(`*** Boss ${newMonster.monsterId} switched target from player ${oldTargetId} to player ${newTargetId} ***`);
+            
+            // Play boss roar sound quietly when target changes
+            if (this.soundManager) {
+                this.soundManager.playSound('boss_roar', 0.6); // Medium volume for target change
+            }
+            
+            // Update our tracking
+            this.bossTargets.set(newMonster.monsterId, newTargetId);
         }
     }
 

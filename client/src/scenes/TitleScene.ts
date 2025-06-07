@@ -211,7 +211,7 @@ export default class TitleScene extends Phaser.Scene {
         this.titleContainer.add(titleText);
         
         // Add subtitle
-        const subtitleText = this.add.text(0, -100, 'Battle for survival in an endless void!', {
+        const subtitleText = this.add.text(0, -100, 'Battle for survival against the void!', {
             fontFamily: 'Arial',
             fontSize: '24px',
             color: '#cccccc',

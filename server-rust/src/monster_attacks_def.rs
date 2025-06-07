@@ -34,10 +34,15 @@ const CHAOS_BALL_INITIAL_DELAY_MS: u64 = 2000;       // Initial delay before fir
 
 // Configuration constants for VoidZone attacks
 const VOID_ZONE_DAMAGE: u32 = 50;                    // Very high damage stationary attack
-const VOID_ZONE_RADIUS: f32 = 180.0;                 // Large area of effect
+const VOID_ZONE_RADIUS: f32 = 199.0;                 // Large area of effect
 const VOID_ZONE_DURATION_MS: u64 = 60000;             // Long lasting (6 seconds)
 const VOID_ZONE_INTERVAL_MS: u64 = 4000;             // Time between VoidZone attacks (8 seconds)
-const VOID_ZONE_INITIAL_DELAY_MS: u64 = 4000;        // Initial delay before first VoidZone       // Initial delay before first EnderBolt (after real scythes spawn)
+const VOID_ZONE_INITIAL_DELAY_MS: u64 = 4000;        // Initial delay before first VoidZone
+
+// Configuration constants for boss target switching
+const BOSS_TARGET_SWITCH_BASE_INTERVAL_MS: u64 = 12000;   // Base interval (8 seconds)
+const BOSS_TARGET_SWITCH_VARIATION_MS: u64 = 4000;       // Random variation (±4 seconds)
+const BOSS_TARGET_SWITCH_INITIAL_DELAY_MS: u64 = 10000;   // Initial delay before first switch       // Initial delay before first EnderBolt (after real scythes spawn)
 
 // Scheduled table for Imp attacks - Imps periodically fire ImpBolts at players
 #[table(name = imp_attack_scheduler, scheduled(trigger_imp_attack), public)]
@@ -117,6 +122,19 @@ pub struct VoidZoneScheduler {
     
     #[index(btree)]
     pub boss_monster_id: u32,     // The Phase 2 boss that will spawn VoidZone
+}
+
+// Scheduled table for Phase 2 boss target switching
+#[table(name = boss_target_switch_scheduler, scheduled(trigger_boss_target_switch), public)]
+pub struct BossTargetSwitchScheduler {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    
+    pub scheduled_at: ScheduleAt, // When the boss should switch targets
+    
+    #[index(btree)]
+    pub boss_monster_id: u32,     // The Phase 2 boss that will switch targets
 }
 
 // Active monster attacks - tracks currently active monster attacks in the game
@@ -926,9 +944,6 @@ pub fn trigger_chaos_ball_attack(ctx: &ReducerContext, scheduler: ChaosBallSched
     if ctx.sender != ctx.identity() {
         panic!("trigger_chaos_ball_attack may not be invoked by clients, only via scheduling.");
     }
-    
-    log::info!("DEBUG: trigger_chaos_ball_attack reducer fired! Scheduler ID: {}, Boss ID: {}", 
-              scheduler.scheduled_id, scheduler.boss_monster_id);
 
     // Check if the boss monster still exists and is a Phase 2 boss
     let boss_opt = ctx.db.monsters().monster_id().find(&scheduler.boss_monster_id);
@@ -1001,9 +1016,6 @@ pub fn trigger_void_zone_attack(ctx: &ReducerContext, scheduler: VoidZoneSchedul
     if ctx.sender != ctx.identity() {
         panic!("trigger_void_zone_attack may not be invoked by clients, only via scheduling.");
     }
-    
-    log::info!("DEBUG: trigger_void_zone_attack reducer fired! Scheduler ID: {}, Boss ID: {}", 
-              scheduler.scheduled_id, scheduler.boss_monster_id);
 
     // Check if the boss monster still exists and is a Phase 2 boss
     let boss_opt = ctx.db.monsters().monster_id().find(&scheduler.boss_monster_id);
@@ -1054,6 +1066,72 @@ pub fn trigger_void_zone_attack(ctx: &ReducerContext, scheduler: VoidZoneSchedul
     schedule_next_void_zone_attack(ctx, scheduler.boss_monster_id);
 }
 
+// Reducer called when boss should switch targets
+#[reducer]
+pub fn trigger_boss_target_switch(ctx: &ReducerContext, scheduler: BossTargetSwitchScheduler) {
+    if ctx.sender != ctx.identity() {
+        panic!("trigger_boss_target_switch may not be invoked by clients, only via scheduling.");
+    }
+
+    // Check if the boss monster still exists and is a Phase 2 boss
+    let boss_opt = ctx.db.monsters().monster_id().find(&scheduler.boss_monster_id);
+    let boss = match boss_opt {
+        Some(monster) => monster,
+        None => {
+            log::info!("Boss {} no longer exists, stopping target switching", scheduler.boss_monster_id);
+            return;
+        }
+    };
+
+    // Verify this is a Phase 2 boss
+    if boss.bestiary_id != crate::MonsterType::FinalBossPhase2 {
+        log::info!("Boss {} is not Phase 2, stopping target switching", scheduler.boss_monster_id);
+        return;
+    }
+
+    // Get all active players
+    let players: Vec<_> = ctx.db.player().iter().collect();
+    let player_count = players.len();
+    
+    if player_count == 0 {
+        log::info!("No players online for boss {} target switch, stopping", scheduler.boss_monster_id);
+        return;
+    }
+    
+    if player_count == 1 {
+        // Only one player, no need to switch, just schedule next check
+        schedule_next_boss_target_switch(ctx, scheduler.boss_monster_id);
+        return;
+    }
+
+    // Find a new target different from current target
+    let current_target_id = boss.target_player_id;
+    let mut available_players: Vec<_> = players.into_iter()
+        .filter(|p| p.player_id != current_target_id)
+        .collect();
+    
+    if available_players.is_empty() {
+        // Fallback: use any player if filtering left us with none
+        available_players = ctx.db.player().iter().collect();
+    }
+    
+    // Select a random new target
+    let mut rng = ctx.rng();
+    let random_index = (rng.gen::<f32>() * available_players.len() as f32) as usize;
+    let new_target = &available_players[random_index];
+    
+    // Update the boss's target
+    let mut updated_boss = boss;
+    updated_boss.target_player_id = new_target.player_id;
+    ctx.db.monsters().monster_id().update(updated_boss);
+    
+    log::info!("Boss {} switched target from player {} to player {} ({})", 
+              scheduler.boss_monster_id, current_target_id, new_target.player_id, new_target.name);
+
+    // Schedule the next target switch
+    schedule_next_boss_target_switch(ctx, scheduler.boss_monster_id);
+}
+
 // Helper function to schedule the next ChaosBall attack with player scaling
 fn schedule_next_chaos_ball_attack(ctx: &ReducerContext, boss_monster_id: u32) {
     // Count the number of active players
@@ -1096,30 +1174,26 @@ fn schedule_next_void_zone_attack(ctx: &ReducerContext, boss_monster_id: u32) {
 
 // Function to start ChaosBall attack scheduling for Phase 2 boss
 pub fn start_chaos_ball_attacks(ctx: &ReducerContext, boss_monster_id: u32) {
-    log::info!("DEBUG: start_chaos_ball_attacks called for boss {}", boss_monster_id);
-    
-    let scheduler = ctx.db.chaos_ball_scheduler().insert(ChaosBallScheduler {
+    ctx.db.chaos_ball_scheduler().insert(ChaosBallScheduler {
         scheduled_id: 0,
         boss_monster_id,
         scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(CHAOS_BALL_INITIAL_DELAY_MS)),
     });
 
-    log::info!("Started ChaosBall attack schedule for boss {} (first attack in {}ms) - Scheduler ID: {}", 
-              boss_monster_id, CHAOS_BALL_INITIAL_DELAY_MS, scheduler.scheduled_id);
+    log::info!("Started ChaosBall attack schedule for boss {} (first attack in {}ms)", 
+              boss_monster_id, CHAOS_BALL_INITIAL_DELAY_MS);
 }
 
 // Function to start VoidZone attack scheduling for Phase 2 boss
 pub fn start_void_zone_attacks(ctx: &ReducerContext, boss_monster_id: u32) {
-    log::info!("DEBUG: start_void_zone_attacks called for boss {}", boss_monster_id);
-    
-    let scheduler = ctx.db.void_zone_scheduler().insert(VoidZoneScheduler {
+    ctx.db.void_zone_scheduler().insert(VoidZoneScheduler {
         scheduled_id: 0,
         boss_monster_id,
         scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(VOID_ZONE_INITIAL_DELAY_MS)),
     });
 
-    log::info!("Started VoidZone attack schedule for boss {} (first attack in {}ms) - Scheduler ID: {}", 
-              boss_monster_id, VOID_ZONE_INITIAL_DELAY_MS, scheduler.scheduled_id);
+    log::info!("Started VoidZone attack schedule for boss {} (first attack in {}ms)", 
+              boss_monster_id, VOID_ZONE_INITIAL_DELAY_MS);
 }
 
 // Function to cleanup ChaosBall attack schedules when a boss dies or changes state
@@ -1188,5 +1262,58 @@ pub fn cleanup_void_zone_schedules(ctx: &ReducerContext, boss_monster_id: u32) {
     if count > 0 || active_count > 0 {
         log::info!("Cleaned up {} VoidZone schedulers and {} active VoidZone attacks for boss {}", 
                   count, active_count, boss_monster_id);
+    }
+}
+
+// Helper function to schedule the next boss target switch with random variation
+fn schedule_next_boss_target_switch(ctx: &ReducerContext, boss_monster_id: u32) {
+    // Add random variation to the base interval (±BOSS_TARGET_SWITCH_VARIATION_MS)
+    let mut rng = ctx.rng();
+    let variation = (rng.gen::<f32>() * 2.0 - 1.0) * BOSS_TARGET_SWITCH_VARIATION_MS as f32; // -4000 to +4000ms
+    let next_interval_ms = (BOSS_TARGET_SWITCH_BASE_INTERVAL_MS as f32 + variation) as u64;
+    
+    // Ensure minimum interval of 4 seconds
+    let next_interval_ms = next_interval_ms.max(4000);
+    
+    ctx.db.boss_target_switch_scheduler().insert(BossTargetSwitchScheduler {
+        scheduled_id: 0,
+        boss_monster_id,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(next_interval_ms)),
+    });
+    
+    log::info!("Scheduled next boss target switch for boss {} in {}ms", 
+              boss_monster_id, next_interval_ms);
+}
+
+// Function to start boss target switching for Phase 2 boss
+pub fn start_boss_target_switching(ctx: &ReducerContext, boss_monster_id: u32) {
+    ctx.db.boss_target_switch_scheduler().insert(BossTargetSwitchScheduler {
+        scheduled_id: 0,
+        boss_monster_id,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(BOSS_TARGET_SWITCH_INITIAL_DELAY_MS)),
+    });
+
+    log::info!("Started boss target switching for boss {} (first switch in {}ms)", 
+              boss_monster_id, BOSS_TARGET_SWITCH_INITIAL_DELAY_MS);
+}
+
+// Function to cleanup boss target switching schedules when a boss dies
+pub fn cleanup_boss_target_switching(ctx: &ReducerContext, boss_monster_id: u32) {
+    // Find and delete all scheduled target switches for this boss
+    let schedulers_to_delete: Vec<u64> = ctx.db.boss_target_switch_scheduler()
+        .boss_monster_id()
+        .filter(&boss_monster_id)
+        .map(|scheduler| scheduler.scheduled_id)
+        .collect();
+    
+    let count = schedulers_to_delete.len();
+    
+    for scheduled_id in schedulers_to_delete {
+        ctx.db.boss_target_switch_scheduler().scheduled_id().delete(&scheduled_id);
+    }
+
+    if count > 0 {
+        log::info!("Cleaned up {} boss target switching schedulers for boss {}", 
+                  count, boss_monster_id);
     }
 }

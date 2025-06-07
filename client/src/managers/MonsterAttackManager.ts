@@ -140,10 +140,10 @@ export class MonsterAttackManager {
             
             // Play sound effects for specific attack types when they spawn
             if (attackType === 'ChaosBall') {
-                // Play boss_roar sound quietly when ChaosBall spawns
+                // Play chaos_bolt_fire sound quietly when ChaosBall spawns
                 const soundManager = (window as any).soundManager;
                 if (soundManager) {
-                    soundManager.playSound('boss_roar', 0.3); // Quiet volume as requested
+                    soundManager.playSound('chaos_bolt_fire', 0.4); // Quiet volume
                 }
             }
             
