@@ -822,9 +822,9 @@ pub fn cleanup_monster_hit_record(ctx: &ReducerContext, cleanup: MonsterHitClean
 }
 
 // Configuration constants for EnderClaw spawning
-const ENDER_CLAW_INITIAL_INTERVAL_MS: u64 = 6000;   // Start spawning every 8 seconds
-const ENDER_CLAW_MIN_INTERVAL_MS: u64 = 1000;       // Minimum spawn interval (2 seconds)
-const ENDER_CLAW_INTERVAL_REDUCTION_MS: u64 = 200;  // Reduce interval by 200ms each wave
+const ENDER_CLAW_INITIAL_INTERVAL_MS: u64 = 6000;   // Start spawning every 6 seconds
+const ENDER_CLAW_MIN_INTERVAL_MS: u64 = 2000;       // Minimum spawn interval (1 second)
+const ENDER_CLAW_INTERVAL_REDUCTION_RATIO: f32 = 0.85; // Reduce interval by 15% each wave (multiply by 0.85)
 const ENDER_CLAW_PRE_SPAWN_DELAY_MS: u64 = 1000;   // Reduced pre-spawn delay (1 second)
 
 // Reducer to spawn a wave of EnderClaws (one per player)
@@ -878,9 +878,9 @@ fn spawn_single_ender_claw(ctx: &ReducerContext, target_player: &crate::Player) 
     let bestiary_entry = ctx.db.bestiary().bestiary_id().find(&(MonsterType::EnderClaw as u32))
         .expect("spawn_single_ender_claw: Could not find bestiary entry for EnderClaw");
 
-    // Calculate spawn position near the target player (300-600 pixels away)
+    // Calculate spawn position near the target player (150-250 pixels away) - closer for more threat
     let mut rng = ctx.rng();
-    let spawn_distance = 300.0 + (rng.gen::<f32>() * 300.0); // 300-600 pixels from player  
+    let spawn_distance = 150.0 + (rng.gen::<f32>() * 100.0); // 150-250 pixels from player (reduced from 300-600)
     let spawn_angle = rng.gen::<f32>() * std::f32::consts::PI * 2.0; // Random angle
 
     let mut spawn_position = DbVector2::new(
@@ -911,8 +911,8 @@ fn spawn_single_ender_claw(ctx: &ReducerContext, target_player: &crate::Player) 
 
 // Helper function to schedule the next EnderClaw wave with interval reduction
 fn schedule_next_ender_claw_wave(ctx: &ReducerContext, boss_monster_id: u32, current_interval_ms: u64) {
-    // Calculate next interval (reduce by ENDER_CLAW_INTERVAL_REDUCTION_MS, but don't go below minimum)
-    let next_interval_ms = (current_interval_ms.saturating_sub(ENDER_CLAW_INTERVAL_REDUCTION_MS))
+    // Calculate next interval (reduce by 15% each wave, but don't go below minimum)
+    let next_interval_ms = ((current_interval_ms as f32 * ENDER_CLAW_INTERVAL_REDUCTION_RATIO) as u64)
         .max(ENDER_CLAW_MIN_INTERVAL_MS);
 
     // Schedule the next wave
