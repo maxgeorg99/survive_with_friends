@@ -159,6 +159,9 @@ export default class GameScene extends Phaser.Scene {
     // Add VoidChest UI for alerts and directional arrow
     private voidChestUI: VoidChestUI | null = null;
 
+    // Track if player damage sound is currently playing
+    private isPlayerDamageSoundPlaying: boolean = false;
+
     constructor() {
         super('GameScene');
         this.spacetimeDBClient = (window as any).spacetimeDBClient;
@@ -240,6 +243,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.audio('voice_level', '/assets/sounds/voice_level.mp3');
         this.load.audio('voice_chest', '/assets/sounds/voice_chest.mp3');
         this.load.audio('alert_event', '/assets/sounds/alert_event.mp3');
+        this.load.audio('player_damage', '/assets/sounds/player_damage.mp3');
         
         // Load boss audio files
         this.load.audio('boss_chase_cue', '/assets/sounds/boss_chase_cue.mp3');
@@ -286,6 +290,7 @@ export default class GameScene extends Phaser.Scene {
             console.log("level_up:", this.cache.audio.exists('level_up'));
             console.log("voice_level:", this.cache.audio.exists('voice_level'));
             console.log("voice_chest:", this.cache.audio.exists('voice_chest'));
+            console.log("player_damage:", this.cache.audio.exists('player_damage'));
             console.log("boss_chase_cue:", this.cache.audio.exists('boss_chase_cue'));
             console.log("voice_boss:", this.cache.audio.exists('voice_boss'));
         });
@@ -1017,9 +1022,24 @@ export default class GameScene extends Phaser.Scene {
             
             // Check if health values changed
             if (currentHp !== player.hp || currentMaxHp !== player.maxHp) {
-                // If HP decreased, show damage effect
+                // If HP decreased, show damage effect and play damage sound
                 if (currentHp !== undefined && player.hp < currentHp) {
                     createPlayerDamageEffect(this.localPlayerSprite);
+                    
+                    // Play player damage sound (only if not already playing)
+                    if (!this.isPlayerDamageSoundPlaying) {
+                        this.isPlayerDamageSoundPlaying = true;
+                        // Try to get the sound instance to listen for completion
+                        try {
+                            const sound = this.sound.add('player_damage', { volume: 1.0 });
+                            sound.once('complete', () => {
+                                this.isPlayerDamageSoundPlaying = false;
+                            });
+                            sound.play();
+                        } catch (error) {
+                            console.log("Failed to play player damage sound via Phaser, falling back to soundManager");
+                        }
+                    }
                 }
                 
                 // Update stored values
@@ -1974,6 +1994,9 @@ export default class GameScene extends Phaser.Scene {
         
         // Important: Mark the scene as shutting down to prevent further updates
         this.gameOver = true;
+        
+        // Reset player damage sound flag
+        this.isPlayerDamageSoundPlaying = false;
 
         this.monsterManager?.shutdown();
         
