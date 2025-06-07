@@ -760,6 +760,13 @@ export default class GameScene extends Phaser.Scene {
         this.lootCapsuleManager = new LootCapsuleManager(this, this.spacetimeDBClient);
         this.lootCapsuleManager.initializeLootCapsules(ctx);
 
+        // Ensure main music is playing (force restart if needed for reconnection scenarios)
+        if (this.musicManager) {
+            console.log("Ensuring main music is playing after game world initialization");
+            this.musicManager.stopCurrentTrack(); // Clear any existing state
+            this.musicManager.playTrack('main');
+        }
+
         console.log("Game world initialization complete.");
     }
 
