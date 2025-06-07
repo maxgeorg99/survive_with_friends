@@ -770,14 +770,44 @@ export default class GameScene extends Phaser.Scene {
         this.lootCapsuleManager = new LootCapsuleManager(this, this.spacetimeDBClient);
         this.lootCapsuleManager.initializeLootCapsules(ctx);
 
-        // Ensure main music is playing (force restart if needed for reconnection scenarios)
+        // Ensure appropriate music is playing based on current game state
         if (this.musicManager) {
-            console.log("Ensuring main music is playing after game world initialization");
+            console.log("Setting appropriate music after game world initialization");
             this.musicManager.stopCurrentTrack(); // Clear any existing state
-            this.musicManager.playTrack('main');
+            
+            // Check if there's an active boss fight - if so, play boss music instead of main
+            const hasBoss = this.checkForActiveBoss(ctx);
+            if (hasBoss) {
+                console.log("Active boss detected during initialization - playing boss music");
+                this.musicManager.playTrack('boss');
+                this.showBossHaze(); // Also show boss haze
+            } else {
+                console.log("No active boss - playing main music");
+                this.musicManager.playTrack('main');
+            }
         }
 
         console.log("Game world initialization complete.");
+    }
+    
+    // Helper method to check if there's an active boss fight during initialization
+    private checkForActiveBoss(ctx: EventContext): boolean {
+        if (!ctx.db) {
+            return false;
+        }
+        
+        // Check if there are any boss monsters present
+        for (const monster of ctx.db.monsters.iter()) {
+            if (monster.bestiaryId && monster.bestiaryId.tag) {
+                const monsterType = monster.bestiaryId.tag;
+                if (monsterType === 'FinalBossPhase1' || monsterType === 'FinalBossPhase2') {
+                    console.log(`Found active boss during initialization: ${monsterType} (ID: ${monster.monsterId})`);
+                    return true;
+                }
+            }
+        }
+        
+        return false;
     }
 
     /**

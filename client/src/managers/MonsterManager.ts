@@ -132,9 +132,21 @@ export default class MonsterManager {
         let container = this.monsters.get(monsterData.monsterId);
         
         if (!container) {
+            // Determine initial position - prefer boid position over spawn position for reconnects
+            let initialPosition = monsterData.spawnPosition;
+            
+            // For existing monsters (like on reconnect), try to get current position from boid data
+            if (this.spacetimeDBClient?.sdkConnection?.db) {
+                const boid = this.spacetimeDBClient.sdkConnection.db.monstersBoid.monsterId.find(monsterData.monsterId);
+                if (boid) {
+                    initialPosition = boid.position;
+                    console.log(`Monster ${monsterData.monsterId} (${monsterTypeName}): Using boid position (${boid.position.x}, ${boid.position.y}) instead of spawn position (${monsterData.spawnPosition.x}, ${monsterData.spawnPosition.y})`);
+                }
+            }
+            
             // Create new container if it doesn't exist
-            container = this.scene.add.container(monsterData.spawnPosition.x, monsterData.spawnPosition.y);
-            container.setDepth(BASE_DEPTH + monsterData.spawnPosition.y);
+            container = this.scene.add.container(initialPosition.x, initialPosition.y);
+            container.setDepth(BASE_DEPTH + initialPosition.y);
             this.monsters.set(monsterData.monsterId, container);
             
             // Create shadow first (so it appears behind the sprite)

@@ -592,21 +592,52 @@ export default class BossTimerUI {
             if (monster.bestiaryId && monster.bestiaryId.tag) {
                 const monsterType = monster.bestiaryId.tag;
                 if (monsterType === 'FinalBossPhase1') {
-                    console.log("Found existing boss phase 1 on reconnect - showing nameplate");
+                    console.log("Found existing boss phase 1 on reconnect - showing nameplate, starting boss music and haze");
                     this.stopTimer();
                     this.container.setVisible(false);
                     this.showBossNameplate("Ender, Scion of Ruin");
+                    
+                    // Trigger boss music and haze for reconnection
+                    this.triggerBossEffectsOnReconnect();
                     return; // Only show one boss nameplate
                 } else if (monsterType === 'FinalBossPhase2') {
-                    console.log("Found existing boss phase 2 on reconnect - showing nameplate");
+                    console.log("Found existing boss phase 2 on reconnect - showing nameplate, starting boss music and haze");
                     this.stopTimer();
                     this.container.setVisible(false);
                     this.showBossNameplate("Ender, Host of Oblivion");
+                    
+                    // Trigger boss music and haze for reconnection
+                    this.triggerBossEffectsOnReconnect();
                     return; // Only show one boss nameplate
                 }
             }
         }
         
         console.log("No existing boss monsters found on reconnect");
+    }
+    
+    // Helper method to trigger boss music and haze effects when reconnecting
+    private triggerBossEffectsOnReconnect(): void {
+        console.log("Triggering boss music and haze effects on reconnect");
+        
+        // Get reference to GameScene to trigger boss effects
+        const gameScene = this.scene as any;
+        
+        // Start boss music only if not already playing boss music
+        if (gameScene.musicManager) {
+            const currentTrack = gameScene.musicManager.getCurrentTrack();
+            if (currentTrack.key !== 'boss') {
+                console.log("Starting boss music on reconnect (current track: " + currentTrack.key + ")");
+                gameScene.musicManager.playTrack('boss');
+            } else {
+                console.log("Boss music already playing, skipping music change");
+            }
+        }
+        
+        // Show boss haze (this is safe to call multiple times)
+        if (gameScene.showBossHaze) {
+            console.log("Showing boss haze on reconnect");
+            gameScene.showBossHaze();
+        }
     }
 } 
