@@ -496,28 +496,24 @@ pub fn spawn_player(ctx: &ReducerContext, class_id: u32) {
 
 // Helper function to create a new player with an associated entity
 fn create_new_player(ctx: &ReducerContext, name: &str, player_class: PlayerClass) -> Option<Player> {
-    // Get game configuration to determine world center
-    let config = ctx.db.config().id().find(&0);
-    if config.is_none() {
-        log::error!("CreateNewPlayer: Could not find game configuration!");
-        // Fall back to a reasonable default if config not found
-        return create_new_player_with_position(ctx, name, player_class, DbVector2::new(1000.0, 1000.0));
-    }
-
-    // Calculate center position based on world size
-    let config = config.unwrap();
-    let center_x = config.world_size as f32 / 2.0;
-    let center_y = config.world_size as f32 / 2.0;
+    // Get collision cache for safe spawn detection
+    let collision_cache = crate::monsters_def::get_collision_cache();
     
-    // Add a small random offset (±100 pixels) to avoid all new players stacking exactly at center
-    let mut rng = ctx.rng();
-    let offset_x = rng.gen_range(-100.0..101.0);
-    let offset_y = rng.gen_range(-100.0..101.0);
+    // Find a safe spawn position using the same logic as bots
+    // This ensures players spawn at least 200 pixels away from any monsters
+    let spawn_position = crate::player_def::find_safe_spawn_position(ctx, 48.0, &collision_cache); // Using standard player radius
+    let spawn_position = match spawn_position {
+        Some(pos) => pos,
+        None => {
+            log::error!("CreateNewPlayer: Failed to find safe spawn position for player '{}'", name);
+            // Fall back to a reasonable default if safe position not found
+            DbVector2::new(3200.0, 3200.0) // World center as fallback
+        }
+    };
     
-    let center_position  = DbVector2::new(center_x + offset_x, center_y + offset_y);
-    log::info!("Placing new player '{}' at position: {}, {}", name, center_position.x, center_position.y);
+    log::info!("Placing new player '{}' at safe position: {}, {}", name, spawn_position.x, spawn_position.y);
     
-    create_new_player_with_position(ctx, name, player_class, center_position)
+    create_new_player_with_position(ctx, name, player_class, spawn_position)
 }
 
 // Helper function that takes a position parameter
