@@ -172,6 +172,13 @@ pub fn spawn_boss_phase_two(ctx: &ReducerContext, position: DbVector2) {
     });
     
     ctx.db.game_state().id().update(game_state);
+
+    // Initialize Phase 2 boss AI (BossIdle only, no automatic patterns)
+    crate::monster_ai_defs::initialize_phase2_boss_ai(ctx, monster.monster_id);
+    
+    // Start EnderClaw spawning for Phase 2 boss
+    log::info!("Starting EnderClaw spawning for Phase 2 boss {}", monster.monster_id);
+    crate::monsters_def::start_ender_claw_spawning(ctx, monster.monster_id);
 }
 
 // Called when phase 2 boss is defeated - all players defeat the game!
@@ -181,6 +188,15 @@ pub fn handle_boss_defeated(ctx: &ReducerContext) {
     // Get game state
     let mut game_state = ctx.db.game_state().id().find(&0)
         .expect("HandleBossDefeated: Could not find game state!");
+    
+    // Cleanup all boss-related scheduled attacks if there was a boss
+    if game_state.boss_monster_id != 0 {
+        crate::monsters_def::cleanup_ender_claw_spawning(ctx, game_state.boss_monster_id);
+        // Clean up EnderScythe attack schedules that might still be active
+        crate::monster_attacks_def::cleanup_ender_scythe_schedules(ctx, game_state.boss_monster_id);
+        // Clean up Imp attack schedules if the boss was an Imp
+        crate::monster_attacks_def::cleanup_imp_attack_schedule(ctx, game_state.boss_monster_id);
+    }
     
     // Reset game state
     game_state.boss_active = false;

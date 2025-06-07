@@ -56,15 +56,34 @@ export default class MonsterSpawnerManager {
             return;
         }
 
+        // Determine asset and properties based on monster type
+        let assetKey = INDICATOR_ASSET_KEY;
+        let originX = INDICATOR_OFFSET_X;
+        let originY = INDICATOR_OFFSET_Y;
+        let finalScale = 1;
+        
+        // Check if this is an EnderClaw spawner
+        const monsterTypeName = this.getMonsterTypeName(spawner.monsterType);
+        if (monsterTypeName === 'EnderClaw') {
+            assetKey = 'claw_spawn';
+            originX = 0.5; // Center the claw spawn
+            originY = 0.5;
+            finalScale = 1.0; // No scaling needed - asset is already the right size
+        }
+
         // Create the indicator sprite at the spawner position
         const indicator = this.scene.add.sprite(
             spawner.position.x, 
             spawner.position.y, 
-            INDICATOR_ASSET_KEY
+            assetKey
         );
         
-        // Set sprite origin to match requirements (34, 54 offset)
-        indicator.setOrigin(INDICATOR_OFFSET_X / indicator.width, INDICATOR_OFFSET_Y / indicator.height);
+        // Set sprite origin based on monster type
+        if (monsterTypeName === 'EnderClaw') {
+            indicator.setOrigin(originX, originY); // Center origin for void zone
+        } else {
+            indicator.setOrigin(originX / indicator.width, originY / indicator.height); // Original logic
+        }
         
         // Set initial scale, alpha and depth
         indicator.setScale(0.1);
@@ -77,14 +96,14 @@ export default class MonsterSpawnerManager {
         // Create grow animation
         this.scene.tweens.add({
             targets: indicator,
-            scale: 1,
+            scale: finalScale, // Use the calculated final scale
             duration: ANIMATION_DURATION,
             ease: 'Elastic.Out',
             onComplete: () => {
                 // Add a slight pulsing effect after the initial grow
                 this.scene.tweens.add({
                     targets: indicator,
-                    scale: { from: 0.95, to: 1.05 },
+                    scale: { from: finalScale * 0.95, to: finalScale * 1.05 },
                     duration: 700,
                     yoyo: true,
                     repeat: -1,
@@ -117,5 +136,29 @@ export default class MonsterSpawnerManager {
     public destroy() {
         this.spawnerIndicators.forEach(indicator => indicator.destroy());
         this.spawnerIndicators.clear();
+    }
+
+    // Helper to get monster type name from bestiary ID (same as MonsterManager)
+    private getMonsterTypeName(bestiaryId: any): string {
+        // Check if bestiaryId is an object with a tag property (from autobindings)
+        if (bestiaryId && typeof bestiaryId === 'object' && 'tag' in bestiaryId) {
+            return bestiaryId.tag;
+        }
+        
+        // Fall back to numeric mapping for backward compatibility
+        switch(bestiaryId) {
+            case 0: return "Rat";
+            case 1: return "Slime";
+            case 2: return "Orc";
+            case 3: return "FinalBossPhase1";
+            case 4: return "FinalBossPhase2";
+            case 5: return "VoidChest";
+            case 6: return "Imp";
+            case 7: return "Zombie";
+            case 8: return "EnderClaw";
+            default: 
+                console.warn(`Unknown monster type: ${bestiaryId}`);
+                return "Unknown";
+        }
     }
 } 

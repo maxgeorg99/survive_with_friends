@@ -9,7 +9,8 @@ export const MONSTER_ASSET_KEYS: Record<string, string> = {
     "Zombie": 'monster_zombie',
     "FinalBossPhase1": 'final_boss_phase1',
     "FinalBossPhase2": 'final_boss_phase2',
-    "VoidChest": 'treasure_chest'
+    "VoidChest": 'treasure_chest',
+    "EnderClaw": 'monster_void_claw'
 };
 
 // Shadow offset configurations for each monster type (horizontal offset in pixels)
@@ -21,7 +22,8 @@ export const MONSTER_SHADOW_OFFSETS_X: Record<string, number> = {
     "Zombie": 6,  // Medium sized humanoid, small offset
     "FinalBossPhase1": -26,  // Large boss, bigger shadow offset
     "FinalBossPhase2": -68,   // Even larger final form, largest shadow offset
-    "VoidChest": -28    // Chest is centered
+    "VoidChest": -28,    // Chest is centered
+    "EnderClaw": -4    // Medium aggressive creature, slight offset
 };
 
 // Shadow offset configurations for each monster type (vertical offset in pixels)
@@ -33,7 +35,8 @@ export const MONSTER_SHADOW_OFFSETS_Y: Record<string, number> = {
     "Zombie": 6, // Medium sized shambling creature, moderate offset
     "FinalBossPhase1": -4,  // Large boss, bigger shadow offset
     "FinalBossPhase2": -78,   // Even larger final form, largest shadow offset
-    "VoidChest": -66    // Chest sits on the ground with small offset
+    "VoidChest": -66,    // Chest sits on the ground with small offset
+    "EnderClaw": -8    // Medium sized creature, moderate offset
 };
 
 export const MONSTER_SHADOW_SCALE: Record<string, number> = {
@@ -44,7 +47,8 @@ export const MONSTER_SHADOW_SCALE: Record<string, number> = {
     "Zombie": 1.2,    // Slightly larger shadow for zombie
     "FinalBossPhase1": 2.0,
     "FinalBossPhase2": 6.5,
-    "VoidChest": 2.75
+    "VoidChest": 2.75,
+    "EnderClaw": 1.1  // Slightly larger shadow for aggressive creature
 };
 // Debug helper to print monster configurations
 export function logMonsterConfigs() {

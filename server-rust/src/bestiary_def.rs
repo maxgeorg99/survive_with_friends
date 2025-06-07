@@ -105,5 +105,15 @@ pub fn init_bestiary(ctx: &ReducerContext) {
         radius: 42.0,      // Medium-large radius (between Slime and Orc)
     });
 
+    // Insert EnderClaw stats - tough, quick, high damage boss minion
+    ctx.db.bestiary().insert(Bestiary {
+        bestiary_id: MonsterType::EnderClaw as u32,
+        monster_type: MonsterType::EnderClaw,
+        max_hp: 100,        // High HP (slightly less than Zombie but still tough)
+        speed: 199.0,      // Very fast (faster than Phase 2 boss)
+        atk: 6.0,          // Very high attack (higher than Zombie)
+        radius: 48.0,      // Medium radius (similar to Orc)
+    });
+
     log::info!("Bestiary initialization complete");
 } 

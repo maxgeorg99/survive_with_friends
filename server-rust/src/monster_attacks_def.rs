@@ -655,8 +655,22 @@ pub fn cleanup_ender_bolt_schedules(ctx: &ReducerContext, boss_monster_id: u32) 
         ctx.db.ender_bolt_scheduler().scheduled_id().delete(&scheduled_id);
     }
 
-    if bolt_count > 0 {
-        log::info!("Cleaned up {} EnderBolt schedulers for boss {}", bolt_count, boss_monster_id);
+    // Also cleanup all ACTIVE EnderBolt attacks that are flying around
+    // These attacks have parameter_u set to the target player ID, but we can identify them by type and check if the boss still exists
+    let active_bolt_attacks_to_delete: Vec<u64> = ctx.db.active_monster_attacks().iter()
+        .filter(|attack| attack.monster_attack_type == MonsterAttackType::EnderBolt)
+        .map(|attack| attack.active_monster_attack_id)
+        .collect();
+    
+    let active_bolt_count = active_bolt_attacks_to_delete.len();
+    
+    for attack_id in active_bolt_attacks_to_delete {
+        ctx.db.active_monster_attacks().active_monster_attack_id().delete(&attack_id);
+    }
+
+    if bolt_count > 0 || active_bolt_count > 0 {
+        log::info!("Cleaned up {} EnderBolt schedulers and {} active EnderBolt attacks for boss {}", 
+                  bolt_count, active_bolt_count, boss_monster_id);
     }
 }
 
@@ -688,12 +702,29 @@ pub fn cleanup_ender_scythe_schedules(ctx: &ReducerContext, boss_monster_id: u32
         ctx.db.ender_scythe_scheduler().scheduled_id().delete(&scheduled_id);
     }
 
+    // IMPORTANT: Also cleanup all ACTIVE EnderScythe attacks that are already flying around
+    // These attacks have parameter_u set to the boss_monster_id
+    let active_scythe_attacks_to_delete: Vec<u64> = ctx.db.active_monster_attacks().iter()
+        .filter(|attack| {
+            (attack.monster_attack_type == MonsterAttackType::EnderScythe || 
+             attack.monster_attack_type == MonsterAttackType::EnderScytheSpawn) &&
+            attack.parameter_u == boss_monster_id
+        })
+        .map(|attack| attack.active_monster_attack_id)
+        .collect();
+    
+    let active_count = active_scythe_attacks_to_delete.len();
+    
+    for attack_id in active_scythe_attacks_to_delete {
+        ctx.db.active_monster_attacks().active_monster_attack_id().delete(&attack_id);
+    }
+
     // Also cleanup EnderBolt schedules since they're part of the dance pattern
     cleanup_ender_bolt_schedules(ctx, boss_monster_id);
 
-    if spawn_count > 0 || scythe_count > 0 {
-        log::info!("Cleaned up {} EnderScytheSpawn and {} EnderScythe schedulers for boss {}", 
-                  spawn_count, scythe_count, boss_monster_id);
+    if spawn_count > 0 || scythe_count > 0 || active_count > 0 {
+        log::info!("Cleaned up {} EnderScytheSpawn schedulers, {} EnderScythe schedulers, and {} active scythe attacks for boss {}", 
+                  spawn_count, scythe_count, active_count, boss_monster_id);
     }
 }
 

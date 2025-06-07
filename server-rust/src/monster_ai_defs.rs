@@ -266,6 +266,20 @@ fn cancel_scheduled_state_changes(ctx: &ReducerContext, monster_id: u32) {
     crate::monster_attacks_def::cleanup_ender_scythe_schedules(ctx, monster_id);
 }
 
+// Public function to cleanup all AI schedules for a monster (used during boss transitions)
+pub fn cleanup_monster_ai_schedules(ctx: &ReducerContext, monster_id: u32) {
+    log::info!("Cleaning up all AI schedules for monster {}", monster_id);
+    
+    // Cancel all scheduled state changes
+    cancel_scheduled_state_changes(ctx, monster_id);
+    
+    // Clean up boss last pattern record to prevent state conflicts
+    if let Some(_last_pattern) = ctx.db.boss_last_patterns().monster_id().find(&monster_id) {
+        ctx.db.boss_last_patterns().monster_id().delete(&monster_id);
+        log::info!("Cleaned up boss last pattern record for monster {}", monster_id);
+    }
+}
+
 // Schedule a random boss pattern (chase, dance, or vanish)
 fn schedule_random_boss_pattern(ctx: &ReducerContext, monster_id: u32) {
     let mut rng = ctx.rng();
@@ -318,6 +332,21 @@ pub fn initialize_boss_ai(ctx: &ReducerContext, monster_id: u32) {
         
         // Schedule first random boss pattern
         schedule_random_boss_pattern(ctx, monster_id);
+    }
+}
+
+// Initialize Phase 2 boss AI state (stays idle, no patterns)
+pub fn initialize_phase2_boss_ai(ctx: &ReducerContext, monster_id: u32) {
+    log::info!("Initializing Phase 2 boss AI for monster {} (BossIdle only, no patterns)", monster_id);
+    
+    // Set boss to idle state  
+    let monster_opt = ctx.db.monsters().monster_id().find(&monster_id);
+    if let Some(mut monster) = monster_opt {
+        monster.ai_state = AIState::BossIdle;
+        ctx.db.monsters().monster_id().update(monster);
+        
+        // Phase 2 boss stays idle - no pattern scheduling
+        log::info!("Phase 2 boss {} set to BossIdle state (no automatic patterns)", monster_id);
     }
 }
 

@@ -119,6 +119,22 @@ export default class MonsterManager {
     onMonsterBoidUpdated(ctx: EventContext, oldBoid: MonsterBoid, newBoid: MonsterBoid) {
         let container = this.monsters.get(newBoid.monsterId);
         if (container) {
+            // Calculate horizontal movement for EnderClaw flipping
+            const monsterType = container.getData('monsterType');
+            if (monsterType === 'EnderClaw') {
+                const sprite = container.list.find(child => child instanceof Phaser.GameObjects.Sprite) as Phaser.GameObjects.Sprite;
+                if (sprite) {
+                    const deltaX = newBoid.position.x - oldBoid.position.x;
+                    // Flip horizontally when moving left
+                    if (deltaX < -0.1) { // Small threshold to avoid jitter
+                        sprite.setFlipX(true);
+                    } else if (deltaX > 0.1) {
+                        sprite.setFlipX(false); // Reset to normal direction when moving right
+                    }
+                    // No change if deltaX is very small (not moving horizontally)
+                }
+            }
+            
             container.setPosition(newBoid.position.x, newBoid.position.y);
             container.setDepth(BASE_DEPTH + newBoid.position.y);
         }
@@ -473,6 +489,18 @@ export default class MonsterManager {
             } else {
                 console.error(`Failed to find boss container after creation!`);
             }
+        } else if (monsterTypeName === "EnderClaw") {
+            // Special handling for EnderClaw - play spawn sound and create immediately
+            console.log(`EnderClaw spawned: ${monster.monsterId}`);
+            
+            // Play boss_appear sound at reduced volume
+            const soundManager = (window as any).soundManager;
+            if (soundManager) {
+                soundManager.playSound('boss_appear', 0.4); // Quieter volume as requested
+            }
+            
+            // Create EnderClaw immediately (bypassing queue)
+            this.createOrUpdateMonster(monster);
         } else {
             // For regular monsters, add to creation queue for smooth spawning
             this.addToCreationQueue(monster);
@@ -562,6 +590,7 @@ export default class MonsterManager {
             case 5: return "VoidChest";
             case 6: return "Imp";
             case 7: return "Zombie";
+            case 8: return "EnderClaw";
             default: 
                 console.warn(`Unknown monster type: ${bestiaryId}`);
                 return "Unknown";

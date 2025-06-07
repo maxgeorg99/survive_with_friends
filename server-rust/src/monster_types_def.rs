@@ -11,4 +11,5 @@ pub enum MonsterType {
     VoidChest = 5,
     Imp = 6,
     Zombie = 7,
+    EnderClaw = 8,
 } 
