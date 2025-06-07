@@ -114,6 +114,9 @@ fn execute_state_entry_behavior(ctx: &ReducerContext, monster: &crate::Monsters,
             // Schedule EnderScythe attack pattern
             crate::monster_attacks_def::schedule_ender_scythe_attacks(ctx, monster.monster_id);
             
+            // Schedule EnderBolt attacks to fire periodically during dance
+            crate::monster_attacks_def::start_ender_bolt_attacks(ctx, monster.monster_id);
+            
             // Schedule return to idle after dance duration
             schedule_state_change(ctx, monster.monster_id, AIState::BossIdle, BOSS_DANCE_DURATION_MS);
         },

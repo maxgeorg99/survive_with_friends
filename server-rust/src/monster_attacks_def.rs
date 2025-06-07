@@ -14,6 +14,14 @@ const ENDER_SCYTHE_DAMAGE: u32 = 15;                 // Damage for EnderScythe a
 const ENDER_SCYTHE_SPEED: f32 = 24.0;                // Rotation speed (degrees per second)
 const ENDER_SCYTHE_RADIUS: f32 = 62.0;               // Collision radius for scythes
 
+// Configuration constants for EnderBolt attacks
+const ENDER_BOLT_DAMAGE: u32 = 25;                   // Damage for EnderBolt attacks (more powerful than ImpBolt)
+const ENDER_BOLT_SPEED: f32 = 800.0;                 // Movement speed for EnderBolt attacks
+const ENDER_BOLT_RADIUS: f32 = 27.0;                 // Collision radius for EnderBolt attacks
+const ENDER_BOLT_DURATION_MS: u64 = 4000;            // Duration before EnderBolt expires
+const ENDER_BOLT_FIRE_INTERVAL_MS: u64 = 1000;       // Time between EnderBolt attacks during dance
+const ENDER_BOLT_INITIAL_DELAY_MS: u64 = 3500;       // Initial delay before first EnderBolt (after real scythes spawn)
+
 // Scheduled table for Imp attacks - Imps periodically fire ImpBolts at players
 #[table(name = imp_attack_scheduler, scheduled(trigger_imp_attack), public)]
 pub struct ImpAttackScheduler {
@@ -53,6 +61,19 @@ pub struct EnderScytheScheduler {
     #[index(btree)]
     pub boss_monster_id: u32,     // The boss monster that will spawn scythes
     pub base_rotation: f32,       // Base rotation angle for the pattern
+}
+
+// Scheduled table for EnderBolt attacks during boss dance
+#[table(name = ender_bolt_scheduler, scheduled(trigger_ender_bolt_attack), public)]
+pub struct EnderBoltScheduler {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    
+    pub scheduled_at: ScheduleAt, // When the next EnderBolt should fire
+    
+    #[index(btree)]
+    pub boss_monster_id: u32,     // The boss monster that will fire EnderBolt
 }
 
 // Active monster attacks - tracks currently active monster attacks in the game
@@ -605,6 +626,39 @@ pub fn schedule_ender_scythe_attacks(ctx: &ReducerContext, boss_monster_id: u32)
     log::info!("Scheduled EnderScythe pattern for boss {} (warning at 1s, attack at 3s)", boss_monster_id);
 }
 
+// Function to start EnderBolt attack scheduling when boss enters dance mode
+pub fn start_ender_bolt_attacks(ctx: &ReducerContext, boss_monster_id: u32) {
+    // Schedule the first EnderBolt attack after the real scythes spawn
+    ctx.db.ender_bolt_scheduler().insert(EnderBoltScheduler {
+        scheduled_id: 0,
+        boss_monster_id,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(ENDER_BOLT_INITIAL_DELAY_MS)),
+    });
+
+    log::info!("Started EnderBolt attack schedule for boss {} (first attack in {}ms)", 
+              boss_monster_id, ENDER_BOLT_INITIAL_DELAY_MS);
+}
+
+// Function to cleanup EnderBolt attack schedules when a boss dies or changes state
+pub fn cleanup_ender_bolt_schedules(ctx: &ReducerContext, boss_monster_id: u32) {
+    // Find and delete all scheduled EnderBolt attacks for this boss
+    let bolt_schedulers_to_delete: Vec<u64> = ctx.db.ender_bolt_scheduler()
+        .boss_monster_id()
+        .filter(&boss_monster_id)
+        .map(|scheduler| scheduler.scheduled_id)
+        .collect();
+    
+    let bolt_count = bolt_schedulers_to_delete.len();
+    
+    for scheduled_id in bolt_schedulers_to_delete {
+        ctx.db.ender_bolt_scheduler().scheduled_id().delete(&scheduled_id);
+    }
+
+    if bolt_count > 0 {
+        log::info!("Cleaned up {} EnderBolt schedulers for boss {}", bolt_count, boss_monster_id);
+    }
+}
+
 // Function to cleanup EnderScythe attack schedules when a boss dies or changes state
 pub fn cleanup_ender_scythe_schedules(ctx: &ReducerContext, boss_monster_id: u32) {
     // Find and delete all scheduled EnderScytheSpawn attacks for this boss
@@ -633,8 +687,142 @@ pub fn cleanup_ender_scythe_schedules(ctx: &ReducerContext, boss_monster_id: u32
         ctx.db.ender_scythe_scheduler().scheduled_id().delete(&scheduled_id);
     }
 
+    // Also cleanup EnderBolt schedules since they're part of the dance pattern
+    cleanup_ender_bolt_schedules(ctx, boss_monster_id);
+
     if spawn_count > 0 || scythe_count > 0 {
         log::info!("Cleaned up {} EnderScytheSpawn and {} EnderScythe schedulers for boss {}", 
                   spawn_count, scythe_count, boss_monster_id);
     }
+}
+
+// Function to spawn an EnderBolt at a particular position, targeting a specific player
+pub fn spawn_ender_bolt(ctx: &ReducerContext, spawn_position: DbVector2, target_player_id: u32) {
+    // Get the target player
+    let target_player_opt = ctx.db.player().player_id().find(&target_player_id);
+    let target_player = match target_player_opt {
+        Some(player) => player,
+        None => {
+            log::error!("Cannot spawn EnderBolt: target player {} not found", target_player_id);
+            return;
+        }
+    };
+
+    // Calculate direction from spawn position toward the target player
+    let direction_vector = DbVector2::new(
+        target_player.position.x - spawn_position.x,
+        target_player.position.y - spawn_position.y
+    ).normalize();
+    
+    // Store the direction angle in parameter_f (in radians)
+    let direction_angle = direction_vector.y.atan2(direction_vector.x);
+
+    // Create active monster attack (scheduled to expire after duration)
+    let active_monster_attack = ctx.db.active_monster_attacks().insert(ActiveMonsterAttack {
+        active_monster_attack_id: 0,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(ENDER_BOLT_DURATION_MS)),
+        position: spawn_position,
+        direction: direction_vector,
+        monster_attack_type: MonsterAttackType::EnderBolt,
+        piercing: false, // EnderBolt is not piercing
+        damage: ENDER_BOLT_DAMAGE,
+        radius: ENDER_BOLT_RADIUS,
+        speed: ENDER_BOLT_SPEED,
+        parameter_u: target_player_id, // Store target player ID
+        parameter_f: direction_angle, // Store direction angle
+        ticks_elapsed: 0,
+    });
+
+    log::info!("Spawned EnderBolt {} at ({}, {}) targeting player {} (expires in {}ms)", 
+              active_monster_attack.active_monster_attack_id, 
+              spawn_position.x, spawn_position.y, 
+              target_player_id, ENDER_BOLT_DURATION_MS);
+}
+
+// Reducer called when a boss should fire an EnderBolt
+#[reducer]
+pub fn trigger_ender_bolt_attack(ctx: &ReducerContext, scheduler: EnderBoltScheduler) {
+    if ctx.sender != ctx.identity() {
+        panic!("TriggerEnderBoltAttack may not be invoked by clients, only via scheduling.");
+    }
+
+    // Check if the boss monster still exists and is still in dance mode
+    let boss_opt = ctx.db.monsters().monster_id().find(&scheduler.boss_monster_id);
+    let boss = match boss_opt {
+        Some(monster) => monster,
+        None => {
+            // Boss is dead - don't reschedule
+            log::info!("Boss {} no longer exists, removing EnderBolt scheduler", scheduler.boss_monster_id);
+            return;
+        }
+    };
+
+    // Check if boss is still in dance mode - if not, don't fire or reschedule
+    if boss.ai_state != crate::monster_ai_defs::AIState::BossDance {
+        log::info!("Boss {} no longer in dance mode, stopping EnderBolt attacks", scheduler.boss_monster_id);
+        return;
+    }
+
+    // Get the boss's current position from boid
+    let boid_opt = ctx.db.monsters_boid().monster_id().find(&scheduler.boss_monster_id);
+    let boss_position = match boid_opt {
+        Some(boid) => boid.position,
+        None => {
+            // No boid found - boss is probably dead, don't reschedule
+            log::info!("Boss {} has no boid, removing EnderBolt scheduler", scheduler.boss_monster_id);
+            return;
+        }
+    };
+
+    // Find a random player to target
+    let target_player = find_random_player(ctx);
+    let target_player = match target_player {
+        Some(player) => player,
+        None => {
+            // No players found - don't attack but reschedule for later
+            log::info!("No players found for boss {}, skipping EnderBolt attack", scheduler.boss_monster_id);
+            schedule_next_ender_bolt_attack(ctx, scheduler.boss_monster_id);
+            return;
+        }
+    };
+
+    // Spawn the EnderBolt attack
+    spawn_ender_bolt(ctx, boss_position, target_player.player_id);
+    
+    log::info!("Boss {} fired EnderBolt at player {} from position ({}, {})", 
+              scheduler.boss_monster_id, target_player.player_id, boss_position.x, boss_position.y);
+
+    // Schedule the next attack
+    schedule_next_ender_bolt_attack(ctx, scheduler.boss_monster_id);
+}
+
+// Helper function to find a random player for targeting
+fn find_random_player(ctx: &ReducerContext) -> Option<crate::Player> {
+    let players: Vec<_> = ctx.db.player().iter().collect();
+    let player_count = players.len();
+    
+    if player_count == 0 {
+        return None;
+    }
+    
+    let mut rng = ctx.rng();
+    let random_index = (rng.gen::<f32>() * player_count as f32) as usize;
+    
+    // Use enumerate to find the player at the random index
+    for (index, player) in ctx.db.player().iter().enumerate() {
+        if index == random_index {
+            return Some(player);
+        }
+    }
+    
+    None
+}
+
+// Helper function to schedule the next EnderBolt attack
+fn schedule_next_ender_bolt_attack(ctx: &ReducerContext, boss_monster_id: u32) {
+    ctx.db.ender_bolt_scheduler().insert(EnderBoltScheduler {
+        scheduled_id: 0,
+        boss_monster_id,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(ENDER_BOLT_FIRE_INTERVAL_MS)),
+    });
 }

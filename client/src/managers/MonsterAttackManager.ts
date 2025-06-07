@@ -173,6 +173,8 @@ export class MonsterAttackManager {
         let spriteKey = 'monster_attack_firebolt'; // Default for most attacks
         if (attackType === 'EnderScytheSpawn' || attackType === 'EnderScythe') {
             spriteKey = 'void_scythe';
+        } else if (attackType === 'EnderBolt') {
+            spriteKey = 'void_bolt';
         }
         
         // Verify the texture exists
@@ -216,12 +218,16 @@ export class MonsterAttackManager {
                 sprite.setRotation(0);
                 break;
                 
+            case 'EnderBolt':
+                // EnderBolt doesn't rotate - keep it facing forward
+                sprite.setRotation(0);
+                break;
+                
             case 'EnderScythe':
                 // EnderScythe uses fast spinning effect (spinAngle) instead of orbital angle (parameterF)
                 sprite.setRotation(attackGraphicData.spinAngle);
                 break;
                 
-            case 'EnderBolt':
             case 'EnderClaw':
             case 'VoidZone':
                 // For other attack types, rotate based on direction vector

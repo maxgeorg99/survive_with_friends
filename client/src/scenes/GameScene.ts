@@ -203,6 +203,7 @@ export default class GameScene extends Phaser.Scene {
         // Load monster attack assets
         this.load.image('monster_attack_firebolt', '/assets/monster_attack_firebolt.png');
         this.load.image('void_scythe', '/assets/void_scythe.png');
+        this.load.image('void_bolt', '/assets/void_bolt.png');
         
         // Also load class icons with ClassSelectScene keys to keep them cached
         this.load.image('fighter_icon', '/assets/attack_sword.png');
