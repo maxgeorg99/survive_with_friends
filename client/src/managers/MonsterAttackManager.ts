@@ -138,6 +138,15 @@ export class MonsterAttackManager {
                 spinAngle: 0
             };
             
+            // Play sound effects for specific attack types when they spawn
+            if (attackType === 'ChaosBall') {
+                // Play boss_roar sound quietly when ChaosBall spawns
+                const soundManager = (window as any).soundManager;
+                if (soundManager) {
+                    soundManager.playSound('boss_roar', 0.3); // Quiet volume as requested
+                }
+            }
+            
             this.attackGraphics.set(attack.activeMonsterAttackId, attackGraphicData);
         } else {
             // Update the server position and time for existing monster attack graphic
@@ -175,6 +184,10 @@ export class MonsterAttackManager {
             spriteKey = 'void_scythe';
         } else if (attackType === 'EnderBolt') {
             spriteKey = 'void_bolt';
+        } else if (attackType === 'ChaosBall') {
+            spriteKey = 'void_ball';
+        } else if (attackType === 'VoidZone') {
+            spriteKey = 'void_zone';
         }
         
         // Verify the texture exists
@@ -228,12 +241,16 @@ export class MonsterAttackManager {
                 sprite.setRotation(attackGraphicData.spinAngle);
                 break;
                 
-            case 'EnderClaw':
-            case 'VoidZone':
-                // For other attack types, rotate based on direction vector
+            case 'ChaosBall':
+                // ChaosBall rotates in direction of motion
                 if (attackGraphicData.direction.length() > 0) {
                     sprite.setRotation(Math.atan2(attackGraphicData.direction.y, attackGraphicData.direction.x));
                 }
+                break;
+                
+            case 'VoidZone':
+                // VoidZone is stationary and doesn't rotate
+                sprite.setRotation(0);
                 break;
                 
             default:

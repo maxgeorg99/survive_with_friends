@@ -206,6 +206,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('void_scythe', '/assets/void_scythe.png');
         this.load.image('void_bolt', '/assets/void_bolt.png');
         this.load.image('void_zone', '/assets/void_zone.png');
+        this.load.image('void_ball', '/assets/void_ball.png');
         this.load.image('claw_spawn', '/assets/claw_spawn.png');
         
         // Also load class icons with ClassSelectScene keys to keep them cached
@@ -260,6 +261,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.audio('boss_teleport_cue', '/assets/sounds/boss_teleport_cue.mp3');
         this.load.audio('boss_vanish', '/assets/sounds/boss_vanish.mp3');
         this.load.audio('boss_appear', '/assets/sounds/boss_appear.mp3');
+        this.load.audio('boss_roar', '/assets/sounds/boss_roar.mp3');
         this.load.audio('boss_teleport_attack', '/assets/sounds/boss_teleport_attack.mp3');
         this.load.audio('boss_transform', '/assets/sounds/boss_transform.mp3');
         this.load.audio('voice_boss', '/assets/sounds/voice_boss.mp3');
@@ -285,6 +287,7 @@ export default class GameScene extends Phaser.Scene {
             console.log("monster_imp:", this.textures.exists('monster_imp'));
             console.log("monster_zombie:", this.textures.exists('monster_zombie'));
             console.log("monster_void_claw:", this.textures.exists('monster_void_claw'));
+            console.log("void_ball:", this.textures.exists('void_ball'));
             console.log("attack_sword:", this.textures.exists('attack_sword'));
             console.log("attack_wand:", this.textures.exists('attack_wand'));
             console.log("attack_knife:", this.textures.exists('attack_knife'));

@@ -179,6 +179,11 @@ pub fn spawn_boss_phase_two(ctx: &ReducerContext, position: DbVector2) {
     // Start EnderClaw spawning for Phase 2 boss
     log::info!("Starting EnderClaw spawning for Phase 2 boss {}", monster.monster_id);
     crate::monsters_def::start_ender_claw_spawning(ctx, monster.monster_id);
+    
+    // Start ChaosBall and VoidZone attacks for Phase 2 boss
+    log::info!("Starting ChaosBall and VoidZone attacks for Phase 2 boss {}", monster.monster_id);
+    crate::monster_attacks_def::start_chaos_ball_attacks(ctx, monster.monster_id);
+    crate::monster_attacks_def::start_void_zone_attacks(ctx, monster.monster_id);
 }
 
 // Called when phase 2 boss is defeated - all players defeat the game!
@@ -196,6 +201,9 @@ pub fn handle_boss_defeated(ctx: &ReducerContext) {
         crate::monster_attacks_def::cleanup_ender_scythe_schedules(ctx, game_state.boss_monster_id);
         // Clean up Imp attack schedules if the boss was an Imp
         crate::monster_attacks_def::cleanup_imp_attack_schedule(ctx, game_state.boss_monster_id);
+        // Clean up ChaosBall and VoidZone attack schedules for Phase 2 boss
+        crate::monster_attacks_def::cleanup_chaos_ball_schedules(ctx, game_state.boss_monster_id);
+        crate::monster_attacks_def::cleanup_void_zone_schedules(ctx, game_state.boss_monster_id);
     }
     
     // Reset game state

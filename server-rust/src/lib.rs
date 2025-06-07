@@ -76,7 +76,7 @@ pub enum MonsterAttackType {
     EnderBolt,
     EnderScytheSpawn,
     EnderScythe,
-    EnderClaw,
+    ChaosBall,
     VoidZone,
 }
 

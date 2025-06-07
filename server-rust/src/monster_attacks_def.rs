@@ -21,7 +21,23 @@ const ENDER_BOLT_RADIUS: f32 = 27.0;                 // Collision radius for End
 const ENDER_BOLT_DURATION_MS: u64 = 4000;            // Duration before EnderBolt expires
 const ENDER_BOLT_BASE_INTERVAL_MS: u64 = 1000;       // Base time between EnderBolt attacks (single player)
 const ENDER_BOLT_MIN_INTERVAL_MS: u64 = 50;         // Minimum time between EnderBolt attacks (many players)
-const ENDER_BOLT_INITIAL_DELAY_MS: u64 = 3500;       // Initial delay before first EnderBolt (after real scythes spawn)
+const ENDER_BOLT_INITIAL_DELAY_MS: u64 = 3500;
+
+// Configuration constants for ChaosBall attacks
+const CHAOS_BALL_DAMAGE: u32 = 35;                   // High damage piercing projectile
+const CHAOS_BALL_SPEED: f32 = 600.0;                 // Fast movement speed
+const CHAOS_BALL_RADIUS: f32 = 32.0;                 // Medium collision radius
+const CHAOS_BALL_DURATION_MS: u64 = 8000;            // Long lasting (8 seconds to cross map)
+const CHAOS_BALL_BASE_INTERVAL_MS: u64 = 2000;       // Base time between ChaosBall attacks (single player)
+const CHAOS_BALL_MIN_INTERVAL_MS: u64 = 400;         // Minimum time between ChaosBall attacks (many players)
+const CHAOS_BALL_INITIAL_DELAY_MS: u64 = 2000;       // Initial delay before first ChaosBall
+
+// Configuration constants for VoidZone attacks
+const VOID_ZONE_DAMAGE: u32 = 50;                    // Very high damage stationary attack
+const VOID_ZONE_RADIUS: f32 = 180.0;                 // Large area of effect
+const VOID_ZONE_DURATION_MS: u64 = 60000;             // Long lasting (6 seconds)
+const VOID_ZONE_INTERVAL_MS: u64 = 4000;             // Time between VoidZone attacks (8 seconds)
+const VOID_ZONE_INITIAL_DELAY_MS: u64 = 4000;        // Initial delay before first VoidZone       // Initial delay before first EnderBolt (after real scythes spawn)
 
 // Scheduled table for Imp attacks - Imps periodically fire ImpBolts at players
 #[table(name = imp_attack_scheduler, scheduled(trigger_imp_attack), public)]
@@ -75,6 +91,32 @@ pub struct EnderBoltScheduler {
     
     #[index(btree)]
     pub boss_monster_id: u32,     // The boss monster that will fire EnderBolt
+}
+
+// Scheduled table for ChaosBall attacks during Phase 2 boss
+#[table(name = chaos_ball_scheduler, scheduled(trigger_chaos_ball_attack), public)]
+pub struct ChaosBallScheduler {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    
+    pub scheduled_at: ScheduleAt, // When the next ChaosBall should fire
+    
+    #[index(btree)]
+    pub boss_monster_id: u32,     // The Phase 2 boss that will fire ChaosBall
+}
+
+// Scheduled table for VoidZone attacks during Phase 2 boss
+#[table(name = void_zone_scheduler, scheduled(trigger_void_zone_attack), public)]
+pub struct VoidZoneScheduler {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    
+    pub scheduled_at: ScheduleAt, // When the next VoidZone should spawn
+    
+    #[index(btree)]
+    pub boss_monster_id: u32,     // The Phase 2 boss that will spawn VoidZone
 }
 
 // Active monster attacks - tracks currently active monster attacks in the game
@@ -876,4 +918,275 @@ fn schedule_next_ender_bolt_attack(ctx: &ReducerContext, boss_monster_id: u32) {
     
     log::info!("Scheduled next EnderBolt for boss {} in {}ms ({} players active)", 
               boss_monster_id, fire_interval_ms, player_count);
+}
+
+// Reducer called when ChaosBall attacks should be triggered
+#[reducer]
+pub fn trigger_chaos_ball_attack(ctx: &ReducerContext, scheduler: ChaosBallScheduler) {
+    if ctx.sender != ctx.identity() {
+        panic!("trigger_chaos_ball_attack may not be invoked by clients, only via scheduling.");
+    }
+    
+    log::info!("DEBUG: trigger_chaos_ball_attack reducer fired! Scheduler ID: {}, Boss ID: {}", 
+              scheduler.scheduled_id, scheduler.boss_monster_id);
+
+    // Check if the boss monster still exists and is a Phase 2 boss
+    let boss_opt = ctx.db.monsters().monster_id().find(&scheduler.boss_monster_id);
+    let boss = match boss_opt {
+        Some(monster) => monster,
+        None => {
+            log::info!("Boss {} no longer exists, removing ChaosBall scheduler", scheduler.boss_monster_id);
+            return;
+        }
+    };
+
+    // Verify this is a Phase 2 boss
+    if boss.bestiary_id != crate::MonsterType::FinalBossPhase2 {
+        log::info!("Boss {} is not Phase 2, stopping ChaosBall attacks", scheduler.boss_monster_id);
+        return;
+    }
+
+    // Get the boss's current position from boid
+    let boid_opt = ctx.db.monsters_boid().monster_id().find(&scheduler.boss_monster_id);
+    let boss_position = match boid_opt {
+        Some(boid) => boid.position,
+        None => {
+            log::info!("Boss {} has no boid, removing ChaosBall scheduler", scheduler.boss_monster_id);
+            return;
+        }
+    };
+
+    // Find a random player to target
+    let target_player = find_random_player(ctx);
+    let target_player = match target_player {
+        Some(player) => player,
+        None => {
+            log::info!("No players found for boss {}, skipping ChaosBall attack", scheduler.boss_monster_id);
+            schedule_next_chaos_ball_attack(ctx, scheduler.boss_monster_id);
+            return;
+        }
+    };
+
+    // Calculate direction vector to the target player
+    let dx = target_player.position.x - boss_position.x;
+    let dy = target_player.position.y - boss_position.y;
+    let direction = DbVector2::new(dx, dy).normalize();
+
+    // Create the ChaosBall attack
+    let active_monster_attack = ctx.db.active_monster_attacks().insert(ActiveMonsterAttack {
+        active_monster_attack_id: 0,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(CHAOS_BALL_DURATION_MS)),
+        position: boss_position,
+        direction,
+        monster_attack_type: MonsterAttackType::ChaosBall,
+        piercing: true, // ChaosBall is piercing
+        damage: CHAOS_BALL_DAMAGE,
+        radius: CHAOS_BALL_RADIUS,
+        speed: CHAOS_BALL_SPEED,
+        parameter_u: target_player.player_id, // Store target player ID
+        parameter_f: 0.0, // No special parameter needed
+        ticks_elapsed: 0,
+    });
+
+    log::info!("Spawned ChaosBall {} targeting player {} ({}) from boss {}", 
+              active_monster_attack.active_monster_attack_id, target_player.name, target_player.player_id, scheduler.boss_monster_id);
+
+    // Schedule the next ChaosBall attack
+    schedule_next_chaos_ball_attack(ctx, scheduler.boss_monster_id);
+}
+
+// Reducer called when VoidZone attacks should be triggered  
+#[reducer]
+pub fn trigger_void_zone_attack(ctx: &ReducerContext, scheduler: VoidZoneScheduler) {
+    if ctx.sender != ctx.identity() {
+        panic!("trigger_void_zone_attack may not be invoked by clients, only via scheduling.");
+    }
+    
+    log::info!("DEBUG: trigger_void_zone_attack reducer fired! Scheduler ID: {}, Boss ID: {}", 
+              scheduler.scheduled_id, scheduler.boss_monster_id);
+
+    // Check if the boss monster still exists and is a Phase 2 boss
+    let boss_opt = ctx.db.monsters().monster_id().find(&scheduler.boss_monster_id);
+    let boss = match boss_opt {
+        Some(monster) => monster,
+        None => {
+            log::info!("Boss {} no longer exists, removing VoidZone scheduler", scheduler.boss_monster_id);
+            return;
+        }
+    };
+
+    // Verify this is a Phase 2 boss
+    if boss.bestiary_id != crate::MonsterType::FinalBossPhase2 {
+        log::info!("Boss {} is not Phase 2, stopping VoidZone attacks", scheduler.boss_monster_id);
+        return;
+    }
+
+    // Get the boss's current position from boid
+    let boid_opt = ctx.db.monsters_boid().monster_id().find(&scheduler.boss_monster_id);
+    let boss_position = match boid_opt {
+        Some(boid) => boid.position,
+        None => {
+            log::info!("Boss {} has no boid, removing VoidZone scheduler", scheduler.boss_monster_id);
+            return;
+        }
+    };
+
+    // Create the VoidZone attack centered on the boss (stationary)
+    let active_monster_attack = ctx.db.active_monster_attacks().insert(ActiveMonsterAttack {
+        active_monster_attack_id: 0,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(VOID_ZONE_DURATION_MS)),
+        position: boss_position,
+        direction: DbVector2::new(0.0, 0.0), // No movement for stationary attack
+        monster_attack_type: MonsterAttackType::VoidZone,
+        piercing: true, // VoidZone is piercing
+        damage: VOID_ZONE_DAMAGE,
+        radius: VOID_ZONE_RADIUS,
+        speed: 0.0, // Stationary
+        parameter_u: scheduler.boss_monster_id, // Store boss ID
+        parameter_f: 0.0, // No special parameter needed
+        ticks_elapsed: 0,
+    });
+
+    log::info!("Spawned VoidZone {} at position ({:.1}, {:.1}) from boss {}", 
+              active_monster_attack.active_monster_attack_id, boss_position.x, boss_position.y, scheduler.boss_monster_id);
+
+    // Schedule the next VoidZone attack
+    schedule_next_void_zone_attack(ctx, scheduler.boss_monster_id);
+}
+
+// Helper function to schedule the next ChaosBall attack with player scaling
+fn schedule_next_chaos_ball_attack(ctx: &ReducerContext, boss_monster_id: u32) {
+    // Count the number of active players
+    let player_count = ctx.db.player().iter().count() as u64;
+    
+    // Calculate scaled interval based on player count - faster with more players
+    // 1 player = base interval, 5+ players = minimum interval
+    let fire_interval_ms = if player_count <= 1 {
+        CHAOS_BALL_BASE_INTERVAL_MS
+    } else if player_count >= 5 {
+        CHAOS_BALL_MIN_INTERVAL_MS
+    } else {
+        // Linear interpolation between base and minimum for 2-4 players
+        let scale_factor = (player_count - 1) as f64 / 4.0; // 0.0 at 1 player, 1.0 at 5 players
+        let interval_range = CHAOS_BALL_BASE_INTERVAL_MS - CHAOS_BALL_MIN_INTERVAL_MS;
+        CHAOS_BALL_BASE_INTERVAL_MS - (interval_range as f64 * scale_factor) as u64
+    };
+    
+    ctx.db.chaos_ball_scheduler().insert(ChaosBallScheduler {
+        scheduled_id: 0,
+        boss_monster_id,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(fire_interval_ms)),
+    });
+    
+    log::info!("Scheduled next ChaosBall for boss {} in {}ms ({} players active)", 
+              boss_monster_id, fire_interval_ms, player_count);
+}
+
+// Helper function to schedule the next VoidZone attack (fixed interval)
+fn schedule_next_void_zone_attack(ctx: &ReducerContext, boss_monster_id: u32) {
+    ctx.db.void_zone_scheduler().insert(VoidZoneScheduler {
+        scheduled_id: 0,
+        boss_monster_id,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(VOID_ZONE_INTERVAL_MS)),
+    });
+    
+    log::info!("Scheduled next VoidZone for boss {} in {}ms", 
+              boss_monster_id, VOID_ZONE_INTERVAL_MS);
+}
+
+// Function to start ChaosBall attack scheduling for Phase 2 boss
+pub fn start_chaos_ball_attacks(ctx: &ReducerContext, boss_monster_id: u32) {
+    log::info!("DEBUG: start_chaos_ball_attacks called for boss {}", boss_monster_id);
+    
+    let scheduler = ctx.db.chaos_ball_scheduler().insert(ChaosBallScheduler {
+        scheduled_id: 0,
+        boss_monster_id,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(CHAOS_BALL_INITIAL_DELAY_MS)),
+    });
+
+    log::info!("Started ChaosBall attack schedule for boss {} (first attack in {}ms) - Scheduler ID: {}", 
+              boss_monster_id, CHAOS_BALL_INITIAL_DELAY_MS, scheduler.scheduled_id);
+}
+
+// Function to start VoidZone attack scheduling for Phase 2 boss
+pub fn start_void_zone_attacks(ctx: &ReducerContext, boss_monster_id: u32) {
+    log::info!("DEBUG: start_void_zone_attacks called for boss {}", boss_monster_id);
+    
+    let scheduler = ctx.db.void_zone_scheduler().insert(VoidZoneScheduler {
+        scheduled_id: 0,
+        boss_monster_id,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(VOID_ZONE_INITIAL_DELAY_MS)),
+    });
+
+    log::info!("Started VoidZone attack schedule for boss {} (first attack in {}ms) - Scheduler ID: {}", 
+              boss_monster_id, VOID_ZONE_INITIAL_DELAY_MS, scheduler.scheduled_id);
+}
+
+// Function to cleanup ChaosBall attack schedules when a boss dies or changes state
+pub fn cleanup_chaos_ball_schedules(ctx: &ReducerContext, boss_monster_id: u32) {
+    // Find and delete all scheduled ChaosBall attacks for this boss
+    let schedulers_to_delete: Vec<u64> = ctx.db.chaos_ball_scheduler()
+        .boss_monster_id()
+        .filter(&boss_monster_id)
+        .map(|scheduler| scheduler.scheduled_id)
+        .collect();
+    
+    let count = schedulers_to_delete.len();
+    
+    for scheduled_id in schedulers_to_delete {
+        ctx.db.chaos_ball_scheduler().scheduled_id().delete(&scheduled_id);
+    }
+
+    // Also cleanup all ACTIVE ChaosBall attacks that are flying around
+    let active_attacks_to_delete: Vec<u64> = ctx.db.active_monster_attacks().iter()
+        .filter(|attack| attack.monster_attack_type == MonsterAttackType::ChaosBall)
+        .map(|attack| attack.active_monster_attack_id)
+        .collect();
+    
+    let active_count = active_attacks_to_delete.len();
+    
+    for attack_id in active_attacks_to_delete {
+        ctx.db.active_monster_attacks().active_monster_attack_id().delete(&attack_id);
+    }
+
+    if count > 0 || active_count > 0 {
+        log::info!("Cleaned up {} ChaosBall schedulers and {} active ChaosBall attacks for boss {}", 
+                  count, active_count, boss_monster_id);
+    }
+}
+
+// Function to cleanup VoidZone attack schedules when a boss dies or changes state
+pub fn cleanup_void_zone_schedules(ctx: &ReducerContext, boss_monster_id: u32) {
+    // Find and delete all scheduled VoidZone attacks for this boss
+    let schedulers_to_delete: Vec<u64> = ctx.db.void_zone_scheduler()
+        .boss_monster_id()
+        .filter(&boss_monster_id)
+        .map(|scheduler| scheduler.scheduled_id)
+        .collect();
+    
+    let count = schedulers_to_delete.len();
+    
+    for scheduled_id in schedulers_to_delete {
+        ctx.db.void_zone_scheduler().scheduled_id().delete(&scheduled_id);
+    }
+
+    // Also cleanup all ACTIVE VoidZone attacks that are active
+    let active_attacks_to_delete: Vec<u64> = ctx.db.active_monster_attacks().iter()
+        .filter(|attack| {
+            attack.monster_attack_type == MonsterAttackType::VoidZone &&
+            attack.parameter_u == boss_monster_id
+        })
+        .map(|attack| attack.active_monster_attack_id)
+        .collect();
+    
+    let active_count = active_attacks_to_delete.len();
+    
+    for attack_id in active_attacks_to_delete {
+        ctx.db.active_monster_attacks().active_monster_attack_id().delete(&attack_id);
+    }
+
+    if count > 0 || active_count > 0 {
+        log::info!("Cleaned up {} VoidZone schedulers and {} active VoidZone attacks for boss {}", 
+                  count, active_count, boss_monster_id);
+    }
 }
