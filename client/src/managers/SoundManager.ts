@@ -179,6 +179,11 @@ export default class SoundManager {
         ]);
     }
 
+    playBossPreTransformSound(): void {
+        // Play the pre-transform voice line during phase 1 to phase 2 transition
+        this.playSound('voice_transform', 1.0);
+    }
+
     // Enable/disable sound effects
     setSoundsEnabled(enabled: boolean): void {
         this.soundsEnabled = enabled;

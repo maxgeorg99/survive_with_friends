@@ -39,6 +39,7 @@ export default class MonsterManager {
     private timeOfBossPhase1Death: number = 0;
     private bossMonsterId: number = 0;
     private bossPosition: { x: number, y: number } | null = null;
+    private bossPreTransformActive: boolean = false; // Prevent duplicate pre-transform effects
     
     // Add SoundManager for boss audio cues (using global instance)
     private soundManager: any;
@@ -260,17 +261,27 @@ export default class MonsterManager {
             }
             
             if (monsterType === 'FinalBossPhase1') {
-                console.log(`*** BOSS PHASE 1 DEFEATED (ID: ${monsterId})! Waiting for phase 2 to spawn... ***`);
+                console.log(`*** BOSS PHASE 1 DEFEATED (ID: ${monsterId})! Starting pre-transform sequence... ***`);
+                
+                // Check if pre-transform is already active to prevent duplicates
+                if (this.bossPreTransformActive) {
+                    console.log("Pre-transform already active, ignoring duplicate boss death event");
+                    return;
+                }
                 
                 // Set tracking variables to monitor phase transition
                 this.bossPhase1Killed = true;
                 this.timeOfBossPhase1Death = Date.now();
                 this.bossMonsterId = monsterId;
                 this.bossPosition = { x: monsterContainer.x, y: monsterContainer.y };
+                this.bossPreTransformActive = true;
                 console.log(`Boss position stored: (${this.bossPosition.x}, ${this.bossPosition.y})`);
                 
-                // Add a visual indicator for phase transition
-                this.createBossTransformationEffect(monsterContainer.x, monsterContainer.y);
+                // Create pre-transform VFX with the boss sprite and delay phase 2 spawning
+                this.createBossPreTransformEffect(monsterContainer);
+                
+                // Don't remove the monster container yet - the pre-transform effect will handle cleanup
+                return; // Early return to prevent normal monster removal
             } else if (monsterType === 'FinalBossPhase2') {
                 console.log(`*** FINAL BOSS DEFEATED (ID: ${monsterId})! GAME COMPLETE! ***`);
             }
@@ -331,6 +342,10 @@ export default class MonsterManager {
         });
         this.bossAfterImages.length = 0; // Clear array
         this.bossesInChaseMode.clear();
+        
+        // Reset boss transition state
+        this.bossPhase1Killed = false;
+        this.bossPreTransformActive = false;
         
         console.log("MonsterManager shutdown complete");
     }
@@ -441,6 +456,7 @@ export default class MonsterManager {
                     const transitionTime = Date.now() - this.timeOfBossPhase1Death;
                     console.log(`Phase transition took ${transitionTime}ms from phase 1 death to phase 2 spawn`);
                     this.bossPhase1Killed = false;
+                    this.bossPreTransformActive = false; // Reset pre-transform flag for Phase 2
                 }
                 
                 // Play the dark transformation effect
@@ -616,6 +632,105 @@ export default class MonsterManager {
             onComplete: () => {
                 text.destroy();
             }
+        });
+    }
+    
+    // Create pre-transform effect for boss phase 1 to phase 2 transition
+    private createBossPreTransformEffect(bossContainer: Phaser.GameObjects.Container) {
+        console.log(`Creating boss pre-transform effect at (${bossContainer.x}, ${bossContainer.y})`);
+        
+        // Get the boss sprite from the container
+        const bossSprite = bossContainer.list.find(child => child instanceof Phaser.GameObjects.Sprite) as Phaser.GameObjects.Sprite;
+        if (!bossSprite) {
+            console.error("No boss sprite found in container for pre-transform effect");
+            return;
+        }
+        
+        // Play the pre-transform voice line
+        this.soundManager.playBossPreTransformSound();
+        
+        // Create a copy of the boss sprite for the pre-transform effect
+        const transformingSprite = this.scene.add.sprite(bossContainer.x, bossContainer.y, bossSprite.texture.key);
+        transformingSprite.setScale(bossSprite.scaleX, bossSprite.scaleY);
+        transformingSprite.setRotation(bossSprite.rotation);
+        transformingSprite.setDepth(bossContainer.depth + 1); // Above the original boss
+        
+        // Start the pre-transform visual effect - growing purple tint and scale
+        const scaleTween = this.scene.tweens.add({
+            targets: transformingSprite,
+            scaleX: bossSprite.scaleX * 1.2,
+            scaleY: bossSprite.scaleY * 1.2,
+            duration: 1500,
+            ease: 'Power2.easeOut'
+        });
+        
+        // Purple tint effect - gradually increase purple tint
+        let purpleTintStrength = 0;
+        const purpleTintTween = this.scene.tweens.add({
+            targets: { tint: 0 },
+            tint: 1,
+            duration: 1500,
+            ease: 'Power2.easeIn',
+            onUpdate: (tween) => {
+                if (transformingSprite && transformingSprite.active) {
+                    const progress = tween.progress;
+                    purpleTintStrength = progress;
+                    // Blend from normal color to purple
+                    const r = Math.floor(255 * (1 - progress * 0.7)); // Reduce red
+                    const g = Math.floor(255 * (1 - progress * 0.8)); // Reduce green more
+                    const b = Math.floor(255 * (1 - progress * 0.3)); // Keep more blue
+                    const tintColor = (r << 16) | (g << 8) | b;
+                    transformingSprite.setTint(tintColor);
+                }
+            }
+        });
+        
+        // Add pulsing energy effect
+        const energyPulse = this.scene.add.circle(bossContainer.x, bossContainer.y, 50, 0x8800ff, 0.3);
+        energyPulse.setDepth(bossContainer.depth);
+        
+        const pulseTween = this.scene.tweens.add({
+            targets: energyPulse,
+            radius: { from: 50, to: 120 },
+            alpha: { from: 0.3, to: 0.1 },
+            duration: 1500,
+            ease: 'Power2.easeOut',
+            yoyo: true,
+            repeat: 1
+        });
+        
+        // After 1.5 seconds, clean up pre-transform effects
+        this.scene.time.delayedCall(1500, () => {
+            console.log("Pre-transform complete, cleaning up pre-transform effects...");
+            
+            // Stop all tweens first to prevent callbacks on destroyed objects
+            if (scaleTween) {
+                scaleTween.stop();
+            }
+            if (purpleTintTween) {
+                purpleTintTween.stop();
+            }
+            if (pulseTween) {
+                pulseTween.stop();
+            }
+            
+            // Clean up the pre-transform sprites
+            transformingSprite.destroy();
+            energyPulse.destroy();
+            
+            // Now remove the original boss container (server should have already handled the monster deletion)
+            const monsterId = this.bossMonsterId;
+            if (this.monsters.has(monsterId)) {
+                const originalContainer = this.monsters.get(monsterId);
+                if (originalContainer) {
+                    originalContainer.destroy();
+                }
+                this.monsters.delete(monsterId);
+                console.log(`Cleaned up original boss container for monster ${monsterId}`);
+            }
+            
+            // Reset the pre-transform flag
+            this.bossPreTransformActive = false;
         });
     }
     

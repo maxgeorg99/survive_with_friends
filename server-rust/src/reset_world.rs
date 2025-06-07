@@ -1,5 +1,5 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp};
-use crate::{entity, monsters, monsters_boid, gems, monster_spawners, boss_spawn_timer, game_state, monster_spawn_timer, monster_hit_cleanup, active_attack_cleanup, attack_burst_cooldowns, player_scheduled_attacks, monster_damage, player, upgrade_options, active_attacks, loot_capsule_defs, winner_transition_timer, dead_player_transition_timer};
+use crate::{entity, monsters, monsters_boid, gems, monster_spawners, boss_spawn_timer, boss_phase_two_timer, game_state, monster_spawn_timer, monster_hit_cleanup, active_attack_cleanup, attack_burst_cooldowns, player_scheduled_attacks, monster_damage, player, upgrade_options, active_attacks, loot_capsule_defs, winner_transition_timer, dead_player_transition_timer};
 
 // ResetWorld reducer - clears all monsters, gems, monster spawners, and resets boss state
 // This should be called when the last player dies
@@ -64,6 +64,17 @@ pub fn reset_world(ctx: &ReducerContext) {
     }
     
     log::info!("ResetWorld: Cleared {} boss spawn timers", boss_timer_count);
+    
+    // 4.5. Clear boss phase 2 timers
+    let mut boss_phase2_timer_count = 0;
+    
+    let boss_phase2_timers_to_delete: Vec<u64> = ctx.db.boss_phase_two_timer().iter().map(|t| t.scheduled_id).collect();
+    for scheduled_id in boss_phase2_timers_to_delete {
+        ctx.db.boss_phase_two_timer().scheduled_id().delete(&scheduled_id);
+        boss_phase2_timer_count += 1;
+    }
+    
+    log::info!("ResetWorld: Cleared {} boss phase 2 timers", boss_phase2_timer_count);
     
     // 5. Reset game state (boss status)
     if let Some(mut game_state) = ctx.db.game_state().id().find(&0) {

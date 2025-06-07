@@ -23,6 +23,16 @@ pub struct BossSpawnTimer {
     pub scheduled_at: ScheduleAt,
 }
 
+// Timer for delayed boss phase 2 spawn (to allow pre-transform VFX)
+#[table(name = boss_phase_two_timer, scheduled(spawn_boss_phase_two_delayed), public)]
+pub struct BossPhase2Timer {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    pub position: DbVector2,
+    pub scheduled_at: ScheduleAt,
+}
+
 // Initialize the game state
 pub fn init_game_state(ctx: &ReducerContext) {
     log::info!("Initializing game state...");
@@ -271,4 +281,30 @@ pub fn update_boss_monster_id(ctx: &ReducerContext, monster_id: u32) {
 
         ctx.db.game_state().id().update(game_state);
     }
+}
+
+// Schedule boss phase 2 spawn with delay for pre-transform VFX
+pub fn schedule_boss_phase_two_spawn(ctx: &ReducerContext, position: DbVector2) {
+    log::info!("Scheduling boss phase 2 spawn at ({}, {}) with 1.5 second delay", position.x, position.y);
+    
+    const PHASE_2_DELAY_MS: u64 = 1500; // 1.5 seconds delay for pre-transform VFX
+    
+    ctx.db.boss_phase_two_timer().insert(BossPhase2Timer {
+        scheduled_id: 0,
+        position,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(PHASE_2_DELAY_MS)),
+    });
+}
+
+// Called when the delayed boss phase 2 timer fires
+#[reducer]
+pub fn spawn_boss_phase_two_delayed(ctx: &ReducerContext, timer: BossPhase2Timer) {
+    if ctx.sender != ctx.identity() {
+        panic!("Reducer spawn_boss_phase_two_delayed may not be invoked by clients, only via scheduling.");
+    }
+
+    log::info!("Delayed boss phase 2 spawn timer triggered at ({}, {})", timer.position.x, timer.position.y);
+    
+    // Call the existing spawn_boss_phase_two function
+    spawn_boss_phase_two(ctx, timer.position);
 }

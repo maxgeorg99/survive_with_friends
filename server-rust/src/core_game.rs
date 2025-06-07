@@ -81,10 +81,10 @@ pub fn damage_monster(ctx: &ReducerContext, monster_id: u32, damage_amount: u32)
                     // Store the entity ID and position before deletion
                     let boss_position = position;
                     
-                    // Spawn phase 2 first, before deleting phase 1
-                    log::info!("Calling spawn_boss_phase_two now...");
-                    crate::boss_system::spawn_boss_phase_two(ctx, boss_position);
-                    log::info!("spawn_boss_phase_two completed successfully");
+                    // Schedule phase 2 spawn after 1.5 second delay to allow pre-transform VFX
+                    log::info!("Scheduling spawn_boss_phase_two with 1.5 second delay for pre-transform...");
+                    crate::boss_system::schedule_boss_phase_two_spawn(ctx, boss_position);
+                    log::info!("Boss phase 2 spawn scheduled successfully");
                     
                     // Clean up boss attack schedules
                     if monster.bestiary_id == MonsterType::Imp {

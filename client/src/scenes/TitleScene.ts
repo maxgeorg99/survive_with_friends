@@ -121,6 +121,7 @@ export default class TitleScene extends Phaser.Scene {
                 this.load.audio('voice_boss', '/assets/sounds/voice_boss.mp3');
                 this.load.audio('boss_transform', '/assets/sounds/boss_transform.mp3');
                 this.load.audio('voice_boss_2', '/assets/sounds/voice_boss_2.mp3');
+                this.load.audio('voice_transform', '/assets/sounds/voice_transform.mp3');
                 
                 // Load UI and menu sound effects
                 this.load.audio('voice_name', '/assets/sounds/voice_name.mp3');

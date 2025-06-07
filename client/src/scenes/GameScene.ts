@@ -261,6 +261,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.audio('boss_transform', '/assets/sounds/boss_transform.mp3');
         this.load.audio('voice_boss', '/assets/sounds/voice_boss.mp3');
         this.load.audio('voice_boss_2', '/assets/sounds/voice_boss_2.mp3');
+        this.load.audio('voice_transform', '/assets/sounds/voice_transform.mp3');
         
         // Add error handling for file loading errors
         this.load.on('loaderror', (fileObj: any) => {
