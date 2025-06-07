@@ -247,6 +247,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.audio('void_capsule_spawned', '/assets/sounds/void_capsule_spawned.mp3');
         this.load.audio('void_capsule_lands', '/assets/sounds/void_capsule_lands.mp3');
         this.load.audio('void_chest_destroyed', '/assets/sounds/void_chest_destroyed.mp3');
+        this.load.audio('upgrade_bar_fill', '/assets/sounds/upgrade_bar_fill.mp3');
         
         // Load boss audio files
         this.load.audio('boss_chase_cue', '/assets/sounds/boss_chase_cue.mp3');
@@ -297,6 +298,7 @@ export default class GameScene extends Phaser.Scene {
             console.log("void_capsule_spawned:", this.cache.audio.exists('void_capsule_spawned'));
             console.log("void_capsule_lands:", this.cache.audio.exists('void_capsule_lands'));
             console.log("void_chest_destroyed:", this.cache.audio.exists('void_chest_destroyed'));
+            console.log("upgrade_bar_fill:", this.cache.audio.exists('upgrade_bar_fill'));
             console.log("boss_chase_cue:", this.cache.audio.exists('boss_chase_cue'));
             console.log("voice_boss:", this.cache.audio.exists('voice_boss'));
         });

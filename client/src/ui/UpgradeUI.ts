@@ -75,6 +75,9 @@ export default class UpgradeUI {
     
     // Track which pointers are being handled by UI to prevent movement
     private handledPointers: Set<number> = new Set();
+    
+    // Track the upgrade bar fill sound instance
+    private upgradeBarFillSound: Phaser.Sound.BaseSound | null = null;
 
     constructor(scene: Phaser.Scene, spacetimeClient: SpacetimeDBClient, localPlayerId: number) {
         this.scene = scene;
@@ -351,6 +354,19 @@ export default class UpgradeUI {
             holdState.progressBar.width = 0; // Reset width
         }
         
+        // Play upgrade bar fill sound
+        if (!this.upgradeBarFillSound) {
+            try {
+                this.upgradeBarFillSound = this.scene.sound.add('upgrade_bar_fill', { 
+                    volume: 0.7,
+                    loop: true // Loop the sound while holding
+                });
+                this.upgradeBarFillSound.play();
+            } catch (error) {
+                console.warn("Failed to play upgrade bar fill sound:", error);
+            }
+        }
+        
         // Add visual feedback to the card
         const card = this.cards[index];
         if (card) {
@@ -376,6 +392,17 @@ export default class UpgradeUI {
         if (holdState.holdTimer) {
             holdState.holdTimer.destroy();
             holdState.holdTimer = null;
+        }
+        
+        // Stop upgrade bar fill sound
+        if (this.upgradeBarFillSound) {
+            try {
+                this.upgradeBarFillSound.stop();
+                this.upgradeBarFillSound.destroy();
+                this.upgradeBarFillSound = null;
+            } catch (error) {
+                console.warn("Failed to stop upgrade bar fill sound:", error);
+            }
         }
         
         // Hide progress bars
@@ -571,6 +598,17 @@ export default class UpgradeUI {
             this.cancelHold(index);
         });
         
+        // Stop upgrade bar fill sound if playing
+        if (this.upgradeBarFillSound) {
+            try {
+                this.upgradeBarFillSound.stop();
+                this.upgradeBarFillSound.destroy();
+                this.upgradeBarFillSound = null;
+            } catch (error) {
+                console.warn("Failed to stop upgrade bar fill sound in hide:", error);
+            }
+        }
+        
         // Clear all handled pointers when hiding
         this.handledPointers.clear();
     }
@@ -580,6 +618,17 @@ export default class UpgradeUI {
         this.cardHoldStates.forEach((_, index) => {
             this.cancelHold(index);
         });
+        
+        // Stop upgrade bar fill sound if playing
+        if (this.upgradeBarFillSound) {
+            try {
+                this.upgradeBarFillSound.stop();
+                this.upgradeBarFillSound.destroy();
+                this.upgradeBarFillSound = null;
+            } catch (error) {
+                console.warn("Failed to stop upgrade bar fill sound in destroy:", error);
+            }
+        }
         
         // Clear handled pointers
         this.handledPointers.clear();
