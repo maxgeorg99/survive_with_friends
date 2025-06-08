@@ -1,8 +1,9 @@
+import { getSoundVolume, setSoundVolume, initializeGlobalVolumes } from './VolumeSettings';
+
 export default class SoundManager {
     private scene: Phaser.Scene | null = null;
     private soundsEnabled: boolean = true;
     private defaultVolume: number = 0.8;
-    private soundVolumeMultiplier: number = 1.0; // Global sound effects volume multiplier
     private soundPool: Map<string, Phaser.Sound.BaseSound[]> = new Map();
     private lastDistanceSoundTime: Map<string, number> = new Map(); // Track per sound type
     private distanceSoundThrottle: number = 50; // Reduced from 100ms to 50ms for better responsiveness
@@ -16,6 +17,9 @@ export default class SoundManager {
         if (scene) {
             this.scene = scene;
         }
+        
+        // Initialize global volume settings
+        initializeGlobalVolumes();
         
         // Register sounds that should be limited to once per frame
         this.frameThrottledSounds.add('attack_fire');
@@ -100,7 +104,7 @@ export default class SoundManager {
         }
 
         // Apply global sound volume multiplier to all volumes
-        const adjustedVolume = volume * this.soundVolumeMultiplier;
+        const adjustedVolume = volume * getSoundVolume();
 
         // Check for frame-based throttling
         if (this.frameThrottledSounds.has(soundKey)) {
@@ -197,7 +201,7 @@ export default class SoundManager {
 
     // Set global sound volume multiplier (affects ALL sound effects)
     setSoundVolumeMultiplier(multiplier: number): void {
-        this.soundVolumeMultiplier = Math.max(0, Math.min(1, multiplier)); // Clamp between 0 and 1
+        setSoundVolume(multiplier);
     }
 
     // Check if sounds are enabled

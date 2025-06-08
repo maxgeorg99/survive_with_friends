@@ -1109,15 +1109,28 @@ export default class GameScene extends Phaser.Scene {
                     // Play player damage sound (only if not already playing)
                     if (!this.isPlayerDamageSoundPlaying) {
                         this.isPlayerDamageSoundPlaying = true;
-                        // Try to get the sound instance to listen for completion
-                        try {
-                            const sound = this.sound.add('player_damage', { volume: 1.0 });
-                            sound.once('complete', () => {
+                        
+                        // Use SoundManager for consistent volume control
+                        const soundManager = (window as any).soundManager;
+                        if (soundManager) {
+                            soundManager.playSound('player_damage', 1.0);
+                            
+                            // Reset flag after a short delay (since we can't listen for completion with SoundManager)
+                            this.time.delayedCall(500, () => {
                                 this.isPlayerDamageSoundPlaying = false;
                             });
-                            sound.play();
-                        } catch (error) {
-                            console.log("Failed to play player damage sound via Phaser, falling back to soundManager");
+                        } else {
+                            // Fallback to direct Phaser sound
+                            try {
+                                const sound = this.sound.add('player_damage', { volume: 1.0 });
+                                sound.once('complete', () => {
+                                    this.isPlayerDamageSoundPlaying = false;
+                                });
+                                sound.play();
+                            } catch (error) {
+                                console.log("Failed to play player damage sound");
+                                this.isPlayerDamageSoundPlaying = false;
+                            }
                         }
                     }
                 }

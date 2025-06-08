@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { getMusicVolume, setMusicVolume, getSoundVolume, setSoundVolume, initializeGlobalVolumes } from '../managers/VolumeSettings';
 
 // Settings interface for localStorage
 interface GameSettings {
@@ -26,6 +27,10 @@ export default class OptionsUI {
 
     constructor(scene: Phaser.Scene) {
         this.scene = scene;
+        
+        // Initialize global volumes first
+        initializeGlobalVolumes();
+        
         this.settings = this.loadSettings();
         this.createUI();
         this.applySettings();
@@ -79,6 +84,9 @@ export default class OptionsUI {
         this.settings.musicVolume = value;
         this.saveSettings();
         
+        // Update global volume
+        setMusicVolume(value);
+        
         // Apply to music manager
         const musicManager = (this.scene as any).musicManager;
         if (musicManager && musicManager.setVolume) {
@@ -89,6 +97,9 @@ export default class OptionsUI {
     protected onSoundVolumeChanged(value: number): void {
         this.settings.soundVolume = value;
         this.saveSettings();
+        
+        // Update global volume
+        setSoundVolume(value);
         
         // Apply to sound manager using the new multiplier method
         const soundManager = (window as any).soundManager;
@@ -124,12 +135,24 @@ export default class OptionsUI {
             const stored = localStorage.getItem('vibesurvivors_settings');
             if (stored) {
                 const parsed = JSON.parse(stored);
-                return { ...DEFAULT_SETTINGS, ...parsed };
+                const settings = { ...DEFAULT_SETTINGS, ...parsed };
+                
+                // Sync loaded settings with global volumes
+                setMusicVolume(settings.musicVolume);
+                setSoundVolume(settings.soundVolume);
+                
+                return settings;
             }
         } catch (error) {
             console.warn('Failed to load settings from localStorage:', error);
         }
-        return { ...DEFAULT_SETTINGS };
+        
+        // Use default settings and sync with global volumes
+        const defaultSettings = { ...DEFAULT_SETTINGS };
+        setMusicVolume(defaultSettings.musicVolume);
+        setSoundVolume(defaultSettings.soundVolume);
+        
+        return defaultSettings;
     }
 
     protected saveSettings(): void {
@@ -141,6 +164,10 @@ export default class OptionsUI {
     }
 
     protected applySettings(): void {
+        // Sync settings with global volumes
+        setMusicVolume(this.settings.musicVolume);
+        setSoundVolume(this.settings.soundVolume);
+        
         // Apply music volume
         const musicManager = (this.scene as any).musicManager;
         if (musicManager && musicManager.setVolume) {
