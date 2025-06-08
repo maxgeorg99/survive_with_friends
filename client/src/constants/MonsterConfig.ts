@@ -7,6 +7,7 @@ export const MONSTER_ASSET_KEYS: Record<string, string> = {
     "Orc": 'monster_orc',
     "Imp": 'monster_imp',
     "Zombie": 'monster_zombie',
+    "Bat": 'monster_bat',
     "FinalBossPhase1": 'final_boss_phase1',
     "FinalBossPhase2": 'final_boss_phase2',
     "VoidChest": 'treasure_chest',
@@ -20,6 +21,7 @@ export const MONSTER_SHADOW_OFFSETS_X: Record<string, number> = {
     "Orc": 0,      // Larger monster, bigger shadow offset
     "Imp": -8,     // Small magical creature, slight offset
     "Zombie": 6,  // Medium sized humanoid, small offset
+    "Bat": -8,     // Small flying creature, slight offset
     "FinalBossPhase1": -26,  // Large boss, bigger shadow offset
     "FinalBossPhase2": -68,   // Even larger final form, largest shadow offset
     "VoidChest": -28,    // Chest is centered
@@ -33,6 +35,7 @@ export const MONSTER_SHADOW_OFFSETS_Y: Record<string, number> = {
     "Orc": 0,      // Larger monster, bigger shadow offset
     "Imp": -8,    // Small flying/floating creature, higher offset
     "Zombie": 6, // Medium sized shambling creature, moderate offset
+    "Bat": 24,    // Flying creature, higher offset for airborne shadow
     "FinalBossPhase1": -4,  // Large boss, bigger shadow offset
     "FinalBossPhase2": -78,   // Even larger final form, largest shadow offset
     "VoidChest": -66,    // Chest sits on the ground with small offset
@@ -45,6 +48,7 @@ export const MONSTER_SHADOW_SCALE: Record<string, number> = {
     "Orc": 1.0,
     "Imp": 1.0,       // Normal scale for small magical creature
     "Zombie": 1.2,    // Slightly larger shadow for zombie
+    "Bat": 0.8,       // Smaller shadow for small flying creature
     "FinalBossPhase1": 2.0,
     "FinalBossPhase2": 6.5,
     "VoidChest": 2.75,

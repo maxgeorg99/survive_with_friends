@@ -12,4 +12,5 @@ pub enum MonsterType {
     Imp = 6,
     Zombie = 7,
     EnderClaw = 8,
+    Bat = 9,
 } 

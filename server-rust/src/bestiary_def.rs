@@ -115,5 +115,15 @@ pub fn init_bestiary(ctx: &ReducerContext) {
         radius: 48.0,      // Medium radius (similar to Orc)
     });
 
+    // Insert Bat stats - fast, small, bit damaging but not tough
+    ctx.db.bestiary().insert(Bestiary {
+        bestiary_id: MonsterType::Bat as u32,
+        monster_type: MonsterType::Bat,
+        max_hp: 15,         // Low HP (even lower than Rat)
+        speed: 130.0,       // Fast (faster than Rat but not as fast as bosses)  
+        atk: 1.8,          // Moderate attack (between Rat and Slime)
+        radius: 28.0,      // Small radius (smaller than Rat)
+    });
+
     log::info!("Bestiary initialization complete");
 } 

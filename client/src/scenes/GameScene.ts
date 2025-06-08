@@ -189,6 +189,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('monster_orc', '/assets/monster_orc.png');
         this.load.image('monster_imp', '/assets/monster_imp.png');
         this.load.image('monster_zombie', '/assets/monster_zombie.png');
+        this.load.image('monster_bat', '/assets/monster_bat.png');
         this.load.image('monster_void_claw', '/assets/monster_void_claw.png');
         this.load.image('monster_spawn_indicator', '/assets/monster_spawn_indicator.png');
         
@@ -298,6 +299,7 @@ export default class GameScene extends Phaser.Scene {
             console.log("monster_orc:", this.textures.exists('monster_orc'));
             console.log("monster_imp:", this.textures.exists('monster_imp'));
             console.log("monster_zombie:", this.textures.exists('monster_zombie'));
+            console.log("monster_bat:", this.textures.exists('monster_bat'));
             console.log("monster_void_claw:", this.textures.exists('monster_void_claw'));
             console.log("void_ball:", this.textures.exists('void_ball'));
             console.log("attack_sword:", this.textures.exists('attack_sword'));

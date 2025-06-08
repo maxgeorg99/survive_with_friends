@@ -13,6 +13,7 @@ const SPAWNABLE_MONSTER_TYPES: &[MonsterType] = &[
     MonsterType::Orc,
     MonsterType::Imp,
     MonsterType::Zombie,
+    MonsterType::Bat,
     // Add new normal monster types here as they are created
     // Bosses are excluded from this list to prevent them from spawning randomly
 ];
@@ -1067,5 +1068,6 @@ fn get_monster_type_name(bestiary_id: &MonsterType) -> &'static str {
         MonsterType::Imp => "Imp",
         MonsterType::Zombie => "Zombie",
         MonsterType::EnderClaw => "EnderClaw",
+        MonsterType::Bat => "Bat",
     }
 }

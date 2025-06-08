@@ -629,6 +629,7 @@ export default class MonsterManager {
             case 6: return "Imp";
             case 7: return "Zombie";
             case 8: return "EnderClaw";
+            case 9: return "Bat";
             default: 
                 console.warn(`Unknown monster type: ${bestiaryId}`);
                 return "Unknown";
