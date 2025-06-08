@@ -1,16 +1,16 @@
 use spacetimedb::SpacetimeType;
 
 // Monster types enum
-#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+#[derive(SpacetimeType, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum MonsterType {
     Rat = 0,
     Slime = 1,
-    Orc = 2,
-    FinalBossPhase1 = 3,
-    FinalBossPhase2 = 4,
-    VoidChest = 5,
-    Imp = 6,
-    Zombie = 7,
-    EnderClaw = 8,
-    Bat = 9,
+    Bat = 2,
+    Orc = 3,
+    Imp = 4,
+    Zombie = 5,
+    VoidChest = 6,
+    EnderClaw = 7,
+    FinalBossPhase1 = 8,
+    FinalBossPhase2 = 9,
 } 

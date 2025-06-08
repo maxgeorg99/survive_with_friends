@@ -6,17 +6,8 @@ use crate::monster_ai_defs::AIState;
 use std::collections::HashMap;
 use std::time::Duration;
 
-// Define which monster types can spawn during normal gameplay (excludes bosses)
-const SPAWNABLE_MONSTER_TYPES: &[MonsterType] = &[
-    MonsterType::Rat,
-    MonsterType::Slime,
-    MonsterType::Orc,
-    MonsterType::Imp,
-    MonsterType::Zombie,
-    MonsterType::Bat,
-    // Add new normal monster types here as they are created
-    // Bosses are excluded from this list to prevent them from spawning randomly
-];
+// Note: Monster spawning is now handled by tier-based weights in monster_spawn_defs.rs
+// VoidChests still have a fixed 0.5% spawn chance regardless of tier
 
 // Main monsters table
 #[table(name = monsters, public)]
@@ -178,7 +169,10 @@ pub fn pre_spawn_monster(ctx: &ReducerContext, _timer: &MonsterSpawnTimer) {
         return;
     }
     
-    // Get a random monster type FROM THE SPAWNABLE LIST (not from all monster types)
+    // Calculate current tier based on elapsed game time
+    let current_tier = crate::monster_spawn_defs::calculate_current_tier(ctx);
+    
+    // Get a random monster type using tier-based weights
     let mut rng = ctx.rng();
     
     // 5% chance to spawn a rare VoidChest instead of regular monsters
@@ -187,9 +181,8 @@ pub fn pre_spawn_monster(ctx: &ReducerContext, _timer: &MonsterSpawnTimer) {
         // Rare VoidChest spawn (5% chance)
         MonsterType::VoidChest
     } else {
-        // Regular monster spawn (95% chance)
-        let random_type_index = (rng.gen::<f32>() * SPAWNABLE_MONSTER_TYPES.len() as f32) as usize;
-        SPAWNABLE_MONSTER_TYPES[random_type_index].clone()
+        // Regular monster spawn using tier-based weights (95% chance)
+        crate::monster_spawn_defs::select_weighted_monster_type(ctx, current_tier)
     };
     
     // Get monster stats from bestiary using the monster type as numerical ID
@@ -351,10 +344,10 @@ pub fn get_closest_player(ctx: &ReducerContext, position: &DbVector2) -> u32 {
 pub fn schedule_monster_spawning(ctx: &ReducerContext) {
     log::info!("Scheduling monster spawning...");
     
-    // Schedule monster spawning every 0.2 seconds
+    // Schedule monster spawning every 1.5 seconds (increased spawn rate for better action)
     ctx.db.monster_spawn_timer().insert(MonsterSpawnTimer {
         scheduled_id: 0,
-        scheduled_at: ScheduleAt::Interval(Duration::from_millis(3000).into()),
+        scheduled_at: ScheduleAt::Interval(Duration::from_millis(1500).into()),
     });
     
     // Schedule guaranteed VoidChest spawns

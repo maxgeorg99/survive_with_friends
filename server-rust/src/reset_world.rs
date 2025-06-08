@@ -76,15 +76,16 @@ pub fn reset_world(ctx: &ReducerContext) {
     
     log::info!("ResetWorld: Cleared {} boss phase 2 timers", boss_phase2_timer_count);
     
-    // 5. Reset game state (boss status)
+    // 5. Reset game state (boss status and restart timer)
     if let Some(mut game_state) = ctx.db.game_state().id().find(&0) {
         game_state.boss_active = false;
         game_state.boss_phase = 0;
         game_state.boss_monster_id = 0;
         game_state.normal_spawning_paused = false;
+        game_state.game_start_time = ctx.timestamp; // Reset game start time for new session
         ctx.db.game_state().id().update(game_state);
         
-        log::info!("ResetWorld: Reset game state (boss status)");
+        log::info!("ResetWorld: Reset game state (boss status and timer)");
     }
     
     // 6. Clear the monster spawn timer

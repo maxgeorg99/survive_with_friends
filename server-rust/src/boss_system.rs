@@ -12,6 +12,7 @@ pub struct GameState {
     pub boss_phase: u32, // 0 = no boss, 1 = phase 1, 2 = phase 2
     pub boss_monster_id: u32, // ID of the current boss monster
     pub normal_spawning_paused: bool, // Whether normal monster spawning is paused
+    pub game_start_time: Timestamp, // When the current game session started
 }
 
 // Timer for boss spawn (scheduled every 5 minutes)
@@ -21,6 +22,7 @@ pub struct BossSpawnTimer {
     #[auto_inc]
     pub scheduled_id: u64,
     pub scheduled_at: ScheduleAt,
+    pub session_start_time: Timestamp, // When this timer was created (session start)
 }
 
 // Timer for delayed boss phase 2 spawn (to allow pre-transform VFX)
@@ -50,6 +52,7 @@ pub fn init_game_state(ctx: &ReducerContext) {
         boss_phase: 0,
         boss_monster_id: 0,
         normal_spawning_paused: false,
+        game_start_time: ctx.timestamp, // Set game start time to current timestamp
     });
 
     log::info!("Game state initialized successfully");
@@ -68,6 +71,7 @@ pub fn schedule_boss_spawn(ctx: &ReducerContext) {
     ctx.db.boss_spawn_timer().insert(BossSpawnTimer {
         scheduled_id: 0,
         scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(BOSS_SPAWN_DELAY_MS)),
+        session_start_time: ctx.timestamp, // Record when this session started
     });
 }
 
@@ -274,6 +278,7 @@ pub fn spawn_boss_for_testing(ctx: &ReducerContext) {
         ctx.db.boss_spawn_timer().insert(BossSpawnTimer {
             scheduled_id: 0,
             scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(TEST_BOSS_SPAWN_DELAY_MS)),
+            session_start_time: ctx.timestamp, // Record when this session started
         });
         
         log::info!("DEVELOPER TEST: Boss timer updated to trigger in 5 seconds");
