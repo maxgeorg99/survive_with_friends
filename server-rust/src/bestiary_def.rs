@@ -7,6 +7,7 @@ pub struct Bestiary {
     pub bestiary_id: u32,
     
     pub monster_type: MonsterType,
+    pub tier: u32,
     
     // monster attributes
     pub max_hp: u32,
@@ -29,6 +30,7 @@ pub fn init_bestiary(ctx: &ReducerContext) {
     ctx.db.bestiary().insert(Bestiary {
         bestiary_id: MonsterType::Rat as u32,
         monster_type: MonsterType::Rat,
+        tier: 0,
         max_hp: 10,
         speed: 80.0,
         atk: 1.0,
@@ -39,6 +41,7 @@ pub fn init_bestiary(ctx: &ReducerContext) {
     ctx.db.bestiary().insert(Bestiary {
         bestiary_id: MonsterType::Slime as u32,
         monster_type: MonsterType::Slime,
+        tier: 1,
         max_hp: 25,
         speed: 50.0,
         atk: 1.5,
@@ -49,6 +52,7 @@ pub fn init_bestiary(ctx: &ReducerContext) {
     ctx.db.bestiary().insert(Bestiary {
         bestiary_id: MonsterType::Orc as u32,
         monster_type: MonsterType::Orc,
+        tier: 3,
         max_hp: 50,
         speed: 70.0,
         atk: 2.0,
@@ -59,6 +63,7 @@ pub fn init_bestiary(ctx: &ReducerContext) {
     ctx.db.bestiary().insert(Bestiary {
         bestiary_id: MonsterType::FinalBossPhase1 as u32,
         monster_type: MonsterType::FinalBossPhase1,
+        tier: 5,
         max_hp: 500,
         speed: 100.0,
         atk: 10.0,
@@ -69,6 +74,7 @@ pub fn init_bestiary(ctx: &ReducerContext) {
     ctx.db.bestiary().insert(Bestiary {
         bestiary_id: MonsterType::FinalBossPhase2 as u32,
         monster_type: MonsterType::FinalBossPhase2,
+        tier: 5,
         max_hp: 500,
         speed: 130.0,
         atk: 12.0,
@@ -79,6 +85,7 @@ pub fn init_bestiary(ctx: &ReducerContext) {
     ctx.db.bestiary().insert(Bestiary {
         bestiary_id: MonsterType::VoidChest as u32,
         monster_type: MonsterType::VoidChest,
+        tier: 0,
         max_hp: 200,
         speed: 0.0,
         atk: 0.0,
@@ -89,6 +96,7 @@ pub fn init_bestiary(ctx: &ReducerContext) {
     ctx.db.bestiary().insert(Bestiary {
         bestiary_id: MonsterType::Imp as u32,
         monster_type: MonsterType::Imp,
+        tier: 4,
         max_hp: 18,        // Low-medium HP (between Rat and Slime)
         speed: 50.0,       // Fast (faster than Rat)
         atk: 1.0,          // Medium attack
@@ -99,6 +107,7 @@ pub fn init_bestiary(ctx: &ReducerContext) {
     ctx.db.bestiary().insert(Bestiary {
         bestiary_id: MonsterType::Zombie as u32,
         monster_type: MonsterType::Zombie,
+        tier: 5,
         max_hp: 100,        // High HP (between Slime and Orc)
         speed: 54.0,       // Very slow (slower than Slime)
         atk: 4.0,          // High attack (slightly higher than Orc)
@@ -109,6 +118,7 @@ pub fn init_bestiary(ctx: &ReducerContext) {
     ctx.db.bestiary().insert(Bestiary {
         bestiary_id: MonsterType::EnderClaw as u32,
         monster_type: MonsterType::EnderClaw,
+        tier: 1,
         max_hp: 100,        // High HP (slightly less than Zombie but still tough)
         speed: 164.0,      // Very fast (faster than Phase 2 boss)
         atk: 6.0,          // Very high attack (higher than Zombie)
@@ -119,6 +129,7 @@ pub fn init_bestiary(ctx: &ReducerContext) {
     ctx.db.bestiary().insert(Bestiary {
         bestiary_id: MonsterType::Bat as u32,
         monster_type: MonsterType::Bat,
+        tier: 2,
         max_hp: 15,         // Low HP (even lower than Rat)
         speed: 130.0,       // Fast (faster than Rat but not as fast as bosses)  
         atk: 1.8,          // Moderate attack (between Rat and Slime)

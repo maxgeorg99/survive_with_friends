@@ -40,7 +40,7 @@ const VOID_ZONE_INTERVAL_MS: u64 = 4000;             // Time between VoidZone at
 const VOID_ZONE_INITIAL_DELAY_MS: u64 = 4000;        // Initial delay before first VoidZone
 
 // Configuration constants for boss target switching
-const BOSS_TARGET_SWITCH_BASE_INTERVAL_MS: u64 = 12000;   // Base interval (8 seconds)
+const BOSS_TARGET_SWITCH_BASE_INTERVAL_MS: u64 = 10000;   // Base interval (8 seconds)
 const BOSS_TARGET_SWITCH_VARIATION_MS: u64 = 4000;       // Random variation (±4 seconds)
 const BOSS_TARGET_SWITCH_INITIAL_DELAY_MS: u64 = 10000;   // Initial delay before first switch       // Initial delay before first EnderBolt (after real scythes spawn)
 
