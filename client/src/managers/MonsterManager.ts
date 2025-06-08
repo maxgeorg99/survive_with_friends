@@ -26,6 +26,9 @@ export default class MonsterManager {
     // Map of monster ID to container
     private monsters: Map<number, Phaser.GameObjects.Container>;
     
+    // Map to track hovering tweens for flying monsters (like Bats)
+    private hoveringTweens: Map<number, Phaser.Tweens.Tween>;
+    
     // Add creation queue for smooth monster spawning
     private creationQueue: Monsters[] = [];
     private isProcessingQueue: boolean = false;
@@ -62,6 +65,7 @@ export default class MonsterManager {
         this.monsters = new Map();
         this.gameEvents = (window as any).gameEvents;
         this.soundManager = (window as any).soundManager;
+        this.hoveringTweens = new Map();
         console.log("MonsterManager constructed");
     }
     
@@ -236,6 +240,11 @@ export default class MonsterManager {
             if (monsterTypeName.includes("Boss") || monsterTypeName === "VoidChest") {
                 console.log(`Created new ${monsterTypeName} sprite (ID: ${monsterData.monsterId})`);
             }
+            
+            // Add hovering animation for flying monsters like Bats
+            if (monsterTypeName === "Bat") {
+                this.createHoveringAnimation(monsterData.monsterId, sprite);
+            }
         }
         
         // Update health bar (only the foreground bar needs updating)
@@ -256,6 +265,14 @@ export default class MonsterManager {
     
     // Helper function to remove monster sprites
     removeMonster(monsterId: number) {
+        // Clean up any hovering tweens for this monster
+        const hoveringTween = this.hoveringTweens.get(monsterId);
+        if (hoveringTween) {
+            hoveringTween.stop();
+            hoveringTween.destroy();
+            this.hoveringTweens.delete(monsterId);
+        }
+        
         // Only log removal for bosses or when debugging
         const monsterContainer = this.monsters.get(monsterId);
         const monsterType = monsterContainer?.getData('monsterType');
@@ -356,6 +373,13 @@ export default class MonsterManager {
     shutdown() {
         this.unregisterListeners();
         this.clearCreationQueue(); // Clear any pending monster creations
+        
+        // Clean up all hovering tweens
+        this.hoveringTweens.forEach((tween, monsterId) => {
+            tween.stop();
+            tween.destroy();
+        });
+        this.hoveringTweens.clear();
         
         // Clean up all existing monsters
         this.monsters.forEach(container => container.destroy());
@@ -1088,5 +1112,24 @@ export default class MonsterManager {
                 glowImage.destroy();
             }
         });
+    }
+
+    // Add a method to create hovering animation for flying monsters like Bats
+    private createHoveringAnimation(monsterId: number, sprite: Phaser.GameObjects.Sprite) {
+        // Create a subtle hovering animation that moves the sprite up and down
+        const hoveringTween = this.scene.tweens.add({
+            targets: sprite,
+            y: sprite.y - 10, // Move up by 8 pixels from original position
+            duration: 600,  // 1.2 seconds for smooth floating
+            ease: 'Sine.easeInOut',
+            yoyo: true,     // Return to original position
+            repeat: -1,     // Repeat infinitely
+            delay: Math.random() * 1000, // Random delay to stagger multiple bats
+        });
+        
+        // Store the tween so we can clean it up later
+        this.hoveringTweens.set(monsterId, hoveringTween);
+        
+        console.log(`Created hovering animation for Bat monster ID: ${monsterId}`);
     }
 } 

@@ -35,7 +35,7 @@ export const MONSTER_SHADOW_OFFSETS_Y: Record<string, number> = {
     "Orc": 0,      // Larger monster, bigger shadow offset
     "Imp": -8,    // Small flying/floating creature, higher offset
     "Zombie": 6, // Medium sized shambling creature, moderate offset
-    "Bat": 24,    // Flying creature, higher offset for airborne shadow
+    "Bat": 20,    // Flying creature, higher offset for airborne shadow
     "FinalBossPhase1": -4,  // Large boss, bigger shadow offset
     "FinalBossPhase2": -78,   // Even larger final form, largest shadow offset
     "VoidChest": -66,    // Chest sits on the ground with small offset
