@@ -52,7 +52,7 @@ export default class GameplayOptionsUI extends OptionsUI {
             }
             
             const isLocal = account.currentPlayerId === player.playerId;
-            console.log(`GameplayOptionsUI: Checking if player ${player.playerId} is local (current player ID: ${account.currentPlayerId}) = ${isLocal}`);
+            //console.log(`GameplayOptionsUI: Checking if player ${player.playerId} is local (current player ID: ${account.currentPlayerId}) = ${isLocal}`);
             return isLocal;
         } catch (error) {
             console.error("GameplayOptionsUI: Error in isLocalPlayer:", error);
