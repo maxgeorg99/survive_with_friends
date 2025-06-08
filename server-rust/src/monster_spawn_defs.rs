@@ -14,8 +14,8 @@ pub const TIER_INCREASE_INTERVAL_SECONDS: u64 = 50;
 pub const TIER_SPAWN_WEIGHTS: [&[(MonsterType, u32)]; 6] = [
     // Tier 0 (0-50s):
     &[
-        (MonsterType::Rat, 90),
-        (MonsterType::Slime, 10),
+        (MonsterType::Rat, 80),
+        (MonsterType::Slime, 20),
         (MonsterType::Bat, 0),
         (MonsterType::Orc, 0),
         (MonsterType::Imp, 0),
@@ -26,7 +26,7 @@ pub const TIER_SPAWN_WEIGHTS: [&[(MonsterType, u32)]; 6] = [
     &[
         (MonsterType::Rat, 40),
         (MonsterType::Slime, 40),
-        (MonsterType::Bat, 0),
+        (MonsterType::Bat, 10),
         (MonsterType::Orc, 0),
         (MonsterType::Imp, 0),
         (MonsterType::Zombie, 0),
@@ -37,7 +37,7 @@ pub const TIER_SPAWN_WEIGHTS: [&[(MonsterType, u32)]; 6] = [
         (MonsterType::Rat, 30),
         (MonsterType::Slime, 40),
         (MonsterType::Bat, 30),
-        (MonsterType::Orc, 0),
+        (MonsterType::Orc, 5),
         (MonsterType::Imp, 0),
         (MonsterType::Zombie, 0),
     ],
@@ -47,8 +47,8 @@ pub const TIER_SPAWN_WEIGHTS: [&[(MonsterType, u32)]; 6] = [
         (MonsterType::Rat, 20),
         (MonsterType::Slime, 30),
         (MonsterType::Bat, 40),
-        (MonsterType::Orc, 10),
-        (MonsterType::Imp, 0),
+        (MonsterType::Orc, 20),
+        (MonsterType::Imp, 5),
         (MonsterType::Zombie, 0),
     ],
     
@@ -59,7 +59,7 @@ pub const TIER_SPAWN_WEIGHTS: [&[(MonsterType, u32)]; 6] = [
         (MonsterType::Bat, 30),
         (MonsterType::Orc, 40),
         (MonsterType::Imp, 10),
-        (MonsterType::Zombie, 0),
+        (MonsterType::Zombie, 5),
     ],
     
     // Tier 5 (250-300s):
