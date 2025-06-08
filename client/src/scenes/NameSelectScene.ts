@@ -15,6 +15,7 @@ export default class NameSelectScene extends Phaser.Scene {
     private nameButton!: HTMLButtonElement;
     private errorText!: Phaser.GameObjects.Text;
     private optionsUI!: OptionsUI;
+    private optionsKey!: Phaser.Input.Keyboard.Key;
 
     constructor() {
         super('NameSelectScene');
@@ -106,14 +107,10 @@ export default class NameSelectScene extends Phaser.Scene {
         // Initialize options UI
         this.optionsUI = new OptionsUI(this);
         
-        // Handle options toggle key (only when name input doesn't have focus)
+                // Handle options toggle key
         if (this.input.keyboard) {
-            this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.O).on('down', () => {
-                // Check if the name input has focus - if so, don't handle the options toggle
-                if (this.nameInput && document.activeElement === this.nameInput) {
-                    console.log("NameSelectScene: 'O' key pressed but name input has focus, ignoring options toggle");
-                    return;
-                }
+            this.optionsKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.O);
+            this.optionsKey.on('down', () => {
                 this.optionsUI.toggle();
             });
         }
@@ -176,6 +173,30 @@ export default class NameSelectScene extends Phaser.Scene {
             if (e.key === 'Enter') {
                 this.setPlayerName();
             }
+        });
+        
+        // Prevent Phaser from capturing keyboard events when input has focus
+        this.nameInput.addEventListener('focus', () => {
+            console.log("NameSelectScene: Input focused, disabling Phaser keyboard capture");
+            // Disable Phaser keyboard input entirely
+            if (this.input.keyboard) {
+                this.input.keyboard.enabled = false;
+            }
+        });
+        
+        // Re-enable Phaser keyboard capture when input loses focus
+        this.nameInput.addEventListener('blur', () => {
+            console.log("NameSelectScene: Input blurred, re-enabling Phaser keyboard capture");
+            // Re-enable Phaser keyboard input
+            if (this.input.keyboard) {
+                this.input.keyboard.enabled = true;
+            }
+        });
+        
+        // Add additional keydown event handler to prevent Phaser from capturing events
+        this.nameInput.addEventListener('keydown', (e) => {
+            // Stop the event from propagating to Phaser
+            e.stopPropagation();
         });
         
         // Position elements initially
@@ -353,9 +374,13 @@ export default class NameSelectScene extends Phaser.Scene {
             console.error("Error cleaning up NameSelectScene HTML elements:", e);
         }
         
-        // Remove keyboard listeners
+        // Remove keyboard listeners and ensure keyboard is re-enabled
+        if (this.optionsKey) {
+            this.optionsKey.removeAllListeners();
+        }
         if (this.input.keyboard) {
             this.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.O);
+            this.input.keyboard.enabled = true; // Ensure keyboard is enabled for next scene
         }
         
         // Remove event listeners
