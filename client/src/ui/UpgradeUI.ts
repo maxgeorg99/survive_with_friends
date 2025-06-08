@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { UpgradeOptionData, UpgradeType } from '../autobindings';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { ChooseUpgrade } from '../autobindings';
+import { getSoundVolume } from '../managers/VolumeSettings';
 
 // Define a type for our attack graphic data with prediction capabilities
 interface AttackGraphicData {
@@ -354,14 +355,20 @@ export default class UpgradeUI {
             holdState.progressBar.width = 0; // Reset width
         }
         
-        // Play upgrade bar fill sound
+        // Play upgrade bar fill sound using global sound volume
         if (!this.upgradeBarFillSound) {
             try {
-                this.upgradeBarFillSound = this.scene.sound.add('upgrade_bar_fill', { 
-                    volume: 0.7,
-                    loop: true // Loop the sound while holding
-                });
-                this.upgradeBarFillSound.play();
+                const globalSoundVolume = getSoundVolume();
+                const adjustedVolume = 0.7 * globalSoundVolume;
+                
+                // Only play if volume is meaningful
+                if (adjustedVolume > 0) {
+                    this.upgradeBarFillSound = this.scene.sound.add('upgrade_bar_fill', { 
+                        volume: adjustedVolume,
+                        loop: true
+                    });
+                    this.upgradeBarFillSound.play();
+                }
             } catch (error) {
                 console.warn("Failed to play upgrade bar fill sound:", error);
             }

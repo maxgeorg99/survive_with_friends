@@ -22,7 +22,9 @@ export function initializeGlobalVolumes(): void {
 
 // Get current music volume
 export function getMusicVolume(): number {
-    return window.vibesurvivors_musicVolume || DEFAULT_MUSIC_VOLUME;
+    return typeof window.vibesurvivors_musicVolume !== 'undefined' 
+        ? window.vibesurvivors_musicVolume 
+        : DEFAULT_MUSIC_VOLUME;
 }
 
 // Set music volume
@@ -32,7 +34,9 @@ export function setMusicVolume(volume: number): void {
 
 // Get current sound volume
 export function getSoundVolume(): number {
-    return window.vibesurvivors_soundVolume || DEFAULT_SOUND_VOLUME;
+    return typeof window.vibesurvivors_soundVolume !== 'undefined' 
+        ? window.vibesurvivors_soundVolume 
+        : DEFAULT_SOUND_VOLUME;
 }
 
 // Set sound volume

@@ -34,6 +34,13 @@ export default class MusicManager {
     // Play a track, stopping any currently playing track
     playTrack(trackKey: string, volume?: number): void {
         const effectiveVolume = volume !== undefined ? volume : getMusicVolume();
+        
+        // If volume is effectively 0, don't play music at all
+        if (effectiveVolume <= 0) {
+            this.stopCurrentTrack();
+            return;
+        }
+        
         // Don't restart the same track (check global state)
         if (globalCurrentTrackKey === trackKey && globalCurrentTrack?.isPlaying) {
             console.log(`MusicManager: Track '${trackKey}' is already playing globally - skipping restart`);

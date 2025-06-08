@@ -106,6 +106,11 @@ export default class SoundManager {
         // Apply global sound volume multiplier to all volumes
         const adjustedVolume = volume * getSoundVolume();
 
+        // If volume is effectively 0, don't play the sound at all
+        if (adjustedVolume <= 0) {
+            return;
+        }
+
         // Check for frame-based throttling
         if (this.frameThrottledSounds.has(soundKey)) {
             if (this.frameThrottledPlayed.has(soundKey)) {
