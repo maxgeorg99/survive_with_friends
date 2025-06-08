@@ -16,6 +16,7 @@ import MonsterCounterUI from '../ui/MonsterCounterUI';
 import VoidChestUI from '../ui/VoidChestUI';
 import MusicManager from '../managers/MusicManager';
 import { DebugManager } from '../managers/DebugManager'; // Added import for DebugManager
+import GameplayOptionsUI from '../ui/GameplayOptionsUI';
 
 // Constants
 const PLAYER_SPEED = 200;
@@ -159,6 +160,9 @@ export default class GameScene extends Phaser.Scene {
     // Add VoidChest UI for alerts and directional arrow
     private voidChestUI: VoidChestUI | null = null;
 
+    // Add Options UI for settings
+    private optionsUI: GameplayOptionsUI | null = null;
+
     // Track if player damage sound is currently playing
     private isPlayerDamageSoundPlaying: boolean = false;
 
@@ -241,6 +245,12 @@ export default class GameScene extends Phaser.Scene {
         // Load a white pixel for particle effects
         this.load.image('white_pixel', '/assets/white_pixel.png');
         
+        // Load assets for options menu
+        this.load.image('icon_music', '/assets/icon_music.png');
+        this.load.image('icon_sound', '/assets/icon_sound.png');
+        this.load.image('button_pvp_on', '/assets/button_pvp_on.png');
+        this.load.image('button_pvp_off', '/assets/button_pvp_off.png');
+        
         // Load audio files for gameplay sounds
         this.load.audio('attack_fire', '/assets/sounds/attack_fire.mp3');
         this.load.audio('attack_soft', '/assets/sounds/attack_soft.mp3');
@@ -268,6 +278,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.audio('voice_boss', '/assets/sounds/voice_boss.mp3');
         this.load.audio('voice_boss_2', '/assets/sounds/voice_boss_2.mp3');
         this.load.audio('voice_transform', '/assets/sounds/voice_transform.mp3');
+        this.load.audio('ui_click', '/assets/sounds/ui_click.mp3');
         
         // Add error handling for file loading errors
         this.load.on('loaderror', (fileObj: any) => {
@@ -439,10 +450,20 @@ export default class GameScene extends Phaser.Scene {
         // Initialize VoidChest UI for alerts and directional arrow
         this.voidChestUI = new VoidChestUI(this, this.spacetimeDBClient);
 
+        // Initialize Options UI for settings
+        this.optionsUI = new GameplayOptionsUI(this);
+
         // Add key listener for toggling monster counter UI
         this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.D).on('down', () => {
             if (this.monsterCounterUI) {
                 this.monsterCounterUI.toggleVisible();
+            }
+        });
+
+        // Add key listener for toggling options menu
+        this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.O).on('down', () => {
+            if (this.optionsUI) {
+                this.optionsUI.toggle();
             }
         });
 
@@ -2117,6 +2138,12 @@ export default class GameScene extends Phaser.Scene {
             this.voidChestUI.destroy();
             this.voidChestUI = null;
         }
+
+        // Clean up Options UI
+        if (this.optionsUI) {
+            this.optionsUI.destroy();
+            this.optionsUI = null;
+        }
         
         // DEFENSIVE CLEANUP: Remove any lingering game objects that might persist between scenes
         console.log("GameScene: Performing defensive cleanup of lingering game objects");
@@ -2216,6 +2243,8 @@ export default class GameScene extends Phaser.Scene {
         if (this.input.keyboard) 
         {
             this.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.R);
+            this.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.D);
+            this.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.O);
         }
         this.debugManager?.clearDebugKeys();
         
@@ -2646,11 +2675,23 @@ export default class GameScene extends Phaser.Scene {
 
     // Setup touch input
     private setupTouchInput() {        
-        this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+                this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
             // Check if this pointer is being handled by the upgrade UI
             if (this.upgradeUI && this.upgradeUI.isPointerHandledByUI && this.upgradeUI.isPointerHandledByUI(pointer.id)) {
                 console.log("Pointer is handled by upgrade UI - skipping movement command");
                 return;
+            }
+            
+            // Check if pointer is over options UI and skip movement if so
+            const isOverOptionsUI = this.optionsUI && this.isPointerOverOptionsUI(pointer);
+            
+            if (isOverOptionsUI) {
+                console.log("Pointer is over options UI - skipping movement command");
+                return; // Return here to prevent movement processing
+            }
+            
+            if (this.optionsUI) {
+                console.log("Pointer not over options UI, proceeding with movement. Pointer pos:", pointer.x, pointer.y);
             }
             
             if (this.localPlayerSprite) {
@@ -2793,5 +2834,36 @@ export default class GameScene extends Phaser.Scene {
         if (this.monsterCounterUI) {
             this.monsterCounterUI.updatePosition();
         }
+    }
+
+    private isPointerOverOptionsUI(pointer: Phaser.Input.Pointer): boolean {
+        if (!this.optionsUI) return false;
+        
+        // Check if options UI is visible
+        const container = (this.optionsUI as any).container;
+        if (!container || !container.visible) return false;
+        
+        // Options UI container has scrollFactor 0, so it's positioned in screen coordinates
+        // Container is at screen position (20, 20) with size 250x200
+        const uiScreenX = 20;
+        const uiScreenY = 20;
+        const uiWidth = 250;
+        const uiHeight = 200;
+        
+        // Use pointer screen coordinates (since UI doesn't move with camera)
+        const screenX = pointer.x;
+        const screenY = pointer.y;
+        
+        // Check if pointer is within the UI bounds in screen space
+        const isOverUI = screenX >= uiScreenX && 
+               screenX <= uiScreenX + uiWidth && 
+               screenY >= uiScreenY && 
+               screenY <= uiScreenY + uiHeight;
+               
+        if (isOverUI) {
+            console.log("Pointer IS over options UI bounds:", screenX, screenY, "vs bounds:", uiScreenX, uiScreenY, uiWidth, uiHeight);
+        }
+        
+        return isOverUI;
     }
 }

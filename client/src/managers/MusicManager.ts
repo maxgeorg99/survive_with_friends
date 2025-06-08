@@ -6,6 +6,7 @@ export default class MusicManager {
     private scene: Phaser.Scene;
     private currentTrack: Phaser.Sound.BaseSound | null = null;
     private currentTrackKey: string | null = null;
+    private currentVolume: number = 0.7; // Default volume
     
     // Define track properties
     private trackConfig = {
@@ -27,7 +28,8 @@ export default class MusicManager {
     }
 
     // Play a track, stopping any currently playing track
-    playTrack(trackKey: string, volume: number = 0.7): void {
+    playTrack(trackKey: string, volume?: number): void {
+        const effectiveVolume = volume !== undefined ? volume : this.currentVolume;
         // Don't restart the same track (check global state)
         if (globalCurrentTrackKey === trackKey && globalCurrentTrack?.isPlaying) {
             console.log(`MusicManager: Track '${trackKey}' is already playing globally - skipping restart`);
@@ -56,7 +58,7 @@ export default class MusicManager {
         try {
             // Create and play the new track
             this.currentTrack = this.scene.sound.add(trackKey, {
-                volume: volume,
+                volume: effectiveVolume,
                 loop: config.loops
             });
 
@@ -67,7 +69,7 @@ export default class MusicManager {
             globalCurrentTrack = this.currentTrack;
             globalCurrentTrackKey = trackKey;
             
-            console.log(`MusicManager: Playing '${trackKey}' (loop: ${config.loops}, volume: ${volume})`);
+            console.log(`MusicManager: Playing '${trackKey}' (loop: ${config.loops}, volume: ${effectiveVolume})`);
 
             // Add completion listener for non-looping tracks
             if (!config.loops) {
@@ -123,6 +125,22 @@ export default class MusicManager {
     // Check if a specific track is currently playing
     isTrackPlaying(trackKey: string): boolean {
         return globalCurrentTrackKey === trackKey && (globalCurrentTrack?.isPlaying || false);
+    }
+
+    // Set the volume for music
+    setVolume(volume: number): void {
+        this.currentVolume = Math.max(0, Math.min(1, volume)); // Clamp between 0 and 1
+        
+        // Apply to currently playing track
+        if (globalCurrentTrack && globalCurrentTrack.isPlaying) {
+            if ('setVolume' in globalCurrentTrack) {
+                (globalCurrentTrack as any).setVolume(this.currentVolume);
+            } else if ('volume' in globalCurrentTrack) {
+                (globalCurrentTrack as any).volume = this.currentVolume;
+            }
+        }
+        
+        console.log(`MusicManager: Volume set to ${this.currentVolume}`);
     }
 
     // Cleanup - call when scene shuts down

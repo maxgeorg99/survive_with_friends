@@ -4,6 +4,7 @@ import { Account } from '../autobindings';
 import PlayerClass from '../autobindings/player_class_type';
 import { GameEvents } from '../constants/GameEvents';
 import MusicManager from '../managers/MusicManager';
+import OptionsUI from '../ui/OptionsUI';
 
 // Map player class to numeric class ID
 const CLASS_ID_MAP = {
@@ -35,6 +36,7 @@ export default class ClassSelectScene extends Phaser.Scene {
     private paladinButton!: HTMLButtonElement;
     private confirmButton!: HTMLButtonElement;
     private errorText!: Phaser.GameObjects.Text;
+    private optionsUI!: OptionsUI;
     
     // State tracking
     private selectedClass: PlayerClass | null = null;
@@ -54,6 +56,10 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.load.image('mage_icon', '/assets/attack_wand.png');
         this.load.image('paladin_icon', '/assets/attack_shield.png');
         this.load.image('title_bg', '/assets/title_bg.png');
+        
+        // Load assets for options menu
+        this.load.image('icon_music', '/assets/icon_music.png');
+        this.load.image('icon_sound', '/assets/icon_sound.png');
         
         // Add load completion listener to ensure assets are ready
         this.load.on('complete', () => {
@@ -170,6 +176,14 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.scale.on('resize', this.handleResize, this);
         
         // Position HTML elements - REMOVED from here since buttons don't exist yet
+        
+        // Initialize options UI
+        this.optionsUI = new OptionsUI(this);
+        
+        // Handle options toggle key
+        this.input.keyboard?.on('keydown-O', () => {
+            this.optionsUI.toggle();
+        });
         
         // Only clean up when the scene is actually shut down, not at scene start
         this.events.on('shutdown', this.shutdown, this);
@@ -595,6 +609,11 @@ export default class ClassSelectScene extends Phaser.Scene {
     
     shutdown() {
         console.log("ClassSelectScene shutdown called");
+        
+        // Cleanup options UI
+        if (this.optionsUI) {
+            this.optionsUI.destroy();
+        }
         
         // Cleanup music manager
         if (this.musicManager) {

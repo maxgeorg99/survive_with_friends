@@ -3,11 +3,13 @@ import SpacetimeDBClient from '../SpacetimeDBClient';
 import { GameEvents } from '../constants/GameEvents';
 import { Account } from '../autobindings';
 import MusicManager from '../managers/MusicManager';
+import OptionsUI from '../ui/OptionsUI';
 
 export default class TitleScene extends Phaser.Scene {
     private spacetimeDBClient: SpacetimeDBClient;
     private gameEvents: Phaser.Events.EventEmitter;
     private musicManager!: MusicManager;
+    private optionsUI!: OptionsUI;
     
     // UI Elements
     private titleContainer!: Phaser.GameObjects.Container;
@@ -54,6 +56,12 @@ export default class TitleScene extends Phaser.Scene {
         this.load.image('upgrade_regenHP', '/assets/upgrade_regenHP.png');
         this.load.image('upgrade_speed', '/assets/upgrade_speed.png');
         this.load.image('upgrade_armor', '/assets/upgrade_armor.png');
+
+        // Preload options UI assets
+        this.load.image('icon_music', '/assets/icon_music.png');
+        this.load.image('icon_sound', '/assets/icon_sound.png');
+        this.load.image('button_pvp_off', '/assets/button_pvp_off.png');
+        this.load.image('button_pvp_on', '/assets/button_pvp_on.png');
         
         // Preload gem assets for smooth gameplay experience
         this.load.image('gem_1', '/assets/gem_1.png');
@@ -100,6 +108,9 @@ export default class TitleScene extends Phaser.Scene {
         // Initialize music manager
         this.musicManager = new MusicManager(this);
         
+        // Initialize options UI
+        this.optionsUI = new OptionsUI(this);
+        
         // Preload music asynchronously after scene is active (can be disabled if music files are missing)
         const ENABLE_MUSIC = true; // Set to false to disable music loading
         if (ENABLE_MUSIC) {
@@ -132,6 +143,7 @@ export default class TitleScene extends Phaser.Scene {
                 this.load.audio('voice_level', '/assets/sounds/voice_level.mp3');
                 this.load.audio('voice_welcome', '/assets/sounds/voice_welcome.mp3');
                 this.load.audio('choose', '/assets/sounds/choose.mp3');
+                this.load.audio('ui_click', '/assets/sounds/ui_click.mp3');
                 
                 // Load gameplay sound effects
                 this.load.audio('level_up', '/assets/sounds/level_up.mp3');
@@ -233,6 +245,13 @@ export default class TitleScene extends Phaser.Scene {
         
         // Register event listeners
         this.registerEventListeners();
+        
+        // Add keyboard handler for options menu
+        if (this.input.keyboard) {
+            this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.O).on('down', () => {
+                this.optionsUI.toggle();
+            });
+        }
         
         // Check initial connection state
         this.updateConnectionStatus();
@@ -458,6 +477,11 @@ export default class TitleScene extends Phaser.Scene {
             this.musicManager.cleanup();
         }
         
+        // Cleanup options UI
+        if (this.optionsUI) {
+            this.optionsUI.destroy();
+        }
+        
         // Remove start button
         if (this.startButton && this.startButton.parentNode) {
             this.startButton.remove();
@@ -466,6 +490,11 @@ export default class TitleScene extends Phaser.Scene {
         // Clean up any lingering start button
         const startButton = document.getElementById('title-start-button');
         if (startButton) startButton.remove();
+        
+        // Remove keyboard listeners
+        if (this.input.keyboard) {
+            this.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.O);
+        }
         
         // Remove event listeners
         this.events.off("shutdown", this.shutdown, this);

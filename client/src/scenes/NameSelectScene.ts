@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { GameEvents } from '../constants/GameEvents';
 import MusicManager from '../managers/MusicManager';
+import OptionsUI from '../ui/OptionsUI';
 
 export default class NameSelectScene extends Phaser.Scene {
     private spacetimeDBClient: SpacetimeDBClient;
@@ -13,6 +14,7 @@ export default class NameSelectScene extends Phaser.Scene {
     private nameInput!: HTMLInputElement;
     private nameButton!: HTMLButtonElement;
     private errorText!: Phaser.GameObjects.Text;
+    private optionsUI!: OptionsUI;
 
     constructor() {
         super('NameSelectScene');
@@ -24,6 +26,10 @@ export default class NameSelectScene extends Phaser.Scene {
     preload() {
         // Load assets needed for the name select screen
         this.load.image('title_bg', '/assets/title_bg.png');
+        
+        // Load assets for options menu
+        this.load.image('icon_music', '/assets/icon_music.png');
+        this.load.image('icon_sound', '/assets/icon_sound.png');
     }
 
     create() {
@@ -96,6 +102,14 @@ export default class NameSelectScene extends Phaser.Scene {
         // Handle window resize
         this.scale.on('resize', this.handleResize, this);
         this.events.on("shutdown", this.shutdown, this);
+        
+        // Initialize options UI
+        this.optionsUI = new OptionsUI(this);
+        
+        // Handle options toggle key
+        this.input.keyboard?.on('keydown-O', () => {
+            this.optionsUI.toggle();
+        });
         
         // Focus on the input
         setTimeout(() => {
@@ -304,6 +318,11 @@ export default class NameSelectScene extends Phaser.Scene {
     }
     
     shutdown() {
+        // Cleanup options UI
+        if (this.optionsUI) {
+            this.optionsUI.destroy();
+        }
+        
         // Cleanup music manager
         if (this.musicManager) {
             this.musicManager.cleanup();
