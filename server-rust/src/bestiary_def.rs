@@ -66,7 +66,7 @@ pub fn init_bestiary(ctx: &ReducerContext) {
         tier: 5,
         max_hp: 500,
         speed: 100.0,
-        atk: 10.0,
+        atk: 9.0,
         radius: 92.0,
     });
     
@@ -76,7 +76,7 @@ pub fn init_bestiary(ctx: &ReducerContext) {
         monster_type: MonsterType::FinalBossPhase2,
         tier: 5,
         max_hp: 500,
-        speed: 130.0,
+        speed: 120.0,
         atk: 12.0,
         radius: 128.0,
     });
@@ -108,7 +108,7 @@ pub fn init_bestiary(ctx: &ReducerContext) {
         bestiary_id: MonsterType::Zombie as u32,
         monster_type: MonsterType::Zombie,
         tier: 5,
-        max_hp: 100,        // High HP (between Slime and Orc)
+        max_hp: 80,        // High HP (between Slime and Orc)
         speed: 54.0,       // Very slow (slower than Slime)
         atk: 4.0,          // High attack (slightly higher than Orc)
         radius: 42.0,      // Medium-large radius (between Slime and Orc)
@@ -119,10 +119,10 @@ pub fn init_bestiary(ctx: &ReducerContext) {
         bestiary_id: MonsterType::EnderClaw as u32,
         monster_type: MonsterType::EnderClaw,
         tier: 1,
-        max_hp: 100,        // High HP (slightly less than Zombie but still tough)
-        speed: 164.0,      // Very fast (faster than Phase 2 boss)
-        atk: 6.0,          // Very high attack (higher than Zombie)
-        radius: 48.0,      // Medium radius (similar to Orc)
+        max_hp: 75,        // High HP (slightly less than Zombie but still tough)
+        speed: 140.0,      // Very fast (faster than Phase 2 boss)
+        atk: 5.0,          // Very high attack (higher than Zombie)
+        radius: 44.0,      // Medium radius (similar to Orc)
     });
 
     // Insert Bat stats - fast, small, bit damaging but not tough
@@ -131,7 +131,7 @@ pub fn init_bestiary(ctx: &ReducerContext) {
         monster_type: MonsterType::Bat,
         tier: 2,
         max_hp: 15,         // Low HP (even lower than Rat)
-        speed: 130.0,       // Fast (faster than Rat but not as fast as bosses)  
+        speed: 120.0,       // Fast (faster than Rat but not as fast as bosses)  
         atk: 1.8,          // Moderate attack (between Rat and Slime)
         radius: 28.0,      // Small radius (smaller than Rat)
     });

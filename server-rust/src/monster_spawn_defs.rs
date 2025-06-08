@@ -14,8 +14,8 @@ pub const TIER_INCREASE_INTERVAL_SECONDS: u64 = 50;
 pub const TIER_SPAWN_WEIGHTS: [&[(MonsterType, u32)]; 6] = [
     // Tier 0 (0-50s):
     &[
-        (MonsterType::Rat, 80),
-        (MonsterType::Slime, 20),
+        (MonsterType::Rat, 90),
+        (MonsterType::Slime, 10),
         (MonsterType::Bat, 0),
         (MonsterType::Orc, 0),
         (MonsterType::Imp, 0),
@@ -25,8 +25,8 @@ pub const TIER_SPAWN_WEIGHTS: [&[(MonsterType, u32)]; 6] = [
     // Tier 1 (50-100s):
     &[
         (MonsterType::Rat, 40),
-        (MonsterType::Slime, 20),
-        (MonsterType::Bat, 40),
+        (MonsterType::Slime, 40),
+        (MonsterType::Bat, 0),
         (MonsterType::Orc, 0),
         (MonsterType::Imp, 0),
         (MonsterType::Zombie, 0),
@@ -35,9 +35,9 @@ pub const TIER_SPAWN_WEIGHTS: [&[(MonsterType, u32)]; 6] = [
     // Tier 2 (100-150s):
     &[
         (MonsterType::Rat, 30),
-        (MonsterType::Slime, 30),
+        (MonsterType::Slime, 40),
         (MonsterType::Bat, 30),
-        (MonsterType::Orc, 20),
+        (MonsterType::Orc, 0),
         (MonsterType::Imp, 0),
         (MonsterType::Zombie, 0),
     ],
@@ -45,31 +45,31 @@ pub const TIER_SPAWN_WEIGHTS: [&[(MonsterType, u32)]; 6] = [
     // Tier 3 (150-200s):
     &[
         (MonsterType::Rat, 20),
-        (MonsterType::Slime, 20),
-        (MonsterType::Bat, 20),
-        (MonsterType::Orc, 15),
-        (MonsterType::Imp, 15),
+        (MonsterType::Slime, 30),
+        (MonsterType::Bat, 40),
+        (MonsterType::Orc, 10),
+        (MonsterType::Imp, 0),
         (MonsterType::Zombie, 0),
     ],
     
     // Tier 4 (200-250s):
     &[
-        (MonsterType::Rat, 20),
+        (MonsterType::Rat, 10),
         (MonsterType::Slime, 20),
-        (MonsterType::Bat, 20),
-        (MonsterType::Orc, 20),
-        (MonsterType::Imp, 20),
-        (MonsterType::Zombie, 20),
+        (MonsterType::Bat, 30),
+        (MonsterType::Orc, 40),
+        (MonsterType::Imp, 10),
+        (MonsterType::Zombie, 0),
     ],
     
     // Tier 5 (250-300s):
     &[
-        (MonsterType::Rat, 10),
+        (MonsterType::Rat, 5),
         (MonsterType::Slime, 10),
-        (MonsterType::Bat, 10),
-        (MonsterType::Orc, 10),
-        (MonsterType::Imp, 20),
-        (MonsterType::Zombie, 40),
+        (MonsterType::Bat, 15),
+        (MonsterType::Orc, 20),
+        (MonsterType::Imp, 10),
+        (MonsterType::Zombie, 30),
     ],
 ];
 

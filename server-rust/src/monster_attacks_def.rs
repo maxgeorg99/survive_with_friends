@@ -10,7 +10,7 @@ const ENDER_SCYTHE_RING_SPACING: f32 = 256.0;         // Distance between rings
 const ENDER_SCYTHE_BASE_COUNT: u32 = 4;              // Number of scythes in the inner ring
 const ENDER_SCYTHE_COUNT_INCREMENT: u32 = 4;         // Additional scythes per ring (6, 8, 10, 12)
 const ENDER_SCYTHE_SPAWN_DURATION_MS: u64 = 1500;     // Duration for EnderScytheSpawn (warning phase)
-const ENDER_SCYTHE_DAMAGE: u32 = 15;                 // Damage for EnderScythe attacks
+const ENDER_SCYTHE_DAMAGE: u32 = 30;                 // Damage for EnderScythe attacks
 const ENDER_SCYTHE_SPEED: f32 = 24.0;                // Rotation speed (degrees per second)
 const ENDER_SCYTHE_RADIUS: f32 = 62.0;               // Collision radius for scythes
 
@@ -24,7 +24,7 @@ const ENDER_BOLT_MIN_INTERVAL_MS: u64 = 50;         // Minimum time between Ende
 const ENDER_BOLT_INITIAL_DELAY_MS: u64 = 3500;
 
 // Configuration constants for ChaosBall attacks
-const CHAOS_BALL_DAMAGE: u32 = 35;                   // High damage piercing projectile
+const CHAOS_BALL_DAMAGE: u32 = 50;                   // High damage piercing projectile
 const CHAOS_BALL_SPEED: f32 = 600.0;                 // Fast movement speed
 const CHAOS_BALL_RADIUS: f32 = 32.0;                 // Medium collision radius
 const CHAOS_BALL_DURATION_MS: u64 = 8000;            // Long lasting (8 seconds to cross map)
@@ -33,7 +33,7 @@ const CHAOS_BALL_MIN_INTERVAL_MS: u64 = 400;         // Minimum time between Cha
 const CHAOS_BALL_INITIAL_DELAY_MS: u64 = 2000;       // Initial delay before first ChaosBall
 
 // Configuration constants for VoidZone attacks
-const VOID_ZONE_DAMAGE: u32 = 50;                    // Very high damage stationary attack
+const VOID_ZONE_DAMAGE: u32 = 80;                    // Very high damage stationary attack
 const VOID_ZONE_RADIUS: f32 = 199.0;                 // Large area of effect
 const VOID_ZONE_DURATION_MS: u64 = 60000;             // Long lasting (6 seconds)
 const VOID_ZONE_INTERVAL_MS: u64 = 4000;             // Time between VoidZone attacks (8 seconds)
@@ -393,8 +393,8 @@ pub fn spawn_imp_bolt(ctx: &ReducerContext, spawn_position: DbVector2, target_pl
         monster_attack_type: MonsterAttackType::ImpBolt,
         piercing: false, // ImpBolt is not piercing
         damage: 12, // ImpBolt damage
-        radius: 16.0, // ImpBolt radius
-        speed: 500.0, // ImpBolt speed
+        radius: 15.0, // ImpBolt radius
+        speed: 480.0, // ImpBolt speed
         parameter_u: target_player_id, // Store target player ID
         parameter_f: direction_angle, // Store direction angle
         ticks_elapsed: 0,
