@@ -81,28 +81,6 @@ export class AccountTableHandle {
       }
     },
   };
-  /**
-   * Access to the `currentPlayerId` unique index on the table `account`,
-   * which allows point queries on the field of the same name
-   * via the [`AccountCurrentPlayerIdUnique.find`] method.
-   *
-   * Users are encouraged not to explicitly reference this type,
-   * but to directly chain method calls,
-   * like `ctx.db.account.currentPlayerId().find(...)`.
-   *
-   * Get a handle on the `currentPlayerId` unique index on the table `account`.
-   */
-  currentPlayerId = {
-    // Find the subscribed row whose `currentPlayerId` column value is equal to `col_val`,
-    // if such a row is present in the client cache.
-    find: (col_val: number): Account | undefined => {
-      for (let row of this.tableCache.iter()) {
-        if (deepEqual(row.currentPlayerId, col_val)) {
-          return row;
-        }
-      }
-    },
-  };
 
   onInsert = (cb: (ctx: EventContext, row: Account) => void) => {
     return this.tableCache.onInsert(cb);

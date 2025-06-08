@@ -217,8 +217,6 @@ pub struct Account {
 
     pub name: String,
     
-    #[unique]
-    #[auto_inc]
     pub current_player_id: u32,
 
     pub last_login: Timestamp,
@@ -637,8 +635,16 @@ pub fn transition_winner_to_choosing_class(ctx: &ReducerContext, timer: WinnerTr
 
 // Helper function to transition player to dead state and schedule return to choosing class
 pub fn transition_player_to_dead_state(ctx: &ReducerContext, player_id: u32) {
-    // Find the account associated with this player
-    if let Some(account) = ctx.db.account().current_player_id().find(&player_id) {
+    // Find the account associated with this player by iterating through all accounts
+    let mut found_account = None;
+    for account in ctx.db.account().iter() {
+        if account.current_player_id == player_id && account.current_player_id != 0 {
+            found_account = Some(account);
+            break;
+        }
+    }
+    
+    if let Some(account) = found_account {
         let identity = account.identity;
         
         // Update account state to dead and reset player ID immediately
@@ -666,8 +672,16 @@ pub fn transition_player_to_dead_state(ctx: &ReducerContext, player_id: u32) {
 
 // Helper function to transition player to winner state and schedule return to choosing class
 pub fn transition_player_to_winner_state(ctx: &ReducerContext, player_id: u32) {
-    // Find the account associated with this player
-    if let Some(account) = ctx.db.account().current_player_id().find(&player_id) {
+    // Find the account associated with this player by iterating through all accounts
+    let mut found_account = None;
+    for account in ctx.db.account().iter() {
+        if account.current_player_id == player_id && account.current_player_id != 0 {
+            found_account = Some(account);
+            break;
+        }
+    }
+    
+    if let Some(account) = found_account {
         let identity = account.identity;
         
         // Update account state to winner and reset player ID immediately
