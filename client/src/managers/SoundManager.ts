@@ -2,6 +2,7 @@ export default class SoundManager {
     private scene: Phaser.Scene | null = null;
     private soundsEnabled: boolean = true;
     private defaultVolume: number = 0.8;
+    private soundVolumeMultiplier: number = 1.0; // Global sound effects volume multiplier
     private soundPool: Map<string, Phaser.Sound.BaseSound[]> = new Map();
     private lastDistanceSoundTime: Map<string, number> = new Map(); // Track per sound type
     private distanceSoundThrottle: number = 50; // Reduced from 100ms to 50ms for better responsiveness
@@ -18,14 +19,11 @@ export default class SoundManager {
         
         // Register sounds that should be limited to once per frame
         this.frameThrottledSounds.add('attack_fire');
-        
-        console.log("SoundManager initialized");
     }
 
     // Update the scene reference when scenes change
     setScene(scene: Phaser.Scene): void {
         this.scene = scene;
-        console.log(`SoundManager: Scene updated to ${scene.scene.key}`);
         // Don't immediately clear sound pool - let playing sounds finish
         // The pool will be cleaned up naturally as sounds complete
     }
@@ -101,6 +99,9 @@ export default class SoundManager {
             return;
         }
 
+        // Apply global sound volume multiplier to all volumes
+        const adjustedVolume = volume * this.soundVolumeMultiplier;
+
         // Check for frame-based throttling
         if (this.frameThrottledSounds.has(soundKey)) {
             if (this.frameThrottledPlayed.has(soundKey)) {
@@ -111,7 +112,7 @@ export default class SoundManager {
             this.frameThrottledPlayed.add(soundKey);
         }
 
-        const sound = this.getSoundFromPool(soundKey, volume);
+        const sound = this.getSoundFromPool(soundKey, adjustedVolume);
         if (sound) {
             try {
                 sound.play();
@@ -187,13 +188,16 @@ export default class SoundManager {
     // Enable/disable sound effects
     setSoundsEnabled(enabled: boolean): void {
         this.soundsEnabled = enabled;
-        console.log(`SoundManager: Sounds ${enabled ? 'enabled' : 'disabled'}`);
     }
 
     // Set default volume for sound effects
     setDefaultVolume(volume: number): void {
         this.defaultVolume = Math.max(0, Math.min(1, volume)); // Clamp between 0 and 1
-        console.log(`SoundManager: Default volume set to ${this.defaultVolume}`);
+    }
+
+    // Set global sound volume multiplier (affects ALL sound effects)
+    setSoundVolumeMultiplier(multiplier: number): void {
+        this.soundVolumeMultiplier = Math.max(0, Math.min(1, multiplier)); // Clamp between 0 and 1
     }
 
     // Check if sounds are enabled
@@ -246,13 +250,11 @@ export default class SoundManager {
 
     // Force cleanup of sound pool (for use during shutdown)
     forceCleanup(): void {
-        console.log("SoundManager: Force cleanup initiated");
         this.clearSoundPool();
     }
 
     // Cleanup - call when scene shuts down
     cleanup(): void {
-        console.log("SoundManager: Cleanup completed");
         // Only clear sound pool during cleanup if it's a full shutdown
         // For normal scene transitions, let sounds finish naturally
         // Note: Don't clear the scene reference in cleanup since this is global
