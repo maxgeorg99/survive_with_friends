@@ -63,12 +63,26 @@ pub fn find_safe_spawn_position(ctx: &ReducerContext, radius: f32, collision_cac
     let config = ctx.db.config().id().find(&0)
         .expect("FindSafeSpawnPosition: Could not find game configuration!");
 
+    // Calculate center of the world
+    let center_x = config.world_size as f32 / 2.0;
+    let center_y = config.world_size as f32 / 2.0;
+    
+    // Define spawn area as a portion of the world size around the center
+    // Using 30% of world size as spawn radius makes it more central while still giving variety
+    let spawn_radius = (config.world_size as f32 * 0.3) / 2.0; // 30% of world size, divided by 2 for radius
+    
+    // Ensure spawn area doesn't go outside world bounds
+    let min_x = (center_x - spawn_radius).max(radius);
+    let max_x = (center_x + spawn_radius).min(config.world_size as f32 - radius);
+    let min_y = (center_y - spawn_radius).max(radius);
+    let max_y = (center_y + spawn_radius).min(config.world_size as f32 - radius);
+
     // Try to find a safe position
     let mut rng = ctx.rng();
     for _attempt in 0..MAX_SPAWN_ATTEMPTS {
-        // Generate random position within world bounds
-        let x = rng.gen_range(radius..(config.world_size as f32 - radius));
-        let y = rng.gen_range(radius..(config.world_size as f32 - radius));
+        // Generate random position within central spawn area
+        let x = rng.gen_range(min_x..max_x);
+        let y = rng.gen_range(min_y..max_y);
         let position = DbVector2::new(x, y);
 
         // Check if position is safe
@@ -77,13 +91,10 @@ pub fn find_safe_spawn_position(ctx: &ReducerContext, radius: f32, collision_cac
         }
     }
 
-    // If we couldn't find a safe position, fall back to center with offset
+    // If we couldn't find a safe position, fall back to center with smaller offset
     log::info!("Could not find safe spawn position, falling back to center with offset");
-    let center_x = config.world_size as f32 / 2.0;
-    let center_y = config.world_size as f32 / 2.0;
-
-    let offset_x = rng.gen_range(-100.0..101.0);
-    let offset_y = rng.gen_range(-100.0..101.0);
+    let offset_x = rng.gen_range(-200.0..201.0);
+    let offset_y = rng.gen_range(-200.0..201.0);
     Some(DbVector2::new(center_x + offset_x, center_y + offset_y))
 }
 

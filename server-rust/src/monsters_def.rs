@@ -6,6 +6,9 @@ use crate::monster_ai_defs::AIState;
 use std::collections::HashMap;
 use std::time::Duration;
 
+// VoidChest spawn chance constants
+const VOID_CHEST_SPAWN_CHANCE_DENOMINATOR: u32 = 400;
+
 // Note: Monster spawning is now handled by tier-based weights in monster_spawn_defs.rs
 // VoidChests still have a fixed 0.5% spawn chance regardless of tier
 
@@ -175,13 +178,13 @@ pub fn pre_spawn_monster(ctx: &ReducerContext, _timer: &MonsterSpawnTimer) {
     // Get a random monster type using tier-based weights
     let mut rng = ctx.rng();
     
-    // 5% chance to spawn a rare VoidChest instead of regular monsters
-    let rare_spawn_roll = rng.gen_range(1..=200);
+    // 0.5% chance to spawn a rare VoidChest instead of regular monsters
+    let rare_spawn_roll = rng.gen_range(1..=VOID_CHEST_SPAWN_CHANCE_DENOMINATOR);
     let monster_type = if rare_spawn_roll <= 1 {
-        // Rare VoidChest spawn (5% chance)
+        // Rare VoidChest spawn (0.5% chance)
         MonsterType::VoidChest
     } else {
-        // Regular monster spawn using tier-based weights (95% chance)
+        // Regular monster spawn using tier-based weights (99.5% chance)
         crate::monster_spawn_defs::select_weighted_monster_type(ctx, current_tier)
     };
     

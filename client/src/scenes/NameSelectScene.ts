@@ -106,10 +106,17 @@ export default class NameSelectScene extends Phaser.Scene {
         // Initialize options UI
         this.optionsUI = new OptionsUI(this);
         
-        // Handle options toggle key
-        this.input.keyboard?.on('keydown-O', () => {
-            this.optionsUI.toggle();
-        });
+        // Handle options toggle key (only when name input doesn't have focus)
+        if (this.input.keyboard) {
+            this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.O).on('down', () => {
+                // Check if the name input has focus - if so, don't handle the options toggle
+                if (this.nameInput && document.activeElement === this.nameInput) {
+                    console.log("NameSelectScene: 'O' key pressed but name input has focus, ignoring options toggle");
+                    return;
+                }
+                this.optionsUI.toggle();
+            });
+        }
         
         // Focus on the input
         setTimeout(() => {
@@ -344,6 +351,11 @@ export default class NameSelectScene extends Phaser.Scene {
             document.querySelectorAll('.name-select-button').forEach(el => el.remove());
         } catch (e) {
             console.error("Error cleaning up NameSelectScene HTML elements:", e);
+        }
+        
+        // Remove keyboard listeners
+        if (this.input.keyboard) {
+            this.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.O);
         }
         
         // Remove event listeners
