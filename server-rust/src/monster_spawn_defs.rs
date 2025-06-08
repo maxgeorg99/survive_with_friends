@@ -3,16 +3,16 @@ use crate::{MonsterType, game_state, account, boss_spawn_timer};
 use std::collections::HashMap;
 
 // Maximum tier level (tier increases every 30 seconds up to this max)
-pub const MAX_TIER: u32 = 9;
+pub const MAX_TIER: u32 = 5;
 
 // Time in seconds between tier increases
-pub const TIER_INCREASE_INTERVAL_SECONDS: u64 = 30;
+pub const TIER_INCREASE_INTERVAL_SECONDS: u64 = 50;
 
 // Spawn weight tables for each tier (0-9)
 // Each tuple represents (MonsterType, Weight) pairs for easy readability
 // Higher weights = more likely to spawn
-pub const TIER_SPAWN_WEIGHTS: [&[(MonsterType, u32)]; 10] = [
-    // Tier 0 (0-30s):
+pub const TIER_SPAWN_WEIGHTS: [&[(MonsterType, u32)]; 6] = [
+    // Tier 0 (0-50s):
     &[
         (MonsterType::Rat, 80),
         (MonsterType::Slime, 20),
@@ -22,7 +22,7 @@ pub const TIER_SPAWN_WEIGHTS: [&[(MonsterType, u32)]; 10] = [
         (MonsterType::Zombie, 0),
     ],
     
-    // Tier 1 (30-60s):
+    // Tier 1 (50-100s):
     &[
         (MonsterType::Rat, 40),
         (MonsterType::Slime, 20),
@@ -32,7 +32,7 @@ pub const TIER_SPAWN_WEIGHTS: [&[(MonsterType, u32)]; 10] = [
         (MonsterType::Zombie, 0),
     ],
     
-    // Tier 2 (60-90s):
+    // Tier 2 (100-150s):
     &[
         (MonsterType::Rat, 30),
         (MonsterType::Slime, 30),
@@ -42,7 +42,7 @@ pub const TIER_SPAWN_WEIGHTS: [&[(MonsterType, u32)]; 10] = [
         (MonsterType::Zombie, 0),
     ],
     
-    // Tier 3 (90-120s):
+    // Tier 3 (150-200s):
     &[
         (MonsterType::Rat, 20),
         (MonsterType::Slime, 20),
@@ -52,17 +52,7 @@ pub const TIER_SPAWN_WEIGHTS: [&[(MonsterType, u32)]; 10] = [
         (MonsterType::Zombie, 0),
     ],
     
-    // Tier 4 (120-150s):
-    &[
-        (MonsterType::Rat, 20),
-        (MonsterType::Slime, 20),
-        (MonsterType::Bat, 30),
-        (MonsterType::Orc, 20),
-        (MonsterType::Imp, 20),
-        (MonsterType::Zombie, 10),
-    ],
-    
-    // Tier 5 (150-180s):
+    // Tier 4 (200-250s):
     &[
         (MonsterType::Rat, 20),
         (MonsterType::Slime, 20),
@@ -72,44 +62,14 @@ pub const TIER_SPAWN_WEIGHTS: [&[(MonsterType, u32)]; 10] = [
         (MonsterType::Zombie, 20),
     ],
     
-    // Tier 6 (180-210s):
+    // Tier 5 (250-300s):
     &[
         (MonsterType::Rat, 10),
         (MonsterType::Slime, 10),
-        (MonsterType::Bat, 20),
-        (MonsterType::Orc, 20),
+        (MonsterType::Bat, 10),
+        (MonsterType::Orc, 10),
         (MonsterType::Imp, 20),
-        (MonsterType::Zombie, 20),
-    ],
-    
-    // Tier 7 (210-240s):
-    &[
-        (MonsterType::Rat, 5),
-        (MonsterType::Slime, 5),
-        (MonsterType::Bat, 15),
-        (MonsterType::Orc, 25),
-        (MonsterType::Imp, 30),
-        (MonsterType::Zombie, 20),
-    ],
-    
-    // Tier 8 (240-270s):
-    &[
-        (MonsterType::Rat, 1),
-        (MonsterType::Slime, 1),
-        (MonsterType::Bat, 8),
-        (MonsterType::Orc, 25),
-        (MonsterType::Imp, 35),
-        (MonsterType::Zombie, 30),
-    ],
-    
-    // Tier 9 (270s+):
-    &[
-        (MonsterType::Rat, 1),
-        (MonsterType::Slime, 1),
-        (MonsterType::Bat, 1),
-        (MonsterType::Orc, 1),
-        (MonsterType::Imp, 30),
-        (MonsterType::Zombie, 60),
+        (MonsterType::Zombie, 40),
     ],
 ];
 

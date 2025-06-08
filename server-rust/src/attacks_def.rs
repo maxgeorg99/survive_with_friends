@@ -87,6 +87,7 @@ pub struct PlayerScheduledAttack {
     pub skill_level: u32,      // The skill level for this attack
     pub parameter_u: u32,      // Additional parameter for the attack
     pub parameter_i: i32,      // Additional parameter for the attack
+    pub attack_count: u32,     // Number of times this attack has triggered (for consistent rotation)
     
     // Combat stats copied from AttackData but can be modified by upgrades
     pub duration: u32,         // Duration in milliseconds that attack lasts
@@ -220,8 +221,8 @@ fn trigger_attack_projectile(ctx: &ReducerContext, player_id: u32, attack_type: 
     let player_x = cache.player.pos_x_player[player_cache_idx];
     let player_y = cache.player.pos_y_player[player_cache_idx];
     
-    // Get attack direction using AttackUtils
-    let direction = crate::attack_utils::determine_attack_direction(ctx, player_id, &attack_type, id_within_burst, parameter_u, parameter_i);
+    // Get attack direction using AttackUtils, passing the upgraded projectiles count
+    let direction = crate::attack_utils::determine_attack_direction(ctx, player_id, &attack_type, id_within_burst, parameter_u, parameter_i, scheduled_attack.projectiles);
     
     // Create a new entity for the projectile and get its ID
     let projectile_entity = ctx.db.entity().insert(Entity {
@@ -333,6 +334,9 @@ pub fn server_trigger_attack(ctx: &ReducerContext, mut attack: PlayerScheduledAt
         return;
     }
 
+    // Increment attack count for consistent rotation patterns
+    attack.attack_count += 1;
+
     // Update the parameters for the attack
     let parameter_u = crate::attack_utils::get_parameter_u(ctx, &attack);
     attack.parameter_u = parameter_u;
@@ -388,6 +392,7 @@ pub fn schedule_new_player_attack(ctx: &ReducerContext, player_id: u32, attack_t
         skill_level,
         parameter_u: 0,
         parameter_i: 0,
+        attack_count: 0,
         duration: attack_data.duration,
         projectiles: attack_data.projectiles,
         fire_delay: attack_data.fire_delay,

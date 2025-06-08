@@ -394,7 +394,7 @@ pub fn spawn_imp_bolt(ctx: &ReducerContext, spawn_position: DbVector2, target_pl
         piercing: false, // ImpBolt is not piercing
         damage: 12, // ImpBolt damage
         radius: 16.0, // ImpBolt radius
-        speed: 600.0, // ImpBolt speed
+        speed: 500.0, // ImpBolt speed
         parameter_u: target_player_id, // Store target player ID
         parameter_f: direction_angle, // Store direction angle
         ticks_elapsed: 0,

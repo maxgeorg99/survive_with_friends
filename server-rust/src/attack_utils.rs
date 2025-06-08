@@ -15,10 +15,11 @@ pub fn get_parameter_u(ctx: &ReducerContext, attack: &PlayerScheduledAttack) -> 
             }
         }
         AttackType::Knives => {
-            // Random angle on a circle
-            let mut rng = ctx.rng();
-            let angle = rng.gen_range(0.0..360.0);
-            angle as u32
+            // Calculate consistent rotation based on attack count
+            // Each attack should rotate by the angle between knives
+            let angle_between_knives = 360.0 / attack.projectiles as f64;
+            let rotation_offset = (attack.attack_count as f64 * angle_between_knives / 12.0) % 360.0;
+            rotation_offset as u32
         }
         AttackType::Shield => {
             let mut rng = ctx.rng();
@@ -37,14 +38,11 @@ pub fn determine_attack_direction(
     id_within_burst: u32,
     parameter_u: u32,
     parameter_i: i32,
+    projectiles: u32, // Use the upgraded projectiles count instead of base attack data
 ) -> DbVector2 {
     // Get the player
     let player = ctx.db.player().player_id().find(&player_id)
         .expect(&format!("DetermineAttackDirection: Player {} not found", player_id));
-
-    // Get attack data from the attacks system
-    let attack_data = find_attack_data_by_type(ctx, &attack_type)
-        .expect(&format!("DetermineAttackDirection: Attack data not found for type {:?}", attack_type));
 
     // Handle different attack types
     match attack_type {
@@ -75,8 +73,9 @@ pub fn determine_attack_direction(
         AttackType::Knives => {
             // Knives attack in a circle around the player starting at the angle specified in the parameter_u
             // The angle is in degrees, so we need to convert it to radians
+            // Use the upgraded projectiles count for proper spacing
             let start_angle = (parameter_u as f64) * PI / 180.0;
-            let angle_step = 360.0 / (attack_data.projectiles as f64) * PI / 180.0;
+            let angle_step = 360.0 / (projectiles as f64) * PI / 180.0;
             let attack_angle = start_angle + (angle_step * (id_within_burst as f64));
             DbVector2::new(attack_angle.cos() as f32, attack_angle.sin() as f32)
         }

@@ -190,7 +190,7 @@ fn create_upgrade_option_data(ctx: &ReducerContext, upgrade_type: UpgradeType, p
                 player_id,
                 upgrade_index: 0,
                 upgrade_type,
-                value: 1,
+                value: 2,
                 is_attack_upgrade: false,
                 is_new_attack: false,
                 attack_type: 0,
@@ -557,6 +557,7 @@ fn apply_player_upgrade(ctx: &ReducerContext, upgrade: &ChosenUpgradeData) {
                     skill_level: modified_attack.skill_level,
                     parameter_u: modified_attack.parameter_u,
                     parameter_i: modified_attack.parameter_i,
+                    attack_count: modified_attack.attack_count, // Preserve attack count
                     duration: modified_attack.duration,
                     projectiles: modified_attack.projectiles,
                     fire_delay: modified_attack.fire_delay,
