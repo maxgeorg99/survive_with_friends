@@ -406,6 +406,13 @@ pub fn spawn_player(ctx: &ReducerContext, class_id: u32) {
 
     log::info!("SpawnPlayer called by identity: {}", identity);
 
+    // Check if spawning a new player would exceed MAX_PLAYERS limit
+    let current_player_count = ctx.db.player().count();
+    if current_player_count >= MAX_PLAYERS as u64 {
+        panic!("SpawnPlayer: Server has reached maximum player capacity ({}/{}). Cannot spawn new player for {}.", 
+               current_player_count, MAX_PLAYERS, identity);
+    }
+
     // Check if account exists
     let account = ctx.db.account().identity().find(&identity)
         .expect(&format!("SpawnPlayer: Account {} does not exist.", identity));

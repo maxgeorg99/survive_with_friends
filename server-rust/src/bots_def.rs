@@ -8,6 +8,13 @@ pub fn spawn_bot(ctx: &ReducerContext) {
     
     log::info!("SpawnBot called - selecting random class");
 
+    // Check if spawning a new bot would exceed MAX_PLAYERS limit
+    let current_player_count = ctx.db.player().count();
+    if current_player_count >= crate::MAX_PLAYERS as u64 {
+        panic!("SpawnBot: Server has reached maximum player capacity ({}/{}). Cannot spawn new bot.", 
+               current_player_count, crate::MAX_PLAYERS);
+    }
+
     // Get all available classes from class_data
     let available_classes: Vec<_> = ctx.db.class_data().iter().collect();
     if available_classes.is_empty() {
