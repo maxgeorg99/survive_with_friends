@@ -1,6 +1,6 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, ScheduleAt, SpacetimeType};
 use crate::{DbVector2, AttackType, Entity, DELTA_TIME, get_world_cell_from_position, spatial_hash_collision_checker,
-           WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT, entity, monster_damage, player};
+           WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT, entity, monster_damage};
 use std::f64::consts::PI;
 use std::time::Duration;
 
@@ -520,12 +520,20 @@ pub fn process_attack_movements(ctx: &ReducerContext) {
             updated_entity.position = updated_entity.position + move_offset;
         }
 
+        // Get the attacking player's PvP status from the cache
+        let attacker_pvp_enabled = if let Some(&cache_idx) = cache.player.player_id_to_cache_index.get(&updated_active_attack.player_id) {
+            cache.player.pvp_player[cache_idx as usize]
+        } else {
+            false // Default to false if player not found in cache
+        };
+
         // Update collision cache
         let cache_idx = cache.attack.cached_count_attacks as usize;
         cache.attack.keys_attack[cache_idx] = updated_active_attack.active_attack_id;
         cache.attack.pos_x_attack[cache_idx] = updated_entity.position.x;
         cache.attack.pos_y_attack[cache_idx] = updated_entity.position.y;
         cache.attack.radius_attack[cache_idx] = updated_entity.radius;
+        cache.attack.pvp_enabled_attack[cache_idx] = attacker_pvp_enabled;
 
         let grid_cell_key = get_world_cell_from_position(updated_entity.position.x, updated_entity.position.y);
         cache.attack.nexts_attack[cache_idx] = cache.attack.heads_attack[grid_cell_key as usize]; 
@@ -592,6 +600,15 @@ pub fn process_player_attack_collisions_spatial_hash(ctx: &ReducerContext) {
                         if player_id == active_attack.player_id {
                             aid = cache.attack.nexts_attack[aid_usize];
                             continue;   
+                        }
+                        
+                        // Check PvP settings - only allow player-vs-player damage if attacker has PvP enabled
+                        let attacker_pvp_enabled = cache.attack.pvp_enabled_attack[aid_usize];
+                        
+                        // Skip damage if attacking player doesn't have PvP enabled
+                        if !attacker_pvp_enabled {
+                            aid = cache.attack.nexts_attack[aid_usize];
+                            continue;
                         }
                         
                         // Apply damage to player using the active attack's damage value

@@ -127,20 +127,38 @@ pub fn find_nearest_target(ctx: &ReducerContext, attacker_position: DbVector2, a
         }
     }
 
-    // Check all other players (excluding the attacker)
-    for player in ctx.db.player().iter() {
-        // Skip the attacking player
-        if player.player_id == attacker_player_id {
-            continue;
-        }
+    // Get the collision cache to access cached player data
+    let cache = crate::monsters_def::get_collision_cache();
+    
+    // Get the attacking player's PvP status from cache
+    let attacker_pvp_enabled = if let Some(&cache_idx) = cache.player.player_id_to_cache_index.get(&attacker_player_id) {
+        cache.player.pvp_player[cache_idx as usize]
+    } else {
+        false // Default to false if player not found in cache
+    };
 
-        let dx = player.position.x - attacker_position.x;
-        let dy = player.position.y - attacker_position.y;
-        let distance_squared = dx * dx + dy * dy;
+    // Check all other cached players (excluding the attacker) - only if attacking player has PvP enabled
+    if attacker_pvp_enabled {
+        for pid in 0..cache.player.cached_count_players as usize {
+            let player_id = cache.player.keys_player[pid];
+            
+            // Skip the attacking player
+            if player_id == attacker_player_id {
+                continue;
+            }
+            
+            // PvP-enabled players can target any other player (regardless of target's PvP status)
 
-        if distance_squared < nearest_distance_squared {
-            nearest_distance_squared = distance_squared;
-            nearest_target_position = Some(player.position);
+            let player_x = cache.player.pos_x_player[pid];
+            let player_y = cache.player.pos_y_player[pid];
+            let dx = player_x - attacker_position.x;
+            let dy = player_y - attacker_position.y;
+            let distance_squared = dx * dx + dy * dy;
+
+            if distance_squared < nearest_distance_squared {
+                nearest_distance_squared = distance_squared;
+                nearest_target_position = Some(DbVector2::new(player_x, player_y));
+            }
         }
     }
 

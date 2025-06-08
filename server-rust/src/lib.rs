@@ -557,6 +557,7 @@ pub fn create_new_player_with_position(ctx: &ReducerContext, name: &str, player_
         unspent_upgrades: 0,
         rerolls: 1,
         shield_count,
+        pvp: false,  // PvP is disabled by default
         position,
         radius: 48.0,
         is_bot: false,

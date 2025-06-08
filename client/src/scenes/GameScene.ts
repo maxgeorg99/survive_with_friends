@@ -1255,8 +1255,18 @@ export default class GameScene extends Phaser.Scene {
         // Get the latest entity data
         if (this.serverPosition) {
             this.serverPosition.set(player.position.x, player.position.y);
+            
+            // Update local player PvP indicator position
+            const pvpIndicator = this.localPlayerSprite?.getData('pvpIndicator') as Phaser.GameObjects.Arc;
+            if (pvpIndicator) {
+                pvpIndicator.setPosition(this.serverPosition.x, this.serverPosition.y);
+                pvpIndicator.setDepth(BASE_DEPTH + this.serverPosition.y - 0.5);
+            }
         }
         this.attackManager?.setLocalPlayerRadius(player.radius);
+        
+        // Update local player PvP indicator based on PvP status
+        this.updateLocalPlayerPvpIndicator(player.pvp);
     }
     
     /**
@@ -1463,6 +1473,10 @@ export default class GameScene extends Phaser.Scene {
         container.setData('exp', playerData.exp);
         container.setData('expForNextLevel', playerData.expForNextLevel);
         container.setData('sprite', sprite);
+        container.setData('pvp', playerData.pvp);
+        
+        // Add PvP indicator if player has PvP enabled
+        this.createPvpIndicator(container, playerData.pvp);
         
         // Name the elements so we can access them by name
         sprite.setName('sprite');
@@ -1614,6 +1628,13 @@ export default class GameScene extends Phaser.Scene {
                                 });
                             }
                         }
+                    }
+                    
+                    // Update PvP indicator if PvP status changed
+                    const currentPvpStatus = container.getData('pvp') || false;
+                    if (playerData.pvp !== currentPvpStatus) {
+                        container.setData('pvp', playerData.pvp);
+                        this.updatePvpIndicator(container, playerData.pvp);
                     }
                     
                     // Add or remove grace period effect
@@ -2878,5 +2899,79 @@ export default class GameScene extends Phaser.Scene {
         }
         
         return isOverUI;
+    }
+
+    // Add PvP circle indicator around PvP-enabled players and manage attack transparency
+    private createPvpIndicator(container: Phaser.GameObjects.Container, isPvpEnabled: boolean): Phaser.GameObjects.Arc | null {
+        if (!isPvpEnabled) return null;
+        
+        // Create a transparent red circle around the player
+        const pvpCircle = this.add.circle(0, 0, 60, 0xff0000, 0.3);
+        pvpCircle.setStrokeStyle(2, 0xff0000, 0.6);
+        pvpCircle.setName('pvpIndicator');
+        
+        // Add pulsing animation
+        this.tweens.add({
+            targets: pvpCircle,
+            alpha: { from: 0.3, to: 0.1 },
+            yoyo: true,
+            repeat: -1,
+            duration: 1500,
+            ease: 'Sine.easeInOut'
+        });
+        
+        // Add to container
+        container.add(pvpCircle);
+        
+        return pvpCircle;
+    }
+
+    private updatePvpIndicator(container: Phaser.GameObjects.Container, isPvpEnabled: boolean): void {
+        const existingIndicator = container.getByName('pvpIndicator') as Phaser.GameObjects.Arc;
+        
+        if (isPvpEnabled && !existingIndicator) {
+            // Add PvP indicator
+            this.createPvpIndicator(container, true);
+        } else if (!isPvpEnabled && existingIndicator) {
+            // Remove PvP indicator
+            existingIndicator.destroy();
+        }
+    }
+
+    private updateLocalPlayerPvpIndicator(isPvpEnabled: boolean): void {
+        if (!this.localPlayerSprite) return;
+        
+        // Check if we already have a PvP indicator
+        const existingIndicator = this.localPlayerSprite.getData('pvpIndicator') as Phaser.GameObjects.Arc;
+        
+        if (isPvpEnabled && !existingIndicator) {
+            // Create PvP indicator for local player
+            const pvpCircle = this.add.circle(
+                this.localPlayerSprite.x, 
+                this.localPlayerSprite.y, 
+                60, 
+                0xff0000, 
+                0.3
+            );
+            pvpCircle.setStrokeStyle(2, 0xff0000, 0.6);
+            pvpCircle.setDepth(this.localPlayerSprite.depth - 0.5); // Just behind the player
+            
+            // Add pulsing animation
+            this.tweens.add({
+                targets: pvpCircle,
+                alpha: { from: 0.3, to: 0.1 },
+                yoyo: true,
+                repeat: -1,
+                duration: 1500,
+                ease: 'Sine.easeInOut'
+            });
+            
+            // Store reference on the player sprite
+            this.localPlayerSprite.setData('pvpIndicator', pvpCircle);
+        } else if (!isPvpEnabled && existingIndicator) {
+            // Remove PvP indicator
+            existingIndicator.destroy();
+            this.localPlayerSprite.setData('pvpIndicator', null);
+        }
     }
 }

@@ -1,5 +1,5 @@
 use spacetimedb::{reducer, Table, ReducerContext, rand::Rng};
-use crate::{PlayerClass, player, class_data};
+use crate::{PlayerClass, player, class_data, account};
 
 #[reducer]
 pub fn spawn_bot(ctx: &ReducerContext) {
@@ -41,3 +41,35 @@ pub fn spawn_bot(ctx: &ReducerContext) {
 
     log::info!("Created new bot player record with class {:?}", player_class.clone());
 } 
+
+#[reducer]
+pub fn debug_enable_bot_pvp(ctx: &ReducerContext) {
+    // Get the identity of the caller
+    let identity = ctx.sender;
+    
+    // Find the account for the caller to verify they exist
+    let _account = ctx.db.account().identity().find(&identity)
+        .expect(&format!("DebugEnableBotPvp: Account {} does not exist.", identity));
+
+    let mut bot_count = 0;
+    let mut updated_count = 0;
+
+    // Find all bot players and enable their PvP
+    for player in ctx.db.player().iter() {
+        if player.is_bot {
+            bot_count += 1;
+            
+            // Only update if PvP is currently disabled
+            if !player.pvp {
+                let mut updated_player = player;
+                updated_player.pvp = true;
+                
+                log::info!("Debug: Enabled PvP for bot {} (ID: {})", updated_player.name, updated_player.player_id);
+                ctx.db.player().player_id().update(updated_player);
+                updated_count += 1;
+            }
+        }
+    }
+
+    log::info!("Debug: PvP enabled for {}/{} bots (rest already had PvP enabled)", updated_count, bot_count);
+}

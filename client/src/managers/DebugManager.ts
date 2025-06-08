@@ -26,6 +26,7 @@ export class DebugManager {
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.G).on('down', this.spawnDebugSpecialGem, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.V).on('down', this.spawnDebugVoidChest, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.L).on('down', this.spawnDebugLootCapsule, this);
+            this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P).on('down', this.enableBotPvp, this);
             console.log("DebugManager: Debug keys initialized.");
         } else {
             console.warn("DebugManager: Keyboard input not available on scene. Debug keys not initialized.");
@@ -40,6 +41,7 @@ export class DebugManager {
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.G);
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.V);
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.L);
+            this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.P);
         }
     }
 
@@ -91,6 +93,15 @@ export class DebugManager {
             this.spacetimedb.sdkConnection.reducers.spawnDebugLootCapsule();
         } else {
             console.warn("DebugManager: SpacetimeDB connection or player position not available for spawning debug loot capsule.");
+        }
+    }
+
+    private enableBotPvp(): void {
+        if (this.spacetimedb && this.spacetimedb.sdkConnection) {
+            console.log("DebugManager: Enabling PvP for all bots...");
+            this.spacetimedb.sdkConnection.reducers.debugEnableBotPvp();
+        } else {
+            console.warn("DebugManager: SpacetimeDB connection not available for enabling PvP for all bots.");
         }
     }
 } 

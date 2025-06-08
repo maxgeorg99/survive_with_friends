@@ -109,6 +109,9 @@ pub struct Player {
     pub rerolls: u32,
     pub shield_count: u32,
 
+    // PvP mode - false by default, true when player opts into PvP
+    pub pvp: bool,
+
     // For tap-to-move
     pub waypoint: DbVector2,    // Target position for movement
     pub has_waypoint: bool,     // Whether entity has an active waypoint
@@ -302,6 +305,7 @@ pub fn process_player_movement(ctx: &ReducerContext, tick_rate: u32, collision_c
         collision_cache.player.pos_y_player[cached_count_players] = modified_player.position.y;
         collision_cache.player.radius_player[cached_count_players] = modified_player.radius;
         collision_cache.player.shield_count_player[cached_count_players] = modified_player.shield_count;
+        collision_cache.player.pvp_player[cached_count_players] = modified_player.pvp;
 
         let grid_cell_key = get_world_cell_from_position(modified_player.position.x, modified_player.position.y) as usize;
         collision_cache.player.cell_player[cached_count_players] = grid_cell_key as i32;
@@ -370,4 +374,26 @@ pub fn commit_player_damage(ctx: &ReducerContext, collision_cache: &collision::C
             crate::core_game::damage_player(ctx, collision_cache.player.keys_player[pid], collision_cache.player.damage_to_player[pid]);
         }
     }
+}
+
+#[reducer]
+pub fn set_player_pvp_mode(ctx: &ReducerContext, pvp_enabled: bool) {
+    // Get the identity of the caller
+    let identity = ctx.sender;
+    
+    // Find the account for the caller   
+    let account = ctx.db.account().identity().find(&identity)
+        .expect(&format!("SetPlayerPvpMode: Account {} does not exist.", identity));
+
+    let player_id = account.current_player_id;
+
+    let mut player = ctx.db.player().player_id().find(&player_id)
+        .expect(&format!("SetPlayerPvpMode: Player {} does not exist.", player_id));
+    
+    // Update PvP mode
+    log::info!("Player {} ({}) {} PvP mode", player.name, player_id, if pvp_enabled { "enabled" } else { "disabled" });
+    player.pvp = pvp_enabled;
+    
+    // Update the player in the database
+    ctx.db.player().player_id().update(player);
 }

@@ -139,9 +139,20 @@ export class AttackManager {
             return;
         }
 
-        // Calculate alpha based on ownership
+        // Calculate alpha based on ownership and PvP status
         const isLocalPlayerAttack = attack.playerId === this.localPlayerId;
-        const alpha = isLocalPlayerAttack ? 0.7 : 0.4;
+        
+        // Check if attacking player has PvP enabled
+        const attackingPlayer = ctx.db?.player.playerId.find(attack.playerId);
+        const attackerPvpEnabled = attackingPlayer?.pvp || false;
+        
+        // Make attacks more transparent if attacker doesn't have PvP enabled
+        let alpha: number;
+        if (isLocalPlayerAttack) {
+            alpha = 1.0;
+        } else {
+            alpha = attackerPvpEnabled ? 1.0 : 0.4; // Other players: normal vs very transparent
+        }
         
         // Determine if this is a shield attack
         const isShield = attack.attackType.tag === "Shield";
@@ -267,6 +278,9 @@ export class AttackManager {
             // Position sprite at predicted position
             sprite.x = attackGraphicData.predictedPosition.x;
             sprite.y = attackGraphicData.predictedPosition.y;
+            
+            // Apply alpha transparency based on PvP status
+            sprite.setAlpha(attackGraphicData.alpha);
             
             // Calculate scale based on radius compared to base radius
             // Only apply if baseRadius is not zero to avoid division by zero

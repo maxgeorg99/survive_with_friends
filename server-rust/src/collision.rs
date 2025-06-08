@@ -15,6 +15,7 @@ pub struct PlayerCollisionCache {
     pub radius_player: Box<[f32]>,
     pub damage_to_player: Box<[f32]>,
     pub shield_count_player: Box<[u32]>,
+    pub pvp_player: Box<[bool]>,  // Whether each player has PvP enabled
     pub cached_count_players: u32,
 }
 
@@ -31,6 +32,7 @@ impl Default for PlayerCollisionCache {
             radius_player: vec![0.0; MAX_PLAYERS as usize].into_boxed_slice(),
             damage_to_player: vec![0.0; MAX_PLAYERS as usize].into_boxed_slice(),
             shield_count_player: vec![0; MAX_PLAYERS as usize].into_boxed_slice(),
+            pvp_player: vec![false; MAX_PLAYERS as usize].into_boxed_slice(),
             cached_count_players: 0,
         }
     }
@@ -118,6 +120,7 @@ pub struct AttackCollisionCache {
     pub pos_x_attack: Box<[f32]>,
     pub pos_y_attack: Box<[f32]>,
     pub radius_attack: Box<[f32]>,
+    pub pvp_enabled_attack: Box<[bool]>,  // Whether the attacking player has PvP enabled
     pub cached_count_attacks: i32,
 }
 
@@ -130,6 +133,7 @@ impl Default for AttackCollisionCache {
             pos_x_attack: vec![0.0; MAX_ATTACK_COUNT as usize].into_boxed_slice(),
             pos_y_attack: vec![0.0; MAX_ATTACK_COUNT as usize].into_boxed_slice(),
             radius_attack: vec![0.0; MAX_ATTACK_COUNT as usize].into_boxed_slice(),
+            pvp_enabled_attack: vec![false; MAX_ATTACK_COUNT as usize].into_boxed_slice(),
             cached_count_attacks: 0,
         }
     }
@@ -183,6 +187,7 @@ impl CollisionCache {
         self.player.radius_player.fill(0.0);
         self.player.damage_to_player.fill(0.0);
         self.player.shield_count_player.fill(0);
+        self.player.pvp_player.fill(false);
         self.player.player_id_to_cache_index.clear();
 
         // Clear monster cache
@@ -223,6 +228,7 @@ impl CollisionCache {
         self.attack.pos_x_attack.fill(0.0);
         self.attack.pos_y_attack.fill(0.0);
         self.attack.radius_attack.fill(0.0);
+        self.attack.pvp_enabled_attack.fill(false);
 
         // Clear monster attack cache
         self.monster_attack.cached_count_monster_attacks = 0;
