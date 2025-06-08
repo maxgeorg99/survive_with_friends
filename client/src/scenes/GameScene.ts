@@ -446,6 +446,9 @@ export default class GameScene extends Phaser.Scene {
             }
         });
 
+        // Handle window resize to update UI positions
+        this.scale.on('resize', this.handleResize, this);
+
         console.log("Game world initialization complete.");
     }
 
@@ -2216,6 +2219,9 @@ export default class GameScene extends Phaser.Scene {
         }
         this.debugManager?.clearDebugKeys();
         
+        // Remove resize listener
+        this.scale.off('resize', this.handleResize);
+        
         // Clean up minimap
         if (this.minimap) {
             this.minimap.container.destroy();
@@ -2779,6 +2785,13 @@ export default class GameScene extends Phaser.Scene {
         if (oldState.bossActive && !newState.bossActive) {
             console.log("Boss defeated! Hiding haze overlay");
             this.hideBossHaze();
+        }
+    }
+
+    private handleResize(): void {
+        // Update MonsterCounterUI position when screen resizes
+        if (this.monsterCounterUI) {
+            this.monsterCounterUI.updatePosition();
         }
     }
 }

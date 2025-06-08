@@ -22,10 +22,12 @@ export default class MonsterCounterUI {
         this.scene = scene;
         this.gameEvents = (window as any).gameEvents;
         
-        // Create container in top-left corner
-        this.container = scene.add.container(20, 20);
+        // Create container in top-right corner
+        const screenWidth = scene.cameras.main.width;
+        this.container = scene.add.container(screenWidth - WINDOW_WIDTH / 2 - 20, 20);
         this.container.setScrollFactor(0); // Make UI fixed to camera
         this.container.setDepth(10000); // Ensure it's above most game elements
+        this.container.setVisible(false); // Default to off (hidden)
         
         // Add background
         const bg = scene.add.rectangle(0, 0, WINDOW_WIDTH, 60, 0x000000, 0.7); // Increased width
@@ -33,12 +35,12 @@ export default class MonsterCounterUI {
         bg.setScrollFactor(0);
         
         // Add monster icon
-        const monsterIcon = scene.add.text(-60, -10, '👾', { fontSize: '24px' });
+        const monsterIcon = scene.add.text(-70, -5, '👾', { fontSize: '24px' });
         monsterIcon.setOrigin(0.5);
         monsterIcon.setScrollFactor(0);
         
         // Add monster count text
-        this.text = scene.add.text(-10, -10, '0', { 
+        this.text = scene.add.text(-10, -5, '0', { 
             fontSize: '24px',
             color: '#ffffff'
         });
@@ -50,7 +52,7 @@ export default class MonsterCounterUI {
             fontSize: '16px',
             color: '#cccccc'
         });
-        this.tickText.setOrigin(0, 0.5);
+        this.tickText.setOrigin(0.3, 0.5);
         this.tickText.setScrollFactor(0);
         
         // Add elements to container
@@ -96,6 +98,12 @@ export default class MonsterCounterUI {
 
     public toggleVisible() {
         this.container.setVisible(!this.container.visible);
+    }
+    
+    public updatePosition() {
+        // Update position when screen resizes
+        const screenWidth = this.scene.cameras.main.width;
+        this.container.setX(screenWidth - WINDOW_WIDTH / 2 - 20);
     }
     
     public destroy() {
