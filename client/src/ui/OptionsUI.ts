@@ -43,8 +43,8 @@ export default class OptionsUI {
         this.container.setDepth(100000);
         this.container.setVisible(true);
 
-        // Create background
-        const bg = this.scene.add.rectangle(0, 0, 250, 160, 0x000000, 0.8);
+        // Create background (taller for Hide button)
+        const bg = this.scene.add.rectangle(0, 0, 250, 180, 0x000000, 0.8);
         bg.setStrokeStyle(2, 0xffffff, 0.8);
         bg.setOrigin(0, 0);
         bg.setScrollFactor(0); // CRITICAL: Fix camera coordinate issues
@@ -74,8 +74,11 @@ export default class OptionsUI {
         this.soundSlider = new SliderControl(this.scene, 55, soundY, 150, this.settings.soundVolume,
             (value: number) => this.onSoundVolumeChanged(value));
 
+        // Create Hide button
+        const hideButton = this.createHideButton();
+
         // Add elements to container
-        this.container.add([bg, title, musicIcon, soundIcon]);
+        this.container.add([bg, title, musicIcon, soundIcon, hideButton]);
         this.container.add(this.musicSlider.getElements());
         this.container.add(this.soundSlider.getElements());
     }
@@ -183,6 +186,44 @@ export default class OptionsUI {
 
     public updatePosition(): void {
         // Update position when screen resizes (override in subclasses if needed)
+    }
+
+    protected createHideButton(): Phaser.GameObjects.Text {
+        const hideY = 135;
+        
+        // Create Hide button text
+        const hideButton = this.scene.add.text(125, hideY, 'Hide', {
+            fontSize: '16px',
+            color: '#ffffff',
+            fontStyle: 'bold',
+            backgroundColor: '#666666',
+            padding: { x: 12, y: 6 }
+        });
+        hideButton.setOrigin(0.5);
+        hideButton.setScrollFactor(0);
+        hideButton.setInteractive({ useHandCursor: true });
+        
+        // Add hover effects
+        hideButton.on('pointerover', () => {
+            hideButton.setBackgroundColor('#888888');
+        });
+        
+        hideButton.on('pointerout', () => {
+            hideButton.setBackgroundColor('#666666');
+        });
+        
+        // Hide menu when clicked
+        hideButton.on('pointerdown', () => {
+            // Play sound effect
+            const soundManager = (window as any).soundManager;
+            if (soundManager) {
+                soundManager.playSound('ui_click', 0.7);
+            }
+            
+            this.hide();
+        });
+        
+        return hideButton;
     }
 }
 

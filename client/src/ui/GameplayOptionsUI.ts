@@ -13,8 +13,8 @@ export default class GameplayOptionsUI extends OptionsUI {
         this.container.setDepth(100000); // Match base OptionsUI depth
         this.container.setVisible(true); // Start visible
 
-        // Create background (taller for PvP option)
-        const bg = this.scene.add.rectangle(0, 0, 250, 200, 0x000000, 0.8);
+        // Create background (taller for PvP option and Hide button)
+        const bg = this.scene.add.rectangle(0, 0, 250, 220, 0x000000, 0.8);
         bg.setStrokeStyle(2, 0xffffff, 0.8);
         bg.setOrigin(0, 0);
         bg.setScrollFactor(0); // CRITICAL: Fix camera coordinate issues
@@ -44,8 +44,12 @@ export default class GameplayOptionsUI extends OptionsUI {
         // Create PvP toggle
         this.createPvPToggle();
 
+        // Create Hide button (positioned below PvP toggle)
+        const hideButton = this.createHideButton();
+        hideButton.setPosition(125, 175); // Override position for gameplay version
+
         // Add elements to container
-        this.container.add([bg, title, musicIcon, soundIcon]);
+        this.container.add([bg, title, musicIcon, soundIcon, hideButton]);
         this.container.add(this.musicSlider.getElements());
         this.container.add(this.soundSlider.getElements());
         this.container.add(this.pvpToggle);
