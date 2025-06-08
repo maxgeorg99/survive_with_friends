@@ -11,7 +11,7 @@ export default class GameplayOptionsUI extends OptionsUI {
         this.container = this.scene.add.container(20, 20);
         this.container.setScrollFactor(0);
         this.container.setDepth(100000); // Match base OptionsUI depth
-        this.container.setVisible(true); // Start visible
+        this.container.setVisible(false); // Initial state, will be set by applyVisibilitySettings
 
         // Create background (taller for PvP option and Hide button)
         const bg = this.scene.add.rectangle(0, 0, 250, 220, 0x000000, 0.8);

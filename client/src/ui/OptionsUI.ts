@@ -6,19 +6,21 @@ interface GameSettings {
     musicVolume: number;
     soundVolume: number;
     pvpEnabled?: boolean;
+    optionsVisible?: boolean;
 }
 
 // Default settings
 const DEFAULT_SETTINGS: GameSettings = {
     musicVolume: 0.7,
     soundVolume: 0.8,
-    pvpEnabled: false
+    pvpEnabled: false,
+    optionsVisible: false // Default to hidden
 };
 
 export default class OptionsUI {
     protected scene: Phaser.Scene;
     protected container!: Phaser.GameObjects.Container;
-    protected isVisible: boolean = true;
+    protected isVisible: boolean = false; // Will be set from settings
     protected musicSlider!: SliderControl;
     protected soundSlider!: SliderControl;
     
@@ -34,6 +36,9 @@ export default class OptionsUI {
         this.settings = this.loadSettings();
         this.createUI();
         this.applySettings();
+        
+        // Apply visibility setting from localStorage
+        this.applyVisibilitySettings();
     }
 
     protected createUI(): void {
@@ -41,7 +46,7 @@ export default class OptionsUI {
         this.container = this.scene.add.container(20, 20);
         this.container.setScrollFactor(0);
         this.container.setDepth(100000);
-        this.container.setVisible(true);
+        this.container.setVisible(false); // Initial state, will be set by applyVisibilitySettings
 
         // Create background (taller for Hide button)
         const bg = this.scene.add.rectangle(0, 0, 250, 180, 0x000000, 0.8);
@@ -114,16 +119,19 @@ export default class OptionsUI {
     public toggle(): void {
         this.isVisible = !this.isVisible;
         this.container.setVisible(this.isVisible);
+        this.saveVisibilityState();
     }
 
     public show(): void {
         this.isVisible = true;
         this.container.setVisible(true);
+        this.saveVisibilityState();
     }
 
     public hide(): void {
         this.isVisible = false;
         this.container.setVisible(false);
+        this.saveVisibilityState();
     }
 
     public destroy(): void {
@@ -182,6 +190,16 @@ export default class OptionsUI {
         if (soundManager && soundManager.setSoundVolumeMultiplier) {
             soundManager.setSoundVolumeMultiplier(this.settings.soundVolume);
         }
+    }
+
+    protected applyVisibilitySettings(): void {
+        this.isVisible = this.settings.optionsVisible ?? false;
+        this.container.setVisible(this.isVisible);
+    }
+
+    protected saveVisibilityState(): void {
+        this.settings.optionsVisible = this.isVisible;
+        this.saveSettings();
     }
 
     public updatePosition(): void {
