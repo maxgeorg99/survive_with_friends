@@ -1,9 +1,9 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, SpacetimeType, rand::Rng};
 use crate::{DbVector2, MAX_GEM_COUNT, WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_HEIGHT, WORLD_GRID_WIDTH,
-           get_world_cell_from_position, spatial_hash_collision_checker, CollisionCache, entity, player, account};
+           get_world_cell_from_position, spatial_hash_collision_checker, CollisionCache, entity, player, account, monsters, bestiary};
 
 // Define the gem levels (1-4 + Soul + Special types)
-#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+#[derive(SpacetimeType, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum GemLevel {
     Small,      // = 1
     Medium,     // = 2
@@ -180,23 +180,41 @@ pub fn spawn_random_gem(ctx: &ReducerContext, position: DbVector2) -> u32 {
     create_gem(ctx, position, level)
 }
 
-// Spawns a gem at the position of a killed monster
+// Spawns a gem at the position of a killed monster using tier-based drops
 pub fn spawn_gem_on_monster_death(ctx: &ReducerContext, monster_id: u32, position: DbVector2, collision_cache: &CollisionCache) {
     if collision_cache.gem.cached_count_gems >= MAX_GEM_COUNT as i32 {
         //TODO grow gems
         return;
     }
 
-    // Get monster data to determine gem drop chance and level
-    // TODO: This will use the real monsters table when monsters system is ported
-    // For now, we'll use a default drop chance
+    // Get monster data to determine gem drop tier
+    let monster_opt = ctx.db.monsters().monster_id().find(&monster_id);
+    if monster_opt.is_none() {
+        log::warn!("Monster {} not found for gem drop, using default tier", monster_id);
+        spawn_random_gem(ctx, position);
+        return;
+    }
+    
+    let monster = monster_opt.unwrap();
+    
+    // Get bestiary entry to find monster tier
+    let bestiary_entry_opt = ctx.db.bestiary().bestiary_id().find(&(monster.bestiary_id.clone() as u32));
+    if bestiary_entry_opt.is_none() {
+        log::warn!("Bestiary entry not found for monster type {:?}, using default tier", monster.bestiary_id);
+        spawn_random_gem(ctx, position);
+        return;
+    }
+    
+    let bestiary_entry = bestiary_entry_opt.unwrap();
+    let monster_tier = bestiary_entry.tier;
+
     let drop_chance = 1.0; // Default 100% drop chance for now
 
     // Roll for gem drop
     let mut rng = ctx.rng();
     let roll = rng.gen_range(0.0..1.0);
     if roll <= drop_chance {
-        // Small chance for special gems (2% total, 0.67% each)
+        // Small chance for special gems (2% total, preserving original special gem rates)
         let special_gem_roll = rng.gen_range(1..=100);
         
         if special_gem_roll == 1 {
@@ -205,22 +223,24 @@ pub fn spawn_gem_on_monster_death(ctx: &ReducerContext, monster_id: u32, positio
             // 1% chance for Fries
             if sub_special_gem_roll <= 50 {
                 create_gem(ctx, position, GemLevel::Fries);
-                log::info!("Monster {} dropped special Fries gem at position {}, {}", monster_id, position.x, position.y);
+                log::info!("Monster {} (Tier {}) dropped special Fries gem at position {}, {}", monster_id, monster_tier, position.x, position.y);
             }
             // 1% chance for Dice
             else if sub_special_gem_roll <= 90 {
                 create_gem(ctx, position, GemLevel::Dice);
-                log::info!("Monster {} dropped special Dice gem at position {}, {}", monster_id, position.x, position.y);
+                log::info!("Monster {} (Tier {}) dropped special Dice gem at position {}, {}", monster_id, monster_tier, position.x, position.y);
             }
             // 1% chance for BoosterPack
             else{
                 create_gem(ctx, position, GemLevel::BoosterPack);
-                log::info!("Monster {} dropped special BoosterPack gem at position {}, {}", monster_id, position.x, position.y);
+                log::info!("Monster {} (Tier {}) dropped special BoosterPack gem at position {}, {}", monster_id, monster_tier, position.x, position.y);
             }
         }
         else {
-            // 97% chance for regular gem
-            spawn_random_gem(ctx, position);
+            // 97% chance for tier-based regular gem
+            let gem_level = crate::gem_drop_defs::select_weighted_gem_level(ctx, monster_tier);
+            create_gem(ctx, position, gem_level.clone());
+            log::info!("Monster {} (Tier {}) dropped {:?} gem at position {}, {}", monster_id, monster_tier, gem_level, position.x, position.y);
         }
     }
 }
