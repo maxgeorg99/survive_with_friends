@@ -361,14 +361,14 @@ export default class UpgradeUI {
                 const globalSoundVolume = getSoundVolume();
                 const adjustedVolume = 0.7 * globalSoundVolume;
                 
-                // Only play if volume is meaningful
-                if (adjustedVolume > 0) {
-                    this.upgradeBarFillSound = this.scene.sound.add('upgrade_bar_fill', { 
-                        volume: adjustedVolume,
-                        loop: true
-                    });
-                    this.upgradeBarFillSound.play();
-                }
+                // Use tiny volume instead of 0 to prevent Phaser default volume fallback
+                const safeVolume = adjustedVolume > 0 ? adjustedVolume : 0.001;
+                
+                this.upgradeBarFillSound = this.scene.sound.add('upgrade_bar_fill', { 
+                    volume: safeVolume,
+                    loop: true
+                });
+                this.upgradeBarFillSound.play();
             } catch (error) {
                 console.warn("Failed to play upgrade bar fill sound:", error);
             }
