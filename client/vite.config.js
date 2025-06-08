@@ -6,7 +6,7 @@ export default defineConfig({
   },
   preview: {
     host: '0.0.0.0', // Allow external connections
-    allowedHosts: ['vibesurvivors.onrender.com', '.onrender.com', 'localhost']
+    allowedHosts: true // Disable host checking entirely
   },
   build: {
     outDir: 'dist'
