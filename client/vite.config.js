@@ -5,8 +5,8 @@ export default defineConfig({
     port: 8080 // Or any port you prefer
   },
   preview: {
-    host: true, // Allow external connections
-    allowedHosts: 'all' // Allow all hosts (including Render's domain)
+    host: '0.0.0.0', // Allow external connections
+    allowedHosts: ['vibesurvivors.onrender.com', '.onrender.com', 'localhost']
   },
   build: {
     outDir: 'dist'
