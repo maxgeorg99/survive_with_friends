@@ -261,6 +261,9 @@ pub fn handle_boss_defeated(ctx: &ReducerContext) {
 // Test/debug utility to manually spawn the boss for testing
 #[reducer]
 pub fn spawn_boss_for_testing(ctx: &ReducerContext) {
+    // Check admin access first
+    crate::require_admin_access(ctx, "SpawnBossForTesting");
+    
     log::info!("DEVELOPER TEST: Looking for existing boss spawn timer...");
     
     // Find the existing boss spawn timer

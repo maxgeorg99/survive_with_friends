@@ -685,3 +685,28 @@ pub fn transition_player_to_winner_state(ctx: &ReducerContext, player_id: u32) {
         log::warn!("Could not find account for player {} when transitioning to winner state", player_id);
     }
 }
+
+// Helper function to check if the caller is an admin
+pub fn is_admin_caller(ctx: &ReducerContext) -> bool {
+    let caller_identity = ctx.sender;
+    
+    // Find the caller's account
+    if let Some(account) = ctx.db.account().identity().find(&caller_identity) {
+        account.name == "AdminXanadar"
+    } else {
+        false
+    }
+}
+
+// Helper function to check admin and panic if not authorized
+pub fn require_admin_access(ctx: &ReducerContext, function_name: &str) {
+    if !is_admin_caller(ctx) {
+        let caller_identity = ctx.sender;
+        let caller_name = ctx.db.account().identity().find(&caller_identity)
+            .map(|account| account.name.clone())
+            .unwrap_or_else(|| "Unknown".to_string());
+        
+        panic!("{}: Access denied. Only AdminXanadar can use debug commands. Caller: {} ({})", 
+               function_name, caller_name, caller_identity);
+    }
+}

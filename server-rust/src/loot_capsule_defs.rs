@@ -136,6 +136,9 @@ pub fn spawn_guaranteed_void_chest(ctx: &ReducerContext, _spawn: GuaranteedVoidC
 // Debug reducer to schedule a loot capsule near the calling player
 #[reducer]
 pub fn spawn_debug_loot_capsule(ctx: &ReducerContext) {
+    // Check admin access first
+    crate::require_admin_access(ctx, "SpawnDebugLootCapsule");
+    
     // Get the caller's identity
     let caller_identity = ctx.sender;
     

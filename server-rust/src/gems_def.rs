@@ -501,6 +501,9 @@ pub fn process_gem_collisions_spatial_hash(ctx: &ReducerContext, collision_cache
 // Debug reducer to spawn a random special gem near the calling player
 #[reducer]
 pub fn spawn_debug_special_gem(ctx: &ReducerContext) {
+    // Check admin access first
+    crate::require_admin_access(ctx, "SpawnDebugSpecialGem");
+    
     // Get the caller's identity
     let caller_identity = ctx.sender;
     

@@ -960,6 +960,9 @@ pub fn cleanup_ender_claw_spawning(ctx: &ReducerContext, boss_monster_id: u32) {
 // Debug reducer to spawn a VoidChest near the calling player
 #[reducer]
 pub fn spawn_debug_void_chest(ctx: &ReducerContext) {
+    // Check admin access first
+    crate::require_admin_access(ctx, "SpawnDebugVoidChest");
+    
     // Get the caller's identity
     let caller_identity = ctx.sender;
     

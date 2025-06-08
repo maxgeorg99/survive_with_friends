@@ -3,6 +3,9 @@ use crate::{PlayerClass, player, class_data, account};
 
 #[reducer]
 pub fn spawn_bot(ctx: &ReducerContext) {
+    // Check admin access first
+    crate::require_admin_access(ctx, "SpawnBot");
+    
     log::info!("SpawnBot called - selecting random class");
 
     // Get all available classes from class_data
@@ -44,13 +47,9 @@ pub fn spawn_bot(ctx: &ReducerContext) {
 
 #[reducer]
 pub fn debug_enable_bot_pvp(ctx: &ReducerContext) {
-    // Get the identity of the caller
-    let identity = ctx.sender;
+    // Check admin access first
+    crate::require_admin_access(ctx, "DebugEnableBotPvp");
     
-    // Find the account for the caller to verify they exist
-    let _account = ctx.db.account().identity().find(&identity)
-        .expect(&format!("DebugEnableBotPvp: Account {} does not exist.", identity));
-
     let mut bot_count = 0;
     let mut updated_count = 0;
 

@@ -296,12 +296,9 @@ export default class MonsterManager {
             // Play distance-based monster death sound
             this.playMonsterDeathSound(monsterContainer);
             
-            // Play void chest destroyed sound if this is a VoidChest
+            // Play void chest destroyed sound if this is a VoidChest (distance-based)
             if (monsterType === 'VoidChest') {
-                const soundManager = (window as any).soundManager;
-                if (soundManager) {
-                    soundManager.playSound('void_chest_destroyed', 0.9);
-                }
+                this.playVoidChestDestroyedSound(monsterContainer);
             }
             
             if (monsterType === 'FinalBossPhase1') {
@@ -1024,6 +1021,30 @@ export default class MonsterManager {
         soundManager.playDistanceBasedSound('attack_soft', localPlayerPosition, monsterPosition, maxDistance, 0.4);
         
         //console.log(`Playing monster damage sound at position (${container.x}, ${container.y})`);
+    }
+
+    // Add a method to play distance-based void chest destroyed sound
+    private playVoidChestDestroyedSound(container: Phaser.GameObjects.Container) {
+        // Get local player position from the scene
+        const gameScene = this.scene as any;
+        const localPlayerPosition = gameScene.getLocalPlayerPosition?.();
+        
+        if (!localPlayerPosition) {
+            return; // No local player or position available
+        }
+        
+        // Get sound manager
+        const soundManager = (window as any).soundManager;
+        if (!soundManager) {
+            return;
+        }
+        
+        // Play distance-based void chest destroyed sound
+        const voidChestPosition = { x: container.x, y: container.y };
+        const maxDistance = 900; // Void chest destroyed sounds travel far but not infinite
+        soundManager.playDistanceBasedSound('void_chest_destroyed', localPlayerPosition, voidChestPosition, maxDistance, 0.9);
+        
+        console.log(`Playing void chest destroyed sound at position (${container.x}, ${container.y}), distance from player: ${Math.sqrt(Math.pow(voidChestPosition.x - localPlayerPosition.x, 2) + Math.pow(voidChestPosition.y - localPlayerPosition.y, 2)).toFixed(1)}`);
     }
 
     // Update boss after image effects during chase mode
