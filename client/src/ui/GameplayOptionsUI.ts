@@ -48,6 +48,9 @@ export default class GameplayOptionsUI extends OptionsUI {
         const hideButton = this.createHideButton();
         hideButton.setPosition(125, 175); // Override position for gameplay version
 
+        // Create Options button (separate from main container)
+        this.createOptionsButton();
+
         // Add elements to container
         this.container.add([bg, title, musicIcon, soundIcon, hideButton]);
         this.container.add(this.musicSlider.getElements());
@@ -157,6 +160,9 @@ export default class GameplayOptionsUI extends OptionsUI {
     public destroy(): void {
         if (this.pvpToggle) {
             this.pvpToggle.destroy();
+        }
+        if (this.optionsButton) {
+            this.optionsButton.destroy();
         }
         super.destroy();
     }

@@ -20,6 +20,7 @@ const DEFAULT_SETTINGS: GameSettings = {
 export default class OptionsUI {
     protected scene: Phaser.Scene;
     protected container!: Phaser.GameObjects.Container;
+    protected optionsButton!: Phaser.GameObjects.Text;
     protected isVisible: boolean = false; // Will be set from settings
     protected musicSlider!: SliderControl;
     protected soundSlider!: SliderControl;
@@ -82,6 +83,9 @@ export default class OptionsUI {
         // Create Hide button
         const hideButton = this.createHideButton();
 
+        // Create Options button (separate from main container)
+        this.createOptionsButton();
+
         // Add elements to container
         this.container.add([bg, title, musicIcon, soundIcon, hideButton]);
         this.container.add(this.musicSlider.getElements());
@@ -119,18 +123,21 @@ export default class OptionsUI {
     public toggle(): void {
         this.isVisible = !this.isVisible;
         this.container.setVisible(this.isVisible);
+        this.optionsButton.setVisible(!this.isVisible);
         this.saveVisibilityState();
     }
 
     public show(): void {
         this.isVisible = true;
         this.container.setVisible(true);
+        this.optionsButton.setVisible(false);
         this.saveVisibilityState();
     }
 
     public hide(): void {
         this.isVisible = false;
         this.container.setVisible(false);
+        this.optionsButton.setVisible(true);
         this.saveVisibilityState();
     }
 
@@ -138,6 +145,9 @@ export default class OptionsUI {
         this.musicSlider.destroy();
         this.soundSlider.destroy();
         this.container.destroy();
+        if (this.optionsButton) {
+            this.optionsButton.destroy();
+        }
     }
 
     // Settings persistence
@@ -195,6 +205,7 @@ export default class OptionsUI {
     protected applyVisibilitySettings(): void {
         this.isVisible = this.settings.optionsVisible ?? false;
         this.container.setVisible(this.isVisible);
+        this.optionsButton.setVisible(!this.isVisible); // Options button visible when menu is hidden
     }
 
     protected saveVisibilityState(): void {
@@ -242,6 +253,40 @@ export default class OptionsUI {
         });
         
         return hideButton;
+    }
+
+    protected createOptionsButton(): void {
+        // Create Options button at top-left of screen
+        this.optionsButton = this.scene.add.text(20, 20, '(O)ptions', {
+            fontSize: '16px',
+            color: '#ffffff',
+            fontStyle: 'bold',
+            backgroundColor: '#444444',
+            padding: { x: 12, y: 6 }
+        });
+        this.optionsButton.setScrollFactor(0);
+        this.optionsButton.setDepth(99999); // Just below options menu depth
+        this.optionsButton.setInteractive({ useHandCursor: true });
+        
+        // Add hover effects
+        this.optionsButton.on('pointerover', () => {
+            this.optionsButton.setBackgroundColor('#666666');
+        });
+        
+        this.optionsButton.on('pointerout', () => {
+            this.optionsButton.setBackgroundColor('#444444');
+        });
+        
+        // Show options menu when clicked
+        this.optionsButton.on('pointerdown', () => {
+            // Play sound effect
+            const soundManager = (window as any).soundManager;
+            if (soundManager) {
+                soundManager.playSound('ui_click', 0.7);
+            }
+            
+            this.show();
+        });
     }
 }
 
