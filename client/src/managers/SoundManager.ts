@@ -131,6 +131,55 @@ export default class SoundManager {
         }
     }
 
+    // Play a sound effect with pitch variation
+    playSoundWithPitch(soundKey: string, volume: number = this.defaultVolume, pitchMin: number = 0.8, pitchMax: number = 1.2): void {
+        if (!this.soundsEnabled) {
+            return;
+        }
+        
+        if (!this.scene) {
+            console.warn("SoundManager: No scene reference available");
+            return;
+        }
+
+        // Apply global sound volume multiplier to all volumes
+        const adjustedVolume = volume * getSoundVolume();
+
+        // If volume is effectively 0, use a tiny volume instead to prevent default volume fallback
+        const safeVolume = adjustedVolume > 0 ? adjustedVolume : 0.001;
+
+        // Check for frame-based throttling
+        if (this.frameThrottledSounds.has(soundKey)) {
+            if (this.frameThrottledPlayed.has(soundKey)) {
+                // This sound was already played this frame, skip it silently
+                return;
+            }
+            // Mark this sound as played for this frame
+            this.frameThrottledPlayed.add(soundKey);
+        }
+
+        const sound = this.getSoundFromPool(soundKey, safeVolume);
+        if (sound) {
+            try {
+                // Generate random pitch between pitchMin and pitchMax
+                const randomPitch = Math.random() * (pitchMax - pitchMin) + pitchMin;
+                
+                // Set the pitch/rate if the sound supports it
+                if ((sound as any).setRate) {
+                    (sound as any).setRate(randomPitch);
+                } else if ((sound as any).rate !== undefined) {
+                    (sound as any).rate = randomPitch;
+                }
+                
+                sound.play();
+            } catch (error) {
+                console.error(`SoundManager: Error playing sound '${soundKey}' with pitch:`, error);
+            }
+        } else {
+            //console.error(`SoundManager: Failed to get sound '${soundKey}' from pool`);
+        }
+    }
+
     // Play multiple sounds in sequence with delays
     playSoundsSequence(soundSequence: Array<{ key: string, delay?: number, volume?: number }>): void {
         if (!this.soundsEnabled || !this.scene) {
@@ -245,6 +294,42 @@ export default class SoundManager {
         if (volume > 0.1) {
             this.playSound(soundKey, volume);
             //console.log(`Playing distance-based sound '${soundKey}' at volume ${volume.toFixed(2)} (distance: ${distance.toFixed(1)})`);
+        }
+    }
+
+    // Play a sound effect with distance-based volume and pitch variation
+    playDistanceBasedSoundWithPitch(soundKey: string, playerPosition: {x: number, y: number}, eventPosition: {x: number, y: number}, maxDistance: number = 300, baseVolume: number = this.defaultVolume, pitchMin: number = 0.8, pitchMax: number = 1.2): void {
+        if (!this.soundsEnabled || !this.scene) {
+            if (!this.scene) {
+                console.warn("SoundManager: No scene reference available for distance-based sound with pitch");
+            }
+            return;
+        }
+
+        // Throttle distance-based sounds to prevent performance issues
+        const now = Date.now();
+        const lastTime = this.lastDistanceSoundTime.get(soundKey) || 0;
+        if (now - lastTime < this.distanceSoundThrottle) {
+            return; // Skip this sound to prevent frame drops
+        }
+        this.lastDistanceSoundTime.set(soundKey, now);
+
+        // Calculate distance between player and event
+        const distance = this.calculateDistance(playerPosition, eventPosition);
+        
+        // Don't play if too far away
+        if (distance > maxDistance) {
+            return;
+        }
+        
+        // Calculate volume based on distance (inverse relationship)
+        const distanceRatio = 1 - (distance / maxDistance);
+        const volume = baseVolume * distanceRatio;
+        
+        // Only play if volume is meaningful
+        if (volume > 0.1) {
+            this.playSoundWithPitch(soundKey, volume, pitchMin, pitchMax);
+            //console.log(`Playing distance-based sound '${soundKey}' with pitch at volume ${volume.toFixed(2)} (distance: ${distance.toFixed(1)})`);
         }
     }
     

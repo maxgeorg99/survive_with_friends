@@ -410,7 +410,7 @@ export default class GemManager {
         
         // Play distance-based sound
         const gemPosition = { x: gemContainer.x, y: gemContainer.y };
-        soundManager.playDistanceBasedSound(soundKey, localPlayerPosition, gemPosition, maxDistance, 0.8);
+        soundManager.playDistanceBasedSoundWithPitch(soundKey, localPlayerPosition, gemPosition, maxDistance, 0.8, 0.9, 1.1);
     }
 
     // Remove a gem and play collection animation

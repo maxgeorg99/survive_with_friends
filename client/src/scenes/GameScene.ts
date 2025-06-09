@@ -1073,10 +1073,10 @@ export default class GameScene extends Phaser.Scene {
         if (this.localPlayerSprite) {
             const currentRerolls = this.localPlayerSprite.getData('rerolls');
             if (currentRerolls !== undefined && player.rerolls > currentRerolls) {
-                // Play dice sound when rerolls increase
+                // Play dice sound when rerolls increase with pitch variation
                 const soundManager = (window as any).soundManager;
                 if (soundManager) {
-                    soundManager.playSound('dice', 0.8);
+                    soundManager.playSoundWithPitch('dice', 0.8, 0.9, 1.1);
                 }
                 console.log(`Player gained reroll(s): ${currentRerolls} -> ${player.rerolls}`);
             }
@@ -1182,10 +1182,10 @@ export default class GameScene extends Phaser.Scene {
                     
                     // Briefly flash the exp bar when gaining exp
                     if (currentExp !== undefined && player.exp > currentExp) {
-                        // Play exp gain sound effect for local player only
+                        // Play exp gain sound effect for local player only with pitch variation
                         const soundManager = (window as any).soundManager;
                         if (soundManager) {
-                            soundManager.playSound('exp_gem', 0.7);
+                            soundManager.playSoundWithPitch('exp_gem', 0.7, 0.9, 1.1);
                         }
                         
                         this.tweens.add({
