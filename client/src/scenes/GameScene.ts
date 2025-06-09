@@ -1182,7 +1182,7 @@ export default class GameScene extends Phaser.Scene {
                     
                     // Briefly flash the exp bar when gaining exp
                     if (currentExp !== undefined && player.exp > currentExp) {
-                        // Play exp gain sound effect
+                        // Play exp gain sound effect for local player only
                         const soundManager = (window as any).soundManager;
                         if (soundManager) {
                             soundManager.playSound('exp_gem', 0.7);
@@ -1613,11 +1613,7 @@ export default class GameScene extends Phaser.Scene {
                             
                             // Briefly flash the exp bar when gaining exp
                             if (playerData.exp > currentExp) {
-                                // Play exp gain sound effect
-                                const soundManager = (window as any).soundManager;
-                                if (soundManager) {
-                                    soundManager.playSound('exp_gem', 0.7);
-                                }
+                                // Don't play exp gain sound for other players - only for local player
                                 
                                 this.tweens.add({
                                     targets: expBar,

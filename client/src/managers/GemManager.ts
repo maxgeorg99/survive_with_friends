@@ -372,6 +372,12 @@ export default class GemManager {
      * Play distance-based sound effects for gem collection
      */
     private playGemCollectionSound(gemContainer: Phaser.GameObjects.Container, gemLevelTag: string) {
+        // Only play sounds if we're in the GameScene
+        if (this.scene.scene.key !== 'GameScene') {
+            console.log("Skipped gem collection sound - not in GameScene");
+            return;
+        }
+        
         // Get local player position from the scene
         const gameScene = this.scene as any;
         const localPlayerPosition = gameScene.getLocalPlayerPosition?.();

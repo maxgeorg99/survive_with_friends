@@ -85,6 +85,12 @@ export default class LootCapsuleManager {
 
     // Helper method to play spawn sound with throttling
     private playSpawnSoundThrottled(): void {
+        // Only play sounds if we're in the GameScene
+        if (this.scene.scene.key !== 'GameScene') {
+            console.log("Skipped void_capsule_spawned sound - not in GameScene");
+            return;
+        }
+        
         const currentTime = Date.now();
         if (currentTime - LootCapsuleManager.lastSpawnSoundTime >= SOUND_THROTTLE_COOLDOWN_MS) {
             const soundManager = (window as any).soundManager;
@@ -100,6 +106,12 @@ export default class LootCapsuleManager {
 
     // Helper method to play land sound with throttling
     private playLandSoundThrottled(): void {
+        // Only play sounds if we're in the GameScene
+        if (this.scene.scene.key !== 'GameScene') {
+            console.log("Skipped void_capsule_lands sound - not in GameScene");
+            return;
+        }
+        
         const currentTime = Date.now();
         if (currentTime - LootCapsuleManager.lastLandSoundTime >= SOUND_THROTTLE_COOLDOWN_MS) {
             const soundManager = (window as any).soundManager;
@@ -408,6 +420,9 @@ export default class LootCapsuleManager {
     public shutdown() {
         console.log("Shutting down LootCapsuleManager", this.lootCapsuleManagerId);
         
+        // Unregister database event listeners first
+        this.unregisterListeners();
+        
         // Stop all active tweens for capsules
         this.capsuleSprites.forEach(container => {
             this.scene.tweens.killTweensOf(container);
@@ -439,5 +454,17 @@ export default class LootCapsuleManager {
         }
         
         console.log("LootCapsuleManager shutdown complete");
+    }
+
+    // Helper method to clean up database event listeners
+    private unregisterListeners() {
+        const db = this.spacetimeDBClient.sdkConnection?.db;
+        if (db) {
+            // @ts-ignore - Remove the event listeners we registered
+            db.lootCapsules?.removeOnInsert(this.handleCapsuleInsert.bind(this));
+            // @ts-ignore
+            db.lootCapsules?.removeOnDelete(this.handleCapsuleDelete.bind(this));
+            console.log("LootCapsuleManager database listeners removed");
+        }
     }
 } 
