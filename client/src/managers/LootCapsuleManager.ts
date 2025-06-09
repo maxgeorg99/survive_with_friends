@@ -11,6 +11,9 @@ const BASE_DEPTH = 50000; // High depth to appear above most game elements but b
 const SPARKLE_PARTICLE_COUNT = 3; // Number of sparkle particles trailing the capsule
 const AWARD_PARTICLE_COUNT = 12; // Number of particles when awarding
 
+// Sound throttling constants to prevent audio overload when many capsules spawn at once
+const SOUND_THROTTLE_COOLDOWN_MS = 100; // Minimum time between playing the same sound type
+
 export default class LootCapsuleManager {
     // Reference to the scene
     private scene: Phaser.Scene;
@@ -27,6 +30,10 @@ export default class LootCapsuleManager {
 
     static nextLootCapsuleManagerId: number = 0;
     private lootCapsuleManagerId: number;
+    
+    // Static sound throttling variables to prevent audio overload across all instances
+    private static lastSpawnSoundTime: number = 0;
+    private static lastLandSoundTime: number = 0;
 
     constructor(scene: Phaser.Scene, client: SpacetimeDBClient) {
         this.scene = scene;
@@ -73,6 +80,36 @@ export default class LootCapsuleManager {
             db.lootCapsules?.onDelete(this.handleCapsuleDelete.bind(this));
         } else {
             console.error("Could not set up LootCapsuleManager database listeners (database not connected)");
+        }
+    }
+
+    // Helper method to play spawn sound with throttling
+    private playSpawnSoundThrottled(): void {
+        const currentTime = Date.now();
+        if (currentTime - LootCapsuleManager.lastSpawnSoundTime >= SOUND_THROTTLE_COOLDOWN_MS) {
+            const soundManager = (window as any).soundManager;
+            if (soundManager) {
+                soundManager.playSound('void_capsule_spawned', 0.8);
+                LootCapsuleManager.lastSpawnSoundTime = currentTime;
+                //console.log("Played throttled void_capsule_spawned sound");
+            }
+        } else {
+            //console.log("Skipped void_capsule_spawned sound due to throttling");
+        }
+    }
+
+    // Helper method to play land sound with throttling
+    private playLandSoundThrottled(): void {
+        const currentTime = Date.now();
+        if (currentTime - LootCapsuleManager.lastLandSoundTime >= SOUND_THROTTLE_COOLDOWN_MS) {
+            const soundManager = (window as any).soundManager;
+            if (soundManager) {
+                soundManager.playSound('void_capsule_lands', 0.8);
+                LootCapsuleManager.lastLandSoundTime = currentTime;
+                //console.log("Played throttled void_capsule_lands sound");
+            }
+        } else {
+            //console.log("Skipped void_capsule_lands sound due to throttling");
         }
     }
 
@@ -173,10 +210,7 @@ export default class LootCapsuleManager {
         this.capsuleSprites.set(capsuleIdKey, container);
         
         // Play void capsule spawned sound
-        const soundManager = (window as any).soundManager;
-        if (soundManager) {
-            soundManager.playSound('void_capsule_spawned', 0.8);
-        }
+        this.playSpawnSoundThrottled();
         
         // Calculate arc animation parameters
         const startX = capsule.startPosition.x;
@@ -317,10 +351,7 @@ export default class LootCapsuleManager {
             this.createAwardEffect(container.x, container.y);
             
             // Play void capsule lands sound
-            const soundManager = (window as any).soundManager;
-            if (soundManager) {
-                soundManager.playSound('void_capsule_lands', 0.8);
-            }
+            this.playLandSoundThrottled();
         }
         
         // Stop any active tweens for this container
