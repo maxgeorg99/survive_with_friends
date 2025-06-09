@@ -531,6 +531,12 @@ export default class GameScene extends Phaser.Scene {
                         this.attackManager = null;
                     }
                     
+                    // Stop LootCapsuleManager immediately to prevent lingering sound effects
+                    if (this.lootCapsuleManager) {
+                        this.lootCapsuleManager.shutdown();
+                        this.lootCapsuleManager = null;
+                    }
+                    
                     // Disable player controls immediately
                     this.disablePlayerControls();
                     
@@ -669,6 +675,13 @@ export default class GameScene extends Phaser.Scene {
             console.log("GameScene: Player died - immediately stopping AttackManager");
             this.attackManager.shutdown();
             this.attackManager = null;
+        }
+        
+        // IMMEDIATELY stop loot capsule manager to prevent lingering sound effects
+        if (this.lootCapsuleManager) {
+            console.log("GameScene: Player died - immediately stopping LootCapsuleManager");
+            this.lootCapsuleManager.shutdown();
+            this.lootCapsuleManager = null;
         }
         
         // Clear any upgrade UI that may be open

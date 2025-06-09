@@ -35,6 +35,13 @@ export default class LootCapsuleManager {
     private static lastSpawnSoundTime: number = 0;
     private static lastLandSoundTime: number = 0;
 
+    // Store bound event handlers for proper cleanup
+    private boundHandleCapsuleInsert: (ctx: EventContext, capsule: LootCapsules) => void;
+    private boundHandleCapsuleDelete: (ctx: EventContext, capsule: LootCapsules) => void;
+    
+    // Flag to track if the manager has been shut down
+    private isDestroyed: boolean = false;
+
     constructor(scene: Phaser.Scene, client: SpacetimeDBClient) {
         this.scene = scene;
         this.spacetimeDBClient = client;
@@ -44,6 +51,10 @@ export default class LootCapsuleManager {
         this.lootCapsuleManagerId = LootCapsuleManager.nextLootCapsuleManagerId;
 
         console.log("LootCapsuleManager constructed", this.lootCapsuleManagerId);
+
+        // Bind event handlers once for proper cleanup
+        this.boundHandleCapsuleInsert = this.handleCapsuleInsert.bind(this);
+        this.boundHandleCapsuleDelete = this.handleCapsuleDelete.bind(this);
 
         // Initialize persistent particle emitters
         this.sparkleEmitter = this.scene.add.particles(0, 0, 'white_pixel', {
@@ -75,9 +86,9 @@ export default class LootCapsuleManager {
         const db = this.spacetimeDBClient.sdkConnection?.db;
         if (db) {
             // @ts-ignore - LootCapsules table might not be fully typed yet
-            db.lootCapsules?.onInsert(this.handleCapsuleInsert.bind(this));
+            db.lootCapsules?.onInsert(this.boundHandleCapsuleInsert);
             // @ts-ignore
-            db.lootCapsules?.onDelete(this.handleCapsuleDelete.bind(this));
+            db.lootCapsules?.onDelete(this.boundHandleCapsuleDelete);
         } else {
             console.error("Could not set up LootCapsuleManager database listeners (database not connected)");
         }
@@ -85,6 +96,12 @@ export default class LootCapsuleManager {
 
     // Helper method to play spawn sound with throttling
     private playSpawnSoundThrottled(): void {
+        // Skip if manager has been destroyed
+        if (this.isDestroyed) {
+            console.log("Skipped void_capsule_spawned sound - LootCapsuleManager destroyed");
+            return;
+        }
+        
         // Only play sounds if we're in the GameScene
         if (this.scene.scene.key !== 'GameScene') {
             console.log("Skipped void_capsule_spawned sound - not in GameScene");
@@ -106,6 +123,12 @@ export default class LootCapsuleManager {
 
     // Helper method to play land sound with throttling
     private playLandSoundThrottled(): void {
+        // Skip if manager has been destroyed
+        if (this.isDestroyed) {
+            console.log("Skipped void_capsule_lands sound - LootCapsuleManager destroyed");
+            return;
+        }
+        
         // Only play sounds if we're in the GameScene
         if (this.scene.scene.key !== 'GameScene') {
             console.log("Skipped void_capsule_lands sound - not in GameScene");
@@ -142,12 +165,24 @@ export default class LootCapsuleManager {
 
     // Handle when a new loot capsule is inserted
     private handleCapsuleInsert(ctx: EventContext, capsule: LootCapsules) {
+        // Skip if manager has been destroyed
+        if (this.isDestroyed) {
+           //console.log("Skipped loot capsule insert - LootCapsuleManager destroyed");
+            return;
+        }
+        
         console.log(`New loot capsule from (${capsule.startPosition.x}, ${capsule.startPosition.y}) to (${capsule.endPosition.x}, ${capsule.endPosition.y}) with gem type: ${capsule.lootdropId.tag}`);
         this.createCapsuleSprite(capsule);
     }
 
     // Handle when a loot capsule is deleted (gem was spawned)
     private handleCapsuleDelete(ctx: EventContext, capsule: LootCapsules) {
+        // Skip if manager has been destroyed
+        if (this.isDestroyed) {
+            //console.log("Skipped loot capsule delete - LootCapsuleManager destroyed");
+            return;
+        }
+        
         console.log(`Loot capsule deleted: ${capsule.capsuleId}`);
         this.removeCapsuleSprite(String(capsule.capsuleId), true); // true = play award effect
     }
@@ -420,6 +455,9 @@ export default class LootCapsuleManager {
     public shutdown() {
         console.log("Shutting down LootCapsuleManager", this.lootCapsuleManagerId);
         
+        // Mark as destroyed to prevent further processing
+        this.isDestroyed = true;
+        
         // Unregister database event listeners first
         this.unregisterListeners();
         
@@ -461,9 +499,9 @@ export default class LootCapsuleManager {
         const db = this.spacetimeDBClient.sdkConnection?.db;
         if (db) {
             // @ts-ignore - Remove the event listeners we registered
-            db.lootCapsules?.removeOnInsert(this.handleCapsuleInsert.bind(this));
+            db.lootCapsules?.removeOnInsert(this.boundHandleCapsuleInsert);
             // @ts-ignore
-            db.lootCapsules?.removeOnDelete(this.handleCapsuleDelete.bind(this));
+            db.lootCapsules?.removeOnDelete(this.boundHandleCapsuleDelete);
             console.log("LootCapsuleManager database listeners removed");
         }
     }
