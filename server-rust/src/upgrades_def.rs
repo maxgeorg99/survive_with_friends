@@ -332,18 +332,85 @@ fn generate_attack_upgrade(ctx: &ReducerContext, attack_type: u32, possible_stat
 #[reducer]
 pub fn choose_upgrade(ctx: &ReducerContext, player_id: u32, upgrade_index: u32) {
     // Ensure the caller's identity is the player's identity
-    let identity_account = ctx.db.account().identity().find(&ctx.sender)
+    let caller_identity = ctx.sender;
+    let identity_account = ctx.db.account().identity().find(&caller_identity)
         .expect("ChooseUpgrade called by null identity");
 
     if identity_account.current_player_id != player_id {
-        panic!("ChooseUpgrade called by wrong player");
+        // Enhanced error logging with detailed information
+        log::error!(
+            "ChooseUpgrade called by wrong player! Caller Identity: {}, Account Name: '{}', Account Current Player ID: {}, Requested Player ID: {}, Account State: {:?}",
+            caller_identity,
+            identity_account.name,
+            identity_account.current_player_id,
+            player_id,
+            identity_account.state
+        );
+        
+        // Also log if the requested player exists
+        if let Some(requested_player) = ctx.db.player().player_id().find(&player_id) {
+            log::error!(
+                "Requested Player Details - ID: {}, Name: '{}', Is Bot: {}, Level: {}",
+                requested_player.player_id,
+                requested_player.name,
+                requested_player.is_bot,
+                requested_player.level
+            );
+        } else {
+            log::error!("Requested Player ID {} does not exist in the database", player_id);
+        }
+        
+        // Log the caller's actual player if they have one
+        if identity_account.current_player_id > 0 {
+            if let Some(caller_player) = ctx.db.player().player_id().find(&identity_account.current_player_id) {
+                log::error!(
+                    "Caller's Actual Player Details - ID: {}, Name: '{}', Is Bot: {}, Level: {}",
+                    caller_player.player_id,
+                    caller_player.name,
+                    caller_player.is_bot,
+                    caller_player.level
+                );
+            } else {
+                log::error!(
+                    "Caller's account points to player ID {} but that player does not exist",
+                    identity_account.current_player_id
+                );
+            }
+        } else {
+            log::error!("Caller's account has no current player (current_player_id = 0)");
+        }
+        
+        panic!("ChooseUpgrade called by wrong player - see detailed logs above");
     }
+
+    // Log successful authentication
+    log::info!(
+        "ChooseUpgrade: Valid request from Identity: {}, Account: '{}', Player ID: {}, Upgrade Index: {}",
+        caller_identity,
+        identity_account.name,
+        player_id,
+        upgrade_index
+    );
 
     // Get the upgrade option data for the player
     let upgrade_options_data: Vec<_> = ctx.db.upgrade_options().player_id().filter(&player_id).collect();
 
+    // Log available upgrade options for debugging
+    log::info!("Player {} has {} upgrade options available:", player_id, upgrade_options_data.len());
+    for (i, option) in upgrade_options_data.iter().enumerate() {
+        log::info!(
+            "  Option {}: Index {}, Type: {:?}, Attack: {}, Value: {}",
+            i,
+            option.upgrade_index,
+            option.upgrade_type,
+            option.is_attack_upgrade,
+            option.value
+        );
+    }
+
     // Ensure the player has upgrades to choose from
     if upgrade_options_data.is_empty() {
+        log::error!("Player {} has no available upgrades to choose from", player_id);
         panic!("Player has no available upgrades to choose from");
     }
 
@@ -356,8 +423,26 @@ pub fn choose_upgrade(ctx: &ReducerContext, player_id: u32, upgrade_index: u32) 
         }
     }
 
-    let selected_upgrade = selected_upgrade
-        .expect(&format!("Upgrade with index {} not found", upgrade_index));
+    let selected_upgrade = match selected_upgrade {
+        Some(upgrade) => {
+            log::info!(
+                "Player {} selected upgrade index {} (Type: {:?})",
+                player_id,
+                upgrade_index,
+                upgrade.upgrade_type
+            );
+            upgrade
+        }
+        None => {
+            log::error!(
+                "Upgrade with index {} not found for player {}. Available indices: {:?}",
+                upgrade_index,
+                player_id,
+                upgrade_options_data.iter().map(|opt| opt.upgrade_index).collect::<Vec<_>>()
+            );
+            panic!("Upgrade with index {} not found", upgrade_index);
+        }
+    };
 
     // Get count of player's current chosen upgrades to determine the order
     let upgrade_order = ctx.db.chosen_upgrades().player_id().filter(&player_id).count() as u32;
