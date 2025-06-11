@@ -40,6 +40,7 @@ export namespace AiState {
   export type BossChase = { tag: "BossChase" };
   export type BossDance = { tag: "BossDance" };
   export type BossVanish = { tag: "BossVanish" };
+  export type BossLurk = { tag: "BossLurk" };
   export type BossTeleport = { tag: "BossTeleport" };
   export type BossTransform = { tag: "BossTransform" };
   export type Stationary = { tag: "Stationary" };
@@ -55,6 +56,7 @@ export namespace AiState {
   export const BossChase = { tag: "BossChase" };
   export const BossDance = { tag: "BossDance" };
   export const BossVanish = { tag: "BossVanish" };
+  export const BossLurk = { tag: "BossLurk" };
   export const BossTeleport = { tag: "BossTeleport" };
   export const BossTransform = { tag: "BossTransform" };
   export const Stationary = { tag: "Stationary" };
@@ -66,6 +68,7 @@ export namespace AiState {
       new SumTypeVariant("BossChase", AlgebraicType.createProductType([])),
       new SumTypeVariant("BossDance", AlgebraicType.createProductType([])),
       new SumTypeVariant("BossVanish", AlgebraicType.createProductType([])),
+      new SumTypeVariant("BossLurk", AlgebraicType.createProductType([])),
       new SumTypeVariant("BossTeleport", AlgebraicType.createProductType([])),
       new SumTypeVariant("BossTransform", AlgebraicType.createProductType([])),
       new SumTypeVariant("Stationary", AlgebraicType.createProductType([])),
@@ -83,7 +86,7 @@ export namespace AiState {
 }
 
 // The tagged union or sum type for the algebraic type `AiState`.
-export type AiState = AiState.Default | AiState.BossIdle | AiState.BossChase | AiState.BossDance | AiState.BossVanish | AiState.BossTeleport | AiState.BossTransform | AiState.Stationary;
+export type AiState = AiState.Default | AiState.BossIdle | AiState.BossChase | AiState.BossDance | AiState.BossVanish | AiState.BossLurk | AiState.BossTeleport | AiState.BossTransform | AiState.Stationary;
 
 export default AiState;
 

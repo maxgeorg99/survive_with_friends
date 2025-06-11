@@ -10,9 +10,10 @@ pub enum AIState {
     BossChase = 2,
     BossDance = 3,
     BossVanish = 4,
-    BossTeleport = 5,
-    BossTransform = 6,
-    Stationary = 7,
+    BossLurk = 5,
+    BossTeleport = 6,
+    BossTransform = 7,
+    Stationary = 8,
 }
 
 // Scheduled table for changing monster AI states
@@ -40,7 +41,8 @@ pub struct BossLastPattern {
 const BOSS_IDLE_DURATION_MS: u64 = 5000;        // 3 seconds idle
 const BOSS_CHASE_DURATION_MS: u64 = 15000;       // 8 seconds chase
 pub const BOSS_DANCE_DURATION_MS: u64 = 15000;       // 5 seconds dance
-const BOSS_VANISH_DURATION_MS: u64 = 4000;      // 2 seconds vanish
+const BOSS_VANISH_DURATION_MS: u64 = 1000;      // 2 seconds vanish
+const BOSS_LURK_DURATION_MS: u64 = 3000;        // 3 seconds lurk (safe period)
 const BOSS_TELEPORT_DURATION_MS: u64 = 1000;     // 0.5 seconds teleport
 const BOSS_TRANSFORM_DURATION_MS: u64 = 2000;   // 2 seconds transform
 
@@ -127,8 +129,16 @@ fn execute_state_entry_behavior(ctx: &ReducerContext, monster: &crate::Monsters,
             // Change target to random player
             change_monster_target_to_random_player(ctx, monster);
             
-            // Schedule transition to teleport after vanish duration
-            schedule_state_change(ctx, monster.monster_id, AIState::BossTeleport, BOSS_VANISH_DURATION_MS);
+            // Schedule transition to lurk after vanish duration
+            schedule_state_change(ctx, monster.monster_id, AIState::BossLurk, BOSS_VANISH_DURATION_MS);
+        },
+        
+        AIState::BossLurk => {
+            log::info!("Monster {} entering BossLurk state", monster.monster_id);
+            
+            // Boss lurks (invisible, non-collidable) before teleporting
+            // Schedule transition to teleport after lurk duration
+            schedule_state_change(ctx, monster.monster_id, AIState::BossTeleport, BOSS_LURK_DURATION_MS);
         },
         
         AIState::BossTeleport => {
@@ -358,6 +368,7 @@ pub fn get_movement_behavior_for_state(state: &AIState) -> MovementBehavior {
         AIState::BossChase => MovementBehavior::Chase,
         AIState::BossDance => MovementBehavior::StandStill,
         AIState::BossVanish => MovementBehavior::StandStill,
+        AIState::BossLurk => MovementBehavior::StandStill,
         AIState::BossTeleport => MovementBehavior::StandStill,
         AIState::BossTransform => MovementBehavior::StandStill,
         AIState::Stationary => MovementBehavior::StandStill,
@@ -412,5 +423,35 @@ pub fn check_boss_chase_distance(ctx: &ReducerContext, monster_id: u32, monster_
             // Schedule new random boss pattern with short delay (immediate attack)
             schedule_random_boss_pattern(ctx, monster_id);
         }
+    }
+}
+
+// Helper function to check if a monster should deal damage based on its AI state
+pub fn can_monster_deal_damage(state: &AIState) -> bool {
+    match state {
+        AIState::Default => true,
+        AIState::BossIdle => true,
+        AIState::BossChase => true,
+        AIState::BossDance => true,
+        AIState::BossVanish => true,   // Boss is vanishing but still dangerous!
+        AIState::BossLurk => false,    // Boss is lurking - completely safe period
+        AIState::BossTeleport => false, // Boss is teleporting - no damage!
+        AIState::BossTransform => true,
+        AIState::Stationary => true,
+    }
+}
+
+// Helper function to check if a monster should have collision detection at all
+pub fn can_monster_collide(state: &AIState) -> bool {
+    match state {
+        AIState::Default => true,
+        AIState::BossIdle => true,
+        AIState::BossChase => true,
+        AIState::BossDance => true,
+        AIState::BossVanish => true,   // Boss is vanishing but still physically present
+        AIState::BossLurk => false,    // Boss is lurking - completely non-collidable
+        AIState::BossTeleport => true, // Boss is teleporting but still there
+        AIState::BossTransform => true,
+        AIState::Stationary => true,
     }
 } 

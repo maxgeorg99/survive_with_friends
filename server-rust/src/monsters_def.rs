@@ -485,6 +485,12 @@ fn populate_monster_cache(ctx: &ReducerContext, cache: &mut crate::collision::Co
         let movement_behavior = crate::monster_ai_defs::get_movement_behavior_for_state(&monster.ai_state);
         cache.monster.movement_behavior[idx] = crate::monster_ai_defs::movement_behavior_to_u8(movement_behavior);
         
+        // Cache whether monster can deal damage based on AI state
+        cache.monster.can_deal_damage[idx] = crate::monster_ai_defs::can_monster_deal_damage(&monster.ai_state);
+        
+        // Cache whether monster can collide at all based on AI state
+        cache.monster.can_collide[idx] = crate::monster_ai_defs::can_monster_collide(&monster.ai_state);
+        
         //Structures and bosses have their weight set to 0.0 to prevent them from being pushed around
         if monster.bestiary_id == MonsterType::VoidChest || 
            monster.bestiary_id == MonsterType::FinalBossPhase1 || 
@@ -610,7 +616,9 @@ pub fn process_player_attack_monster_collisions_spatial_hash(ctx: &ReducerContex
                     let my = cache.monster.pos_y_monster[mid_usize];
                     let mr = cache.monster.radius_monster[mid_usize];
 
-                    if spatial_hash_collision_checker(ax, ay, ar, mx, my, mr) {
+                    // Only check collision if monster can collide at all (fixes boss lurk issue)
+                    if cache.monster.can_collide[mid_usize] &&
+                       spatial_hash_collision_checker(ax, ay, ar, mx, my, mr) {
                         // Get the active attack data
                         if current_attack_data.is_none() {
                             if let Some(active_attack) = ctx.db.active_attacks().active_attack_id().find(&cache.attack.keys_attack[aid]) {
@@ -705,6 +713,12 @@ fn solve_monster_repulsion_spatial_hash(cache: &mut crate::collision::CollisionC
                 while i_b != -1 {
                     let i_b_usize = i_b as usize;
                     if i_b <= i_a as i32 {
+                        i_b = cache.monster.nexts_monster[i_b_usize];
+                        continue;
+                    }
+
+                    // Skip collision if either monster can't collide (fixes boss lurk issue)
+                    if !cache.monster.can_collide[i_a] || !cache.monster.can_collide[i_b_usize] {
                         i_b = cache.monster.nexts_monster[i_b_usize];
                         continue;
                     }
