@@ -3,6 +3,23 @@ import SpacetimeDBClient from '../SpacetimeDBClient';
 import { GameEvents } from '../constants/GameEvents';
 import MusicManager from '../managers/MusicManager';
 
+// Constants for responsive design
+const RESPONSIVE_CONFIG = {
+    DEAD_SIZE_RATIO: 0.09,
+    DEAD_HEIGHT_RATIO: 0.13,
+    MAX_DEAD_SIZE: 72,
+    FLAVOR_SIZE_RATIO: 0.025,
+    FLAVOR_HEIGHT_RATIO: 0.04,
+    MAX_FLAVOR_SIZE: 24,
+    STATUS_SIZE_RATIO: 0.02,
+    STATUS_HEIGHT_RATIO: 0.035,
+    MAX_STATUS_SIZE: 20,
+    DEAD_Y_OFFSET: 0.1,
+    FLAVOR_Y_OFFSET: -0.02,
+    STATUS_Y_OFFSET: -0.04,
+    MIN_STROKE_WIDTH: 4
+};
+
 export default class DeadScene extends Phaser.Scene {
     private spacetimeDBClient: SpacetimeDBClient;
     private gameEvents: Phaser.Events.EventEmitter;
@@ -54,7 +71,8 @@ export default class DeadScene extends Phaser.Scene {
             if (this.textures.exists('loss_screen')) {
                 const bg = this.add.image(width/2, height/2, 'loss_screen')
                     .setDisplaySize(width, height)
-                    .setDepth(0);
+                    .setDepth(0)
+                    .setName('loss_screen');
                 // No tinting to preserve the original loss screen appearance
             }
         } catch (error) {
@@ -67,37 +85,43 @@ export default class DeadScene extends Phaser.Scene {
         // Create a container for all dead UI elements
         this.deadContainer = this.add.container(width/2, height/2);
         
+        // Calculate responsive font sizes based on screen dimensions
+        const baseDeadSize = Math.min(width * RESPONSIVE_CONFIG.DEAD_SIZE_RATIO, height * RESPONSIVE_CONFIG.DEAD_HEIGHT_RATIO, RESPONSIVE_CONFIG.MAX_DEAD_SIZE);
+        const baseFlavorSize = Math.min(width * RESPONSIVE_CONFIG.FLAVOR_SIZE_RATIO, height * RESPONSIVE_CONFIG.FLAVOR_HEIGHT_RATIO, RESPONSIVE_CONFIG.MAX_FLAVOR_SIZE);
+        const baseStatusSize = Math.min(width * RESPONSIVE_CONFIG.STATUS_SIZE_RATIO, height * RESPONSIVE_CONFIG.STATUS_HEIGHT_RATIO, RESPONSIVE_CONFIG.MAX_STATUS_SIZE);
+        console.log(`DeadScene: Responsive text sizing - Dead: ${baseDeadSize}px, Flavor: ${baseFlavorSize}px, Status: ${baseStatusSize}px for screen ${width}x${height}`);
+        
         // Add "You are no survivor" text
-        const deadText = this.add.text(0, -100, 'YOU ARE NO SURVIVOR', {
+        const deadText = this.add.text(0, -height * RESPONSIVE_CONFIG.DEAD_Y_OFFSET, 'YOU ARE NO SURVIVOR', {
             fontFamily: 'Arial Black',
-            fontSize: '72px',
+            fontSize: `${baseDeadSize}px`,
             color: '#ff3333',
             align: 'center',
             stroke: '#000000',
-            strokeThickness: 8
-        }).setOrigin(0.5);
+            strokeThickness: Math.max(RESPONSIVE_CONFIG.MIN_STROKE_WIDTH, baseDeadSize / 9)
+        }).setOrigin(0.5).setName('deadText');
         this.deadContainer.add(deadText);
         
         // Add flavor text
-        const flavorText = this.add.text(0, -20, 'The void has claimed another soul...', {
+        const flavorText = this.add.text(0, height * RESPONSIVE_CONFIG.FLAVOR_Y_OFFSET, 'The void has claimed another soul...', {
             fontFamily: 'Arial',
-            fontSize: '24px',
+            fontSize: `${baseFlavorSize}px`,
             color: '#FFFFFF',
             align: 'center',
             stroke: '#000000',
-            strokeThickness: 4
-        }).setOrigin(0.5);
+            strokeThickness: Math.max(RESPONSIVE_CONFIG.MIN_STROKE_WIDTH, baseFlavorSize / 6)
+        }).setOrigin(0.5).setName('flavorText');
         this.deadContainer.add(flavorText);
         
         // Add status text
-        this.statusText = this.add.text(0, 40, 'Returning to character select...', {
+        this.statusText = this.add.text(0, height * RESPONSIVE_CONFIG.STATUS_Y_OFFSET, 'Returning to character select...', {
             fontFamily: 'Arial',
-            fontSize: '20px',
+            fontSize: `${baseStatusSize}px`,
             color: '#FFFFFF',
             align: 'center',
             stroke: '#000000',
-            strokeThickness: 3
-        }).setOrigin(0.5);
+            strokeThickness: Math.max(3, baseStatusSize / 7)
+        }).setOrigin(0.5).setName('statusText');
         this.deadContainer.add(this.statusText);
         
         // Add animated dots for waiting
@@ -134,10 +158,48 @@ export default class DeadScene extends Phaser.Scene {
     
     private handleResize() {
         const { width, height } = this.scale;
+        console.log(`DeadScene: Handling resize to ${width}x${height}`);
+        
+        // Update background image
+        const backgroundImage = this.children.getByName('loss_screen') as Phaser.GameObjects.Image;
+        if (backgroundImage) {
+            backgroundImage.setPosition(width/2, height/2);
+            backgroundImage.setDisplaySize(width, height);
+            console.log(`DeadScene: Updated background image to ${width}x${height}`);
+        }
         
         // Update container position to new center
         if (this.deadContainer) {
             this.deadContainer.setPosition(width/2, height/2);
+            
+            // Update text elements within the container
+            const deadText = this.deadContainer.getByName('deadText') as Phaser.GameObjects.Text;
+            const flavorText = this.deadContainer.getByName('flavorText') as Phaser.GameObjects.Text;
+            const statusText = this.deadContainer.getByName('statusText') as Phaser.GameObjects.Text;
+            
+            if (deadText) {
+                const baseDeadSize = Math.min(width * RESPONSIVE_CONFIG.DEAD_SIZE_RATIO, height * RESPONSIVE_CONFIG.DEAD_HEIGHT_RATIO, RESPONSIVE_CONFIG.MAX_DEAD_SIZE);
+                deadText.setPosition(0, -height * RESPONSIVE_CONFIG.DEAD_Y_OFFSET);
+                deadText.setFontSize(baseDeadSize);
+                deadText.setStroke('#000000', Math.max(RESPONSIVE_CONFIG.MIN_STROKE_WIDTH, baseDeadSize / 9));
+                console.log(`DeadScene: Updated dead text - size: ${baseDeadSize}px, position: (0, ${-height * RESPONSIVE_CONFIG.DEAD_Y_OFFSET})`);
+            }
+            
+            if (flavorText) {
+                const baseFlavorSize = Math.min(width * RESPONSIVE_CONFIG.FLAVOR_SIZE_RATIO, height * RESPONSIVE_CONFIG.FLAVOR_HEIGHT_RATIO, RESPONSIVE_CONFIG.MAX_FLAVOR_SIZE);
+                flavorText.setPosition(0, height * RESPONSIVE_CONFIG.FLAVOR_Y_OFFSET);
+                flavorText.setFontSize(baseFlavorSize);
+                flavorText.setStroke('#000000', Math.max(RESPONSIVE_CONFIG.MIN_STROKE_WIDTH, baseFlavorSize / 6));
+                console.log(`DeadScene: Updated flavor text - size: ${baseFlavorSize}px, position: (0, ${height * RESPONSIVE_CONFIG.FLAVOR_Y_OFFSET})`);
+            }
+            
+            if (statusText) {
+                const baseStatusSize = Math.min(width * RESPONSIVE_CONFIG.STATUS_SIZE_RATIO, height * RESPONSIVE_CONFIG.STATUS_HEIGHT_RATIO, RESPONSIVE_CONFIG.MAX_STATUS_SIZE);
+                statusText.setPosition(0, height * RESPONSIVE_CONFIG.STATUS_Y_OFFSET);
+                statusText.setFontSize(baseStatusSize);
+                statusText.setStroke('#000000', Math.max(3, baseStatusSize / 7));
+                console.log(`DeadScene: Updated status text - size: ${baseStatusSize}px, position: (0, ${height * RESPONSIVE_CONFIG.STATUS_Y_OFFSET})`);
+            }
         }
     }
     

@@ -5,6 +5,22 @@ import { Account } from '../autobindings';
 import MusicManager from '../managers/MusicManager';
 import OptionsUI from '../ui/OptionsUI';
 
+// Constants for responsive design
+const RESPONSIVE_CONFIG = {
+    TITLE_SIZE_RATIO: 0.08,
+    TITLE_HEIGHT_RATIO: 0.12,
+    MAX_TITLE_SIZE: 64,
+    SUBTITLE_SIZE_RATIO: 0.025,
+    SUBTITLE_HEIGHT_RATIO: 0.04,
+    MAX_SUBTITLE_SIZE: 24,
+    STATUS_SIZE_RATIO: 0.02,
+    STATUS_HEIGHT_RATIO: 0.035,
+    MAX_STATUS_SIZE: 20,
+    TITLE_Y_OFFSET: 0.15,
+    SUBTITLE_Y_OFFSET: 0.1,
+    MIN_STROKE_WIDTH: 4
+};
+
 export default class TitleScene extends Phaser.Scene {
     private spacetimeDBClient: SpacetimeDBClient;
     private gameEvents: Phaser.Events.EventEmitter;
@@ -203,7 +219,8 @@ export default class TitleScene extends Phaser.Scene {
             if (this.textures.exists('title_bg')) {
                 this.add.image(width/2, height/2, 'title_bg')
                     .setDisplaySize(width, height)
-                    .setDepth(0);
+                    .setDepth(0)
+                    .setName('title_bg');
             }
         } catch (error) {
             console.error("Error loading background:", error);
@@ -212,33 +229,39 @@ export default class TitleScene extends Phaser.Scene {
         // Create a container for all title UI elements
         this.titleContainer = this.add.container(width/2, height/2);
         
+        // Calculate responsive font sizes based on screen dimensions
+        const baseTitleSize = Math.min(width * RESPONSIVE_CONFIG.TITLE_SIZE_RATIO, height * RESPONSIVE_CONFIG.TITLE_HEIGHT_RATIO, RESPONSIVE_CONFIG.MAX_TITLE_SIZE);
+        const baseSubtitleSize = Math.min(width * RESPONSIVE_CONFIG.SUBTITLE_SIZE_RATIO, height * RESPONSIVE_CONFIG.SUBTITLE_HEIGHT_RATIO, RESPONSIVE_CONFIG.MAX_SUBTITLE_SIZE);
+        const baseStatusSize = Math.min(width * RESPONSIVE_CONFIG.STATUS_SIZE_RATIO, height * RESPONSIVE_CONFIG.STATUS_HEIGHT_RATIO, RESPONSIVE_CONFIG.MAX_STATUS_SIZE);
+        console.log(`TitleScene: Responsive text sizing - Title: ${baseTitleSize}px, Subtitle: ${baseSubtitleSize}px, Status: ${baseStatusSize}px for screen ${width}x${height}`);
+        
         // Add game title
-        const titleText = this.add.text(0, -150, 'VIBE SURVIVORS', {
+        const titleText = this.add.text(0, -height * RESPONSIVE_CONFIG.TITLE_Y_OFFSET, 'VIBE SURVIVORS', {
             fontFamily: 'Arial Black',
-            fontSize: '64px',
+            fontSize: `${baseTitleSize}px`,
             color: '#ffffff',
             align: 'center',
             stroke: '#000000',
-            strokeThickness: 8
-        }).setOrigin(0.5);
+            strokeThickness: Math.max(RESPONSIVE_CONFIG.MIN_STROKE_WIDTH, baseTitleSize / 8)
+        }).setOrigin(0.5).setName('titleText');
         this.titleContainer.add(titleText);
         
         // Add subtitle
-        const subtitleText = this.add.text(0, -100, 'Battle for survival against the void!', {
+        const subtitleText = this.add.text(0, -height * RESPONSIVE_CONFIG.SUBTITLE_Y_OFFSET, 'Battle for survival against the void!', {
             fontFamily: 'Arial',
-            fontSize: '24px',
+            fontSize: `${baseSubtitleSize}px`,
             color: '#cccccc',
             align: 'center'
-        }).setOrigin(0.5);
+        }).setOrigin(0.5).setName('subtitleText');
         this.titleContainer.add(subtitleText);
         
         // Add status text for connection
         this.statusText = this.add.text(0, 0, 'Connecting to server...', {
             fontFamily: 'Arial',
-            fontSize: '20px',
+            fontSize: `${baseStatusSize}px`,
             color: '#ffffff',
             align: 'center'
-        }).setOrigin(0.5);
+        }).setOrigin(0.5).setName('statusText');
         this.titleContainer.add(this.statusText);
         
         // Create start button (initially hidden)
@@ -391,10 +414,46 @@ export default class TitleScene extends Phaser.Scene {
     
     private handleResize() {
         const { width, height } = this.scale;
+        console.log(`TitleScene: Handling resize to ${width}x${height}`);
+        
+        // Update background image
+        const backgroundImage = this.children.getByName('title_bg') as Phaser.GameObjects.Image;
+        if (backgroundImage) {
+            backgroundImage.setPosition(width/2, height/2);
+            backgroundImage.setDisplaySize(width, height);
+            console.log(`TitleScene: Updated background image to ${width}x${height}`);
+        }
         
         // Update container position to new center
         if (this.titleContainer) {
             this.titleContainer.setPosition(width/2, height/2);
+            
+            // Update text elements within the container
+            const titleText = this.titleContainer.getByName('titleText') as Phaser.GameObjects.Text;
+            const subtitleText = this.titleContainer.getByName('subtitleText') as Phaser.GameObjects.Text;
+            const statusText = this.titleContainer.getByName('statusText') as Phaser.GameObjects.Text;
+            
+            if (titleText) {
+                // Recalculate responsive font sizes
+                const baseTitleSize = Math.min(width * RESPONSIVE_CONFIG.TITLE_SIZE_RATIO, height * RESPONSIVE_CONFIG.TITLE_HEIGHT_RATIO, RESPONSIVE_CONFIG.MAX_TITLE_SIZE);
+                titleText.setPosition(0, -height * RESPONSIVE_CONFIG.TITLE_Y_OFFSET);
+                titleText.setFontSize(baseTitleSize);
+                titleText.setStroke('#000000', Math.max(RESPONSIVE_CONFIG.MIN_STROKE_WIDTH, baseTitleSize / 8));
+                console.log(`TitleScene: Updated title text - size: ${baseTitleSize}px, position: (0, ${-height * RESPONSIVE_CONFIG.TITLE_Y_OFFSET})`);
+            }
+            
+            if (subtitleText) {
+                const baseSubtitleSize = Math.min(width * RESPONSIVE_CONFIG.SUBTITLE_SIZE_RATIO, height * RESPONSIVE_CONFIG.SUBTITLE_HEIGHT_RATIO, RESPONSIVE_CONFIG.MAX_SUBTITLE_SIZE);
+                subtitleText.setPosition(0, -height * RESPONSIVE_CONFIG.SUBTITLE_Y_OFFSET);
+                subtitleText.setFontSize(baseSubtitleSize);
+                console.log(`TitleScene: Updated subtitle text - size: ${baseSubtitleSize}px, position: (0, ${-height * RESPONSIVE_CONFIG.SUBTITLE_Y_OFFSET})`);
+            }
+            
+            if (statusText) {
+                const baseStatusSize = Math.min(width * RESPONSIVE_CONFIG.STATUS_SIZE_RATIO, height * RESPONSIVE_CONFIG.STATUS_HEIGHT_RATIO, RESPONSIVE_CONFIG.MAX_STATUS_SIZE);
+                statusText.setFontSize(baseStatusSize);
+                console.log(`TitleScene: Updated status text - size: ${baseStatusSize}px`);
+            }
         }
         
         // Update button positions

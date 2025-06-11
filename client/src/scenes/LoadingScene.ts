@@ -3,6 +3,19 @@ import { GameEvents } from '../constants/GameEvents';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { AccountState } from '../autobindings/account_state_type';
 
+// Constants for responsive design
+const RESPONSIVE_CONFIG = {
+    LOADING_SIZE_RATIO: 0.025,
+    LOADING_HEIGHT_RATIO: 0.04,
+    MAX_LOADING_SIZE: 24,
+    DOTS_SIZE_RATIO: 0.025,
+    DOTS_HEIGHT_RATIO: 0.04,
+    MAX_DOTS_SIZE: 24,
+    LOADING_Y_OFFSET: 50,
+    DOTS_Y_OFFSET: 20,
+    SPINNER_Y_OFFSET: 50
+};
+
 export default class LoadingScene extends Phaser.Scene {
     private loadingText!: Phaser.GameObjects.Text;
     private spinner!: Phaser.GameObjects.Container;
@@ -69,35 +82,42 @@ export default class LoadingScene extends Phaser.Scene {
         // Add a full-screen rectangle to ensure complete background coverage
         const backgroundRect = this.add.rectangle(width/2, height/2, width, height, 0x042E64);
         backgroundRect.setDepth(-100); // Ensure it's behind everything
+        backgroundRect.setName('backgroundRect');
         
         // Add title background
         try {
             if (this.textures.exists('title_bg')) {
                 this.add.image(width/2, height/2, 'title_bg')
                     .setDisplaySize(width, height)
-                    .setDepth(-50); // Behind UI elements but in front of background rect
+                    .setDepth(-50) // Behind UI elements but in front of background rect
+                    .setName('title_bg');
             }
         } catch (error) {
             console.error("Error loading background:", error);
         }
         
+        // Calculate responsive font sizes based on screen dimensions
+        const baseLoadingSize = Math.min(width * RESPONSIVE_CONFIG.LOADING_SIZE_RATIO, height * RESPONSIVE_CONFIG.LOADING_HEIGHT_RATIO, RESPONSIVE_CONFIG.MAX_LOADING_SIZE);
+        const baseDotsSize = Math.min(width * RESPONSIVE_CONFIG.DOTS_SIZE_RATIO, height * RESPONSIVE_CONFIG.DOTS_HEIGHT_RATIO, RESPONSIVE_CONFIG.MAX_DOTS_SIZE);
+        console.log(`LoadingScene: Responsive text sizing - Loading: ${baseLoadingSize}px, Dots: ${baseDotsSize}px for screen ${width}x${height}`);
+        
         // Create loading text
-        this.loadingText = this.add.text(width / 2, height / 2 - 50, this.message, {
+        this.loadingText = this.add.text(width / 2, height / 2 - RESPONSIVE_CONFIG.LOADING_Y_OFFSET, this.message, {
             fontFamily: 'Arial',
-            fontSize: '24px',
+            fontSize: `${baseLoadingSize}px`,
             color: '#ffffff',
             align: 'center'
-        }).setOrigin(0.5);
+        }).setOrigin(0.5).setName('loadingText');
         
         // Create animated dots
-        this.dots = this.add.text(width / 2, height / 2 - 20, '', {
+        this.dots = this.add.text(width / 2, height / 2 - RESPONSIVE_CONFIG.DOTS_Y_OFFSET, '', {
             fontFamily: 'Arial',
-            fontSize: '24px',
+            fontSize: `${baseDotsSize}px`,
             color: '#ffffff'
-        }).setOrigin(0.5);
+        }).setOrigin(0.5).setName('dotsText');
         
         // Create spinner animation
-        this.createSpinner(width / 2, height / 2 + 50);
+        this.createSpinner(width / 2, height / 2 + RESPONSIVE_CONFIG.SPINNER_Y_OFFSET);
         
         // Start dot animation
         this.dotTimer = this.time.addEvent({
@@ -294,17 +314,40 @@ export default class LoadingScene extends Phaser.Scene {
     
     private handleResize() {
         const { width, height } = this.scale;
+        console.log(`LoadingScene: Handling resize to ${width}x${height}`);
+        
+        // Update background rectangle
+        const backgroundRect = this.children.getByName('backgroundRect') as Phaser.GameObjects.Rectangle;
+        if (backgroundRect) {
+            backgroundRect.setPosition(width/2, height/2);
+            backgroundRect.setSize(width, height);
+        }
+        
+        // Update background image
+        const backgroundImage = this.children.getByName('title_bg') as Phaser.GameObjects.Image;
+        if (backgroundImage) {
+            backgroundImage.setPosition(width/2, height/2);
+            backgroundImage.setDisplaySize(width, height);
+            console.log(`LoadingScene: Updated background image to ${width}x${height}`);
+        }
         
         if (this.loadingText) {
-            this.loadingText.setPosition(width / 2, height / 2 - 50);
+            const baseLoadingSize = Math.min(width * RESPONSIVE_CONFIG.LOADING_SIZE_RATIO, height * RESPONSIVE_CONFIG.LOADING_HEIGHT_RATIO, RESPONSIVE_CONFIG.MAX_LOADING_SIZE);
+            this.loadingText.setPosition(width / 2, height / 2 - RESPONSIVE_CONFIG.LOADING_Y_OFFSET);
+            this.loadingText.setFontSize(baseLoadingSize);
+            console.log(`LoadingScene: Updated loading text - size: ${baseLoadingSize}px, position: (${width / 2}, ${height / 2 - RESPONSIVE_CONFIG.LOADING_Y_OFFSET})`);
         }
         
         if (this.dots) {
-            this.dots.setPosition(width / 2, height / 2 - 20);
+            const baseDotsSize = Math.min(width * RESPONSIVE_CONFIG.DOTS_SIZE_RATIO, height * RESPONSIVE_CONFIG.DOTS_HEIGHT_RATIO, RESPONSIVE_CONFIG.MAX_DOTS_SIZE);
+            this.dots.setPosition(width / 2, height / 2 - RESPONSIVE_CONFIG.DOTS_Y_OFFSET);
+            this.dots.setFontSize(baseDotsSize);
+            console.log(`LoadingScene: Updated dots text - size: ${baseDotsSize}px, position: (${width / 2}, ${height / 2 - RESPONSIVE_CONFIG.DOTS_Y_OFFSET})`);
         }
         
         if (this.spinner) {
-            this.spinner.setPosition(width / 2, height / 2 + 50);
+            this.spinner.setPosition(width / 2, height / 2 + RESPONSIVE_CONFIG.SPINNER_Y_OFFSET);
+            console.log(`LoadingScene: Updated spinner position: (${width / 2}, ${height / 2 + RESPONSIVE_CONFIG.SPINNER_Y_OFFSET})`);
         }
     }
     
