@@ -325,13 +325,18 @@ pub fn give_player_exp(ctx: &ReducerContext, player_id: u32, exp_amount: u32) {
         
         // Grant an unspent upgrade point for each level gained
         player.unspent_upgrades += levels_gained;
+        
+        // Heal player to max HP when leveling up
+        let old_hp = player.hp;
+        player.hp = player.max_hp;
 
         if player.unspent_upgrades == 1 {
             // Draw upgrade options for the player
             crate::upgrades_def::draw_upgrade_options(ctx, player_id);
         }
         
-        log::info!("Player {} leveled up to level {}! Exp: {}/{}", player_id, current_level, remaining_exp, exp_needed);
+        log::info!("Player {} leveled up to level {}! Exp: {}/{}, Healed from {:.1} to {:.1} HP", 
+                  player_id, current_level, remaining_exp, exp_needed, old_hp, player.max_hp);
     } else {
         //Log::info(&format!("Player {} gained {} exp. Now: {}/{}", player_id, exp_amount, remaining_exp, exp_needed));
     }

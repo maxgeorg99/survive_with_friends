@@ -173,7 +173,7 @@ fn create_upgrade_option_data(ctx: &ReducerContext, upgrade_type: UpgradeType, p
                 player_id,
                 upgrade_index: 0,
                 upgrade_type,
-                value: 50,
+                value: 100,
                 is_attack_upgrade: false,
                 is_new_attack: false,
                 attack_type: 0,
