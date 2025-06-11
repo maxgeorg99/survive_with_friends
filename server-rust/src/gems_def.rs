@@ -257,6 +257,36 @@ pub fn calculate_exp_for_level(ctx: &ReducerContext, level: u32) -> u32 {
     (config.base_exp_per_level as f32 * (level as f32).powf(config.level_exp_factor)) as u32
 }
 
+// Calculate the total accumulated experience for a player (all XP earned to reach current level + remaining XP)
+pub fn calculate_total_player_exp(ctx: &ReducerContext, player_level: u32, remaining_exp: u32) -> u32 {
+    if player_level <= 1 {
+        // Level 1 players only have their remaining exp
+        return remaining_exp;
+    }
+    
+    let config = ctx.db.exp_config().config_id().find(&0);
+    if config.is_none() {
+        // Fallback calculation if config not found
+        let mut total_exp = 0;
+        for level in 1..player_level {
+            total_exp += level * 100; // Simple fallback formula
+        }
+        return total_exp + remaining_exp;
+    }
+
+    let config = config.unwrap();
+    let mut total_exp = 0;
+    
+    // Sum up all XP needed from level 1 to current level
+    for level in 1..player_level {
+        let exp_for_level = (config.base_exp_per_level as f32 * (level as f32).powf(config.level_exp_factor)) as u32;
+        total_exp += exp_for_level;
+    }
+    
+    // Add the remaining XP for the current level
+    total_exp + remaining_exp
+}
+
 // Get exp value for a gem level (now deprecated - use gem.value instead)
 pub fn get_exp_value_for_gem(ctx: &ReducerContext, level: &GemLevel) -> u32 {
     let config = ctx.db.exp_config().config_id().find(&0);

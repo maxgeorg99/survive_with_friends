@@ -215,11 +215,15 @@ pub fn damage_player(ctx: &ReducerContext, player_id: u32, damage_amount: f32) -
         // Log the death
         log::info!("Player {} (ID: {}) has died!", player.name, player.player_id);
         
-        // Create a Soul gem worth 25% of the player's experience at their death location
+        // Calculate the total accumulated experience (XP needed to reach current level + remaining XP)
+        let total_player_exp = crate::gems_def::calculate_total_player_exp(ctx, player.level, player.exp);
+        
+        // Create a Soul gem worth 90% of the player's total accumulated experience at their death location
         // Ensure minimum value of 1 exp
-        let soul_gem_value = std::cmp::max(1, (player.exp as f32 * 0.25) as u32);
+        let soul_gem_value = std::cmp::max(1, (total_player_exp as f32 * 0.9) as u32);
         crate::gems_def::create_soul_gem(ctx, player.position, soul_gem_value);
-        log::info!("Created Soul gem worth {} exp at player {}'s death location", soul_gem_value, player.name);
+        log::info!("Created Soul gem worth {} exp (90% of {} total exp) at player {}'s death location", 
+                  soul_gem_value, total_player_exp, player.name);
         
         // Store the player in the dead_players table before removing them
         let _dead_player_opt = ctx.db.dead_players().insert(DeadPlayer {
