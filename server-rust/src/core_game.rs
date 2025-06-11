@@ -220,7 +220,7 @@ pub fn damage_player(ctx: &ReducerContext, player_id: u32, damage_amount: f32) -
         
         // Create a Soul gem worth 90% of the player's total accumulated experience at their death location
         // Ensure minimum value of 1 exp
-        let soul_gem_value = std::cmp::max(1, (total_player_exp as f32 * 0.9) as u32);
+        let soul_gem_value = std::cmp::max(1, (total_player_exp as f32 * 0.75) as u32);
         let soul_gem_id = crate::gems_def::create_soul_gem(ctx, player.position, soul_gem_value);
         log::info!("Created Soul gem {} worth {} exp (90% of {} total exp) at player {}'s death location", 
                   soul_gem_id, soul_gem_value, total_player_exp, player.name);
