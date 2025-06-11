@@ -326,16 +326,22 @@ pub fn trigger_void_chest_death_pinata(ctx: &ReducerContext, chest_position: DbV
     
     // Spawn multiple capsules in a larger area
     for i in 0..VOID_CHEST_DEATH_CAPSULE_COUNT {
-        let gem_type = select_weighted_gem_type(&mut rng);
+        let gem_type = if i == 0 {
+            // Guarantee the first capsule is always a booster pack
+            GemLevel::BoosterPack
+        } else {
+            // Use weighted random selection for the rest
+            select_weighted_gem_type(&mut rng)
+        };
         
         if i == 0 {
-            log::info!("First death capsule: {:?} gem", gem_type);
+            log::info!("First death capsule: {:?} gem (guaranteed)", gem_type);
         }
         
         spawn_loot_capsule_in_radius(ctx, chest_position, LARGE_RADIUS, gem_type);
     }
     
-    log::info!("VoidChest death pinata complete - {} capsules spawned", VOID_CHEST_DEATH_CAPSULE_COUNT);
+    log::info!("VoidChest death pinata complete - {} capsules spawned (with guaranteed booster pack)", VOID_CHEST_DEATH_CAPSULE_COUNT);
 }
 
 // Function to schedule guaranteed VoidChest spawns at game start
