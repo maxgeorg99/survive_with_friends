@@ -4,6 +4,19 @@ import { GameEvents } from '../constants/GameEvents';
 import MusicManager from '../managers/MusicManager';
 import OptionsUI from '../ui/OptionsUI';
 
+// Constants for responsive design
+const RESPONSIVE_CONFIG = {
+    TITLE_SIZE_RATIO: 0.08,
+    TITLE_HEIGHT_RATIO: 0.12,
+    MAX_TITLE_SIZE: 64,
+    SUBTITLE_SIZE_RATIO: 0.025,
+    SUBTITLE_HEIGHT_RATIO: 0.04,
+    MAX_SUBTITLE_SIZE: 24,
+    TITLE_Y_OFFSET: 0.15,
+    SUBTITLE_Y_OFFSET: 0.08,
+    MIN_STROKE_WIDTH: 4
+};
+
 export default class NameSelectScene extends Phaser.Scene {
     private spacetimeDBClient: SpacetimeDBClient;
     private gameEvents: Phaser.Events.EventEmitter;
@@ -56,7 +69,8 @@ export default class NameSelectScene extends Phaser.Scene {
             if (this.textures.exists('title_bg')) {
                 this.add.image(width/2, height/2, 'title_bg')
                     .setDisplaySize(width, height)
-                    .setDepth(0);
+                    .setDepth(0)
+                    .setName('title_bg');
             }
         } catch (error) {
             console.error("Error loading background:", error);
@@ -65,24 +79,29 @@ export default class NameSelectScene extends Phaser.Scene {
         // Create a container for all name UI elements
         this.nameContainer = this.add.container(width/2, height/2);
         
+        // Calculate responsive font sizes based on screen dimensions
+        const baseTitleSize = Math.min(width * RESPONSIVE_CONFIG.TITLE_SIZE_RATIO, height * RESPONSIVE_CONFIG.TITLE_HEIGHT_RATIO, RESPONSIVE_CONFIG.MAX_TITLE_SIZE);
+        const baseSubtitleSize = Math.min(width * RESPONSIVE_CONFIG.SUBTITLE_SIZE_RATIO, height * RESPONSIVE_CONFIG.SUBTITLE_HEIGHT_RATIO, RESPONSIVE_CONFIG.MAX_SUBTITLE_SIZE);
+        console.log(`NameSelectScene: Responsive text sizing - Title: ${baseTitleSize}px, Subtitle: ${baseSubtitleSize}px for screen ${width}x${height}`);
+        
         // Add game title
-        const titleText = this.add.text(0, -150, 'VIBE SURVIVORS', {
+        const titleText = this.add.text(0, -height * RESPONSIVE_CONFIG.TITLE_Y_OFFSET, 'VIBE SURVIVORS', {
             fontFamily: 'Arial Black',
-            fontSize: '64px',
+            fontSize: `${baseTitleSize}px`,
             color: '#ffffff',
             align: 'center',
             stroke: '#000000',
-            strokeThickness: 8
-        }).setOrigin(0.5);
+            strokeThickness: Math.max(RESPONSIVE_CONFIG.MIN_STROKE_WIDTH, baseTitleSize / 8)
+        }).setOrigin(0.5).setName('titleText');
         this.nameContainer.add(titleText);
         
         // Add instruction text
-        const instructionText = this.add.text(0, -80, 'Enter your name to begin your journey:', {
+        const instructionText = this.add.text(0, -height * RESPONSIVE_CONFIG.SUBTITLE_Y_OFFSET, 'Enter your name to begin your journey:', {
             fontFamily: 'Arial',
-            fontSize: '24px',
+            fontSize: `${baseSubtitleSize}px`,
             color: '#ffffff',
             align: 'center'
-        }).setOrigin(0.5);
+        }).setOrigin(0.5).setName('instructionText');
         this.nameContainer.add(instructionText);
         
         // Create HTML elements for input
@@ -212,9 +231,38 @@ export default class NameSelectScene extends Phaser.Scene {
     
     private handleResize() {
         const { width, height } = this.scale;
+        console.log(`NameSelectScene: Handling resize to ${width}x${height}`);
+        
+        // Update background image
+        const backgroundImage = this.children.getByName('title_bg') as Phaser.GameObjects.Image;
+        if (backgroundImage) {
+            backgroundImage.setPosition(width/2, height/2);
+            backgroundImage.setDisplaySize(width, height);
+            console.log(`NameSelectScene: Updated background image to ${width}x${height}`);
+        }
         
         if (this.nameContainer) {
             this.nameContainer.setPosition(width/2, height/2);
+            
+            // Update text elements within the container
+            const titleText = this.nameContainer.getByName('titleText') as Phaser.GameObjects.Text;
+            const instructionText = this.nameContainer.getByName('instructionText') as Phaser.GameObjects.Text;
+            
+            if (titleText) {
+                // Recalculate responsive font sizes
+                const baseTitleSize = Math.min(width * RESPONSIVE_CONFIG.TITLE_SIZE_RATIO, height * RESPONSIVE_CONFIG.TITLE_HEIGHT_RATIO, RESPONSIVE_CONFIG.MAX_TITLE_SIZE);
+                titleText.setPosition(0, -height * RESPONSIVE_CONFIG.TITLE_Y_OFFSET);
+                titleText.setFontSize(baseTitleSize);
+                titleText.setStroke('#000000', Math.max(RESPONSIVE_CONFIG.MIN_STROKE_WIDTH, baseTitleSize / 8));
+                console.log(`NameSelectScene: Updated title text - size: ${baseTitleSize}px, position: (0, ${-height * RESPONSIVE_CONFIG.TITLE_Y_OFFSET})`);
+            }
+            
+            if (instructionText) {
+                const baseSubtitleSize = Math.min(width * RESPONSIVE_CONFIG.SUBTITLE_SIZE_RATIO, height * RESPONSIVE_CONFIG.SUBTITLE_HEIGHT_RATIO, RESPONSIVE_CONFIG.MAX_SUBTITLE_SIZE);
+                instructionText.setPosition(0, -height * RESPONSIVE_CONFIG.SUBTITLE_Y_OFFSET);
+                instructionText.setFontSize(baseSubtitleSize);
+                console.log(`NameSelectScene: Updated instruction text - size: ${baseSubtitleSize}px, position: (0, ${-height * RESPONSIVE_CONFIG.SUBTITLE_Y_OFFSET})`);
+            }
         }
         
         this.positionHTMLElements();

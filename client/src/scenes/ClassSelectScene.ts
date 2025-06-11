@@ -21,6 +21,20 @@ const CLASS_ICON_MAP : Record<string, string> = {
     "paladin_icon": "attack_shield"
 };
 
+// Constants for responsive design
+const RESPONSIVE_CONFIG = {
+    TITLE_SIZE_RATIO: 0.06,
+    TITLE_HEIGHT_RATIO: 0.09,
+    MAX_TITLE_SIZE: 48,
+    SUBTITLE_SIZE_RATIO: 0.025,
+    SUBTITLE_HEIGHT_RATIO: 0.04,
+    MAX_SUBTITLE_SIZE: 24,
+    SUBTITLE_Y_OFFSET: 0.06,
+    MIN_SUBTITLE_Y_OFFSET: 50,
+    MIN_STROKE_WIDTH_TITLE: 3,
+    MIN_STROKE_WIDTH_SUBTITLE: 2
+};
+
 export default class ClassSelectScene extends Phaser.Scene {
     private spacetimeDBClient: SpacetimeDBClient;
     private gameEvents: Phaser.Events.EventEmitter;
@@ -113,37 +127,44 @@ export default class ClassSelectScene extends Phaser.Scene {
         // Add a full-screen rectangle to ensure complete background coverage
         const backgroundRect = this.add.rectangle(width/2, height/2, width, height, 0x042E64);
         backgroundRect.setDepth(-100); // Ensure it's behind everything
+        backgroundRect.setName('backgroundRect');
         
         try {
             if (this.textures.exists('title_bg')) {
                 const bgImage = this.add.image(width/2, height/2, 'title_bg')
                     .setDisplaySize(width, height)
-                    .setDepth(-50); // Behind UI elements but in front of background rect
+                    .setDepth(-50) // Behind UI elements but in front of background rect
+                    .setName('title_bg');
                 console.log("ClassSelectScene: Background image loaded successfully");
             }
         } catch (error) {
             console.error("Error loading background:", error);
         }
         
+        // Calculate responsive font sizes based on screen dimensions
+        const baseTitleSize = Math.min(width * RESPONSIVE_CONFIG.TITLE_SIZE_RATIO, height * RESPONSIVE_CONFIG.TITLE_HEIGHT_RATIO, RESPONSIVE_CONFIG.MAX_TITLE_SIZE);
+        const baseSubtitleSize = Math.min(width * RESPONSIVE_CONFIG.SUBTITLE_SIZE_RATIO, height * RESPONSIVE_CONFIG.SUBTITLE_HEIGHT_RATIO, RESPONSIVE_CONFIG.MAX_SUBTITLE_SIZE);
+        console.log(`ClassSelectScene: Responsive text sizing - Title: ${baseTitleSize}px, Subtitle: ${baseSubtitleSize}px for screen ${width}x${height}`);
+        
         // Add title
         this.titleText = this.add.text(width/2, height/4, 'SELECT YOUR CLASS', {
             fontFamily: 'Arial Black',
-            fontSize: '48px',
+            fontSize: `${baseTitleSize}px`,
             color: '#ffffff',
             align: 'center',
             stroke: '#000000',
-            strokeThickness: 6
-        }).setOrigin(0.5);
+            strokeThickness: Math.max(RESPONSIVE_CONFIG.MIN_STROKE_WIDTH_TITLE, baseTitleSize / 8)
+        }).setOrigin(0.5).setName('titleText');
         
         // Add subtitle
-        this.subtitleText = this.add.text(width/2, height/4 + 60, 'Choose wisely, brave survivor...', {
+        this.subtitleText = this.add.text(width/2, height/4 + Math.max(RESPONSIVE_CONFIG.MIN_SUBTITLE_Y_OFFSET, height * RESPONSIVE_CONFIG.SUBTITLE_Y_OFFSET), 'Choose wisely, brave survivor...', {
             fontFamily: 'Arial',
-            fontSize: '24px',
+            fontSize: `${baseSubtitleSize}px`,
             color: '#ffffff',
             align: 'center',
             stroke: '#000000',
-            strokeThickness: 3
-        }).setOrigin(0.5);
+            strokeThickness: Math.max(RESPONSIVE_CONFIG.MIN_STROKE_WIDTH_SUBTITLE, baseSubtitleSize / 8)
+        }).setOrigin(0.5).setName('subtitleText');
         
         // Wait for assets to be fully loaded before creating HTML elements
         if (this.load.isLoading()) {
@@ -378,6 +399,48 @@ export default class ClassSelectScene extends Phaser.Scene {
     }
     
     private handleResize() {
+        const { width, height } = this.scale;
+        console.log(`ClassSelectScene: Handling resize to ${width}x${height}`);
+        
+        // Update background rectangle
+        const backgroundRect = this.children.getByName('backgroundRect') as Phaser.GameObjects.Rectangle;
+        if (backgroundRect) {
+            backgroundRect.setPosition(width/2, height/2);
+            backgroundRect.setSize(width, height);
+        }
+        
+        // Update background image
+        const backgroundImage = this.children.getByName('title_bg') as Phaser.GameObjects.Image;
+        if (backgroundImage) {
+            backgroundImage.setPosition(width/2, height/2);
+            backgroundImage.setDisplaySize(width, height);
+            console.log(`ClassSelectScene: Updated background image to ${width}x${height}`);
+        }
+        
+        // Update title text position and size
+        if (this.titleText) {
+            const baseTitleSize = Math.min(width * RESPONSIVE_CONFIG.TITLE_SIZE_RATIO, height * RESPONSIVE_CONFIG.TITLE_HEIGHT_RATIO, RESPONSIVE_CONFIG.MAX_TITLE_SIZE);
+            this.titleText.setPosition(width/2, height/4);
+            this.titleText.setFontSize(baseTitleSize);
+            this.titleText.setStroke('#000000', Math.max(RESPONSIVE_CONFIG.MIN_STROKE_WIDTH_TITLE, baseTitleSize / 8));
+            console.log(`ClassSelectScene: Updated title text - size: ${baseTitleSize}px, position: (${width/2}, ${height/4})`);
+        }
+        
+        // Update subtitle text position and size
+        if (this.subtitleText) {
+            const baseSubtitleSize = Math.min(width * RESPONSIVE_CONFIG.SUBTITLE_SIZE_RATIO, height * RESPONSIVE_CONFIG.SUBTITLE_HEIGHT_RATIO, RESPONSIVE_CONFIG.MAX_SUBTITLE_SIZE);
+            const subtitleY = height/4 + Math.max(RESPONSIVE_CONFIG.MIN_SUBTITLE_Y_OFFSET, height * RESPONSIVE_CONFIG.SUBTITLE_Y_OFFSET);
+            this.subtitleText.setPosition(width/2, subtitleY);
+            this.subtitleText.setFontSize(baseSubtitleSize);
+            this.subtitleText.setStroke('#000000', Math.max(RESPONSIVE_CONFIG.MIN_STROKE_WIDTH_SUBTITLE, baseSubtitleSize / 8));
+            console.log(`ClassSelectScene: Updated subtitle text - size: ${baseSubtitleSize}px, position: (${width/2}, ${subtitleY})`);
+        }
+        
+        // Update error text position
+        if (this.errorText) {
+            this.errorText.setPosition(width/2, height * 0.85);
+        }
+        
         this.positionHTMLElements();
     }
     
