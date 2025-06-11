@@ -2,7 +2,7 @@ use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, Sc
 use crate::{DbVector2, GameTickTimer, DeadPlayer, MonsterType, monsters_def, gems_def, boss_system, reset_world, 
     monster_damage, monsters, monsters_boid, player, attack_utils, game_state, dead_players, active_attacks,
     attack_burst_cooldowns, player_scheduled_attacks, active_attack_cleanup, entity, config, class_data, world,
-    game_tick_timer, loot_capsule_defs, monster_attacks_def};
+    game_tick_timer, loot_capsule_defs, monster_attacks_def, account};
 use std::time::Duration;
 
 static mut ERROR_FLAG: bool = false;
@@ -221,9 +221,22 @@ pub fn damage_player(ctx: &ReducerContext, player_id: u32, damage_amount: f32) -
         // Create a Soul gem worth 90% of the player's total accumulated experience at their death location
         // Ensure minimum value of 1 exp
         let soul_gem_value = std::cmp::max(1, (total_player_exp as f32 * 0.9) as u32);
-        crate::gems_def::create_soul_gem(ctx, player.position, soul_gem_value);
-        log::info!("Created Soul gem worth {} exp (90% of {} total exp) at player {}'s death location", 
-                  soul_gem_value, total_player_exp, player.name);
+        let soul_gem_id = crate::gems_def::create_soul_gem(ctx, player.position, soul_gem_value);
+        log::info!("Created Soul gem {} worth {} exp (90% of {} total exp) at player {}'s death location", 
+                  soul_gem_id, soul_gem_value, total_player_exp, player.name);
+        
+        // Find the account for this player and update the soul_id
+        for account in ctx.db.account().iter() {
+            if account.current_player_id == player_id {
+                let account_identity = account.identity;
+                let mut updated_account = account;
+                updated_account.soul_id = soul_gem_id;
+                ctx.db.account().identity().update(updated_account);
+                log::info!("Updated account {} with soul_id {} for deceased player {}", 
+                          account_identity, soul_gem_id, player.name);
+                break;
+            }
+        }
         
         // Store the player in the dead_players table before removing them
         let _dead_player_opt = ctx.db.dead_players().insert(DeadPlayer {

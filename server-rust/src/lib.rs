@@ -222,6 +222,8 @@ pub struct Account {
     pub last_login: Timestamp,
     
     pub state: AccountState,  // Current progression state
+    
+    pub soul_id: u32,  // gem_id of the soul created when this player last died (0 if no soul)
 }
 
 // --- Lifecycle Hooks ---
@@ -347,6 +349,7 @@ pub fn client_connected(ctx: &ReducerContext) {
             current_player_id: 0, // PlayerID 0 indicates no character yet
             last_login: ctx.timestamp,
             state: AccountState::ChoosingName,
+            soul_id: 0, // No soul initially
         }) {
             log::info!("Created new account for {} in ChoosingName state", identity);
         } else {
@@ -434,6 +437,7 @@ pub fn spawn_player(ctx: &ReducerContext, class_id: u32) {
                 current_player_id: 0,
                 last_login: account.last_login,
                 state: AccountState::ChoosingClass,
+                soul_id: account.soul_id, // Keep existing soul_id when resetting account
             };
             ctx.db.account().identity().update(fixed_account);
         }
