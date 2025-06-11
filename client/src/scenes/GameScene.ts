@@ -15,6 +15,7 @@ import BossTimerUI from '../ui/BossTimerUI';
 import MonsterCounterUI from '../ui/MonsterCounterUI';
 import VoidChestUI from '../ui/VoidChestUI';
 import SoulUI from '../ui/SoulUI';
+import Minimap, { MinimapElements } from '../ui/Minimap';
 import MusicManager from '../managers/MusicManager';
 import { DebugManager } from '../managers/DebugManager'; // Added import for DebugManager
 import GameplayOptionsUI from '../ui/GameplayOptionsUI';
@@ -113,13 +114,8 @@ export default class GameScene extends Phaser.Scene {
     private bossTimerUI: BossTimerUI | null = null;
     
     // Add minimap
-    private minimap: {
-        container: Phaser.GameObjects.Container;
-        background: Phaser.GameObjects.Rectangle;
-        playerDot: Phaser.GameObjects.Arc;
-        border: Phaser.GameObjects.Rectangle;
-        botDotsContainer?: Phaser.GameObjects.Container;
-    } | null = null;
+    private minimap: Minimap | null = null;
+    private minimapElements: MinimapElements | null = null;
     
     private localPlayerId: number = 0;
     
@@ -462,6 +458,11 @@ export default class GameScene extends Phaser.Scene {
 
         // Initialize Soul UI for guiding players to their soul
         this.soulUI = new SoulUI(this, this.spacetimeDBClient);
+
+        // Set the SoulUI reference on the minimap if it exists
+        if (this.minimap) {
+            this.minimap.setSoulUI(this.soulUI);
+        }
 
         // Initialize Options UI for settings
         this.optionsUI = new GameplayOptionsUI(this);
@@ -1940,113 +1941,13 @@ export default class GameScene extends Phaser.Scene {
     
     // Update the minimap with player's position
     private updateMinimap() {
-        if (!this.minimap || !this.localPlayerSprite || !this.minimap.botDotsContainer) return;
+        if (!this.minimap || !this.localPlayerSprite) return;
         
-        // Get world bounds and minimap size
+        // Get world bounds
         const worldBounds = this.physics.world.bounds;
-        const minimapSize = this.minimap.background.width;
         
-        // Calculate position ratio (player position relative to world size)
-        const ratioX = this.localPlayerSprite.x / worldBounds.width;
-        const ratioY = this.localPlayerSprite.y / worldBounds.height;
-        
-        // Position player dot on minimap based on world position
-        this.minimap.playerDot.x = ratioX * minimapSize;
-        this.minimap.playerDot.y = ratioY * minimapSize;
-
-        // Update bot dots and boss dots
-        if (this.spacetimeDBClient.sdkConnection?.db) {
-            // Clear existing bot dots
-            this.minimap.botDotsContainer.removeAll(true);
-
-            // Add dots for all bot players
-            for (const player of this.spacetimeDBClient.sdkConnection.db.player.iter()) {
-                if (player.isBot) {
-                    const botRatioX = player.position.x / worldBounds.width;
-                    const botRatioY = player.position.y / worldBounds.height;
-                    
-                    const botDot = this.add.circle(
-                        botRatioX * minimapSize,
-                        botRatioY * minimapSize,
-                        5, // Same size as player dot
-                        0x800080, // Purple color
-                        1
-                    );
-                    this.minimap.botDotsContainer.add(botDot);
-                }
-            }
-
-            // Add boss monsters as red dots
-            for (const monster of this.spacetimeDBClient.sdkConnection.db.monsters.iter()) {
-                const monsterType = monster.bestiaryId?.tag || monster.bestiaryId;
-                if (monsterType === 'FinalBossPhase1' || monsterType === 'FinalBossPhase2') {
-                    // Get monster position from boid data
-                    const boid = this.spacetimeDBClient.sdkConnection.db.monstersBoid.monsterId.find(monster.monsterId);
-                    if (boid) {
-                        const bossRatioX = boid.position.x / worldBounds.width;
-                        const bossRatioY = boid.position.y / worldBounds.height;
-                        
-                        const bossDot = this.add.circle(
-                            bossRatioX * minimapSize,
-                            bossRatioY * minimapSize,
-                            8, // Larger than other dots
-                            0xff0000, // Red color for boss
-                            1
-                        );
-                        // Add pulsing effect for boss
-                        this.tweens.add({
-                            targets: bossDot,
-                            alpha: { from: 1, to: 0.5 },
-                            duration: 1000,
-                            ease: 'Sine.easeInOut',
-                            yoyo: true,
-                            repeat: -1
-                        });
-                        this.minimap.botDotsContainer.add(bossDot);
-                    }
-                } else if (monsterType === 'VoidChest') {
-                    // Add VoidChests as purple boxes
-                    const boid = this.spacetimeDBClient.sdkConnection.db.monstersBoid.monsterId.find(monster.monsterId);
-                    if (boid) {
-                        const chestRatioX = boid.position.x / worldBounds.width;
-                        const chestRatioY = boid.position.y / worldBounds.height;
-                        
-                        const chestBox = this.add.rectangle(
-                            chestRatioX * minimapSize,
-                            chestRatioY * minimapSize,
-                            10, // Width of the box
-                            10, // Height of the box
-                            0x800080, // Purple color for VoidChest
-                            1
-                        );
-                        // Add subtle pulsing effect for VoidChest
-                        this.tweens.add({
-                            targets: chestBox,
-                            alpha: { from: 1, to: 0.7 },
-                            duration: 1500,
-                            ease: 'Sine.easeInOut',
-                            yoyo: true,
-                            repeat: -1
-                        });
-                        this.minimap.botDotsContainer.add(chestBox);
-                    }
-                }
-            }
-
-            // Add soul gem indicator if player has a soul
-            if (this.soulUI) {
-                const soulDot = this.soulUI.createMinimapSoulIndicator(
-                    this.spacetimeDBClient.sdkConnection,
-                    this.spacetimeDBClient.identity,
-                    worldBounds,
-                    minimapSize
-                );
-                
-                if (soulDot) {
-                    this.minimap.botDotsContainer.add(soulDot);
-                }
-            }
-        }
+        // Use the new Minimap class update method
+        this.minimap.update(this.localPlayerSprite, worldBounds);
     }
 
     // Force a synchronization of player entities
@@ -2334,9 +2235,10 @@ export default class GameScene extends Phaser.Scene {
         
         // Clean up minimap
         if (this.minimap) {
-            this.minimap.container.destroy();
+            this.minimap.destroy();
             this.minimap = null;
         }
+        this.minimapElements = null;
         
         // Clean up boss haze overlay
         if (this.bossHazeOverlay) {
@@ -2682,76 +2584,12 @@ export default class GameScene extends Phaser.Scene {
 
     // Create a semi-transparent minimap in the bottom-left corner
     private createMinimap() {
-        const { width, height } = this.scale;
+        // Create the minimap using the new Minimap class
+        // SoulUI will be set later after it's initialized
+        this.minimap = new Minimap(this, this.spacetimeDBClient);
+        this.minimapElements = this.minimap.create();
         
-        // Constants for minimap sizing and positioning
-        const MINIMAP_SIZE = 150; // Size of the minimap (square)
-        const MINIMAP_MARGIN = 20; // Margin from screen edges
-        const MINIMAP_ALPHA = 0.7; // Semi-transparency
-        const PLAYER_DOT_SIZE = 5; // Size of player dot on minimap
-        const BORDER_SIZE = 2; // Width of minimap border
-        
-        // Create minimap container at the bottom-left corner
-        const container = this.add.container(
-            MINIMAP_MARGIN,
-            height - MINIMAP_MARGIN - MINIMAP_SIZE
-        );
-        
-        // Create semi-transparent dark background
-        const background = this.add.rectangle(
-            0, 
-            0, 
-            MINIMAP_SIZE, 
-            MINIMAP_SIZE, 
-            0x000000, 
-            0.5
-        ).setOrigin(0);
-        
-        // Create border
-        const border = this.add.rectangle(
-            0,
-            0,
-            MINIMAP_SIZE,
-            MINIMAP_SIZE,
-            0xFFFFFF,
-            0.3
-        ).setOrigin(0);
-        border.setStrokeStyle(BORDER_SIZE, 0xFFFFFF, 0.5);
-        
-        // Create player dot (will be positioned in update)
-        const playerDot = this.add.circle(
-            0,
-            0,
-            PLAYER_DOT_SIZE,
-            0xFFFFFF,
-            1
-        );
-
-        // Create container for bot dots
-        const botDotsContainer = this.add.container(0, 0);
-        
-        // Add all elements to container
-        container.add([background, border, playerDot, botDotsContainer]);
-        
-        // Fix to camera so it doesn't move with world
-        container.setScrollFactor(0);
-        
-        // Set high depth to ensure minimap stays on top of monsters and other game elements
-        container.setDepth(UI_DEPTH);
-        
-        // Set initial alpha
-        container.setAlpha(MINIMAP_ALPHA);
-        
-        // Store reference to minimap elements
-        this.minimap = {
-            container,
-            background,
-            playerDot,
-            border,
-            botDotsContainer
-        };
-        
-        console.log("Minimap created with depth:", UI_DEPTH);
+        console.log("Minimap created using Minimap class");
     }
 
     // Setup touch input
