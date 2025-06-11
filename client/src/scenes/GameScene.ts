@@ -14,6 +14,7 @@ import PlayerHUD from '../ui/PlayerHUD';
 import BossTimerUI from '../ui/BossTimerUI';
 import MonsterCounterUI from '../ui/MonsterCounterUI';
 import VoidChestUI from '../ui/VoidChestUI';
+import SoulUI from '../ui/SoulUI';
 import MusicManager from '../managers/MusicManager';
 import { DebugManager } from '../managers/DebugManager'; // Added import for DebugManager
 import GameplayOptionsUI from '../ui/GameplayOptionsUI';
@@ -160,6 +161,9 @@ export default class GameScene extends Phaser.Scene {
     // Add VoidChest UI for alerts and directional arrow
     private voidChestUI: VoidChestUI | null = null;
 
+    // Add Soul UI for guiding players to their soul
+    private soulUI: SoulUI | null = null;
+
     // Add Options UI for settings
     private optionsUI: GameplayOptionsUI | null = null;
 
@@ -243,6 +247,9 @@ export default class GameScene extends Phaser.Scene {
         // Load VoidChest UI assets
         this.load.image('void_arrow', '/assets/void_arrow.png');
         
+        // Load Soul UI assets
+        this.load.image('soul_arrow', '/assets/soul_arrow.png');
+        
         // Load a white pixel for particle effects
         this.load.image('white_pixel', '/assets/white_pixel.png');
         
@@ -307,6 +314,7 @@ export default class GameScene extends Phaser.Scene {
             console.log("attack_knife:", this.textures.exists('attack_knife'));
             console.log("attack_shield:", this.textures.exists('attack_shield'));
             console.log("void_arrow:", this.textures.exists('void_arrow'));
+            console.log("soul_arrow:", this.textures.exists('soul_arrow'));
             console.log(GRASS_ASSET_KEY + ":", this.textures.exists(GRASS_ASSET_KEY));
             console.log(SHADOW_ASSET_KEY + ":", this.textures.exists(SHADOW_ASSET_KEY));
             
@@ -451,6 +459,9 @@ export default class GameScene extends Phaser.Scene {
 
         // Initialize VoidChest UI for alerts and directional arrow
         this.voidChestUI = new VoidChestUI(this, this.spacetimeDBClient);
+
+        // Initialize Soul UI for guiding players to their soul
+        this.soulUI = new SoulUI(this, this.spacetimeDBClient);
 
         // Initialize Options UI for settings
         this.optionsUI = new GameplayOptionsUI(this);
@@ -1918,6 +1929,11 @@ export default class GameScene extends Phaser.Scene {
             this.voidChestUI.update();
         }
 
+        // Update Soul UI for soul guidance
+        if (this.soulUI) {
+            this.soulUI.update();
+        }
+
         // Update minimap
         this.updateMinimap();
     }
@@ -2182,6 +2198,12 @@ export default class GameScene extends Phaser.Scene {
         if (this.voidChestUI) {
             this.voidChestUI.destroy();
             this.voidChestUI = null;
+        }
+
+        // Clean up Soul UI
+        if (this.soulUI) {
+            this.soulUI.destroy();
+            this.soulUI = null;
         }
 
         // Clean up Options UI

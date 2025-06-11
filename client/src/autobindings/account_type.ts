@@ -38,6 +38,7 @@ export type Account = {
   currentPlayerId: number,
   lastLogin: Timestamp,
   state: __AccountState,
+  soulId: number,
 };
 
 /**
@@ -55,6 +56,7 @@ export namespace Account {
       new ProductTypeElement("currentPlayerId", AlgebraicType.createU32Type()),
       new ProductTypeElement("lastLogin", AlgebraicType.createTimestampType()),
       new ProductTypeElement("state", __AccountState.getTypeScriptAlgebraicType()),
+      new ProductTypeElement("soulId", AlgebraicType.createU32Type()),
     ]);
   }
 
