@@ -433,9 +433,9 @@ pub fn can_monster_deal_damage(state: &AIState) -> bool {
         AIState::BossIdle => true,
         AIState::BossChase => true,
         AIState::BossDance => true,
-        AIState::BossVanish => true,   // Boss is vanishing but still dangerous!
-        AIState::BossLurk => false,    // Boss is lurking - completely safe period
-        AIState::BossTeleport => false, // Boss is teleporting - no damage!
+        AIState::BossVanish => true,
+        AIState::BossLurk => false, 
+        AIState::BossTeleport => true, 
         AIState::BossTransform => true,
         AIState::Stationary => true,
     }
@@ -448,9 +448,9 @@ pub fn can_monster_collide(state: &AIState) -> bool {
         AIState::BossIdle => true,
         AIState::BossChase => true,
         AIState::BossDance => true,
-        AIState::BossVanish => true,   // Boss is vanishing but still physically present
-        AIState::BossLurk => false,    // Boss is lurking - completely non-collidable
-        AIState::BossTeleport => true, // Boss is teleporting but still there
+        AIState::BossVanish => true,
+        AIState::BossLurk => false,   
+        AIState::BossTeleport => true, 
         AIState::BossTransform => true,
         AIState::Stationary => true,
     }
