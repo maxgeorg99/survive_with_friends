@@ -2032,6 +2032,20 @@ export default class GameScene extends Phaser.Scene {
                     }
                 }
             }
+
+            // Add soul gem indicator if player has a soul
+            if (this.soulUI) {
+                const soulDot = this.soulUI.createMinimapSoulIndicator(
+                    this.spacetimeDBClient.sdkConnection,
+                    this.spacetimeDBClient.identity,
+                    worldBounds,
+                    minimapSize
+                );
+                
+                if (soulDot) {
+                    this.minimap.botDotsContainer.add(soulDot);
+                }
+            }
         }
     }
 

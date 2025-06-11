@@ -12,7 +12,6 @@ export default class SoulUI {
     
     // UI elements
     private soulArrow: Phaser.GameObjects.Image | null = null;
-    private minimapSoulIndicator: Phaser.GameObjects.Arc | null = null;
     
     // Tracking
     private lastKnownPlayerPosition: { x: number, y: number } = { x: 0, y: 0 };
@@ -42,7 +41,6 @@ export default class SoulUI {
         if (!account || account.soulId === 0) {
             // No soul exists for this player
             this.hideArrow();
-            this.hideMinimapIndicator();
             return;
         }
         
@@ -51,7 +49,6 @@ export default class SoulUI {
         if (!soulGem) {
             // Soul gem doesn't exist (was probably collected)
             this.hideArrow();
-            this.hideMinimapIndicator();
             return;
         }
         
@@ -60,15 +57,11 @@ export default class SoulUI {
         if (!soulEntity) {
             // Entity doesn't exist
             this.hideArrow();
-            this.hideMinimapIndicator();
             return;
         }
         
         // Show arrow pointing to the soul
         this.showArrow(soulEntity.position.x, soulEntity.position.y);
-        
-        // Show minimap indicator for the soul
-        this.showMinimapIndicator(soulEntity.position.x, soulEntity.position.y);
     }
     
     /**
@@ -107,55 +100,7 @@ export default class SoulUI {
         this.soulArrow.setVisible(true);
     }
     
-    /**
-     * Show the pink circle indicator on the minimap for the soul location
-     */
-    private showMinimapIndicator(soulX: number, soulY: number): void {
-        // Get the minimap from the scene (assuming it's stored in the scene)
-        const minimap = (this.scene as any).minimap;
-        if (!minimap || !minimap.botDotsContainer) return;
-        
-        // Create indicator if it doesn't exist
-        if (!this.minimapSoulIndicator) {
-            // Get world bounds and minimap size
-            const worldBounds = this.scene.physics.world.bounds;
-            const minimapSize = minimap.background.width;
-            
-            // Calculate position ratio (soul position relative to world size)
-            const ratioX = soulX / worldBounds.width;
-            const ratioY = soulY / worldBounds.height;
-            
-            // Create pink circle for soul on minimap
-            this.minimapSoulIndicator = this.scene.add.circle(
-                ratioX * minimapSize,
-                ratioY * minimapSize,
-                8, // Size of the circle
-                0xff69b4, // Pink color for soul
-                1
-            );
-            
-            // Add pulsing effect for soul indicator
-            this.scene.tweens.add({
-                targets: this.minimapSoulIndicator,
-                alpha: { from: 1, to: 0.5 },
-                duration: 1000,
-                ease: 'Sine.easeInOut',
-                yoyo: true,
-                repeat: -1
-            });
-            
-            // Add to the minimap's bot dots container
-            minimap.botDotsContainer.add(this.minimapSoulIndicator);
-        } else {
-            // Update position if soul has moved (shouldn't happen but just in case)
-            const worldBounds = this.scene.physics.world.bounds;
-            const minimapSize = minimap.background.width;
-            const ratioX = soulX / worldBounds.width;
-            const ratioY = soulY / worldBounds.height;
-            
-            this.minimapSoulIndicator.setPosition(ratioX * minimapSize, ratioY * minimapSize);
-        }
-    }
+
     
     /**
      * Hide the soul arrow
@@ -167,14 +112,66 @@ export default class SoulUI {
     }
     
     /**
-     * Hide the minimap soul indicator
+     * Helper function to create a soul indicator on the minimap if the player has a soul
+     * Called by GameScene.updateMinimap() with the necessary parameters
+     * Returns the created indicator or null if no soul exists
      */
-    private hideMinimapIndicator(): void {
-        if (this.minimapSoulIndicator) {
-            this.minimapSoulIndicator.destroy();
-            this.minimapSoulIndicator = null;
+    public createMinimapSoulIndicator(
+        sdkConnection: any,
+        identity: any,
+        worldBounds: Phaser.Geom.Rectangle, 
+        minimapSize: number
+    ): Phaser.GameObjects.Arc | null {
+        if (!sdkConnection?.db || !identity) return null;
+        
+        // Get the local account
+        const account = sdkConnection.db.account.identity.find(identity);
+        if (!account || account.soulId === 0) {
+            // No soul exists for this player
+            return null;
         }
+        
+        // Find the soul gem with the matching gem_id
+        const soulGem = sdkConnection.db.gems.gemId.find(account.soulId);
+        if (!soulGem) {
+            // Soul gem doesn't exist (was probably collected)
+            return null;
+        }
+        
+        // Get the entity data for the soul gem to get its position
+        const soulEntity = sdkConnection.db.entity.entityId.find(soulGem.entityId);
+        if (!soulEntity) {
+            // Entity doesn't exist
+            return null;
+        }
+        
+        // Calculate position ratio (soul position relative to world size)
+        const ratioX = soulEntity.position.x / worldBounds.width;
+        const ratioY = soulEntity.position.y / worldBounds.height;
+        
+        // Create pink circle for soul on minimap
+        const soulDot = this.scene.add.circle(
+            ratioX * minimapSize,
+            ratioY * minimapSize,
+            8, // Size of the circle
+            0xff69b4, // Pink color for soul
+            1
+        );
+        
+        // Add pulsing effect for soul indicator
+        this.scene.tweens.add({
+            targets: soulDot,
+            alpha: { from: 1, to: 0.5 },
+            duration: 1000,
+            ease: 'Sine.easeInOut',
+            yoyo: true,
+            repeat: -1
+        });
+        
+        return soulDot;
     }
+    
+
     
     /**
      * Clean up when scene shuts down
@@ -188,8 +185,7 @@ export default class SoulUI {
             this.soulArrow = null;
         }
         
-        // Clean up minimap indicator
-        this.hideMinimapIndicator();
+
         
         console.log("SoulUI destroyed");
     }
