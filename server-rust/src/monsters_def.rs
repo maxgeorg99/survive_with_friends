@@ -488,9 +488,6 @@ fn populate_monster_cache(ctx: &ReducerContext, cache: &mut crate::collision::Co
         // Cache whether monster can deal damage based on AI state
         cache.monster.can_deal_damage[idx] = crate::monster_ai_defs::can_monster_deal_damage(&monster.ai_state);
         
-        // Cache whether monster can collide at all based on AI state
-        cache.monster.can_collide[idx] = crate::monster_ai_defs::can_monster_collide(&monster.ai_state);
-        
         //Structures and bosses have their weight set to 0.0 to prevent them from being pushed around
         if monster.bestiary_id == MonsterType::VoidChest || 
            monster.bestiary_id == MonsterType::FinalBossPhase1 || 
@@ -616,9 +613,7 @@ pub fn process_player_attack_monster_collisions_spatial_hash(ctx: &ReducerContex
                     let my = cache.monster.pos_y_monster[mid_usize];
                     let mr = cache.monster.radius_monster[mid_usize];
 
-                    // Only check collision if monster can collide at all (fixes boss lurk issue)
-                    if cache.monster.can_collide[mid_usize] &&
-                       spatial_hash_collision_checker(ax, ay, ar, mx, my, mr) {
+                    if spatial_hash_collision_checker(ax, ay, ar, mx, my, mr) {
                         // Get the active attack data
                         if current_attack_data.is_none() {
                             if let Some(active_attack) = ctx.db.active_attacks().active_attack_id().find(&cache.attack.keys_attack[aid]) {
@@ -717,11 +712,7 @@ fn solve_monster_repulsion_spatial_hash(cache: &mut crate::collision::CollisionC
                         continue;
                     }
 
-                    // Skip collision if either monster can't collide (fixes boss lurk issue)
-                    if !cache.monster.can_collide[i_a] || !cache.monster.can_collide[i_b_usize] {
-                        i_b = cache.monster.nexts_monster[i_b_usize];
-                        continue;
-                    }
+
 
                     let dx_ab = ax - cache.monster.pos_x_monster[i_b_usize];
                     let dy_ab = ay - cache.monster.pos_y_monster[i_b_usize];

@@ -368,10 +368,8 @@ pub fn process_player_monster_collisions_spatial_hash(ctx: &ReducerContext, coll
                     let my = collision_cache.monster.pos_y_monster[mid_usize];
                     let mr = collision_cache.monster.radius_monster[mid_usize];
 
-                    // Only check collision if monster can collide at all (fixes boss lurk issue)
-                    if collision_cache.monster.can_collide[mid_usize] &&
-                       spatial_hash_collision_checker(px, py, pr, mx, my, mr) {
-                        // Only apply damage if monster can deal damage
+                    if spatial_hash_collision_checker(px, py, pr, mx, my, mr) {
+                        // Only apply damage if monster can deal damage (fixes boss lurk issue)
                         if collision_cache.monster.can_deal_damage[mid_usize] {
                             collision_cache.player.damage_to_player[pid] += collision_cache.monster.atk_monster[mid_usize];
                         }

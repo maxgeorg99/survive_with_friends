@@ -441,17 +441,3 @@ pub fn can_monster_deal_damage(state: &AIState) -> bool {
     }
 }
 
-// Helper function to check if a monster should have collision detection at all
-pub fn can_monster_collide(state: &AIState) -> bool {
-    match state {
-        AIState::Default => true,
-        AIState::BossIdle => true,
-        AIState::BossChase => true,
-        AIState::BossDance => true,
-        AIState::BossVanish => true,
-        AIState::BossLurk => false,   
-        AIState::BossTeleport => true, 
-        AIState::BossTransform => true,
-        AIState::Stationary => true,
-    }
-} 
