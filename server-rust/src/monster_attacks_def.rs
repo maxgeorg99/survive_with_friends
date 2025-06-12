@@ -4,7 +4,7 @@ use crate::{DbVector2, MonsterAttackType, DELTA_TIME, get_world_cell_from_positi
 use std::time::Duration;
 
 // Configuration constants for EnderScythe attacks
-const ENDER_SCYTHE_RINGS: u32 = 8;                    // Number of rings around the boss
+const ENDER_SCYTHE_RINGS: u32 = 7;                    // Number of rings around the boss
 const ENDER_SCYTHE_BASE_RADIUS: f32 = 256.0;          // Starting radius for first ring
 const ENDER_SCYTHE_RING_SPACING: f32 = 256.0;         // Distance between rings
 const ENDER_SCYTHE_BASE_COUNT: u32 = 4;              // Number of scythes in the inner ring

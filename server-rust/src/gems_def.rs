@@ -352,6 +352,8 @@ pub fn give_player_exp(ctx: &ReducerContext, player_id: u32, exp_amount: u32) {
         player.level = current_level;
         // Store the new exp needed for next level
         player.exp_for_next_level = exp_needed;
+
+        let prev_unspent_upgrades = player.unspent_upgrades;
         
         // Grant an unspent upgrade point for each level gained
         player.unspent_upgrades += levels_gained;
@@ -360,7 +362,7 @@ pub fn give_player_exp(ctx: &ReducerContext, player_id: u32, exp_amount: u32) {
         let old_hp = player.hp;
         player.hp = player.max_hp;
 
-        if player.unspent_upgrades == 1 {
+        if prev_unspent_upgrades == 0 {
             // Draw upgrade options for the player
             crate::upgrades_def::draw_upgrade_options(ctx, player_id);
         }
