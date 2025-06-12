@@ -616,8 +616,11 @@ export default class GameScene extends Phaser.Scene {
     }
 
     private handlePlayerUpdated(ctx: EventContext, oldPlayer: Player, newPlayer: Player, isLocalPlayer: boolean) {
-        //console.log("Player updated:", newPlayer.playerId, "Local:", isLocalPlayer);
-        
+        if (!oldPlayer || !newPlayer) {
+            console.warn("Received player update with missing data, skipping");
+            return;
+        }
+
         // If local player and level increased, show level up effect
         if (isLocalPlayer && newPlayer.level > oldPlayer.level) {
             console.log("Player level up: from level", oldPlayer.level, "to level", newPlayer.level);
@@ -664,20 +667,27 @@ export default class GameScene extends Phaser.Scene {
         }
     }
 
-    private handlePlayerDeleted(ctx: EventContext, player: Player, isLocalPlayer: boolean = false) 
-    {
+    private handlePlayerDeleted(ctx: EventContext, player: Player, isLocalPlayer: boolean = false) {
+        if (!player) {
+            console.warn("Received player delete with missing data, skipping");
+            return;
+        }
+
         if (isLocalPlayer) {
-            // (Local player deletion is handled by handlePlayerDied)
-            console.log("Local player deleted event received");
+            // Handle local player deletion (death)
+            this.handlePlayerDied(ctx, player);
         } else {
-            // Find and remove the other player
-            console.log("Other player deleted:", player);
-            
+            // Handle other player deletion
             this.removeOtherPlayer(player.playerId);
         }
     }
 
     private handlePlayerDied(ctx: EventContext, player: Player) {
+        if (!player) {
+            console.warn("Received player death with missing data, skipping");
+            return;
+        }
+
         console.log("Player died event received in GameScene");
         // This is our local player that died
         console.log("Local player died:", player);

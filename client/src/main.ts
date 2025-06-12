@@ -247,47 +247,49 @@ const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
 
         if (myAccount.currentPlayerId === player.playerId) {
             console.log("Local player inserted!");
-            
-            // Emit player created event
-            gameEvents.emit(GameEvents.PLAYER_CREATED, ctx, player);
+            gameEvents.emit(GameEvents.PLAYER_CREATED, ctx, player, true);
         } else {
-            console.log("Another player has logged on: " + player.name);
-            
-            // Emit player created event for other players too
+            console.log("Other player inserted!");
             gameEvents.emit(GameEvents.PLAYER_CREATED, ctx, player, false);
         }
     });
 
-    // Listen for player updates
+    // Add defensive checks for player updates
     localDb.player.onUpdate((ctx, oldPlayer, newPlayer) => {
-        const myAccount = ctx.db?.account.identity.find(localIdentity);
-        const isLocalPlayer = myAccount && myAccount.currentPlayerId === newPlayer.playerId;
-        
-        // Emit player updated event
-        gameEvents.emit(GameEvents.PLAYER_UPDATED, ctx, oldPlayer, newPlayer, isLocalPlayer);
-    });
-
-    // Listen for player deletions (death)
-    localDb.player.onDelete((ctx, player) => {
-        console.log("Player deleted event received");
-        console.log("- Player data: ", player.name + " - " + player.playerId);
+        if (!oldPlayer || !newPlayer) {
+            console.warn("Received player update with missing data, skipping");
+            return;
+        }
 
         const myAccount = ctx.db?.account.identity.find(localIdentity);
         if (!myAccount) {
-            console.log("No account found for local identity.");
+            console.log("No account found for local identity. Waiting for account.");
+            return;
+        }
+
+        if (myAccount.currentPlayerId === newPlayer.playerId) {
+            gameEvents.emit(GameEvents.PLAYER_UPDATED, ctx, oldPlayer, newPlayer, true);
+        } else {
+            gameEvents.emit(GameEvents.PLAYER_UPDATED, ctx, oldPlayer, newPlayer, false);
+        }
+    });
+
+    // Add defensive checks for player deletes
+    localDb.player.onDelete((ctx, player) => {
+        if (!player) {
+            console.warn("Received player delete with missing data, skipping");
+            return;
+        }
+
+        const myAccount = ctx.db?.account.identity.find(localIdentity);
+        if (!myAccount) {
+            console.log("No account found for local identity. Waiting for account.");
             return;
         }
 
         if (myAccount.currentPlayerId === player.playerId) {
-            console.log("Local player was deleted/died!");
-            
-            // Emit player died event
-            gameEvents.emit(GameEvents.PLAYER_DIED, ctx, player);
-            
-            // The server will handle transitioning the account to Dead state
-            // No need to manually navigate here
+            gameEvents.emit(GameEvents.PLAYER_DELETED, ctx, player, true);
         } else {
-            // Emit player deleted event for other players
             gameEvents.emit(GameEvents.PLAYER_DELETED, ctx, player, false);
         }
     });
