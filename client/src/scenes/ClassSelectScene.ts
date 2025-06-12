@@ -52,6 +52,11 @@ export default class ClassSelectScene extends Phaser.Scene {
     private errorText!: Phaser.GameObjects.Text;
     private optionsUI!: OptionsUI;
     
+    // Add status text for game state
+    private statusText!: Phaser.GameObjects.Text;
+    private statusBackground!: Phaser.GameObjects.Rectangle;
+    private statusContainer!: Phaser.GameObjects.Container;
+    
     // State tracking
     private selectedClass: PlayerClass | null = null;
     private isLoading: boolean = false;
@@ -129,6 +134,9 @@ export default class ClassSelectScene extends Phaser.Scene {
         backgroundRect.setDepth(-100); // Ensure it's behind everything
         backgroundRect.setName('backgroundRect');
         
+        // Create status container at the top of the screen
+        this.createStatusUI();
+
         try {
             if (this.textures.exists('title_bg')) {
                 const bgImage = this.add.image(width/2, height/2, 'title_bg')
@@ -670,6 +678,167 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.errorText.setVisible(true);
     }
     
+    private createStatusUI() {
+        // Create container for status UI
+        this.statusContainer = this.add.container(0, 0);
+        this.statusContainer.setDepth(1000); // High depth to stay on top
+
+        // Create background for status text
+        this.statusBackground = this.add.rectangle(0, 0, 300, 40, 0x000000, 0.7);
+        this.statusBackground.setStrokeStyle(2, 0x444444);
+        this.statusBackground.setOrigin(0.5, 0.5);
+
+        // Create status text
+        this.statusText = this.add.text(0, 0, "", {
+            fontSize: '18px',
+            fontFamily: 'Arial',
+            color: '#ffffff',
+            stroke: '#000000',
+            strokeThickness: 2,
+            align: 'center'
+        });
+        this.statusText.setOrigin(0.5, 0.5);
+
+        // Add elements to container
+        this.statusContainer.add([this.statusBackground, this.statusText]);
+
+        // Position at top center of screen
+        const camera = this.cameras.main;
+        if (camera) {
+            this.statusContainer.setPosition(
+                camera.scrollX + camera.width / 2,
+                camera.scrollY + 40
+            );
+        }
+
+        // Add update callback to scene
+        this.events.on('update', this.updateStatus, this);
+    }
+
+    private updateStatus() {
+        if (!this.spacetimeDBClient.sdkConnection?.db) return;
+
+        const gameState = this.spacetimeDBClient.sdkConnection.db.gameState.id.find(0);
+        if (!gameState) {
+            this.statusContainer.setVisible(false);
+            return;
+        }
+
+        // Check if boss is active
+        if (gameState.bossActive) {
+            this.statusText.setText("Boss Fight in Progress");
+            this.statusContainer.setVisible(true);
+            return;
+        }
+
+        // Check for boss spawn timer
+        const bossTimers = Array.from(this.spacetimeDBClient.sdkConnection.db.bossSpawnTimer.iter());
+        if (bossTimers.length > 0) {
+            const now = Date.now();
+            const timestamp = this.extractTimestampFromTimer(bossTimers[0]);
+            if (timestamp) {
+                const timeRemaining = Math.max(0, (timestamp - now) / 1000); // Convert to seconds
+                const minutes = Math.floor(timeRemaining / 60);
+                const seconds = Math.floor(timeRemaining % 60);
+                
+                if (timeRemaining > 0) {
+                    this.statusText.setText(`Run in Progress: ${minutes}:${seconds.toString().padStart(2, '0')}`);
+                    this.statusContainer.setVisible(true);
+                    return;
+                }
+            }
+        }
+
+        // No active game state to show
+        this.statusContainer.setVisible(false);
+    }
+
+    private extractTimestampFromTimer(timer: any): number | null {
+        try {
+            // First check if we have a scheduledAt property
+            if (!timer || !timer.scheduledAt) {
+                return null;
+            }
+            
+            // Handle scheduledAt property based on its type
+            const scheduledAt = timer.scheduledAt;
+            
+            // If scheduled_at has a microsSinceUnixEpoch property (common timestamp format)
+            if (scheduledAt.microsSinceUnixEpoch !== undefined) {
+                // Convert microseconds to milliseconds for JS Date
+                const microsValue = scheduledAt.microsSinceUnixEpoch;
+                if (typeof microsValue === 'bigint') {
+                    return Number(microsValue) / 1000;
+                } else if (typeof microsValue === 'number') {
+                    return microsValue / 1000;
+                }
+            }
+            
+            // If it has a time_ms field
+            if (scheduledAt.timeMs !== undefined) {
+                return typeof scheduledAt.timeMs === 'bigint' 
+                    ? Number(scheduledAt.timeMs) 
+                    : scheduledAt.timeMs;
+            }
+            
+            // If it's a structured object with tag and value
+            if (typeof scheduledAt === 'object' && scheduledAt.tag && scheduledAt.value) {
+                if (scheduledAt.tag === 'Time') {
+                    const timeValue = scheduledAt.value;
+                    
+                    // Direct BigInt handling
+                    if (typeof timeValue === 'bigint') {
+                        return Number(timeValue) / 1000;
+                    }
+                    
+                    // Handle case where value is a string (could be with or without 'n')
+                    if (typeof timeValue === 'string') {
+                        // Check if it's a BigInt string (ends with 'n')
+                        if (timeValue.endsWith('n')) {
+                            // Remove the 'n' suffix and convert to number
+                            const valueWithoutN = timeValue.slice(0, -1);
+                            // This is microseconds since epoch, convert to ms
+                            return Number(valueWithoutN) / 1000;
+                        } else {
+                            // It's a regular string number, convert directly
+                            return Number(timeValue) / 1000;
+                        }
+                    }
+                    
+                    // Check for microsSinceUnixEpoch in the value
+                    if (timeValue && typeof timeValue === 'object' && timeValue.microsSinceUnixEpoch !== undefined) {
+                        const microsValue = timeValue.microsSinceUnixEpoch;
+                        if (typeof microsValue === 'bigint') {
+                            return Number(microsValue) / 1000;
+                        } else if (typeof microsValue === 'number') {
+                            return microsValue / 1000;
+                        }
+                    }
+                    
+                    // Check for timeMs in the value
+                    if (timeValue && typeof timeValue === 'object' && timeValue.timeMs !== undefined) {
+                        return typeof timeValue.timeMs === 'bigint' 
+                            ? Number(timeValue.timeMs) 
+                            : timeValue.timeMs;
+                    }
+
+                    // Try direct conversion as a fallback
+                    if (timeValue) {
+                        const timestamp = Number(timeValue);
+                        if (!isNaN(timestamp) && timestamp > 0) {
+                            return timestamp / 1000; // Convert microseconds to milliseconds
+                        }
+                    }
+                }
+            }
+            
+            return null;
+        } catch (error) {
+            console.error("Error extracting timestamp:", error);
+            return null;
+        }
+    }
+
     shutdown() {
         console.log("ClassSelectScene shutdown called");
         
@@ -693,5 +862,8 @@ export default class ClassSelectScene extends Phaser.Scene {
         
         // Remove resize listener
         this.scale.off('resize', this.handleResize);
+        
+        // Remove update callback
+        this.events.off('update', this.updateStatus, this);
     }
 } 
