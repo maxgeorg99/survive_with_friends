@@ -2859,4 +2859,6 @@ export default class GameScene extends Phaser.Scene {
             this.localPlayerSprite.setData('pvpIndicator', null);
         }
     }
+    
+    // Development functions removed for production
 }

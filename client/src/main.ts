@@ -83,6 +83,8 @@ const soundManager = new SoundManager();
     cleanupDOMElements();
 };
 
+// Development cheats removed for production
+
 const config: Phaser.Types.Core.GameConfig = {
     type: Phaser.AUTO,
     width: window.innerWidth,
@@ -105,6 +107,9 @@ const config: Phaser.Types.Core.GameConfig = {
 
 const game = new Phaser.Game(config);
 console.log("Phaser game initialized.");
+
+// Expose game instance to window for development/testing
+(window as any).game = game;
 
 // Global DOM cleanup function
 const cleanupDOMElements = () => {

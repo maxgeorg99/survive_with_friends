@@ -14,9 +14,10 @@ const RESPONSIVE_CONFIG = {
     STATUS_SIZE_RATIO: 0.02,
     STATUS_HEIGHT_RATIO: 0.035,
     MAX_STATUS_SIZE: 20,
-    DEAD_Y_OFFSET: 0.1,
-    FLAVOR_Y_OFFSET: -0.02,
-    STATUS_Y_OFFSET: -0.04,
+    // Improved vertical spacing for better hierarchy
+    DEAD_Y_OFFSET: 0.15,       // Top: "YOU ARE NO SURVIVOR" - moved higher
+    FLAVOR_Y_OFFSET: -0.05,    // Middle: flavor text - proper spacing
+    STATUS_Y_OFFSET: 0.025,     // Bottom: status text - moved DOWN to bottom
     MIN_STROKE_WIDTH: 4
 };
 
@@ -117,10 +118,10 @@ export default class DeadScene extends Phaser.Scene {
         this.statusText = this.add.text(0, height * RESPONSIVE_CONFIG.STATUS_Y_OFFSET, 'Returning to character select...', {
             fontFamily: 'Arial',
             fontSize: `${baseStatusSize}px`,
-            color: '#FFFFFF',
+            color: '#CCCCCC',  // Softer color for less prominence
             align: 'center',
             stroke: '#000000',
-            strokeThickness: Math.max(3, baseStatusSize / 7)
+            strokeThickness: Math.max(2, baseStatusSize / 8)  // Lighter stroke
         }).setOrigin(0.5).setName('statusText');
         this.deadContainer.add(this.statusText);
         
@@ -138,19 +139,16 @@ export default class DeadScene extends Phaser.Scene {
     }
     
     private createWaitingDots() {
-        const dotsText = this.add.text(0, 80, '', {
-            fontFamily: 'Arial',
-            fontSize: '24px',
-            color: '#ffffff'
-        }).setOrigin(0.5);
-        this.deadContainer.add(dotsText);
-        
+        // Animate the dots at the end of the status text
+        const baseText = 'Returning to character select';
         let dotCount = 0;
+        
         this.time.addEvent({
-            delay: 500,
+            delay: 600,  // Slower animation
             callback: () => {
-                dotCount = (dotCount + 1) % 4;
-                dotsText.setText('.'.repeat(dotCount));
+                dotCount = (dotCount % 3) + 1; // Cycle 1, 2, 3 dots
+                const dotsText = '.'.repeat(dotCount);
+                this.statusText.setText(`${baseText}${dotsText}`);
             },
             loop: true
         });

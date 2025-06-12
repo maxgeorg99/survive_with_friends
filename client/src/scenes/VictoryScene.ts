@@ -17,10 +17,11 @@ const RESPONSIVE_CONFIG = {
     STATUS_SIZE_RATIO: 0.02,
     STATUS_HEIGHT_RATIO: 0.035,
     MAX_STATUS_SIZE: 20,
-    VICTORY_Y_OFFSET: 0.12,
-    SURVIVOR_Y_OFFSET: 0.04,
-    FLAVOR_Y_OFFSET: -0.02,
-    STATUS_Y_OFFSET: -0.06,
+    // Improved vertical spacing for better hierarchy
+    VICTORY_Y_OFFSET: 0.18,    // Top: "VICTORY!" - moved higher
+    SURVIVOR_Y_OFFSET: 0.08,   // Upper middle: "TRUE SURVIVOR" - better gap
+    FLAVOR_Y_OFFSET: -0.08,    // Lower middle: flavor text - proper spacing
+    STATUS_Y_OFFSET: -0.16,    // Bottom: status text - clear separation
     MIN_STROKE_WIDTH: 4
 };
 
@@ -119,26 +120,15 @@ export default class VictoryScene extends Phaser.Scene {
         }).setOrigin(0.5).setName('survivorText');
         this.victoryContainer.add(survivorText);
         
-        // Add flavor text
-        const flavorText = this.add.text(0, height * RESPONSIVE_CONFIG.FLAVOR_Y_OFFSET, 'You have conquered the void and emerged victorious!', {
-            fontFamily: 'Arial',
-            fontSize: `${baseFlavorSize}px`,
-            color: '#FFFFFF',
-            align: 'center',
-            stroke: '#000000',
-            strokeThickness: Math.max(RESPONSIVE_CONFIG.MIN_STROKE_WIDTH, baseFlavorSize / 6)
-        }).setOrigin(0.5).setName('flavorText');
-        this.victoryContainer.add(flavorText);
-        
-        // Add status text
-        this.statusText = this.add.text(0, height * RESPONSIVE_CONFIG.STATUS_Y_OFFSET, 'Basking in glory...', {
+        // Status text placeholder (hidden, but needed for event handling)
+        this.statusText = this.add.text(0, height * RESPONSIVE_CONFIG.STATUS_Y_OFFSET, '', {
             fontFamily: 'Arial',
             fontSize: `${baseStatusSize}px`,
-            color: '#FFFFFF',
+            color: '#CCCCCC',
             align: 'center',
             stroke: '#000000',
-            strokeThickness: Math.max(3, baseStatusSize / 7)
-        }).setOrigin(0.5).setName('statusText');
+            strokeThickness: Math.max(2, baseStatusSize / 8)
+        }).setOrigin(0.5).setName('statusText').setVisible(false);
         this.victoryContainer.add(this.statusText);
         
         // Add animated dots for waiting
@@ -158,16 +148,18 @@ export default class VictoryScene extends Phaser.Scene {
     }
     
     private createWaitingDots() {
-        const dotsText = this.add.text(0, 100, '', {
+        const { height } = this.scale;
+        // Position dots below status text with proper spacing
+        const dotsText = this.add.text(0, height * -0.10, '', {
             fontFamily: 'Arial',
-            fontSize: '24px',
-            color: '#654321'
+            fontSize: '20px',
+            color: '#888888'  // Much more subtle color
         }).setOrigin(0.5);
         this.victoryContainer.add(dotsText);
         
         let dotCount = 0;
         this.time.addEvent({
-            delay: 500,
+            delay: 600,  // Slower animation
             callback: () => {
                 dotCount = (dotCount + 1) % 4;
                 dotsText.setText('.'.repeat(dotCount));
@@ -236,7 +228,6 @@ export default class VictoryScene extends Phaser.Scene {
             // Update text elements within the container
             const victoryText = this.victoryContainer.getByName('victoryText') as Phaser.GameObjects.Text;
             const survivorText = this.victoryContainer.getByName('survivorText') as Phaser.GameObjects.Text;
-            const flavorText = this.victoryContainer.getByName('flavorText') as Phaser.GameObjects.Text;
             const statusText = this.victoryContainer.getByName('statusText') as Phaser.GameObjects.Text;
             
             if (victoryText) {
@@ -255,13 +246,7 @@ export default class VictoryScene extends Phaser.Scene {
                 console.log(`VictoryScene: Updated survivor text - size: ${baseSurvivorSize}px, position: (0, ${-height * RESPONSIVE_CONFIG.SURVIVOR_Y_OFFSET})`);
             }
             
-            if (flavorText) {
-                const baseFlavorSize = Math.min(width * RESPONSIVE_CONFIG.FLAVOR_SIZE_RATIO, height * RESPONSIVE_CONFIG.FLAVOR_HEIGHT_RATIO, RESPONSIVE_CONFIG.MAX_FLAVOR_SIZE);
-                flavorText.setPosition(0, height * RESPONSIVE_CONFIG.FLAVOR_Y_OFFSET);
-                flavorText.setFontSize(baseFlavorSize);
-                flavorText.setStroke('#000000', Math.max(RESPONSIVE_CONFIG.MIN_STROKE_WIDTH, baseFlavorSize / 6));
-                console.log(`VictoryScene: Updated flavor text - size: ${baseFlavorSize}px, position: (0, ${height * RESPONSIVE_CONFIG.FLAVOR_Y_OFFSET})`);
-            }
+
             
             if (statusText) {
                 const baseStatusSize = Math.min(width * RESPONSIVE_CONFIG.STATUS_SIZE_RATIO, height * RESPONSIVE_CONFIG.STATUS_HEIGHT_RATIO, RESPONSIVE_CONFIG.MAX_STATUS_SIZE);
