@@ -59,6 +59,11 @@ pub fn damage_monster(ctx: &ReducerContext, monster_id: u32, damage_amount: u32)
             log::info!("VoidChest {} destroyed! Triggering death pinata at ({:.1}, {:.1})", 
                       monster.monster_id, position.x, position.y);
             loot_capsule_defs::trigger_void_chest_death_pinata(ctx, position);
+        } else if monster.variant == crate::MonsterVariant::Shiny {
+            // Shiny monster death pinata - spawn capsules based on tier
+            log::info!("Shiny monster {} destroyed! Triggering death pinata at ({:.1}, {:.1})", 
+                      monster.monster_id, position.x, position.y);
+            monsters_def::trigger_shiny_monster_death_pinata(ctx, &monster);
         }
         
         // Clean up any monster damage records for this monster
@@ -148,8 +153,8 @@ pub fn damage_monster(ctx: &ReducerContext, monster_id: u32, damage_amount: u32)
         
         // For non-boss monsters or if game state not found, spawn a gem
         if !is_boss {
-            // Spawn a gem at the monster's position (but not for VoidChest since it already spawned capsules)
-            if !is_void_chest {
+            // Spawn a gem at the monster's position (but not for VoidChest or Shiny since they already spawned capsules)
+            if !is_void_chest && monster.variant != crate::MonsterVariant::Shiny {
                 let cache = crate::monsters_def::get_collision_cache();
                 crate::gems_def::spawn_gem_on_monster_death(ctx, monster_id, position, cache);
             }

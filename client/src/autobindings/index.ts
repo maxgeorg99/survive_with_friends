@@ -294,6 +294,8 @@ import { MonsterStateChange } from "./monster_state_change_type.ts";
 export { MonsterStateChange };
 import { MonsterType } from "./monster_type_type.ts";
 export { MonsterType };
+import { MonsterVariant } from "./monster_variant_type.ts";
+export { MonsterVariant };
 import { Monsters } from "./monsters_type.ts";
 export { Monsters };
 import { Player } from "./player_type.ts";

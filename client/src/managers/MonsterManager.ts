@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { Monsters, EventContext, MonsterType, MonsterBoid, AiState} from "../autobindings";
+import { Monsters, EventContext, MonsterType, MonsterBoid, AiState, MonsterVariant} from "../autobindings";
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { MONSTER_ASSET_KEYS, MONSTER_SHADOW_OFFSETS_X, MONSTER_SHADOW_OFFSETS_Y, MONSTER_SHADOW_SCALE} from '../constants/MonsterConfig';
 import { GameEvents } from '../constants/GameEvents';
@@ -17,6 +17,28 @@ const BASE_DEPTH = 1000; // Base depth to ensure all sprites are above backgroun
 const SHADOW_DEPTH_OFFSET = -1; // Always behind the sprite
 const HEALTH_BG_DEPTH_OFFSET = 1; // Just behind health bar
 const HEALTH_BAR_DEPTH_OFFSET = 1.1;
+
+// Constants for shiny monster effects
+const SHINY_PARTICLE_COUNT = 8;
+const SHINY_PARTICLE_LIFESPAN = 1000;
+const SHINY_PARTICLE_SPEED = { min: 20, max: 60 };
+const SHINY_PARTICLE_SCALE = { start: 0.4, end: 0 };
+const SHINY_PARTICLE_COLORS = [0xffffff, 0xcccccc, 0x999999]; // White to light gray gradient
+const SHINY_COLOR_SHIFT = 0xffffff; // White tint for shiny monsters
+
+// Base monster sizes from bestiary for shiny scaling
+const MONSTER_BASE_SIZES: { [key: string]: number } = {
+    "Rat": 24.0,
+    "Slime": 30.0,
+    "Orc": 40.0,
+    "FinalBossPhase1": 92.0,
+    "FinalBossPhase2": 128.0,
+    "VoidChest": 82.0,
+    "Imp": 34.0,
+    "Zombie": 42.0,
+    "EnderClaw": 44.0,
+    "Bat": 28.0
+};
 
 export default class MonsterManager {
     // Reference to the scene
@@ -190,6 +212,87 @@ export default class MonsterManager {
             sprite.setDepth(0);
             container.add(sprite);
             
+            // If this is a shiny monster, add visual effects
+            if (monsterData.variant.tag === 'Shiny') {
+                console.log(`Creating shiny monster effects for ${monsterTypeName} (ID: ${monsterData.monsterId})`);
+                
+                // Add brightness and glow effect
+                sprite.setTint(SHINY_COLOR_SHIFT); // Pure white base
+                sprite.setAlpha(1.2); // Slightly brighter than normal
+                
+                // Create particle emitter for shiny effect
+                const particles = this.scene.add.particles(0, 0, 'white_pixel', {
+                    speed: SHINY_PARTICLE_SPEED,
+                    scale: SHINY_PARTICLE_SCALE,
+                    blendMode: Phaser.BlendModes.ADD,
+                    lifespan: SHINY_PARTICLE_LIFESPAN,
+                    tint: [0xFFFFFF, 0xFFFFAA, 0xFFFFFF], // White to light yellow and back
+                    quantity: 1,
+                    frequency: 100,
+                    emitting: true
+                });
+                particles.setDepth(0.1); // Just above the sprite
+                container.add(particles);
+                
+                // Store the particle emitter for cleanup
+                container.setData('shinyParticles', particles);
+                
+                // Add a glow effect using a second sprite
+                const glowSprite = this.scene.add.sprite(0, 0, sprite.texture.key);
+                glowSprite.setTint(SHINY_COLOR_SHIFT);
+                glowSprite.setAlpha(0.1);
+                glowSprite.setScale(sprite.scaleX * 1.2, sprite.scaleY * 1.2); // Slightly larger for glow
+                glowSprite.setBlendMode(Phaser.BlendModes.ADD);
+                glowSprite.setDepth(sprite.depth - 1);
+                container.add(glowSprite);
+                
+                // Store the glow sprite for cleanup
+                container.setData('shinyGlow', glowSprite);
+                
+                // Create a pulsing glow effect
+                const glowTween = this.scene.tweens.add({
+                    targets: glowSprite,
+                    alpha: 0.3,
+                    duration: 1000,
+                    ease: 'Sine.easeInOut',
+                    yoyo: true,
+                    repeat: -1
+                });
+                
+                // Store the tween for cleanup
+                container.setData('shinyGlowTween', glowTween);
+                
+                // Get base radius from hardcoded values
+                const baseRadius = MONSTER_BASE_SIZES[monsterTypeName];
+                if (baseRadius) {
+                    // Calculate scale based on ratio of current radius to base radius
+                    const scaleRatio = monsterData.radius / baseRadius;
+                    console.log(`Shiny monster ${monsterData.monsterId} (${monsterTypeName}):`);
+                    console.log(`- Current radius: ${monsterData.radius}`);
+                    console.log(`- Base radius: ${baseRadius}`);
+                    console.log(`- Scale ratio: ${scaleRatio}`);
+                    
+                    // Apply scale to both sprite and shadow
+                    sprite.setScale(scaleRatio);
+                    shadow.setScale((MONSTER_SHADOW_SCALE[monsterTypeName] || 1.0) * scaleRatio);
+                    
+                    // Adjust shadow position to account for scaling
+                    const scaledShadowX = (MONSTER_SHADOW_OFFSETS_X[monsterTypeName] || 0) * scaleRatio;
+                    const scaledShadowY = (MONSTER_SHADOW_OFFSETS_Y[monsterTypeName] || 0) * scaleRatio;
+                    shadow.setPosition(scaledShadowX, scaledShadowY);
+                    
+                    // Update glow sprite scale to match
+                    glowSprite.setScale(scaleRatio * 1.2);
+                    
+                    // Log the final scale values
+                    console.log(`- Sprite scale: ${sprite.scaleX}`);
+                    console.log(`- Shadow scale: ${shadow.scaleX}`);
+                    console.log(`- Glow scale: ${glowSprite.scaleX}`);
+                } else {
+                    console.warn(`No base radius found for monster type: ${monsterTypeName}`);
+                }
+            }
+            
             // Pre-calculate health bar position to avoid repeated calculations
             const healthBarY = -sprite.height/2 - MONSTER_HEALTH_BAR_OFFSET_Y;
             
@@ -331,6 +434,23 @@ export default class MonsterManager {
         // Get and destroy the container
         const container = this.monsters.get(monsterId);
         if (container) {
+            // Clean up shiny effects if present
+            const particles = container.getData('shinyParticles');
+            if (particles) {
+                particles.destroy();
+            }
+            
+            const glowSprite = container.getData('shinyGlow');
+            if (glowSprite) {
+                glowSprite.destroy();
+            }
+            
+            const glowTween = container.getData('shinyGlowTween');
+            if (glowTween) {
+                glowTween.stop();
+                glowTween.destroy();
+            }
+
             container.destroy();
         }
         this.monsters.delete(monsterId);

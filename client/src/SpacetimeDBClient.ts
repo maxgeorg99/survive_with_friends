@@ -4,7 +4,8 @@ import { RemoteReducers, SetReducerFlags, RemoteTables, DbConnection, ErrorConte
 import { GameEvents } from './constants/GameEvents';
 
 // Define your SpacetimeDB connection details
-const SPACETIMEDB_DB_NAME : string = "vibesurvivors";
+//const SPACETIMEDB_DB_NAME : string = "vibesurvivors";
+const SPACETIMEDB_DB_NAME : string = "vibesurvivorsptr";
 const LOCAL_SPACETIMEDB_URI : string = "ws://localhost:3000"; // Use wss for cloud, corrected order
 const REMOTE_SPACETIMEDB_URI : string = "wss://maincloud.spacetimedb.com";
 const PROXY_SPACETIMEDB_URI : string = "ws://localhost:3001";

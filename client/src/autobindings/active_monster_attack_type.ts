@@ -46,6 +46,7 @@ export type ActiveMonsterAttack = {
   parameterU: number,
   parameterF: number,
   ticksElapsed: number,
+  fromShinyMonster: boolean,
 };
 
 /**
@@ -70,6 +71,7 @@ export namespace ActiveMonsterAttack {
       new ProductTypeElement("parameterU", AlgebraicType.createU32Type()),
       new ProductTypeElement("parameterF", AlgebraicType.createF32Type()),
       new ProductTypeElement("ticksElapsed", AlgebraicType.createU32Type()),
+      new ProductTypeElement("fromShinyMonster", AlgebraicType.createBoolType()),
     ]);
   }
 

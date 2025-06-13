@@ -44,6 +44,9 @@ const BOSS_TARGET_SWITCH_BASE_INTERVAL_MS: u64 = 10000;   // Base interval (8 se
 const BOSS_TARGET_SWITCH_VARIATION_MS: u64 = 4000;       // Random variation (±4 seconds)
 const BOSS_TARGET_SWITCH_INITIAL_DELAY_MS: u64 = 10000;   // Initial delay before first switch       // Initial delay before first EnderBolt (after real scythes spawn)
 
+// Shiny monster attack damage multiplier
+const SHINY_ATTACK_DAMAGE_MULTIPLIER: f32 = 2.0; // Shiny monster attacks do 2x damage
+
 // Scheduled table for Imp attacks - Imps periodically fire ImpBolts at players
 #[table(name = imp_attack_scheduler, scheduled(trigger_imp_attack), public)]
 pub struct ImpAttackScheduler {
@@ -159,6 +162,7 @@ pub struct ActiveMonsterAttack {
     pub parameter_u: u32,      // Additional parameter for the attack
     pub parameter_f: f32,      // Additional parameter for the attack 
     pub ticks_elapsed: u32,    // Number of ticks since the attack was created
+    pub from_shiny_monster: bool, // Whether this attack came from a shiny monster
 }
 
 // Helper method to process monster attack movements
@@ -363,7 +367,7 @@ pub fn find_nearest_player(ctx: &ReducerContext, position: DbVector2) -> Option<
 }
 
 // Function to spawn an ImpBolt at a particular position, targeting a specific player
-pub fn spawn_imp_bolt(ctx: &ReducerContext, spawn_position: DbVector2, target_player_id: u32) {
+pub fn spawn_imp_bolt(ctx: &ReducerContext, spawn_position: DbVector2, target_player_id: u32, attacking_monster_id: u32) {
     // Get the target player
     let target_player_opt = ctx.db.player().player_id().find(&target_player_id);
     let target_player = match target_player_opt {
@@ -383,6 +387,24 @@ pub fn spawn_imp_bolt(ctx: &ReducerContext, spawn_position: DbVector2, target_pl
     // Store the direction angle in parameter_f (in radians)
     let direction_angle = direction_vector.y.atan2(direction_vector.x);
 
+    // Check if the attacking monster is shiny and calculate damage
+    let attacking_monster = ctx.db.monsters().monster_id().find(&attacking_monster_id);
+    let (base_damage, is_shiny) = match attacking_monster {
+        Some(monster) => {
+            let is_shiny = matches!(monster.variant, crate::MonsterVariant::Shiny);
+            let damage = if is_shiny {
+                (12.0 * SHINY_ATTACK_DAMAGE_MULTIPLIER) as u32
+            } else {
+                12
+            };
+            (damage, is_shiny)
+        }
+        None => {
+            log::warn!("Attacking monster {} not found, using default damage", attacking_monster_id);
+            (12, false)
+        }
+    };
+
     // Create active monster attack (scheduled to expire after 3 seconds)
     let duration_ms = 3000u64;
     let active_monster_attack = ctx.db.active_monster_attacks().insert(ActiveMonsterAttack {
@@ -392,18 +414,26 @@ pub fn spawn_imp_bolt(ctx: &ReducerContext, spawn_position: DbVector2, target_pl
         direction: direction_vector,
         monster_attack_type: MonsterAttackType::ImpBolt,
         piercing: false, // ImpBolt is not piercing
-        damage: 12, // ImpBolt damage
+        damage: base_damage, // Damage adjusted for shiny monsters
         radius: 15.0, // ImpBolt radius
         speed: 480.0, // ImpBolt speed
         parameter_u: target_player_id, // Store target player ID
         parameter_f: direction_angle, // Store direction angle
         ticks_elapsed: 0,
+        from_shiny_monster: is_shiny, // Track if this attack came from a shiny monster
     });
 
-    log::info!("Spawned ImpBolt {} at ({}, {}) targeting player {} (expires in {}ms)", 
-              active_monster_attack.active_monster_attack_id, 
-              spawn_position.x, spawn_position.y, 
-              target_player_id, duration_ms);
+    if is_shiny {
+        log::info!("Spawned SHINY ImpBolt {} at ({}, {}) targeting player {} with {}x damage ({} total, expires in {}ms)", 
+                  active_monster_attack.active_monster_attack_id, 
+                  spawn_position.x, spawn_position.y, 
+                  target_player_id, SHINY_ATTACK_DAMAGE_MULTIPLIER, base_damage, duration_ms);
+    } else {
+        log::info!("Spawned ImpBolt {} at ({}, {}) targeting player {} (expires in {}ms)", 
+                  active_monster_attack.active_monster_attack_id, 
+                  spawn_position.x, spawn_position.y, 
+                  target_player_id, duration_ms);
+    }
 }
 
 // Reducer called when an Imp should fire an ImpBolt
@@ -455,7 +485,7 @@ pub fn trigger_imp_attack(ctx: &ReducerContext, scheduler: ImpAttackScheduler) {
     };
 
     // Spawn the ImpBolt attack
-    spawn_imp_bolt(ctx, imp_position, target_player.player_id);
+    spawn_imp_bolt(ctx, imp_position, target_player.player_id, scheduler.imp_monster_id);
     
     log::info!("Imp {} fired ImpBolt at player {} from position ({}, {})", 
               scheduler.imp_monster_id, target_player.player_id, imp_position.x, imp_position.y);
@@ -576,6 +606,7 @@ pub fn spawn_ender_scythe_spawns(ctx: &ReducerContext, scheduler: EnderScytheSpa
                 parameter_u: scheduler.boss_monster_id, // Store boss ID for orbital movement
                 parameter_f: angle, // Store current angle for orbital movement
                 ticks_elapsed: 0,
+                from_shiny_monster: false, // Boss attacks are not from shiny monsters
             });
 
             log::info!("Spawned EnderScytheSpawn {} at ({:.1}, {:.1}) angle {:.2} for boss {}", 
@@ -651,6 +682,7 @@ pub fn spawn_ender_scythes(ctx: &ReducerContext, scheduler: EnderScytheScheduler
                 parameter_u: scheduler.boss_monster_id, // Store boss ID for orbital movement
                 parameter_f: angle, // Store current angle for orbital movement
                 ticks_elapsed: 0,
+                from_shiny_monster: false, // Boss attacks are not from shiny monsters
             });
 
             log::info!("Spawned EnderScythe {} at ({:.1}, {:.1}) angle {:.2} for boss {}", 
@@ -823,6 +855,7 @@ pub fn spawn_ender_bolt(ctx: &ReducerContext, spawn_position: DbVector2, target_
         parameter_u: target_player_id, // Store target player ID
         parameter_f: direction_angle, // Store direction angle
         ticks_elapsed: 0,
+        from_shiny_monster: false, // Boss attacks are not from shiny monsters
     });
 
     log::info!("Spawned EnderBolt {} at ({}, {}) targeting player {} (expires in {}ms)", 
@@ -1001,6 +1034,7 @@ pub fn trigger_chaos_ball_attack(ctx: &ReducerContext, scheduler: ChaosBallSched
         parameter_u: target_player.player_id, // Store target player ID
         parameter_f: 0.0, // No special parameter needed
         ticks_elapsed: 0,
+        from_shiny_monster: false, // Boss attacks are not from shiny monsters
     });
 
     log::info!("Spawned ChaosBall {} targeting player {} ({}) from boss {}", 
@@ -1057,6 +1091,7 @@ pub fn trigger_void_zone_attack(ctx: &ReducerContext, scheduler: VoidZoneSchedul
         parameter_u: scheduler.boss_monster_id, // Store boss ID
         parameter_f: 0.0, // No special parameter needed
         ticks_elapsed: 0,
+        from_shiny_monster: false, // Boss attacks are not from shiny monsters
     });
 
     log::info!("Spawned VoidZone {} at position ({:.1}, {:.1}) from boss {}", 

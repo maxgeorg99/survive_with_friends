@@ -10,6 +10,10 @@ const MIN_RADIUS: f32 = 220.0; // Minimum radius for capsule spawn
 const MODERATE_RADIUS: f32 = 550.0; // Radius for damage-triggered capsules
 const LARGE_RADIUS: f32 = 650.0; // Radius for death-triggered capsules
 
+// Public constants for shiny monster death drops
+pub const MONSTER_MIN_RADIUS: f32 = 32.0;
+pub const MONSTER_MAX_RADIUS: f32 = 256.0;
+
 // Table for LootCapsules - scheduled gem spawners that move from start to end position
 #[table(name = loot_capsules, scheduled(spawn_loot_capsule), public)]
 pub struct LootCapsules {
@@ -108,6 +112,7 @@ pub fn spawn_guaranteed_void_chest(ctx: &ReducerContext, _spawn: GuaranteedVoidC
     let monster = ctx.db.monsters().insert(crate::Monsters {
         monster_id: 0,
         bestiary_id: crate::MonsterType::VoidChest,
+        variant: crate::MonsterVariant::Default,
         hp: bestiary_entry.max_hp,
         max_hp: bestiary_entry.max_hp,
         atk: bestiary_entry.atk,
@@ -230,9 +235,9 @@ pub fn spawn_debug_loot_capsule(ctx: &ReducerContext) {
     );
 }
 
-// Helper function to select a weighted random gem type for VoidChest loot
+// Public function to select a weighted gem type for loot drops
 // About 25% special items, with food and dice being common, booster packs rarer
-fn select_weighted_gem_type(rng: &mut impl Rng) -> GemLevel {
+pub fn select_weighted_gem_type(rng: &mut impl Rng) -> GemLevel {
     let roll = rng.gen_range(1..=100);
     
     match roll {
@@ -251,17 +256,18 @@ fn select_weighted_gem_type(rng: &mut impl Rng) -> GemLevel {
     }
 }
 
-// Helper function to spawn a single LootCapsule from start position to a random position within radius
-fn spawn_loot_capsule_in_radius(
+// Public function to spawn a loot capsule in a radius
+pub fn spawn_loot_capsule_in_radius(
     ctx: &ReducerContext, 
     start_position: DbVector2, 
-    radius: f32,
+    radius_min: f32,
+    radius_max: f32,
     gem_type: GemLevel
 ) {
     let mut rng = ctx.rng();
     
     // Generate random position within radius
-    let distance = rng.gen_range(MIN_RADIUS..radius);
+    let distance = rng.gen_range(radius_min..radius_max);
     let angle = rng.gen_range(0.0..(2.0 * std::f32::consts::PI));
     
     let end_position = DbVector2::new(
@@ -311,7 +317,7 @@ pub fn trigger_void_chest_damage_pinata(ctx: &ReducerContext, chest_position: Db
     let roll = rng.gen_range(0.0..1.0);
     if roll <= VOID_CHEST_DAMAGE_CAPSULE_CHANCE {
         let gem_type = select_weighted_gem_type(&mut rng);
-        spawn_loot_capsule_in_radius(ctx, chest_position, MODERATE_RADIUS, gem_type);
+        spawn_loot_capsule_in_radius(ctx, chest_position, MIN_RADIUS, MODERATE_RADIUS, gem_type);
         
         log::info!("VoidChest damage pinata triggered at ({:.1}, {:.1})", chest_position.x, chest_position.y);
     }
@@ -338,7 +344,7 @@ pub fn trigger_void_chest_death_pinata(ctx: &ReducerContext, chest_position: DbV
             log::info!("First death capsule: {:?} gem (guaranteed)", gem_type);
         }
         
-        spawn_loot_capsule_in_radius(ctx, chest_position, LARGE_RADIUS, gem_type);
+        spawn_loot_capsule_in_radius(ctx, chest_position, MIN_RADIUS, LARGE_RADIUS, gem_type);
     }
     
     log::info!("VoidChest death pinata complete - {} capsules spawned (with guaranteed booster pack)", VOID_CHEST_DEATH_CAPSULE_COUNT);

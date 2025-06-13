@@ -7,7 +7,15 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 // VoidChest spawn chance constants
-const VOID_CHEST_SPAWN_CHANCE_DENOMINATOR: u32 = 400;
+const VOID_CHEST_SPAWN_CHANCE_DENOMINATOR: u32 = 400; // 0.5% chance (1 in 200)
+
+// Shiny monster constants
+const SHINY_SPAWN_CHANCE_DENOMINATOR: u32 = 100; 
+const SHINY_SCALE_MULTIPLIER: f32 = 1.5; // Shiny monsters are 50% larger
+const SHINY_HP_MULTIPLIER: f32 = 10.0; // Shiny monsters have 10x HP
+const SHINY_ATTACK_MULTIPLIER: f32 = 2.0; // Shiny monsters have 2x attack
+const SHINY_SPEED_MULTIPLIER: f32 = 1.25; // Shiny monsters are 25% faster
+const SHINY_MAX_RADIUS: f32 = 128.0; // Maximum radius for shiny monsters
 
 // Note: Monster spawning is now handled by tier-based weights in monster_spawn_defs.rs
 // VoidChests still have a fixed 0.5% spawn chance regardless of tier
@@ -22,6 +30,7 @@ pub struct Monsters {
 
     // monster attributes
     pub bestiary_id: MonsterType,
+    pub variant: crate::MonsterVariant,
     pub hp: u32,
     pub max_hp: u32, // Maximum HP copied from bestiary
     pub atk: f32,
@@ -283,19 +292,41 @@ pub fn spawn_monster(ctx: &ReducerContext, spawner: MonsterSpawners) {
         AIState::Default
     };
     
+    // Determine if this monster should be shiny
+    let is_shiny = should_spawn_as_shiny(ctx, &spawner.monster_type);
+    let variant = if is_shiny {
+        crate::MonsterVariant::Shiny
+    } else {
+        crate::MonsterVariant::Default
+    };
+    
+    // Apply shiny modifiers if needed
+    let (final_hp, final_max_hp, final_atk, final_speed, final_radius) = if is_shiny {
+        apply_shiny_modifiers(bestiary_entry.max_hp, bestiary_entry.max_hp, bestiary_entry.atk, bestiary_entry.speed, bestiary_entry.radius)
+    } else {
+        (bestiary_entry.max_hp, bestiary_entry.max_hp, bestiary_entry.atk, bestiary_entry.speed, bestiary_entry.radius)
+    };
+    
     // Create the monster
     let monster_opt = ctx.db.monsters().insert(Monsters {
         monster_id: 0,
         bestiary_id: spawner.monster_type.clone(),
-        hp: bestiary_entry.max_hp,
-        max_hp: bestiary_entry.max_hp,
-        atk: bestiary_entry.atk,
-        speed: bestiary_entry.speed,
+        variant,
+        hp: final_hp,
+        max_hp: final_max_hp,
+        atk: final_atk,
+        speed: final_speed,
         target_player_id: closest_player_id,
-        radius: bestiary_entry.radius,
+        radius: final_radius,
         spawn_position: spawner.position.clone(),
         ai_state: initial_ai_state,
     });
+    
+    // Log shiny monster spawn
+    if is_shiny {
+        log::info!("SHINY MONSTER SPAWNED! Type: {:?}, ID: {}, HP: {}/{}, ATK: {:.1}, Speed: {:.1}, Radius: {:.1}", 
+                  spawner.monster_type, monster_opt.monster_id, final_hp, final_max_hp, final_atk, final_speed, final_radius);
+    }
 
     let monster = monster_opt;
 
@@ -712,8 +743,6 @@ fn solve_monster_repulsion_spatial_hash(cache: &mut crate::collision::CollisionC
                         continue;
                     }
 
-
-
                     let dx_ab = ax - cache.monster.pos_x_monster[i_b_usize];
                     let dy_ab = ay - cache.monster.pos_y_monster[i_b_usize];
                     let d2 = (dx_ab * dx_ab + dy_ab * dy_ab).max(0.1);
@@ -1034,6 +1063,7 @@ pub fn spawn_debug_void_chest(ctx: &ReducerContext) {
     let monster = ctx.db.monsters().insert(Monsters {
         monster_id: 0,
         bestiary_id: MonsterType::VoidChest,
+        variant: crate::MonsterVariant::Default,
         hp: bestiary_entry.max_hp,
         max_hp: bestiary_entry.max_hp,
         atk: bestiary_entry.atk,
@@ -1074,4 +1104,85 @@ fn get_monster_type_name(bestiary_id: &MonsterType) -> &'static str {
         MonsterType::EnderClaw => "EnderClaw",
         MonsterType::Bat => "Bat",
     }
+}
+
+// Function to determine if a monster should spawn as shiny (excludes bosses, VoidChests, and EnderClaws)
+fn should_spawn_as_shiny(ctx: &ReducerContext, monster_type: &MonsterType) -> bool {
+    // Never spawn bosses, VoidChests, or EnderClaws as shiny
+    match monster_type {
+        MonsterType::FinalBossPhase1 | MonsterType::FinalBossPhase2 | MonsterType::VoidChest | MonsterType::EnderClaw => {
+            log::debug!("{} excluded from shiny spawning", get_monster_type_name(monster_type));
+            false
+        },
+        _ => {
+            // 1% chance for regular monsters to be shiny
+            let mut rng = ctx.rng();
+            let roll = rng.gen_range(1..=SHINY_SPAWN_CHANCE_DENOMINATOR);
+            roll == 1
+        }
+    }
+}
+
+// Function to apply shiny modifiers to monster stats
+fn apply_shiny_modifiers(hp: u32, max_hp: u32, atk: f32, speed: f32, radius: f32) -> (u32, u32, f32, f32, f32) {
+    let new_hp = (hp as f32 * SHINY_HP_MULTIPLIER) as u32;
+    let new_max_hp = (max_hp as f32 * SHINY_HP_MULTIPLIER) as u32;
+    let new_atk = atk * SHINY_ATTACK_MULTIPLIER;
+    let new_speed = speed * SHINY_SPEED_MULTIPLIER;
+    let scaled_radius = radius * SHINY_SCALE_MULTIPLIER;
+    let new_radius = scaled_radius.min(SHINY_MAX_RADIUS);
+    
+    // Log when radius is capped
+    if scaled_radius > SHINY_MAX_RADIUS {
+        log::info!("Shiny monster radius capped: {:.1} -> {:.1} (base: {:.1})", 
+                  scaled_radius, new_radius, radius);
+    }
+    
+    (new_hp, new_max_hp, new_atk, new_speed, new_radius)
+}
+
+// Function to trigger shiny monster death pinata - spawns void capsules
+pub fn trigger_shiny_monster_death_pinata(ctx: &ReducerContext, monster: &Monsters) {
+    // Get the monster's current position from the boid, fallback to spawn position if not found
+    let monster_position = if let Some(boid) = ctx.db.monsters_boid().monster_id().find(&monster.monster_id) {
+        boid.position
+    } else {
+        log::warn!("Shiny monster {} has no boid data, using spawn position for death loot", monster.monster_id);
+        monster.spawn_position
+    };
+    
+    // Get tier from bestiary entry and calculate loot count using formula: (tier + 1) × 3
+    let bestiary_entry = ctx.db.bestiary().bestiary_id().find(&(monster.bestiary_id.clone() as u32));
+    let monster_tier = if let Some(entry) = bestiary_entry {
+        entry.tier
+    } else {
+        log::warn!("Bestiary entry not found for monster type {:?}, defaulting to tier 1", &monster.bestiary_id);
+        1 // Default to tier 1 if bestiary entry not found
+    };
+    
+    let capsule_count = (monster_tier + 1) * 3;
+    
+    log::info!("Shiny {} (Tier {}) death pinata! Spawning {} void capsules at current position ({:.1}, {:.1})", 
+              get_monster_type_name(&monster.bestiary_id), monster_tier, capsule_count, monster_position.x, monster_position.y);
+    
+    // Spawn the calculated number of void capsules
+    for i in 0..capsule_count {
+        // Use public function from loot_capsule_defs with appropriate radius
+        let gem_type = crate::loot_capsule_defs::select_weighted_gem_type(&mut ctx.rng());
+        
+        if i == 0 {
+            log::info!("First shiny death capsule: {:?} gem", gem_type);
+        }
+        
+        // Use the public radius constants from loot_capsule_defs
+        crate::loot_capsule_defs::spawn_loot_capsule_in_radius(
+            ctx, 
+            monster_position, 
+            crate::loot_capsule_defs::MONSTER_MIN_RADIUS,
+            crate::loot_capsule_defs::MONSTER_MAX_RADIUS, 
+            gem_type
+        );
+    }
+    
+    log::info!("Shiny monster death pinata complete - {} capsules spawned", capsule_count);
 }

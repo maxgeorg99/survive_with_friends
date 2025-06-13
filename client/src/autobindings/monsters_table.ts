@@ -34,6 +34,7 @@ import { Monsters } from "./monsters_type";
 import { DbVector2 as __DbVector2 } from "./db_vector_2_type";
 import { MonsterType as __MonsterType } from "./monster_type_type";
 import { AiState as __AiState } from "./ai_state_type";
+import { MonsterVariant as __MonsterVariant } from "./monster_variant_type";
 
 import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
 

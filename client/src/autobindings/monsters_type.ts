@@ -33,10 +33,12 @@ import {
 import { DbVector2 as __DbVector2 } from "./db_vector_2_type";
 import { MonsterType as __MonsterType } from "./monster_type_type";
 import { AiState as __AiState } from "./ai_state_type";
+import { MonsterVariant as __MonsterVariant } from "./monster_variant_type";
 
 export type Monsters = {
   monsterId: number,
   bestiaryId: __MonsterType,
+  variant: __MonsterVariant,
   hp: number,
   maxHp: number,
   atk: number,
@@ -59,6 +61,7 @@ export namespace Monsters {
     return AlgebraicType.createProductType([
       new ProductTypeElement("monsterId", AlgebraicType.createU32Type()),
       new ProductTypeElement("bestiaryId", __MonsterType.getTypeScriptAlgebraicType()),
+      new ProductTypeElement("variant", __MonsterVariant.getTypeScriptAlgebraicType()),
       new ProductTypeElement("hp", AlgebraicType.createU32Type()),
       new ProductTypeElement("maxHp", AlgebraicType.createU32Type()),
       new ProductTypeElement("atk", AlgebraicType.createF32Type()),

@@ -154,6 +154,7 @@ pub fn spawn_boss_phase_two(ctx: &ReducerContext, position: DbVector2) {
     let monster_opt = ctx.db.monsters().insert(crate::Monsters {
         monster_id: 0,
         bestiary_id: MonsterType::FinalBossPhase2,
+        variant: crate::MonsterVariant::Default,
         hp: bestiary_entry.max_hp,
         max_hp: bestiary_entry.max_hp,
         atk: bestiary_entry.atk,

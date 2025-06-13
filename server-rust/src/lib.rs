@@ -84,6 +84,13 @@ pub enum MonsterAttackType {
     VoidZone,
 }
 
+// Monster variant enum for shiny monsters
+#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum MonsterVariant {
+    Default,
+    Shiny,
+}
+
 #[derive(SpacetimeType, Clone, Copy, Debug, PartialEq)]
 pub struct DbVector2 {
     pub x: f32,
