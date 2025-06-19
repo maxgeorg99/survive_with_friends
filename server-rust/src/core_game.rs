@@ -135,7 +135,7 @@ pub fn damage_monster(ctx: &ReducerContext, monster_id: u32, damage_amount: u32)
                     // Clean up EnderScythe attack schedules for bosses
                     crate::monster_attacks_def::cleanup_ender_scythe_schedules(ctx, monster_id);
                     // Clean up EnderClaw spawning for Phase 2 boss
-                    crate::monsters_def::cleanup_ender_claw_spawning(ctx, monster_id);
+                    crate::boss_ender_defs::cleanup_ender_claw_spawning(ctx, monster_id);
                     
                     // Delete the monster and entity
                     ctx.db.monsters().monster_id().delete(&monster_id);
