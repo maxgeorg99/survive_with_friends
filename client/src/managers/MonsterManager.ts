@@ -113,10 +113,15 @@ export default class MonsterManager {
         return monsterType === 'BossEnderPhase1' || monsterType === 'BossEnderPhase2';
     }
 
-    private isAgnaBoss(monsterType: string): boolean {
+        private isAgnaBoss(monsterType: string): boolean {
         return monsterType === 'BossAgnaPhase1' || monsterType === 'BossAgnaPhase2';
     }
-    
+
+    // Helper method to check if the game is over (prevents boss effects during cleanup)
+    private isGameOver(): boolean {
+        return (this.scene as any).gameOver === true;
+    }
+
     // Initialize monster handlers
     initializeMonsters(ctx: EventContext) {
         if (!this.spacetimeDBClient?.sdkConnection?.db) {
@@ -405,7 +410,7 @@ export default class MonsterManager {
         // Get the monster container
         const monsterContainer = this.monsters.get(monsterId);
         if (!monsterContainer) {
-            console.warn(`Attempted to remove monster ${monsterId} but container not found`);
+            // This is normal - server may delete monsters that client never created (distance culling, etc.)
             this.monsters.delete(monsterId); // Clean up the map entry anyway
             return;
         }
@@ -443,27 +448,33 @@ export default class MonsterManager {
         
         // Special handling for boss phase 1 (pre-transform effect)
         if (monsterType && this.isBossPhase1(monsterType)) {
-            console.log(`*** BOSS PHASE 1 DEFEATED (ID: ${monsterId})! Starting pre-transform sequence... ***`);
-            
-            // Check if pre-transform is already active to prevent duplicates
-            if (this.bossPreTransformActive) {
-                console.log("Pre-transform already active, ignoring duplicate boss death event");
-                return;
+            // Don't play boss effects if the game is over (player died, world cleanup, etc.)
+            if (this.isGameOver()) {
+                console.log(`*** BOSS PHASE 1 REMOVED (ID: ${monsterId}) - Game over, skipping transform effects ***`);
+                // Just clean up normally without effects
+            } else {
+                console.log(`*** BOSS PHASE 1 DEFEATED (ID: ${monsterId})! Starting pre-transform sequence... ***`);
+                
+                // Check if pre-transform is already active to prevent duplicates
+                if (this.bossPreTransformActive) {
+                    console.log("Pre-transform already active, ignoring duplicate boss death event");
+                    return;
+                }
+                
+                // Set tracking variables to monitor phase transition
+                this.bossPhase1Killed = true;
+                this.timeOfBossPhase1Death = Date.now();
+                this.bossMonsterId = monsterId;
+                this.bossPosition = { x: monsterContainer.x, y: monsterContainer.y };
+                this.bossPreTransformActive = true;
+                console.log(`Boss position stored: (${this.bossPosition.x}, ${this.bossPosition.y})`);
+                
+                // Create pre-transform VFX with the boss sprite and delay phase 2 spawning
+                this.createBossPreTransformEffect(monsterContainer);
+                
+                // Don't remove the monster container yet - the pre-transform effect will handle cleanup
+                return; // Early return to prevent normal monster removal
             }
-            
-            // Set tracking variables to monitor phase transition
-            this.bossPhase1Killed = true;
-            this.timeOfBossPhase1Death = Date.now();
-            this.bossMonsterId = monsterId;
-            this.bossPosition = { x: monsterContainer.x, y: monsterContainer.y };
-            this.bossPreTransformActive = true;
-            console.log(`Boss position stored: (${this.bossPosition.x}, ${this.bossPosition.y})`);
-            
-            // Create pre-transform VFX with the boss sprite and delay phase 2 spawning
-            this.createBossPreTransformEffect(monsterContainer);
-            
-            // Don't remove the monster container yet - the pre-transform effect will handle cleanup
-            return; // Early return to prevent normal monster removal
         }
         
         // Log final boss defeat

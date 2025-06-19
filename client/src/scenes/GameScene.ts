@@ -19,6 +19,7 @@ import Minimap, { MinimapElements } from '../ui/Minimap';
 import MusicManager from '../managers/MusicManager';
 import { DebugManager } from '../managers/DebugManager'; // Added import for DebugManager
 import GameplayOptionsUI from '../ui/GameplayOptionsUI';
+import { getSoundVolume } from '../managers/VolumeSettings';
 
 // Constants
 const PLAYER_SPEED = 200;
@@ -1170,9 +1171,12 @@ export default class GameScene extends Phaser.Scene {
                                 this.isPlayerDamageSoundPlaying = false;
                             });
                         } else {
-                            // Fallback to direct Phaser sound
+                            // Fallback to direct Phaser sound - apply global volume multiplier
                             try {
-                                const sound = this.sound.add('player_damage', { volume: 1.0 });
+                                const adjustedVolume = 1.0 * getSoundVolume();
+                                const safeVolume = adjustedVolume > 0 ? adjustedVolume : 0.001;
+                                
+                                const sound = this.sound.add('player_damage', { volume: safeVolume });
                                 sound.once('complete', () => {
                                     this.isPlayerDamageSoundPlaying = false;
                                 });

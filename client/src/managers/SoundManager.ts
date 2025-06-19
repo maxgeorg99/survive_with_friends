@@ -227,7 +227,7 @@ export default class SoundManager {
     playBossSpawnSound(bossType?: string): void {
         // Play appropriate voice line based on boss type
         if (bossType === 'BossAgnaPhase1') {
-            this.playSound('voice_agna_1', 1.0);
+            this.playSound('voice_agna_1', 0.4); // Reduced volume for Agna narrator
         } else {
             // Default to Ender voice (original behavior)
             this.playSound('voice_boss', 1.0);
@@ -239,7 +239,7 @@ export default class SoundManager {
         if (bossType === 'BossAgnaPhase2') {
             this.playSoundsSequence([
                 { key: 'boss_transform', volume: 0.9 },
-                { key: 'voice_agna_2', delay: 1500, volume: 1.0 } // 1.5 second delay
+                { key: 'voice_agna_2', delay: 1500, volume: 0.4 } // Reduced volume for Agna narrator
             ]);
         } else {
             // Default to Ender voices (original behavior)
