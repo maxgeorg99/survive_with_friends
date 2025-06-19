@@ -57,8 +57,10 @@ pub fn init_game_state(ctx: &ReducerContext) {
 
     log::info!("Game state initialized successfully");
     
-    // Schedule first boss spawn after 5 minutes
-    schedule_boss_spawn(ctx);
+    // NOTE: Boss spawn timer is NOT scheduled here on server startup
+    // It will be scheduled when the first player spawns (see spawn_player in lib.rs)
+    // This prevents the "end of the world counter" from appearing in the class select screen
+    // when the server is freshly initialized with no players
 }
 
 // Schedule the boss to spawn after 5 minutes
