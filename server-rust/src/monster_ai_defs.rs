@@ -14,6 +14,7 @@ pub enum AIState {
     BossEnderTeleport = 6,
     BossEnderTransform = 7,
     Stationary = 8,
+    BossAgnaIdle = 9,
 }
 
 // Scheduled table for changing monster AI states
@@ -114,6 +115,13 @@ fn execute_state_entry_behavior(ctx: &ReducerContext, monster: &crate::Monsters,
             crate::boss_ender_defs::execute_boss_ender_transform_behavior(ctx, monster);
         },
         
+        AIState::BossAgnaIdle => {
+            log::info!("Monster {} entering BossAgnaIdle state", monster.monster_id);
+            
+            // For now, Agna just has idle behavior - we'll add attacks later
+            // No special behavior needed, just normal movement toward target
+        },
+        
         AIState::Default => {
             log::info!("Monster {} entering Default state", monster.monster_id);
             // No special behavior for default state
@@ -173,18 +181,58 @@ fn schedule_random_boss_ender_pattern(ctx: &ReducerContext, monster_id: u32) {
 
 // Initialize boss AI state when a boss is spawned
 pub fn initialize_boss_ai(ctx: &ReducerContext, monster_id: u32) {
-    log::info!("Initializing boss ender AI for monster {}", monster_id);
+    // Get the monster to determine its type
+    let monster_opt = ctx.db.monsters().monster_id().find(&monster_id);
+    if monster_opt.is_none() {
+        log::warn!("initialize_boss_ai: Monster {} not found", monster_id);
+        return;
+    }
     
-    // Delegate to boss_ender_defs for Ender boss specific initialization
-    crate::boss_ender_defs::initialize_boss_ender_ai(ctx, monster_id);
+    let monster = monster_opt.unwrap();
+    
+    match monster.bestiary_id {
+        MonsterType::BossEnderPhase1 | MonsterType::BossEnderPhase2 => {
+            log::info!("Initializing Ender boss AI for monster {}", monster_id);
+            // Delegate to boss_ender_defs for Ender boss specific initialization
+            crate::boss_ender_defs::initialize_boss_ender_ai(ctx, monster_id);
+        },
+        MonsterType::BossAgnaPhase1 | MonsterType::BossAgnaPhase2 => {
+            log::info!("Initializing Agna boss AI for monster {} (BossAgnaIdle only, no patterns)", monster_id);
+            // For now, Agna just uses idle behavior - we'll add attacks later
+            // No special initialization needed beyond the default AI state
+        },
+        _ => {
+            log::warn!("initialize_boss_ai called for non-boss monster {} of type {:?}", monster_id, monster.bestiary_id);
+        }
+    }
 }
 
 // Initialize Phase 2 boss AI state (stays idle, no patterns)
 pub fn initialize_phase2_boss_ai(ctx: &ReducerContext, monster_id: u32) {
-    log::info!("Initializing Phase 2 boss ender AI for monster {} (BossEnderIdle only, no patterns)", monster_id);
+    // Get the monster to determine its type
+    let monster_opt = ctx.db.monsters().monster_id().find(&monster_id);
+    if monster_opt.is_none() {
+        log::warn!("initialize_phase2_boss_ai: Monster {} not found", monster_id);
+        return;
+    }
     
-    // Delegate to boss_ender_defs for Ender boss specific initialization
-    crate::boss_ender_defs::initialize_phase2_boss_ender_ai(ctx, monster_id);
+    let monster = monster_opt.unwrap();
+    
+    match monster.bestiary_id {
+        MonsterType::BossEnderPhase2 => {
+            log::info!("Initializing Phase 2 Ender boss AI for monster {} (BossEnderIdle only, no patterns)", monster_id);
+            // Delegate to boss_ender_defs for Ender boss specific initialization
+            crate::boss_ender_defs::initialize_phase2_boss_ender_ai(ctx, monster_id);
+        },
+        MonsterType::BossAgnaPhase2 => {
+            log::info!("Initializing Phase 2 Agna boss AI for monster {} (BossAgnaIdle only, no patterns)", monster_id);
+            // For now, Agna just uses idle behavior - we'll add attacks later
+            // No special initialization needed beyond the default AI state
+        },
+        _ => {
+            log::warn!("initialize_phase2_boss_ai called for non-phase-2-boss monster {} of type {:?}", monster_id, monster.bestiary_id);
+        }
+    }
 }
 
 // Get movement behavior based on AI state
@@ -198,6 +246,7 @@ pub fn get_movement_behavior_for_state(state: &AIState) -> MovementBehavior {
         AIState::BossEnderLurk => MovementBehavior::StandStill,
         AIState::BossEnderTeleport => MovementBehavior::StandStill,
         AIState::BossEnderTransform => MovementBehavior::StandStill,
+        AIState::BossAgnaIdle => MovementBehavior::Normal,
         AIState::Stationary => MovementBehavior::StandStill,
     }
 }
@@ -264,6 +313,7 @@ pub fn can_monster_deal_damage(state: &AIState) -> bool {
         AIState::BossEnderLurk => false, 
         AIState::BossEnderTeleport => true, 
         AIState::BossEnderTransform => true,
+        AIState::BossAgnaIdle => true,
         AIState::Stationary => true,
     }
 }

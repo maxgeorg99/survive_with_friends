@@ -260,6 +260,9 @@ pub fn init(ctx: &ReducerContext) {
     // TODO: Initialize game state
     init_game_state(ctx);
     
+    // Initialize boss selection (choose between Ender and Agna)
+    boss_system::init_boss_selection(ctx);
+    
     // TODO: Initialize class data
     initialize_class_data(ctx);
 

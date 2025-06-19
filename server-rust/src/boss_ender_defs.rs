@@ -1494,14 +1494,16 @@ pub fn handle_ender_boss_chase_movement(
 fn get_monster_type_name(bestiary_id: &MonsterType) -> &'static str {
     match bestiary_id {
         MonsterType::Rat => "Rat",
-        MonsterType::Slime => "Slime", 
+        MonsterType::Slime => "Slime",
+        MonsterType::Bat => "Bat",
         MonsterType::Orc => "Orc",
-        MonsterType::BossEnderPhase1 => "BossEnderPhase1",
-        MonsterType::BossEnderPhase2 => "BossEnderPhase2",
-        MonsterType::VoidChest => "VoidChest",
         MonsterType::Imp => "Imp",
         MonsterType::Zombie => "Zombie",
+        MonsterType::VoidChest => "VoidChest",
         MonsterType::EnderClaw => "EnderClaw",
-        MonsterType::Bat => "Bat",
+        MonsterType::BossEnderPhase1 => "BossEnderPhase1",
+        MonsterType::BossEnderPhase2 => "BossEnderPhase2",
+        MonsterType::BossAgnaPhase1 => "BossAgnaPhase1",
+        MonsterType::BossAgnaPhase2 => "BossAgnaPhase2",
     }
 }

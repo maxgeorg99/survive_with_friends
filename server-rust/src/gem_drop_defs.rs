@@ -153,6 +153,8 @@ pub fn debug_check_gem_drops(ctx: &spacetimedb::ReducerContext) {
         MonsterType::Zombie,
         MonsterType::BossEnderPhase1,
         MonsterType::BossEnderPhase2,
+        MonsterType::BossAgnaPhase1,
+        MonsterType::BossAgnaPhase2,
     ];
     
     for monster_type in monster_types {

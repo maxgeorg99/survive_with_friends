@@ -257,7 +257,9 @@ pub fn spawn_monster(ctx: &ReducerContext, spawner: MonsterSpawners) {
     let monster_count = ctx.db.monsters().count();
     if monster_count >= config.max_monsters as u64 && 
                spawner.monster_type != MonsterType::BossEnderPhase1 && 
-       spawner.monster_type != MonsterType::BossEnderPhase2 {
+       spawner.monster_type != MonsterType::BossEnderPhase2 &&
+       spawner.monster_type != MonsterType::BossAgnaPhase1 &&
+       spawner.monster_type != MonsterType::BossAgnaPhase2 {
         //Log::info(&format!("SpawnMonster: At maximum monster capacity ({}/{}), skipping spawn.", monster_count, config.max_monsters));
         return;
     }
@@ -273,6 +275,9 @@ pub fn spawn_monster(ctx: &ReducerContext, spawner: MonsterSpawners) {
     let initial_ai_state = if spawner.monster_type == MonsterType::BossEnderPhase1 || 
                               spawner.monster_type == MonsterType::BossEnderPhase2 {
         AIState::BossEnderIdle
+    } else if spawner.monster_type == MonsterType::BossAgnaPhase1 ||
+              spawner.monster_type == MonsterType::BossAgnaPhase2 {
+        AIState::BossAgnaIdle
     } else if spawner.monster_type == MonsterType::VoidChest {
         AIState::Stationary
     } else if spawner.monster_type == MonsterType::EnderClaw {
@@ -328,7 +333,10 @@ pub fn spawn_monster(ctx: &ReducerContext, spawner: MonsterSpawners) {
     //Log::info(&format!("Spawned {:?} monster. Total monsters: {}", spawner.monster_type, ctx.db.monsters().count()));
     
     // If this is a boss monster, update the game state and initialize AI
-    if spawner.monster_type.clone() == MonsterType::BossEnderPhase1 || spawner.monster_type.clone() == MonsterType::BossEnderPhase2 {
+    if spawner.monster_type.clone() == MonsterType::BossEnderPhase1 || 
+       spawner.monster_type.clone() == MonsterType::BossEnderPhase2 ||
+       spawner.monster_type.clone() == MonsterType::BossAgnaPhase1 ||
+       spawner.monster_type.clone() == MonsterType::BossAgnaPhase2 {
         log::info!("Boss monster of type {:?} created with ID {}", spawner.monster_type, monster.monster_id);
         crate::boss_system::update_boss_monster_id(ctx, monster.monster_id);
         
@@ -494,7 +502,9 @@ fn populate_monster_cache(ctx: &ReducerContext, cache: &mut crate::collision::Co
         //Structures and bosses have their weight set to 0.0 to prevent them from being pushed around
         if monster.bestiary_id == MonsterType::VoidChest || 
            monster.bestiary_id == MonsterType::BossEnderPhase1 || 
-           monster.bestiary_id == MonsterType::BossEnderPhase2 {
+           monster.bestiary_id == MonsterType::BossEnderPhase2 ||
+           monster.bestiary_id == MonsterType::BossAgnaPhase1 ||
+           monster.bestiary_id == MonsterType::BossAgnaPhase2 {
             cache.monster.push_ratio_monster[idx] = 0;
         }
         else {
@@ -932,6 +942,8 @@ fn get_monster_type_name(bestiary_id: &MonsterType) -> &'static str {
         MonsterType::Orc => "Orc",
         MonsterType::BossEnderPhase1 => "BossEnderPhase1",
         MonsterType::BossEnderPhase2 => "BossEnderPhase2",
+        MonsterType::BossAgnaPhase1 => "BossAgnaPhase1",
+        MonsterType::BossAgnaPhase2 => "BossAgnaPhase2",
         MonsterType::VoidChest => "VoidChest",
         MonsterType::Imp => "Imp",
         MonsterType::Zombie => "Zombie",
@@ -944,7 +956,9 @@ fn get_monster_type_name(bestiary_id: &MonsterType) -> &'static str {
 fn should_spawn_as_shiny(ctx: &ReducerContext, monster_type: &MonsterType) -> bool {
     // Never spawn bosses, VoidChests, or EnderClaws as shiny
     match monster_type {
-        MonsterType::BossEnderPhase1 | MonsterType::BossEnderPhase2 | MonsterType::VoidChest | MonsterType::EnderClaw => {
+        MonsterType::BossEnderPhase1 | MonsterType::BossEnderPhase2 | 
+        MonsterType::BossAgnaPhase1 | MonsterType::BossAgnaPhase2 |
+        MonsterType::VoidChest | MonsterType::EnderClaw => {
             log::debug!("{} excluded from shiny spawning", get_monster_type_name(monster_type));
             false
         },

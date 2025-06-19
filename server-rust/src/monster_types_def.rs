@@ -13,4 +13,6 @@ pub enum MonsterType {
     EnderClaw = 7,
     BossEnderPhase1 = 8,
     BossEnderPhase2 = 9,
+    BossAgnaPhase1 = 10,
+    BossAgnaPhase2 = 11,
 } 
