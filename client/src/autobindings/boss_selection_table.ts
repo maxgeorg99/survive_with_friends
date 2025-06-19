@@ -30,25 +30,25 @@ import {
   Timestamp,
   deepEqual,
 } from "@clockworklabs/spacetimedb-sdk";
-import { GameState } from "./game_state_type";
+import { BossSelection } from "./boss_selection_type";
 import { BossType as __BossType } from "./boss_type_type";
 
 import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
 
 /**
- * Table handle for the table `game_state`.
+ * Table handle for the table `boss_selection`.
  *
- * Obtain a handle from the [`gameState`] property on [`RemoteTables`],
- * like `ctx.db.gameState`.
+ * Obtain a handle from the [`bossSelection`] property on [`RemoteTables`],
+ * like `ctx.db.bossSelection`.
  *
  * Users are encouraged not to explicitly reference this type,
  * but to directly chain method calls,
- * like `ctx.db.gameState.on_insert(...)`.
+ * like `ctx.db.bossSelection.on_insert(...)`.
  */
-export class GameStateTableHandle {
-  tableCache: TableCache<GameState>;
+export class BossSelectionTableHandle {
+  tableCache: TableCache<BossSelection>;
 
-  constructor(tableCache: TableCache<GameState>) {
+  constructor(tableCache: TableCache<BossSelection>) {
     this.tableCache = tableCache;
   }
 
@@ -56,24 +56,24 @@ export class GameStateTableHandle {
     return this.tableCache.count();
   }
 
-  iter(): Iterable<GameState> {
+  iter(): Iterable<BossSelection> {
     return this.tableCache.iter();
   }
   /**
-   * Access to the `id` unique index on the table `game_state`,
+   * Access to the `id` unique index on the table `boss_selection`,
    * which allows point queries on the field of the same name
-   * via the [`GameStateIdUnique.find`] method.
+   * via the [`BossSelectionIdUnique.find`] method.
    *
    * Users are encouraged not to explicitly reference this type,
    * but to directly chain method calls,
-   * like `ctx.db.gameState.id().find(...)`.
+   * like `ctx.db.bossSelection.id().find(...)`.
    *
-   * Get a handle on the `id` unique index on the table `game_state`.
+   * Get a handle on the `id` unique index on the table `boss_selection`.
    */
   id = {
     // Find the subscribed row whose `id` column value is equal to `col_val`,
     // if such a row is present in the client cache.
-    find: (col_val: number): GameState | undefined => {
+    find: (col_val: number): BossSelection | undefined => {
       for (let row of this.tableCache.iter()) {
         if (deepEqual(row.id, col_val)) {
           return row;
@@ -82,27 +82,27 @@ export class GameStateTableHandle {
     },
   };
 
-  onInsert = (cb: (ctx: EventContext, row: GameState) => void) => {
+  onInsert = (cb: (ctx: EventContext, row: BossSelection) => void) => {
     return this.tableCache.onInsert(cb);
   }
 
-  removeOnInsert = (cb: (ctx: EventContext, row: GameState) => void) => {
+  removeOnInsert = (cb: (ctx: EventContext, row: BossSelection) => void) => {
     return this.tableCache.removeOnInsert(cb);
   }
 
-  onDelete = (cb: (ctx: EventContext, row: GameState) => void) => {
+  onDelete = (cb: (ctx: EventContext, row: BossSelection) => void) => {
     return this.tableCache.onDelete(cb);
   }
 
-  removeOnDelete = (cb: (ctx: EventContext, row: GameState) => void) => {
+  removeOnDelete = (cb: (ctx: EventContext, row: BossSelection) => void) => {
     return this.tableCache.removeOnDelete(cb);
   }
 
   // Updates are only defined for tables with primary keys.
-  onUpdate = (cb: (ctx: EventContext, oldRow: GameState, newRow: GameState) => void) => {
+  onUpdate = (cb: (ctx: EventContext, oldRow: BossSelection, newRow: BossSelection) => void) => {
     return this.tableCache.onUpdate(cb);
   }
 
-  removeOnUpdate = (cb: (ctx: EventContext, onRow: GameState, newRow: GameState) => void) => {
+  removeOnUpdate = (cb: (ctx: EventContext, onRow: BossSelection, newRow: BossSelection) => void) => {
     return this.tableCache.removeOnUpdate(cb);
   }}

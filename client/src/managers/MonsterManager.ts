@@ -33,6 +33,8 @@ const MONSTER_BASE_SIZES: { [key: string]: number } = {
     "Orc": 40.0,
     "BossEnderPhase1": 92.0,
     "BossEnderPhase2": 128.0,
+    "BossAgnaPhase1": 88.0,
+    "BossAgnaPhase2": 120.0,
     "VoidChest": 82.0,
     "Imp": 34.0,
     "Zombie": 42.0,
@@ -85,10 +87,34 @@ export default class MonsterManager {
         this.scene = scene;
         this.spacetimeDBClient = spacetimeDBClient;
         this.monsters = new Map();
+        this.hoveringTweens = new Map();
         this.gameEvents = (window as any).gameEvents;
         this.soundManager = (window as any).soundManager;
-        this.hoveringTweens = new Map();
         console.log("MonsterManager constructed");
+        
+        this.registerMonsterListeners();
+    }
+
+    // Helper functions for boss type checking
+    private isBoss(monsterType: string): boolean {
+        return monsterType === 'BossEnderPhase1' || monsterType === 'BossEnderPhase2' ||
+               monsterType === 'BossAgnaPhase1' || monsterType === 'BossAgnaPhase2';
+    }
+
+    private isBossPhase1(monsterType: string): boolean {
+        return monsterType === 'BossEnderPhase1' || monsterType === 'BossAgnaPhase1';
+    }
+
+    private isBossPhase2(monsterType: string): boolean {
+        return monsterType === 'BossEnderPhase2' || monsterType === 'BossAgnaPhase2';
+    }
+
+    private isEnderBoss(monsterType: string): boolean {
+        return monsterType === 'BossEnderPhase1' || monsterType === 'BossEnderPhase2';
+    }
+
+    private isAgnaBoss(monsterType: string): boolean {
+        return monsterType === 'BossAgnaPhase1' || monsterType === 'BossAgnaPhase2';
     }
     
     // Initialize monster handlers
@@ -324,7 +350,7 @@ export default class MonsterManager {
             container.add(healthBar);
             
             // For bosses, make them larger and ensure visibility
-            if (monsterTypeName === "BossEnderPhase1" || monsterTypeName === "BossEnderPhase2") {
+            if (this.isBoss(monsterTypeName)) {
                 console.log(`Setting up boss sprite: ${monsterTypeName} (ID: ${monsterData.monsterId})`);
                 console.log(`Boss data: HP=${monsterData.hp}/${monsterData.maxHp}`);
                 console.log(`Boss initial AI state: ${monsterData.aiState.tag}`);
@@ -376,11 +402,23 @@ export default class MonsterManager {
             this.hoveringTweens.delete(monsterId);
         }
         
-        // Only log removal for bosses or when debugging
+        // Get the monster container
         const monsterContainer = this.monsters.get(monsterId);
-        const monsterType = monsterContainer?.getData('monsterType');
+        if (!monsterContainer) {
+            console.warn(`Attempted to remove monster ${monsterId} but container not found`);
+            this.monsters.delete(monsterId); // Clean up the map entry anyway
+            return;
+        }
         
-        if (monsterType?.includes("Boss") || monsterType === "VoidChest") {
+        const monsterType = monsterContainer.getData('monsterType');
+        
+        // Debug logging for monster type detection
+        if (!monsterType) {
+            console.warn(`Monster ${monsterId} has no monsterType data, removing anyway`);
+        }
+        
+        // Only log removal for bosses or when debugging
+        if (monsterType && (this.isBoss(monsterType) || monsterType === "VoidChest")) {
             console.log(`Removing ${monsterType}: ${monsterId}`);
         }
         
@@ -395,64 +433,63 @@ export default class MonsterManager {
             this.bossTargets.delete(monsterId);
         }
         
-        if (monsterContainer) {
-            // Play distance-based monster death sound
-            this.playMonsterDeathSound(monsterContainer);
-            
-            // Play void chest destroyed sound if this is a VoidChest (distance-based)
-            if (monsterType === 'VoidChest') {
-                this.playVoidChestDestroyedSound(monsterContainer);
-            }
-            
-            if (monsterType === 'BossEnderPhase1') {
-                console.log(`*** BOSS PHASE 1 DEFEATED (ID: ${monsterId})! Starting pre-transform sequence... ***`);
-                
-                // Check if pre-transform is already active to prevent duplicates
-                if (this.bossPreTransformActive) {
-                    console.log("Pre-transform already active, ignoring duplicate boss death event");
-                    return;
-                }
-                
-                // Set tracking variables to monitor phase transition
-                this.bossPhase1Killed = true;
-                this.timeOfBossPhase1Death = Date.now();
-                this.bossMonsterId = monsterId;
-                this.bossPosition = { x: monsterContainer.x, y: monsterContainer.y };
-                this.bossPreTransformActive = true;
-                console.log(`Boss position stored: (${this.bossPosition.x}, ${this.bossPosition.y})`);
-                
-                // Create pre-transform VFX with the boss sprite and delay phase 2 spawning
-                this.createBossPreTransformEffect(monsterContainer);
-                
-                // Don't remove the monster container yet - the pre-transform effect will handle cleanup
-                return; // Early return to prevent normal monster removal
-            } else if (monsterType === 'BossEnderPhase2') {
-                console.log(`*** FINAL BOSS DEFEATED (ID: ${monsterId})! GAME COMPLETE! ***`);
-            }
+        // Play distance-based monster death sound
+        this.playMonsterDeathSound(monsterContainer);
+        
+        // Play void chest destroyed sound if this is a VoidChest (distance-based)
+        if (monsterType === 'VoidChest') {
+            this.playVoidChestDestroyedSound(monsterContainer);
         }
         
-        // Get and destroy the container
-        const container = this.monsters.get(monsterId);
-        if (container) {
-            // Clean up shiny effects if present
-            const particles = container.getData('shinyParticles');
-            if (particles) {
-                particles.destroy();
+        // Special handling for boss phase 1 (pre-transform effect)
+        if (monsterType && this.isBossPhase1(monsterType)) {
+            console.log(`*** BOSS PHASE 1 DEFEATED (ID: ${monsterId})! Starting pre-transform sequence... ***`);
+            
+            // Check if pre-transform is already active to prevent duplicates
+            if (this.bossPreTransformActive) {
+                console.log("Pre-transform already active, ignoring duplicate boss death event");
+                return;
             }
             
-            const glowSprite = container.getData('shinyGlow');
-            if (glowSprite) {
-                glowSprite.destroy();
-            }
+            // Set tracking variables to monitor phase transition
+            this.bossPhase1Killed = true;
+            this.timeOfBossPhase1Death = Date.now();
+            this.bossMonsterId = monsterId;
+            this.bossPosition = { x: monsterContainer.x, y: monsterContainer.y };
+            this.bossPreTransformActive = true;
+            console.log(`Boss position stored: (${this.bossPosition.x}, ${this.bossPosition.y})`);
             
-            const glowTween = container.getData('shinyGlowTween');
-            if (glowTween) {
-                glowTween.stop();
-                glowTween.destroy();
-            }
-
-            container.destroy();
+            // Create pre-transform VFX with the boss sprite and delay phase 2 spawning
+            this.createBossPreTransformEffect(monsterContainer);
+            
+            // Don't remove the monster container yet - the pre-transform effect will handle cleanup
+            return; // Early return to prevent normal monster removal
         }
+        
+        // Log final boss defeat
+        if (monsterType && this.isBossPhase2(monsterType)) {
+            console.log(`*** FINAL BOSS DEFEATED (ID: ${monsterId})! GAME COMPLETE! ***`);
+        }
+        
+        // Clean up shiny effects if present
+        const particles = monsterContainer.getData('shinyParticles');
+        if (particles) {
+            particles.destroy();
+        }
+        
+        const glowSprite = monsterContainer.getData('shinyGlow');
+        if (glowSprite) {
+            glowSprite.destroy();
+        }
+        
+        const glowTween = monsterContainer.getData('shinyGlowTween');
+        if (glowTween) {
+            glowTween.stop();
+            glowTween.destroy();
+        }
+
+        // Destroy the container and remove from map
+        monsterContainer.destroy();
         this.monsters.delete(monsterId);
     }
     
@@ -523,7 +560,7 @@ export default class MonsterManager {
     private checkBossAiStateChange(oldMonster: Monsters, newMonster: Monsters) {
         // Only check boss monsters
         const monsterTypeName = this.getMonsterTypeName(newMonster.bestiaryId);
-        if (monsterTypeName !== "BossEnderPhase1" && monsterTypeName !== "BossEnderPhase2") {
+        if (!this.isBoss(monsterTypeName)) {
             return;
         }
 
@@ -581,7 +618,9 @@ export default class MonsterManager {
                 }
                 break;
             case 'BossEnderTransform':
-                this.soundManager.playBossTransformSound();
+                // Detect boss type from the monster data
+                const transformBossType = this.getMonsterTypeName(newMonster.bestiaryId);
+                this.soundManager.playBossTransformSound(transformBossType);
                 break;
             default:
                 // No sound for other states (BossIdle, Default, Stationary)
@@ -593,7 +632,7 @@ export default class MonsterManager {
     private checkBossTargetChange(oldMonster: Monsters, newMonster: Monsters) {
         // Only check Phase 2 boss monsters
         const monsterTypeName = this.getMonsterTypeName(newMonster.bestiaryId);
-        if (monsterTypeName !== "BossEnderPhase2") {
+        if (!this.isBossPhase2(monsterTypeName)) {
             return;
         }
 
@@ -620,12 +659,12 @@ export default class MonsterManager {
         const monsterTypeName = this.getMonsterTypeName(monster.bestiaryId);
         
         // Only log creation for bosses, special monsters, or when debugging
-        if (monsterTypeName.includes("Boss") || monsterTypeName === "VoidChest") {
+        if (this.isBoss(monsterTypeName) || monsterTypeName === "VoidChest") {
             //console.log(`Monster created: ${monster.monsterId}, type: ${monsterTypeName}`);
         }
         
         // Special handling for boss monsters - create immediately (no queue)
-        if (monsterTypeName === "BossEnderPhase1" || monsterTypeName === "BossEnderPhase2") {
+        if (this.isBoss(monsterTypeName)) {
             console.log(`BOSS SPAWNED: ${monsterTypeName}`);
             console.log(`- Monster ID: ${monster.monsterId}`);
             console.log(`- HP: ${monster.hp}/${monster.maxHp}`);
@@ -633,18 +672,20 @@ export default class MonsterManager {
             console.log(`- Texture exists: ${this.scene.textures.exists(MONSTER_ASSET_KEYS[monsterTypeName])}`);
             console.log(`- Position: (${monster.spawnPosition.x}, ${monster.spawnPosition.y})`);
             
-            // Play boss spawn sound for first form
-            if (monsterTypeName === "BossEnderPhase1") {
-                console.log("*** FIRST BOSS FORM SPAWNED! Playing voice cue... ***");
-                this.soundManager.playBossSpawnSound();
+            // Play boss spawn sound for first form (both Ender and Agna Phase 1)
+            if (this.isBossPhase1(monsterTypeName)) {
+                const bossName = this.isEnderBoss(monsterTypeName) ? "ENDER" : "AGNA";
+                console.log(`*** ${bossName} PHASE 1 SPAWNED! Playing voice cue... ***`);
+                this.soundManager.playBossSpawnSound(monsterTypeName);
             }
             
             // If this is phase 2, it means phase 1 was defeated
-            if (monsterTypeName === "BossEnderPhase2") {
-                console.log("*** PHASE 2 OF THE BOSS HAS BEGUN! ***");
+            if (this.isBossPhase2(monsterTypeName)) {
+                const bossName = this.isEnderBoss(monsterTypeName) ? "ENDER" : "AGNA";
+                console.log(`*** ${bossName} PHASE 2 HAS BEGUN! ***`);
                 
                 // Play transformation sound sequence
-                this.soundManager.playBossTransformSound();
+                this.soundManager.playBossTransformSound(monsterTypeName);
                 
                 // Reset phase 1 tracking variables since phase 2 has spawned
                 if (this.bossPhase1Killed) {
@@ -855,8 +896,12 @@ export default class MonsterManager {
             return;
         }
         
-        // Play the pre-transform voice line
-        this.soundManager.playBossPreTransformSound();
+        // Detect boss type from container data
+        const bossType = bossContainer.getData('monsterType');
+        console.log(`Pre-transform effect for boss type: ${bossType}`);
+        
+        // Play the pre-transform voice line with boss type
+        this.soundManager.playBossPreTransformSound(bossType);
         
         // Create a copy of the boss sprite for the pre-transform effect
         const transformingSprite = this.scene.add.sprite(bossContainer.x, bossContainer.y, bossSprite.texture.key);

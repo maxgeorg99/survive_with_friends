@@ -256,17 +256,21 @@ export default class BossTimerUI {
         // If a boss monster is created, hide the timer and show nameplate
         if (monster.bestiaryId && monster.bestiaryId.tag) {
             const monsterType = monster.bestiaryId.tag;
-            if (monsterType === 'BossEnderPhase1') {
-                this.stopTimer();
-                this.container.setVisible(false);
-                this.showBossNameplate("Ender, Scion of Ruin");
-            } else if (monsterType === 'BossEnderPhase2') {
-                // Hide any existing nameplate first
-                this.hideBossNameplate();
-                // Small delay before showing new nameplate for dramatic effect
-                this.scene.time.delayedCall(1000, () => {
-                    this.showBossNameplate("Ender, Host of Oblivion");
-                });
+            if (this.isBoss(monsterType)) {
+                const bossName = this.getBossName(monsterType);
+                
+                if (this.isBossPhase1(monsterType)) {
+                    this.stopTimer();
+                    this.container.setVisible(false);
+                    this.showBossNameplate(bossName);
+                } else if (this.isBossPhase2(monsterType)) {
+                    // Hide any existing nameplate first
+                    this.hideBossNameplate();
+                    // Small delay before showing new nameplate for dramatic effect
+                    this.scene.time.delayedCall(1000, () => {
+                        this.showBossNameplate(bossName);
+                    });
+                }
             } else {
                 // For regular monsters, recheck the boss timer to keep it in sync
                 this.checkForExistingBossTimer();
@@ -591,20 +595,13 @@ export default class BossTimerUI {
         for (const monster of this.spacetimeClient.sdkConnection.db.monsters.iter()) {
             if (monster.bestiaryId && monster.bestiaryId.tag) {
                 const monsterType = monster.bestiaryId.tag;
-                if (monsterType === 'BossEnderPhase1') {
-                    console.log("Found existing boss phase 1 on reconnect - showing nameplate, starting boss music and haze");
+                if (this.isBoss(monsterType)) {
+                    const bossName = this.getBossName(monsterType);
+                    const phaseText = this.isBossPhase1(monsterType) ? "phase 1" : "phase 2";
+                    console.log(`Found existing boss ${phaseText} on reconnect - showing nameplate, starting boss music and haze`);
                     this.stopTimer();
                     this.container.setVisible(false);
-                    this.showBossNameplate("Ender, Scion of Ruin");
-                    
-                    // Trigger boss music and haze for reconnection
-                    this.triggerBossEffectsOnReconnect();
-                    return; // Only show one boss nameplate
-                } else if (monsterType === 'BossEnderPhase2') {
-                    console.log("Found existing boss phase 2 on reconnect - showing nameplate, starting boss music and haze");
-                    this.stopTimer();
-                    this.container.setVisible(false);
-                    this.showBossNameplate("Ender, Host of Oblivion");
+                    this.showBossNameplate(bossName);
                     
                     // Trigger boss music and haze for reconnection
                     this.triggerBossEffectsOnReconnect();
@@ -638,6 +635,30 @@ export default class BossTimerUI {
         if (gameScene.showBossHaze) {
             console.log("Showing boss haze on reconnect");
             gameScene.showBossHaze();
+        }
+    }
+
+    // Helper functions for boss type checking
+    private isBoss(monsterType: string): boolean {
+        return monsterType === 'BossEnderPhase1' || monsterType === 'BossEnderPhase2' ||
+               monsterType === 'BossAgnaPhase1' || monsterType === 'BossAgnaPhase2';
+    }
+
+    private isBossPhase1(monsterType: string): boolean {
+        return monsterType === 'BossEnderPhase1' || monsterType === 'BossAgnaPhase1';
+    }
+
+    private isBossPhase2(monsterType: string): boolean {
+        return monsterType === 'BossEnderPhase2' || monsterType === 'BossAgnaPhase2';
+    }
+
+    private getBossName(monsterType: string): string {
+        switch (monsterType) {
+            case 'BossEnderPhase1': return "Ender, Scion of Ruin";
+            case 'BossEnderPhase2': return "Ender, Host of Oblivion";
+            case 'BossAgnaPhase1': return "Agna, the Seething Calamity";
+            case 'BossAgnaPhase2': return "Agna, Purified by Flame";
+            default: return "Unknown Boss";
         }
     }
 } 

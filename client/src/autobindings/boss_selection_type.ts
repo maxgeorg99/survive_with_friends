@@ -32,20 +32,15 @@ import {
 } from "@clockworklabs/spacetimedb-sdk";
 import { BossType as __BossType } from "./boss_type_type";
 
-export type GameState = {
+export type BossSelection = {
   id: number,
-  bossActive: boolean,
-  bossPhase: number,
-  bossMonsterId: number,
   bossType: __BossType,
-  normalSpawningPaused: boolean,
-  gameStartTime: Timestamp,
 };
 
 /**
  * A namespace for generated helper functions.
  */
-export namespace GameState {
+export namespace BossSelection {
   /**
   * A function which returns this type represented as an AlgebraicType.
   * This function is derived from the AlgebraicType used to generate this type.
@@ -53,21 +48,16 @@ export namespace GameState {
   export function getTypeScriptAlgebraicType(): AlgebraicType {
     return AlgebraicType.createProductType([
       new ProductTypeElement("id", AlgebraicType.createU32Type()),
-      new ProductTypeElement("bossActive", AlgebraicType.createBoolType()),
-      new ProductTypeElement("bossPhase", AlgebraicType.createU32Type()),
-      new ProductTypeElement("bossMonsterId", AlgebraicType.createU32Type()),
       new ProductTypeElement("bossType", __BossType.getTypeScriptAlgebraicType()),
-      new ProductTypeElement("normalSpawningPaused", AlgebraicType.createBoolType()),
-      new ProductTypeElement("gameStartTime", AlgebraicType.createTimestampType()),
     ]);
   }
 
-  export function serialize(writer: BinaryWriter, value: GameState): void {
-    GameState.getTypeScriptAlgebraicType().serialize(writer, value);
+  export function serialize(writer: BinaryWriter, value: BossSelection): void {
+    BossSelection.getTypeScriptAlgebraicType().serialize(writer, value);
   }
 
-  export function deserialize(reader: BinaryReader): GameState {
-    return GameState.getTypeScriptAlgebraicType().deserialize(reader);
+  export function deserialize(reader: BinaryReader): BossSelection {
+    return BossSelection.getTypeScriptAlgebraicType().deserialize(reader);
   }
 
 }

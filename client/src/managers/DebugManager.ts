@@ -27,6 +27,8 @@ export class DebugManager {
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.V).on('down', this.spawnDebugVoidChest, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.L).on('down', this.spawnDebugLootCapsule, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P).on('down', this.enableBotPvp, this);
+            this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR).on('down', this.setBossTypeEnder, this);
+            this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FIVE).on('down', this.setBossTypeAgna, this);
             console.log("DebugManager: Debug keys initialized.");
         } else {
             console.warn("DebugManager: Keyboard input not available on scene. Debug keys not initialized.");
@@ -42,6 +44,8 @@ export class DebugManager {
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.V);
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.L);
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.P);
+            this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.FOUR);
+            this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.FIVE);
         }
     }
 
@@ -102,6 +106,24 @@ export class DebugManager {
             this.spacetimedb.sdkConnection.reducers.debugEnableBotPvp();
         } else {
             console.warn("DebugManager: SpacetimeDB connection not available for enabling PvP for all bots.");
+        }
+    }
+
+    private setBossTypeEnder(): void {
+        if (this.spacetimedb && this.spacetimedb.sdkConnection) {
+            console.log("DebugManager: Setting boss type to Ender (client key 4)...");
+            this.spacetimedb.sdkConnection.reducers.debugSetBossType(4);
+        } else {
+            console.warn("DebugManager: SpacetimeDB connection not available for setting boss type to Ender.");
+        }
+    }
+
+    private setBossTypeAgna(): void {
+        if (this.spacetimedb && this.spacetimedb.sdkConnection) {
+            console.log("DebugManager: Setting boss type to Agna (client key 5)...");
+            this.spacetimedb.sdkConnection.reducers.debugSetBossType(5);
+        } else {
+            console.warn("DebugManager: SpacetimeDB connection not available for setting boss type to Agna.");
         }
     }
 } 

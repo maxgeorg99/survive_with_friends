@@ -173,6 +173,20 @@ export default class GameScene extends Phaser.Scene {
         console.log("GameScene constructor called.");
     }
 
+    // Helper functions for boss type checking
+    private isBoss(monsterType: string): boolean {
+        return monsterType === 'BossEnderPhase1' || monsterType === 'BossEnderPhase2' ||
+               monsterType === 'BossAgnaPhase1' || monsterType === 'BossAgnaPhase2';
+    }
+
+    private isBossPhase1(monsterType: string): boolean {
+        return monsterType === 'BossEnderPhase1' || monsterType === 'BossAgnaPhase1';
+    }
+
+    private isBossPhase2(monsterType: string): boolean {
+        return monsterType === 'BossEnderPhase2' || monsterType === 'BossAgnaPhase2';
+    }
+
     preload() {
         console.log("GameScene preload started.");
         // Load assets from the /assets path (copied from public)
@@ -196,6 +210,8 @@ export default class GameScene extends Phaser.Scene {
         // Load boss monster assets
         this.load.image('final_boss_phase1', '/assets/final_boss_phase_1.png');
         this.load.image('final_boss_phase2', '/assets/final_boss_phase_2.png');
+        this.load.image('boss_agna_1', '/assets/boss_agna_1.png');
+        this.load.image('boss_agna_2', '/assets/boss_agna_2.png');
         
         // Load special monster assets
         this.load.image('treasure_chest', '/assets/treasure_chest.png');
@@ -283,6 +299,9 @@ export default class GameScene extends Phaser.Scene {
         this.load.audio('voice_boss_2', '/assets/sounds/voice_boss_2.mp3');
         this.load.audio('voice_transform', '/assets/sounds/voice_transform.mp3');
         this.load.audio('ui_click', '/assets/sounds/ui_click.mp3');
+        this.load.audio('voice_agna_1', '/assets/sounds/narrator_agna_1.mp3');
+        this.load.audio('voice_agna_2', '/assets/sounds/narrator_agna_2.mp3');
+        this.load.audio('agna_phase_2', '/assets/sounds/agna_phase_2.mp3');
         
         // Add error handling for file loading errors
         this.load.on('loaderror', (fileObj: any) => {
@@ -369,17 +388,6 @@ export default class GameScene extends Phaser.Scene {
         // Setup keyboard input
         this.cursors = this.input.keyboard?.createCursorKeys() ?? null;
         
-        // Initialize MonsterManager
-        this.monsterManager = new MonsterManager(this, this.spacetimeDBClient);
-        
-        // Initialize AttackManager
-        this.attackManager = new AttackManager(this, this.spacetimeDBClient);
-
-        // Initialize DebugManager AFTER AttackManager is created
-        this.debugManager = new DebugManager(this, this.spacetimeDBClient, this.attackManager);
-        this.debugManager.initializeDebugKeys();
-        console.log("DebugManager initialized in GameScene.");
-        
         if (this.input.keyboard) 
         {
             this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R).on('down', this.rerollUpgrades, this);
@@ -441,6 +449,11 @@ export default class GameScene extends Phaser.Scene {
         
         // Initialize AttackManager
         this.attackManager = new AttackManager(this, this.spacetimeDBClient);
+        
+        // Initialize DebugManager AFTER AttackManager is created
+        this.debugManager = new DebugManager(this, this.spacetimeDBClient, this.attackManager);
+        this.debugManager.initializeDebugKeys();
+        console.log("DebugManager initialized in GameScene.");
         
         // Initialize MonsterSpawnerManager
         this.monsterSpawnerManager = new MonsterSpawnerManager(this, this.spacetimeDBClient);
@@ -742,7 +755,7 @@ export default class GameScene extends Phaser.Scene {
             //console.log("Monster created:", monsterType);
             
             // If a boss monster spawns, switch to boss music and show dark haze
-            if (monsterType === 'BossEnderPhase1' || monsterType === 'BossEnderPhase2') {
+            if (this.isBoss(monsterType)) {
                 console.log("Boss detected! Switching to boss music and showing dark haze");
                 if (this.musicManager) {
                     this.musicManager.playTrack('boss');
@@ -870,7 +883,7 @@ export default class GameScene extends Phaser.Scene {
         for (const monster of ctx.db.monsters.iter()) {
             if (monster.bestiaryId && monster.bestiaryId.tag) {
                 const monsterType = monster.bestiaryId.tag;
-                if (monsterType === 'BossEnderPhase1' || monsterType === 'BossEnderPhase2') {
+                if (this.isBoss(monsterType)) {
                     console.log(`Found active boss during initialization: ${monsterType} (ID: ${monster.monsterId})`);
                     return true;
                 }
@@ -2073,8 +2086,6 @@ export default class GameScene extends Phaser.Scene {
         
         // Clean up MonsterSpawnerManager
         console.log("GameScene shutting down...");
-
-        this.monsterManager?.shutdown();
         
         // Clean up MonsterSpawnerManager
         this.monsterSpawnerManager?.destroy();

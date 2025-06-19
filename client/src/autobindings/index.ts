@@ -48,6 +48,8 @@ import { DebugCheckTier } from "./debug_check_tier_reducer.ts";
 export { DebugCheckTier };
 import { DebugEnableBotPvp } from "./debug_enable_bot_pvp_reducer.ts";
 export { DebugEnableBotPvp };
+import { DebugSetBossType } from "./debug_set_boss_type_reducer.ts";
+export { DebugSetBossType };
 import { ExpireMonsterAttack } from "./expire_monster_attack_reducer.ts";
 export { ExpireMonsterAttack };
 import { GameTick } from "./game_tick_reducer.ts";
@@ -138,6 +140,8 @@ import { BossEnderLastPatternsTableHandle } from "./boss_ender_last_patterns_tab
 export { BossEnderLastPatternsTableHandle };
 import { BossPhaseTwoTimerTableHandle } from "./boss_phase_two_timer_table.ts";
 export { BossPhaseTwoTimerTableHandle };
+import { BossSelectionTableHandle } from "./boss_selection_table.ts";
+export { BossSelectionTableHandle };
 import { BossSpawnTimerTableHandle } from "./boss_spawn_timer_table.ts";
 export { BossSpawnTimerTableHandle };
 import { BossTargetSwitchSchedulerTableHandle } from "./boss_target_switch_scheduler_table.ts";
@@ -232,10 +236,14 @@ import { BossEnderLastPattern } from "./boss_ender_last_pattern_type.ts";
 export { BossEnderLastPattern };
 import { BossPhase2Timer } from "./boss_phase_2_timer_type.ts";
 export { BossPhase2Timer };
+import { BossSelection } from "./boss_selection_type.ts";
+export { BossSelection };
 import { BossSpawnTimer } from "./boss_spawn_timer_type.ts";
 export { BossSpawnTimer };
 import { BossTargetSwitchScheduler } from "./boss_target_switch_scheduler_type.ts";
 export { BossTargetSwitchScheduler };
+import { BossType } from "./boss_type_type.ts";
+export { BossType };
 import { ChaosBallScheduler } from "./chaos_ball_scheduler_type.ts";
 export { ChaosBallScheduler };
 import { ChosenUpgradeData } from "./chosen_upgrade_data_type.ts";
@@ -361,6 +369,11 @@ const REMOTE_MODULE = {
       tableName: "boss_phase_two_timer",
       rowType: BossPhase2Timer.getTypeScriptAlgebraicType(),
       primaryKey: "scheduledId",
+    },
+    boss_selection: {
+      tableName: "boss_selection",
+      rowType: BossSelection.getTypeScriptAlgebraicType(),
+      primaryKey: "id",
     },
     boss_spawn_timer: {
       tableName: "boss_spawn_timer",
@@ -566,6 +579,10 @@ const REMOTE_MODULE = {
       reducerName: "debug_enable_bot_pvp",
       argsType: DebugEnableBotPvp.getTypeScriptAlgebraicType(),
     },
+    debug_set_boss_type: {
+      reducerName: "debug_set_boss_type",
+      argsType: DebugSetBossType.getTypeScriptAlgebraicType(),
+    },
     expire_monster_attack: {
       reducerName: "expire_monster_attack",
       argsType: ExpireMonsterAttack.getTypeScriptAlgebraicType(),
@@ -741,6 +758,7 @@ export type Reducer = never
 | { name: "DebugCheckGemDrops", args: DebugCheckGemDrops }
 | { name: "DebugCheckTier", args: DebugCheckTier }
 | { name: "DebugEnableBotPvp", args: DebugEnableBotPvp }
+| { name: "DebugSetBossType", args: DebugSetBossType }
 | { name: "ExpireMonsterAttack", args: ExpireMonsterAttack }
 | { name: "GameTick", args: GameTick }
 | { name: "HandleAttackBurstCooldown", args: HandleAttackBurstCooldown }
@@ -887,6 +905,22 @@ export class RemoteReducers {
 
   removeOnDebugEnableBotPvp(callback: (ctx: ReducerEventContext) => void) {
     this.connection.offReducer("debug_enable_bot_pvp", callback);
+  }
+
+  debugSetBossType(clientKey: number) {
+    const __args = { clientKey };
+    let __writer = new BinaryWriter(1024);
+    DebugSetBossType.getTypeScriptAlgebraicType().serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("debug_set_boss_type", __argsBuffer, this.setCallReducerFlags.debugSetBossTypeFlags);
+  }
+
+  onDebugSetBossType(callback: (ctx: ReducerEventContext, clientKey: number) => void) {
+    this.connection.onReducer("debug_set_boss_type", callback);
+  }
+
+  removeOnDebugSetBossType(callback: (ctx: ReducerEventContext, clientKey: number) => void) {
+    this.connection.offReducer("debug_set_boss_type", callback);
   }
 
   expireMonsterAttack(attack: ActiveMonsterAttack) {
@@ -1451,6 +1485,11 @@ export class SetReducerFlags {
     this.debugEnableBotPvpFlags = flags;
   }
 
+  debugSetBossTypeFlags: CallReducerFlags = 'FullUpdate';
+  debugSetBossType(flags: CallReducerFlags) {
+    this.debugSetBossTypeFlags = flags;
+  }
+
   expireMonsterAttackFlags: CallReducerFlags = 'FullUpdate';
   expireMonsterAttack(flags: CallReducerFlags) {
     this.expireMonsterAttackFlags = flags;
@@ -1665,6 +1704,10 @@ export class RemoteTables {
 
   get bossPhaseTwoTimer(): BossPhaseTwoTimerTableHandle {
     return new BossPhaseTwoTimerTableHandle(this.connection.clientCache.getOrCreateTable<BossPhase2Timer>(REMOTE_MODULE.tables.boss_phase_two_timer));
+  }
+
+  get bossSelection(): BossSelectionTableHandle {
+    return new BossSelectionTableHandle(this.connection.clientCache.getOrCreateTable<BossSelection>(REMOTE_MODULE.tables.boss_selection));
   }
 
   get bossSpawnTimer(): BossSpawnTimerTableHandle {

@@ -234,7 +234,7 @@ export default class Minimap {
         for (const monster of this.spacetimeDBClient.sdkConnection.db.monsters.iter()) {
             const monsterType = monster.bestiaryId?.tag || monster.bestiaryId;
             
-            if (monsterType === 'BossEnderPhase1' || monsterType === 'BossEnderPhase2') {
+            if (this.isBoss(monsterType)) {
                 // Get monster position from boid data
                 const boid = this.spacetimeDBClient.sdkConnection.db.monstersBoid.monsterId.find(monster.monsterId);
                 if (boid) {
@@ -330,5 +330,11 @@ export default class Minimap {
         }
         
         console.log("Minimap destroyed");
+    }
+
+    // Helper functions for boss type checking
+    private isBoss(monsterType: string): boolean {
+        return monsterType === 'BossEnderPhase1' || monsterType === 'BossEnderPhase2' ||
+               monsterType === 'BossAgnaPhase1' || monsterType === 'BossAgnaPhase2';
     }
 } 

@@ -101,6 +101,8 @@ export default class TitleScene extends Phaser.Scene {
         // Preload boss assets for end-game experience
         this.load.image('final_boss_phase1', '/assets/final_boss_phase_1.png');
         this.load.image('final_boss_phase2', '/assets/final_boss_phase_2.png');
+        this.load.image('boss_agna_1', '/assets/boss_agna_1.png');
+        this.load.image('boss_agna_2', '/assets/boss_agna_2.png');
         
         // Load special monster assets
         this.load.image('treasure_chest', '/assets/treasure_chest.png');
@@ -150,6 +152,9 @@ export default class TitleScene extends Phaser.Scene {
                 this.load.audio('boss_transform', '/assets/sounds/boss_transform.mp3');
                 this.load.audio('voice_boss_2', '/assets/sounds/voice_boss_2.mp3');
                 this.load.audio('voice_transform', '/assets/sounds/voice_transform.mp3');
+                this.load.audio('voice_agna_1', '/assets/sounds/narrator_agna_1.mp3');
+                this.load.audio('voice_agna_2', '/assets/sounds/narrator_agna_2.mp3');
+                this.load.audio('agna_phase_2', '/assets/sounds/agna_phase_2.mp3');
                 
                 // Load UI and menu sound effects
                 this.load.audio('voice_name', '/assets/sounds/voice_name.mp3');
