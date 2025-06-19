@@ -256,8 +256,8 @@ pub fn spawn_monster(ctx: &ReducerContext, spawner: MonsterSpawners) {
     // Check if we're at monster capacity (player could have spawned during delay)
     let monster_count = ctx.db.monsters().count();
     if monster_count >= config.max_monsters as u64 && 
-       spawner.monster_type != MonsterType::FinalBossPhase1 && 
-       spawner.monster_type != MonsterType::FinalBossPhase2 {
+               spawner.monster_type != MonsterType::BossEnderPhase1 && 
+       spawner.monster_type != MonsterType::BossEnderPhase2 {
         //Log::info(&format!("SpawnMonster: At maximum monster capacity ({}/{}), skipping spawn.", monster_count, config.max_monsters));
         return;
     }
@@ -270,9 +270,9 @@ pub fn spawn_monster(ctx: &ReducerContext, spawner: MonsterSpawners) {
     let closest_player_id = get_closest_player(ctx, &spawner.position);
     
     // Determine initial AI state based on monster type
-    let initial_ai_state = if spawner.monster_type == MonsterType::FinalBossPhase1 || 
-                              spawner.monster_type == MonsterType::FinalBossPhase2 {
-        AIState::BossIdle
+    let initial_ai_state = if spawner.monster_type == MonsterType::BossEnderPhase1 || 
+                              spawner.monster_type == MonsterType::BossEnderPhase2 {
+        AIState::BossEnderIdle
     } else if spawner.monster_type == MonsterType::VoidChest {
         AIState::Stationary
     } else if spawner.monster_type == MonsterType::EnderClaw {
@@ -328,7 +328,7 @@ pub fn spawn_monster(ctx: &ReducerContext, spawner: MonsterSpawners) {
     //Log::info(&format!("Spawned {:?} monster. Total monsters: {}", spawner.monster_type, ctx.db.monsters().count()));
     
     // If this is a boss monster, update the game state and initialize AI
-    if spawner.monster_type.clone() == MonsterType::FinalBossPhase1 || spawner.monster_type.clone() == MonsterType::FinalBossPhase2 {
+    if spawner.monster_type.clone() == MonsterType::BossEnderPhase1 || spawner.monster_type.clone() == MonsterType::BossEnderPhase2 {
         log::info!("Boss monster of type {:?} created with ID {}", spawner.monster_type, monster.monster_id);
         crate::boss_system::update_boss_monster_id(ctx, monster.monster_id);
         
@@ -422,43 +422,16 @@ fn move_monsters(ctx: &ReducerContext, cache: &mut crate::collision::CollisionCa
 
         let mut speed = cache.monster.speed_monster[i];
         
-        // Check if this is a boss in chase mode and close to target
-        if movement_behavior == crate::monster_ai_defs::MovementBehavior::Chase {
-            // Check if this is a boss monster
-            let monster_id = cache.monster.keys_monster[i];
-            let real_monster = ctx.db.monsters().monster_id().find(&monster_id);
-            if let Some(monster) = real_monster {
-                let monster_type_name = get_monster_type_name(&monster.bestiary_id);
-                if monster_type_name == "FinalBossPhase1" || monster_type_name == "FinalBossPhase2" {
-                    // Check distance to target for boss monsters
-                    let monster_position = DbVector2::new(cache.monster.pos_x_monster[i], cache.monster.pos_y_monster[i]);
-                    let target_position = DbVector2::new(cache.monster.target_x_monster[i], cache.monster.target_y_monster[i]);
-                    
-                    crate::monster_ai_defs::check_boss_chase_distance(ctx, monster_id, &monster_position, &target_position);
-                    
-                    // Re-check if monster is still in chase mode (might have been changed by check_boss_chase_distance)
-                    let updated_monster = ctx.db.monsters().monster_id().find(&monster_id);
-                    if let Some(updated_monster) = updated_monster {
-                        let updated_behavior = crate::monster_ai_defs::get_movement_behavior_for_state(&updated_monster.ai_state);
-                        if updated_behavior != crate::monster_ai_defs::MovementBehavior::Chase {
-                            continue; // Skip movement if no longer chasing
-                        }
-                    }
-                }
+        // Handle chase behavior (delegated to boss-specific modules)
+        if movement_behavior == crate::monster_ai_defs::MovementBehavior::EnderChase {
+            // Delegate chase behavior to the appropriate boss module
+            let should_continue_movement = crate::boss_ender_defs::handle_ender_boss_chase_movement(ctx, cache, i);
+            if !should_continue_movement {
+                continue; // Skip movement if chase handler says to stop
             }
             
-            // Apply chase acceleration if still in chase mode
-            speed *= crate::monster_ai_defs::CHASE_ACCELERATION_MULTIPLIER;
-            speed = speed.min(crate::monster_ai_defs::MAX_CHASE_SPEED);
-            
-            cache.monster.speed_monster[i] = speed; // Update cached speed for next frame
-
-            let real_monster = ctx.db.monsters().monster_id().find(&cache.monster.keys_monster[i]);
-            if let Some(monster) = real_monster {
-                let mut updated_monster = monster;
-                updated_monster.speed = speed;
-                ctx.db.monsters().monster_id().update(updated_monster);
-            }
+            // Update speed from cache (may have been modified by chase handler)
+            speed = cache.monster.speed_monster[i];
         }
         
         let move_x = norm_x * speed * DELTA_TIME;
@@ -520,8 +493,8 @@ fn populate_monster_cache(ctx: &ReducerContext, cache: &mut crate::collision::Co
         
         //Structures and bosses have their weight set to 0.0 to prevent them from being pushed around
         if monster.bestiary_id == MonsterType::VoidChest || 
-           monster.bestiary_id == MonsterType::FinalBossPhase1 || 
-           monster.bestiary_id == MonsterType::FinalBossPhase2 {
+           monster.bestiary_id == MonsterType::BossEnderPhase1 || 
+           monster.bestiary_id == MonsterType::BossEnderPhase2 {
             cache.monster.push_ratio_monster[idx] = 0;
         }
         else {
@@ -957,8 +930,8 @@ fn get_monster_type_name(bestiary_id: &MonsterType) -> &'static str {
         MonsterType::Rat => "Rat",
         MonsterType::Slime => "Slime", 
         MonsterType::Orc => "Orc",
-        MonsterType::FinalBossPhase1 => "FinalBossPhase1",
-        MonsterType::FinalBossPhase2 => "FinalBossPhase2",
+        MonsterType::BossEnderPhase1 => "BossEnderPhase1",
+        MonsterType::BossEnderPhase2 => "BossEnderPhase2",
         MonsterType::VoidChest => "VoidChest",
         MonsterType::Imp => "Imp",
         MonsterType::Zombie => "Zombie",
@@ -971,7 +944,7 @@ fn get_monster_type_name(bestiary_id: &MonsterType) -> &'static str {
 fn should_spawn_as_shiny(ctx: &ReducerContext, monster_type: &MonsterType) -> bool {
     // Never spawn bosses, VoidChests, or EnderClaws as shiny
     match monster_type {
-        MonsterType::FinalBossPhase1 | MonsterType::FinalBossPhase2 | MonsterType::VoidChest | MonsterType::EnderClaw => {
+        MonsterType::BossEnderPhase1 | MonsterType::BossEnderPhase2 | MonsterType::VoidChest | MonsterType::EnderClaw => {
             log::debug!("{} excluded from shiny spawning", get_monster_type_name(monster_type));
             false
         },

@@ -128,7 +128,7 @@ fn schedule_boss_spawning(ctx: &ReducerContext, position: DbVector2) {
     let spawner_opt = ctx.db.monster_spawners().insert(crate::MonsterSpawners {
         scheduled_id: 0,
         position,
-        monster_type: MonsterType::FinalBossPhase1,
+        monster_type: MonsterType::BossEnderPhase1,
         scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(BOSS_SPAWN_VISUALIZATION_DELAY_MS)),
     });
 }
@@ -146,7 +146,7 @@ pub fn spawn_boss_phase_two(ctx: &ReducerContext, position: DbVector2) {
     log::info!("Game state updated to phase 2");
     
     // Get boss stats from bestiary
-    let bestiary_entry = ctx.db.bestiary().bestiary_id().find(&(MonsterType::FinalBossPhase2 as u32))
+    let bestiary_entry = ctx.db.bestiary().bestiary_id().find(&(MonsterType::BossEnderPhase2 as u32))
         .expect("SpawnBossPhaseTwo: Could not find bestiary entry for boss phase 2!");
     
     // Find the closest player to target
@@ -155,7 +155,7 @@ pub fn spawn_boss_phase_two(ctx: &ReducerContext, position: DbVector2) {
     // Create the phase 2 boss monster
     let monster_opt = ctx.db.monsters().insert(crate::Monsters {
         monster_id: 0,
-        bestiary_id: MonsterType::FinalBossPhase2,
+        bestiary_id: MonsterType::BossEnderPhase2,
         variant: crate::MonsterVariant::Default,
         hp: bestiary_entry.max_hp,
         max_hp: bestiary_entry.max_hp,
@@ -164,7 +164,7 @@ pub fn spawn_boss_phase_two(ctx: &ReducerContext, position: DbVector2) {
         target_player_id: closest_player_id,
         radius: bestiary_entry.radius,
         spawn_position: position.clone(),
-        ai_state: crate::monster_ai_defs::AIState::BossIdle,
+        ai_state: crate::monster_ai_defs::AIState::BossEnderIdle,
     });
     
     let monster = monster_opt;
@@ -180,7 +180,7 @@ pub fn spawn_boss_phase_two(ctx: &ReducerContext, position: DbVector2) {
     
     ctx.db.game_state().id().update(game_state);
 
-    // Initialize Phase 2 boss AI (BossIdle only, no automatic patterns)
+    // Initialize Phase 2 boss AI (BossEnderIdle only, no automatic patterns)
     crate::monster_ai_defs::initialize_phase2_boss_ai(ctx, monster.monster_id);
     
     // Start EnderClaw spawning for Phase 2 boss
@@ -306,8 +306,8 @@ pub fn update_boss_monster_id(ctx: &ReducerContext, monster_id: u32) {
     }
 
     let monster = monster_opt.unwrap();
-    // Check if this is a boss monster (FinalBossPhase1)
-    if monster.bestiary_id == MonsterType::FinalBossPhase1 {
+    // Check if this is a boss monster (BossEnderPhase1)
+    if monster.bestiary_id == MonsterType::BossEnderPhase1 {
         log::info!("BOSS PHASE 1 CREATED: Updating game state with boss_monster_id={}", monster_id);
         
         // Get game state

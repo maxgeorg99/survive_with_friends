@@ -61,8 +61,8 @@ pub fn init_bestiary(ctx: &ReducerContext) {
     
     // Insert Final Boss Phase 1 stats
     ctx.db.bestiary().insert(Bestiary {
-        bestiary_id: MonsterType::FinalBossPhase1 as u32,
-        monster_type: MonsterType::FinalBossPhase1,
+        bestiary_id: MonsterType::BossEnderPhase1 as u32,
+        monster_type: MonsterType::BossEnderPhase1,
         tier: 5,
         max_hp: 500,
         speed: 100.0,
@@ -72,8 +72,8 @@ pub fn init_bestiary(ctx: &ReducerContext) {
     
     // Insert Final Boss Phase 2 stats
     ctx.db.bestiary().insert(Bestiary {
-        bestiary_id: MonsterType::FinalBossPhase2 as u32,
-        monster_type: MonsterType::FinalBossPhase2,
+        bestiary_id: MonsterType::BossEnderPhase2 as u32,
+        monster_type: MonsterType::BossEnderPhase2,
         tier: 5,
         max_hp: 500,
         speed: 120.0,
