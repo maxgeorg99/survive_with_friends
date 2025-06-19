@@ -134,8 +134,8 @@ import { AttackDataTableHandle } from "./attack_data_table.ts";
 export { AttackDataTableHandle };
 import { BestiaryTableHandle } from "./bestiary_table.ts";
 export { BestiaryTableHandle };
-import { BossLastPatternsTableHandle } from "./boss_last_patterns_table.ts";
-export { BossLastPatternsTableHandle };
+import { BossEnderLastPatternsTableHandle } from "./boss_ender_last_patterns_table.ts";
+export { BossEnderLastPatternsTableHandle };
 import { BossPhaseTwoTimerTableHandle } from "./boss_phase_two_timer_table.ts";
 export { BossPhaseTwoTimerTableHandle };
 import { BossSpawnTimerTableHandle } from "./boss_spawn_timer_table.ts";
@@ -228,8 +228,8 @@ import { AttackType } from "./attack_type_type.ts";
 export { AttackType };
 import { Bestiary } from "./bestiary_type.ts";
 export { Bestiary };
-import { BossLastPattern } from "./boss_last_pattern_type.ts";
-export { BossLastPattern };
+import { BossEnderLastPattern } from "./boss_ender_last_pattern_type.ts";
+export { BossEnderLastPattern };
 import { BossPhase2Timer } from "./boss_phase_2_timer_type.ts";
 export { BossPhase2Timer };
 import { BossSpawnTimer } from "./boss_spawn_timer_type.ts";
@@ -352,9 +352,9 @@ const REMOTE_MODULE = {
       rowType: Bestiary.getTypeScriptAlgebraicType(),
       primaryKey: "bestiaryId",
     },
-    boss_last_patterns: {
-      tableName: "boss_last_patterns",
-      rowType: BossLastPattern.getTypeScriptAlgebraicType(),
+    boss_ender_last_patterns: {
+      tableName: "boss_ender_last_patterns",
+      rowType: BossEnderLastPattern.getTypeScriptAlgebraicType(),
       primaryKey: "monsterId",
     },
     boss_phase_two_timer: {
@@ -1659,8 +1659,8 @@ export class RemoteTables {
     return new BestiaryTableHandle(this.connection.clientCache.getOrCreateTable<Bestiary>(REMOTE_MODULE.tables.bestiary));
   }
 
-  get bossLastPatterns(): BossLastPatternsTableHandle {
-    return new BossLastPatternsTableHandle(this.connection.clientCache.getOrCreateTable<BossLastPattern>(REMOTE_MODULE.tables.boss_last_patterns));
+  get bossEnderLastPatterns(): BossEnderLastPatternsTableHandle {
+    return new BossEnderLastPatternsTableHandle(this.connection.clientCache.getOrCreateTable<BossEnderLastPattern>(REMOTE_MODULE.tables.boss_ender_last_patterns));
   }
 
   get bossPhaseTwoTimer(): BossPhaseTwoTimerTableHandle {

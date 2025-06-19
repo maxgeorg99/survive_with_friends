@@ -30,25 +30,25 @@ import {
   Timestamp,
   deepEqual,
 } from "@clockworklabs/spacetimedb-sdk";
-import { BossLastPattern } from "./boss_last_pattern_type";
+import { BossEnderLastPattern } from "./boss_ender_last_pattern_type";
 import { AiState as __AiState } from "./ai_state_type";
 
 import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
 
 /**
- * Table handle for the table `boss_last_patterns`.
+ * Table handle for the table `boss_ender_last_patterns`.
  *
- * Obtain a handle from the [`bossLastPatterns`] property on [`RemoteTables`],
- * like `ctx.db.bossLastPatterns`.
+ * Obtain a handle from the [`bossEnderLastPatterns`] property on [`RemoteTables`],
+ * like `ctx.db.bossEnderLastPatterns`.
  *
  * Users are encouraged not to explicitly reference this type,
  * but to directly chain method calls,
- * like `ctx.db.bossLastPatterns.on_insert(...)`.
+ * like `ctx.db.bossEnderLastPatterns.on_insert(...)`.
  */
-export class BossLastPatternsTableHandle {
-  tableCache: TableCache<BossLastPattern>;
+export class BossEnderLastPatternsTableHandle {
+  tableCache: TableCache<BossEnderLastPattern>;
 
-  constructor(tableCache: TableCache<BossLastPattern>) {
+  constructor(tableCache: TableCache<BossEnderLastPattern>) {
     this.tableCache = tableCache;
   }
 
@@ -56,24 +56,24 @@ export class BossLastPatternsTableHandle {
     return this.tableCache.count();
   }
 
-  iter(): Iterable<BossLastPattern> {
+  iter(): Iterable<BossEnderLastPattern> {
     return this.tableCache.iter();
   }
   /**
-   * Access to the `monsterId` unique index on the table `boss_last_patterns`,
+   * Access to the `monsterId` unique index on the table `boss_ender_last_patterns`,
    * which allows point queries on the field of the same name
-   * via the [`BossLastPatternsMonsterIdUnique.find`] method.
+   * via the [`BossEnderLastPatternsMonsterIdUnique.find`] method.
    *
    * Users are encouraged not to explicitly reference this type,
    * but to directly chain method calls,
-   * like `ctx.db.bossLastPatterns.monsterId().find(...)`.
+   * like `ctx.db.bossEnderLastPatterns.monsterId().find(...)`.
    *
-   * Get a handle on the `monsterId` unique index on the table `boss_last_patterns`.
+   * Get a handle on the `monsterId` unique index on the table `boss_ender_last_patterns`.
    */
   monsterId = {
     // Find the subscribed row whose `monsterId` column value is equal to `col_val`,
     // if such a row is present in the client cache.
-    find: (col_val: number): BossLastPattern | undefined => {
+    find: (col_val: number): BossEnderLastPattern | undefined => {
       for (let row of this.tableCache.iter()) {
         if (deepEqual(row.monsterId, col_val)) {
           return row;
@@ -82,27 +82,27 @@ export class BossLastPatternsTableHandle {
     },
   };
 
-  onInsert = (cb: (ctx: EventContext, row: BossLastPattern) => void) => {
+  onInsert = (cb: (ctx: EventContext, row: BossEnderLastPattern) => void) => {
     return this.tableCache.onInsert(cb);
   }
 
-  removeOnInsert = (cb: (ctx: EventContext, row: BossLastPattern) => void) => {
+  removeOnInsert = (cb: (ctx: EventContext, row: BossEnderLastPattern) => void) => {
     return this.tableCache.removeOnInsert(cb);
   }
 
-  onDelete = (cb: (ctx: EventContext, row: BossLastPattern) => void) => {
+  onDelete = (cb: (ctx: EventContext, row: BossEnderLastPattern) => void) => {
     return this.tableCache.onDelete(cb);
   }
 
-  removeOnDelete = (cb: (ctx: EventContext, row: BossLastPattern) => void) => {
+  removeOnDelete = (cb: (ctx: EventContext, row: BossEnderLastPattern) => void) => {
     return this.tableCache.removeOnDelete(cb);
   }
 
   // Updates are only defined for tables with primary keys.
-  onUpdate = (cb: (ctx: EventContext, oldRow: BossLastPattern, newRow: BossLastPattern) => void) => {
+  onUpdate = (cb: (ctx: EventContext, oldRow: BossEnderLastPattern, newRow: BossEnderLastPattern) => void) => {
     return this.tableCache.onUpdate(cb);
   }
 
-  removeOnUpdate = (cb: (ctx: EventContext, onRow: BossLastPattern, newRow: BossLastPattern) => void) => {
+  removeOnUpdate = (cb: (ctx: EventContext, onRow: BossEnderLastPattern, newRow: BossEnderLastPattern) => void) => {
     return this.tableCache.removeOnUpdate(cb);
   }}

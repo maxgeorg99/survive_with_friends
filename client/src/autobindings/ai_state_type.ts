@@ -36,13 +36,13 @@ export namespace AiState {
   // One type is generated per variant and will be used in the `value` field of
   // the tagged union.
   export type Default = { tag: "Default" };
-  export type BossIdle = { tag: "BossIdle" };
-  export type BossChase = { tag: "BossChase" };
-  export type BossDance = { tag: "BossDance" };
-  export type BossVanish = { tag: "BossVanish" };
-  export type BossLurk = { tag: "BossLurk" };
-  export type BossTeleport = { tag: "BossTeleport" };
-  export type BossTransform = { tag: "BossTransform" };
+  export type BossEnderIdle = { tag: "BossEnderIdle" };
+  export type BossEnderChase = { tag: "BossEnderChase" };
+  export type BossEnderDance = { tag: "BossEnderDance" };
+  export type BossEnderVanish = { tag: "BossEnderVanish" };
+  export type BossEnderLurk = { tag: "BossEnderLurk" };
+  export type BossEnderTeleport = { tag: "BossEnderTeleport" };
+  export type BossEnderTransform = { tag: "BossEnderTransform" };
   export type Stationary = { tag: "Stationary" };
 
   // Helper functions for constructing each variant of the tagged union.
@@ -52,25 +52,25 @@ export namespace AiState {
   // assert!(foo.value === 42);
   // ```
   export const Default = { tag: "Default" };
-  export const BossIdle = { tag: "BossIdle" };
-  export const BossChase = { tag: "BossChase" };
-  export const BossDance = { tag: "BossDance" };
-  export const BossVanish = { tag: "BossVanish" };
-  export const BossLurk = { tag: "BossLurk" };
-  export const BossTeleport = { tag: "BossTeleport" };
-  export const BossTransform = { tag: "BossTransform" };
+  export const BossEnderIdle = { tag: "BossEnderIdle" };
+  export const BossEnderChase = { tag: "BossEnderChase" };
+  export const BossEnderDance = { tag: "BossEnderDance" };
+  export const BossEnderVanish = { tag: "BossEnderVanish" };
+  export const BossEnderLurk = { tag: "BossEnderLurk" };
+  export const BossEnderTeleport = { tag: "BossEnderTeleport" };
+  export const BossEnderTransform = { tag: "BossEnderTransform" };
   export const Stationary = { tag: "Stationary" };
 
   export function getTypeScriptAlgebraicType(): AlgebraicType {
     return AlgebraicType.createSumType([
       new SumTypeVariant("Default", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossIdle", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossChase", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossDance", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossVanish", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossLurk", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossTeleport", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossTransform", AlgebraicType.createProductType([])),
+      new SumTypeVariant("BossEnderIdle", AlgebraicType.createProductType([])),
+      new SumTypeVariant("BossEnderChase", AlgebraicType.createProductType([])),
+      new SumTypeVariant("BossEnderDance", AlgebraicType.createProductType([])),
+      new SumTypeVariant("BossEnderVanish", AlgebraicType.createProductType([])),
+      new SumTypeVariant("BossEnderLurk", AlgebraicType.createProductType([])),
+      new SumTypeVariant("BossEnderTeleport", AlgebraicType.createProductType([])),
+      new SumTypeVariant("BossEnderTransform", AlgebraicType.createProductType([])),
       new SumTypeVariant("Stationary", AlgebraicType.createProductType([])),
     ]);
   }
@@ -86,7 +86,7 @@ export namespace AiState {
 }
 
 // The tagged union or sum type for the algebraic type `AiState`.
-export type AiState = AiState.Default | AiState.BossIdle | AiState.BossChase | AiState.BossDance | AiState.BossVanish | AiState.BossLurk | AiState.BossTeleport | AiState.BossTransform | AiState.Stationary;
+export type AiState = AiState.Default | AiState.BossEnderIdle | AiState.BossEnderChase | AiState.BossEnderDance | AiState.BossEnderVanish | AiState.BossEnderLurk | AiState.BossEnderTeleport | AiState.BossEnderTransform | AiState.Stationary;
 
 export default AiState;
 

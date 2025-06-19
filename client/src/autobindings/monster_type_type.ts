@@ -43,8 +43,8 @@ export namespace MonsterType {
   export type Zombie = { tag: "Zombie" };
   export type VoidChest = { tag: "VoidChest" };
   export type EnderClaw = { tag: "EnderClaw" };
-  export type FinalBossPhase1 = { tag: "FinalBossPhase1" };
-  export type FinalBossPhase2 = { tag: "FinalBossPhase2" };
+  export type BossEnderPhase1 = { tag: "BossEnderPhase1" };
+  export type BossEnderPhase2 = { tag: "BossEnderPhase2" };
 
   // Helper functions for constructing each variant of the tagged union.
   // ```
@@ -60,8 +60,8 @@ export namespace MonsterType {
   export const Zombie = { tag: "Zombie" };
   export const VoidChest = { tag: "VoidChest" };
   export const EnderClaw = { tag: "EnderClaw" };
-  export const FinalBossPhase1 = { tag: "FinalBossPhase1" };
-  export const FinalBossPhase2 = { tag: "FinalBossPhase2" };
+  export const BossEnderPhase1 = { tag: "BossEnderPhase1" };
+  export const BossEnderPhase2 = { tag: "BossEnderPhase2" };
 
   export function getTypeScriptAlgebraicType(): AlgebraicType {
     return AlgebraicType.createSumType([
@@ -73,8 +73,8 @@ export namespace MonsterType {
       new SumTypeVariant("Zombie", AlgebraicType.createProductType([])),
       new SumTypeVariant("VoidChest", AlgebraicType.createProductType([])),
       new SumTypeVariant("EnderClaw", AlgebraicType.createProductType([])),
-      new SumTypeVariant("FinalBossPhase1", AlgebraicType.createProductType([])),
-      new SumTypeVariant("FinalBossPhase2", AlgebraicType.createProductType([])),
+      new SumTypeVariant("BossEnderPhase1", AlgebraicType.createProductType([])),
+      new SumTypeVariant("BossEnderPhase2", AlgebraicType.createProductType([])),
     ]);
   }
 
@@ -89,7 +89,7 @@ export namespace MonsterType {
 }
 
 // The tagged union or sum type for the algebraic type `MonsterType`.
-export type MonsterType = MonsterType.Rat | MonsterType.Slime | MonsterType.Bat | MonsterType.Orc | MonsterType.Imp | MonsterType.Zombie | MonsterType.VoidChest | MonsterType.EnderClaw | MonsterType.FinalBossPhase1 | MonsterType.FinalBossPhase2;
+export type MonsterType = MonsterType.Rat | MonsterType.Slime | MonsterType.Bat | MonsterType.Orc | MonsterType.Imp | MonsterType.Zombie | MonsterType.VoidChest | MonsterType.EnderClaw | MonsterType.BossEnderPhase1 | MonsterType.BossEnderPhase2;
 
 export default MonsterType;
 

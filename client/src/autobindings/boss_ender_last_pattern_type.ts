@@ -32,7 +32,7 @@ import {
 } from "@clockworklabs/spacetimedb-sdk";
 import { AiState as __AiState } from "./ai_state_type";
 
-export type BossLastPattern = {
+export type BossEnderLastPattern = {
   monsterId: number,
   lastPattern: __AiState,
 };
@@ -40,7 +40,7 @@ export type BossLastPattern = {
 /**
  * A namespace for generated helper functions.
  */
-export namespace BossLastPattern {
+export namespace BossEnderLastPattern {
   /**
   * A function which returns this type represented as an AlgebraicType.
   * This function is derived from the AlgebraicType used to generate this type.
@@ -52,12 +52,12 @@ export namespace BossLastPattern {
     ]);
   }
 
-  export function serialize(writer: BinaryWriter, value: BossLastPattern): void {
-    BossLastPattern.getTypeScriptAlgebraicType().serialize(writer, value);
+  export function serialize(writer: BinaryWriter, value: BossEnderLastPattern): void {
+    BossEnderLastPattern.getTypeScriptAlgebraicType().serialize(writer, value);
   }
 
-  export function deserialize(reader: BinaryReader): BossLastPattern {
-    return BossLastPattern.getTypeScriptAlgebraicType().deserialize(reader);
+  export function deserialize(reader: BinaryReader): BossEnderLastPattern {
+    return BossEnderLastPattern.getTypeScriptAlgebraicType().deserialize(reader);
   }
 
 }

@@ -28,16 +28,7 @@ pub struct MonsterStateChange {
     pub scheduled_at: ScheduleAt,
 }
 
-// Table to track the last chosen pattern for each Ender boss to avoid repetition
-#[table(name = boss_ender_last_patterns, public)]
-pub struct BossEnderLastPattern {
-    #[primary_key]
-    pub monster_id: u32,
-    
-    pub last_pattern: AIState,
-}
-
-// Note: Boss-specific constants have been moved to boss_ender_defs.rs 
+// Note: Boss-specific constants and tables have been moved to boss_ender_defs.rs 
 
 // Chase acceleration per frame
 pub const CHASE_ACCELERATION_MULTIPLIER: f32 = 1.02; // 2% increase per frame
@@ -171,11 +162,7 @@ pub fn cleanup_monster_ai_schedules(ctx: &ReducerContext, monster_id: u32) {
     // Cancel all scheduled state changes
     cancel_scheduled_state_changes(ctx, monster_id);
     
-    // Clean up boss ender last pattern record to prevent state conflicts
-    if let Some(_last_pattern) = ctx.db.boss_ender_last_patterns().monster_id().find(&monster_id) {
-        ctx.db.boss_ender_last_patterns().monster_id().delete(&monster_id);
-        log::info!("Cleaned up boss ender last pattern record for monster {}", monster_id);
-    }
+    // Note: Boss ender last pattern cleanup is now handled in boss_ender_defs.rs
 }
 
 // Schedule a random boss ender pattern (chase, dance, or vanish) - will be moved to boss_ender_defs
