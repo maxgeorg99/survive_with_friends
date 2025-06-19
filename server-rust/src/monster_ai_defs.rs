@@ -114,10 +114,10 @@ fn execute_state_entry_behavior(ctx: &ReducerContext, monster: &crate::Monsters,
             log::info!("Monster {} entering BossDance state", monster.monster_id);
             
             // Schedule EnderScythe attack pattern
-            crate::monster_attacks_def::schedule_ender_scythe_attacks(ctx, monster.monster_id);
+            crate::boss_ender_defs::schedule_ender_scythe_attacks(ctx, monster.monster_id);
             
             // Schedule EnderBolt attacks to fire periodically during dance
-            crate::monster_attacks_def::start_ender_bolt_attacks(ctx, monster.monster_id);
+            crate::boss_ender_defs::start_ender_bolt_attacks(ctx, monster.monster_id);
             
             // Schedule return to idle after dance duration
             schedule_state_change(ctx, monster.monster_id, AIState::BossIdle, BOSS_DANCE_DURATION_MS);
@@ -273,7 +273,7 @@ fn cancel_scheduled_state_changes(ctx: &ReducerContext, monster_id: u32) {
     }
     
     // Also cleanup any pending EnderScythe attacks for this boss
-    crate::monster_attacks_def::cleanup_ender_scythe_schedules(ctx, monster_id);
+    crate::boss_ender_defs::cleanup_ender_scythe_schedules(ctx, monster_id);
 }
 
 // Public function to cleanup all AI schedules for a monster (used during boss transitions)

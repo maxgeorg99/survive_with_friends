@@ -96,7 +96,7 @@ pub fn damage_monster(ctx: &ReducerContext, monster_id: u32, damage_amount: u32)
                         crate::monster_attacks_def::cleanup_imp_attack_schedule(ctx, monster_id);
                     }
                     // Clean up EnderScythe attack schedules for bosses
-                    crate::monster_attacks_def::cleanup_ender_scythe_schedules(ctx, monster_id);
+                    crate::boss_ender_defs::cleanup_ender_scythe_schedules(ctx, monster_id);
                     // Clean up all scheduled AI state changes for Phase 1 boss
                     crate::monster_ai_defs::cleanup_monster_ai_schedules(ctx, monster_id);
                     
@@ -133,7 +133,7 @@ pub fn damage_monster(ctx: &ReducerContext, monster_id: u32, damage_amount: u32)
                         crate::monster_attacks_def::cleanup_imp_attack_schedule(ctx, monster_id);
                     }
                     // Clean up EnderScythe attack schedules for bosses
-                    crate::monster_attacks_def::cleanup_ender_scythe_schedules(ctx, monster_id);
+                    crate::boss_ender_defs::cleanup_ender_scythe_schedules(ctx, monster_id);
                     // Clean up EnderClaw spawning for Phase 2 boss
                     crate::boss_ender_defs::cleanup_ender_claw_spawning(ctx, monster_id);
                     
