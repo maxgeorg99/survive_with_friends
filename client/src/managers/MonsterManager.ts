@@ -31,8 +31,8 @@ const MONSTER_BASE_SIZES: { [key: string]: number } = {
     "Rat": 24.0,
     "Slime": 30.0,
     "Orc": 40.0,
-    "FinalBossPhase1": 92.0,
-    "FinalBossPhase2": 128.0,
+    "BossEnderPhase1": 92.0,
+    "BossEnderPhase2": 128.0,
     "VoidChest": 82.0,
     "Imp": 34.0,
     "Zombie": 42.0,
@@ -324,7 +324,7 @@ export default class MonsterManager {
             container.add(healthBar);
             
             // For bosses, make them larger and ensure visibility
-            if (monsterTypeName === "FinalBossPhase1" || monsterTypeName === "FinalBossPhase2") {
+            if (monsterTypeName === "BossEnderPhase1" || monsterTypeName === "BossEnderPhase2") {
                 console.log(`Setting up boss sprite: ${monsterTypeName} (ID: ${monsterData.monsterId})`);
                 console.log(`Boss data: HP=${monsterData.hp}/${monsterData.maxHp}`);
                 console.log(`Boss initial AI state: ${monsterData.aiState.tag}`);
@@ -333,7 +333,7 @@ export default class MonsterManager {
                 sprite.setVisible(true);
                 
                 // Check if boss starts in chase mode
-                if (monsterData.aiState.tag === 'BossChase') {
+                if (monsterData.aiState.tag === 'BossEnderChase') {
                     this.bossesInChaseMode.add(monsterData.monsterId);
                     console.log(`Boss ${monsterData.monsterId} created in chase mode - after images activated`);
                 }
@@ -404,7 +404,7 @@ export default class MonsterManager {
                 this.playVoidChestDestroyedSound(monsterContainer);
             }
             
-            if (monsterType === 'FinalBossPhase1') {
+            if (monsterType === 'BossEnderPhase1') {
                 console.log(`*** BOSS PHASE 1 DEFEATED (ID: ${monsterId})! Starting pre-transform sequence... ***`);
                 
                 // Check if pre-transform is already active to prevent duplicates
@@ -426,7 +426,7 @@ export default class MonsterManager {
                 
                 // Don't remove the monster container yet - the pre-transform effect will handle cleanup
                 return; // Early return to prevent normal monster removal
-            } else if (monsterType === 'FinalBossPhase2') {
+            } else if (monsterType === 'BossEnderPhase2') {
                 console.log(`*** FINAL BOSS DEFEATED (ID: ${monsterId})! GAME COMPLETE! ***`);
             }
         }
@@ -523,7 +523,7 @@ export default class MonsterManager {
     private checkBossAiStateChange(oldMonster: Monsters, newMonster: Monsters) {
         // Only check boss monsters
         const monsterTypeName = this.getMonsterTypeName(newMonster.bestiaryId);
-        if (monsterTypeName !== "FinalBossPhase1" && monsterTypeName !== "FinalBossPhase2") {
+        if (monsterTypeName !== "BossEnderPhase1" && monsterTypeName !== "BossEnderPhase2") {
             return;
         }
 
@@ -537,7 +537,7 @@ export default class MonsterManager {
         }
         
         // Always check current state (not just changes) for chase mode tracking
-        if (newStateTag === 'BossChase') {
+        if (newStateTag === 'BossEnderChase') {
             if (!this.bossesInChaseMode.has(newMonster.monsterId)) {
                 this.bossesInChaseMode.add(newMonster.monsterId);
                 console.log(`Boss ${newMonster.monsterId} entered chase mode - after images activated`);
@@ -560,27 +560,27 @@ export default class MonsterManager {
 
         // Play appropriate sound and visual effects based on the new state
         switch (newStateTag) {
-            case 'BossChase':
+            case 'BossEnderChase':
                 this.soundManager.playBossChaseSound();
                 break;
-            case 'BossDance':
+            case 'BossEnderDance':
                 this.soundManager.playBossDanceSound();
                 break;
-            case 'BossVanish':
+            case 'BossEnderVanish':
                 this.soundManager.playBossVanishSound();
                 // Play fadeout animation for vanish
                 if (bossContainer && bossSprite) {
                     this.createBossVanishEffect(bossContainer, bossSprite);
                 }
                 break;
-            case 'BossTeleport':
+            case 'BossEnderTeleport':
                 this.soundManager.playBossTeleportSound();
                 // Play teleport entry VFX
                 if (bossContainer && bossSprite) {
                     this.createBossTeleportEffect(bossContainer, bossSprite);
                 }
                 break;
-            case 'BossTransform':
+            case 'BossEnderTransform':
                 this.soundManager.playBossTransformSound();
                 break;
             default:
@@ -593,7 +593,7 @@ export default class MonsterManager {
     private checkBossTargetChange(oldMonster: Monsters, newMonster: Monsters) {
         // Only check Phase 2 boss monsters
         const monsterTypeName = this.getMonsterTypeName(newMonster.bestiaryId);
-        if (monsterTypeName !== "FinalBossPhase2") {
+        if (monsterTypeName !== "BossEnderPhase2") {
             return;
         }
 
@@ -625,7 +625,7 @@ export default class MonsterManager {
         }
         
         // Special handling for boss monsters - create immediately (no queue)
-        if (monsterTypeName === "FinalBossPhase1" || monsterTypeName === "FinalBossPhase2") {
+        if (monsterTypeName === "BossEnderPhase1" || monsterTypeName === "BossEnderPhase2") {
             console.log(`BOSS SPAWNED: ${monsterTypeName}`);
             console.log(`- Monster ID: ${monster.monsterId}`);
             console.log(`- HP: ${monster.hp}/${monster.maxHp}`);
@@ -634,13 +634,13 @@ export default class MonsterManager {
             console.log(`- Position: (${monster.spawnPosition.x}, ${monster.spawnPosition.y})`);
             
             // Play boss spawn sound for first form
-            if (monsterTypeName === "FinalBossPhase1") {
+            if (monsterTypeName === "BossEnderPhase1") {
                 console.log("*** FIRST BOSS FORM SPAWNED! Playing voice cue... ***");
                 this.soundManager.playBossSpawnSound();
             }
             
             // If this is phase 2, it means phase 1 was defeated
-            if (monsterTypeName === "FinalBossPhase2") {
+            if (monsterTypeName === "BossEnderPhase2") {
                 console.log("*** PHASE 2 OF THE BOSS HAS BEGUN! ***");
                 
                 // Play transformation sound sequence
@@ -764,8 +764,8 @@ export default class MonsterManager {
             case 0: return "Rat";
             case 1: return "Slime";
             case 2: return "Orc";
-            case 3: return "FinalBossPhase1";
-            case 4: return "FinalBossPhase2";
+            case 3: return "BossEnderPhase1";
+            case 4: return "BossEnderPhase2";
             case 5: return "VoidChest";
             case 6: return "Imp";
             case 7: return "Zombie";

@@ -234,7 +234,7 @@ export default class Minimap {
         for (const monster of this.spacetimeDBClient.sdkConnection.db.monsters.iter()) {
             const monsterType = monster.bestiaryId?.tag || monster.bestiaryId;
             
-            if (monsterType === 'FinalBossPhase1' || monsterType === 'FinalBossPhase2') {
+            if (monsterType === 'BossEnderPhase1' || monsterType === 'BossEnderPhase2') {
                 // Get monster position from boid data
                 const boid = this.spacetimeDBClient.sdkConnection.db.monstersBoid.monsterId.find(monster.monsterId);
                 if (boid) {

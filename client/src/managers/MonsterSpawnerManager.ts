@@ -150,8 +150,8 @@ export default class MonsterSpawnerManager {
             case 0: return "Rat";
             case 1: return "Slime";
             case 2: return "Orc";
-            case 3: return "FinalBossPhase1";
-            case 4: return "FinalBossPhase2";
+                    case 3: return "BossEnderPhase1";
+        case 4: return "BossEnderPhase2";
             case 5: return "VoidChest";
             case 6: return "Imp";
             case 7: return "Zombie";

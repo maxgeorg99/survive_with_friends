@@ -742,7 +742,7 @@ export default class GameScene extends Phaser.Scene {
             //console.log("Monster created:", monsterType);
             
             // If a boss monster spawns, switch to boss music and show dark haze
-            if (monsterType === 'FinalBossPhase1' || monsterType === 'FinalBossPhase2') {
+            if (monsterType === 'BossEnderPhase1' || monsterType === 'BossEnderPhase2') {
                 console.log("Boss detected! Switching to boss music and showing dark haze");
                 if (this.musicManager) {
                     this.musicManager.playTrack('boss');
@@ -870,7 +870,7 @@ export default class GameScene extends Phaser.Scene {
         for (const monster of ctx.db.monsters.iter()) {
             if (monster.bestiaryId && monster.bestiaryId.tag) {
                 const monsterType = monster.bestiaryId.tag;
-                if (monsterType === 'FinalBossPhase1' || monsterType === 'FinalBossPhase2') {
+                if (monsterType === 'BossEnderPhase1' || monsterType === 'BossEnderPhase2') {
                     console.log(`Found active boss during initialization: ${monsterType} (ID: ${monster.monsterId})`);
                     return true;
                 }

@@ -256,11 +256,11 @@ export default class BossTimerUI {
         // If a boss monster is created, hide the timer and show nameplate
         if (monster.bestiaryId && monster.bestiaryId.tag) {
             const monsterType = monster.bestiaryId.tag;
-            if (monsterType === 'FinalBossPhase1') {
+            if (monsterType === 'BossEnderPhase1') {
                 this.stopTimer();
                 this.container.setVisible(false);
                 this.showBossNameplate("Ender, Scion of Ruin");
-            } else if (monsterType === 'FinalBossPhase2') {
+            } else if (monsterType === 'BossEnderPhase2') {
                 // Hide any existing nameplate first
                 this.hideBossNameplate();
                 // Small delay before showing new nameplate for dramatic effect
@@ -591,7 +591,7 @@ export default class BossTimerUI {
         for (const monster of this.spacetimeClient.sdkConnection.db.monsters.iter()) {
             if (monster.bestiaryId && monster.bestiaryId.tag) {
                 const monsterType = monster.bestiaryId.tag;
-                if (monsterType === 'FinalBossPhase1') {
+                if (monsterType === 'BossEnderPhase1') {
                     console.log("Found existing boss phase 1 on reconnect - showing nameplate, starting boss music and haze");
                     this.stopTimer();
                     this.container.setVisible(false);
@@ -600,7 +600,7 @@ export default class BossTimerUI {
                     // Trigger boss music and haze for reconnection
                     this.triggerBossEffectsOnReconnect();
                     return; // Only show one boss nameplate
-                } else if (monsterType === 'FinalBossPhase2') {
+                } else if (monsterType === 'BossEnderPhase2') {
                     console.log("Found existing boss phase 2 on reconnect - showing nameplate, starting boss music and haze");
                     this.stopTimer();
                     this.container.setVisible(false);
