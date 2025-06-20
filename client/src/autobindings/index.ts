@@ -90,6 +90,8 @@ import { SpawnDebugSpecialGem } from "./spawn_debug_special_gem_reducer.ts";
 export { SpawnDebugSpecialGem };
 import { SpawnDebugVoidChest } from "./spawn_debug_void_chest_reducer.ts";
 export { SpawnDebugVoidChest };
+import { SpawnDelayedAgnaFireOrb } from "./spawn_delayed_agna_fire_orb_reducer.ts";
+export { SpawnDelayedAgnaFireOrb };
 import { SpawnEnderClawWave } from "./spawn_ender_claw_wave_reducer.ts";
 export { SpawnEnderClawWave };
 import { SpawnEnderScytheSpawns } from "./spawn_ender_scythe_spawns_reducer.ts";
@@ -134,6 +136,8 @@ import { ActiveAttacksTableHandle } from "./active_attacks_table.ts";
 export { ActiveAttacksTableHandle };
 import { ActiveMonsterAttacksTableHandle } from "./active_monster_attacks_table.ts";
 export { ActiveMonsterAttacksTableHandle };
+import { AgnaDelayedOrbSchedulerTableHandle } from "./agna_delayed_orb_scheduler_table.ts";
+export { AgnaDelayedOrbSchedulerTableHandle };
 import { AgnaFireOrbSchedulerTableHandle } from "./agna_fire_orb_scheduler_table.ts";
 export { AgnaFireOrbSchedulerTableHandle };
 import { AgnaFlamethrowerSchedulerTableHandle } from "./agna_flamethrower_scheduler_table.ts";
@@ -236,6 +240,8 @@ import { ActiveAttackCleanup } from "./active_attack_cleanup_type.ts";
 export { ActiveAttackCleanup };
 import { ActiveMonsterAttack } from "./active_monster_attack_type.ts";
 export { ActiveMonsterAttack };
+import { AgnaDelayedOrbScheduler } from "./agna_delayed_orb_scheduler_type.ts";
+export { AgnaDelayedOrbScheduler };
 import { AgnaFireOrbScheduler } from "./agna_fire_orb_scheduler_type.ts";
 export { AgnaFireOrbScheduler };
 import { AgnaFlamethrowerScheduler } from "./agna_flamethrower_scheduler_type.ts";
@@ -364,6 +370,11 @@ const REMOTE_MODULE = {
       tableName: "active_monster_attacks",
       rowType: ActiveMonsterAttack.getTypeScriptAlgebraicType(),
       primaryKey: "activeMonsterAttackId",
+    },
+    agna_delayed_orb_scheduler: {
+      tableName: "agna_delayed_orb_scheduler",
+      rowType: AgnaDelayedOrbScheduler.getTypeScriptAlgebraicType(),
+      primaryKey: "scheduledId",
     },
     agna_fire_orb_scheduler: {
       tableName: "agna_fire_orb_scheduler",
@@ -703,6 +714,10 @@ const REMOTE_MODULE = {
       reducerName: "spawn_debug_void_chest",
       argsType: SpawnDebugVoidChest.getTypeScriptAlgebraicType(),
     },
+    spawn_delayed_agna_fire_orb: {
+      reducerName: "spawn_delayed_agna_fire_orb",
+      argsType: SpawnDelayedAgnaFireOrb.getTypeScriptAlgebraicType(),
+    },
     spawn_ender_claw_wave: {
       reducerName: "spawn_ender_claw_wave",
       argsType: SpawnEnderClawWave.getTypeScriptAlgebraicType(),
@@ -827,6 +842,7 @@ export type Reducer = never
 | { name: "SpawnDebugLootCapsule", args: SpawnDebugLootCapsule }
 | { name: "SpawnDebugSpecialGem", args: SpawnDebugSpecialGem }
 | { name: "SpawnDebugVoidChest", args: SpawnDebugVoidChest }
+| { name: "SpawnDelayedAgnaFireOrb", args: SpawnDelayedAgnaFireOrb }
 | { name: "SpawnEnderClawWave", args: SpawnEnderClawWave }
 | { name: "SpawnEnderScytheSpawns", args: SpawnEnderScytheSpawns }
 | { name: "SpawnEnderScythes", args: SpawnEnderScythes }
@@ -1261,6 +1277,22 @@ export class RemoteReducers {
     this.connection.offReducer("spawn_debug_void_chest", callback);
   }
 
+  spawnDelayedAgnaFireOrb(scheduler: AgnaDelayedOrbScheduler) {
+    const __args = { scheduler };
+    let __writer = new BinaryWriter(1024);
+    SpawnDelayedAgnaFireOrb.getTypeScriptAlgebraicType().serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("spawn_delayed_agna_fire_orb", __argsBuffer, this.setCallReducerFlags.spawnDelayedAgnaFireOrbFlags);
+  }
+
+  onSpawnDelayedAgnaFireOrb(callback: (ctx: ReducerEventContext, scheduler: AgnaDelayedOrbScheduler) => void) {
+    this.connection.onReducer("spawn_delayed_agna_fire_orb", callback);
+  }
+
+  removeOnSpawnDelayedAgnaFireOrb(callback: (ctx: ReducerEventContext, scheduler: AgnaDelayedOrbScheduler) => void) {
+    this.connection.offReducer("spawn_delayed_agna_fire_orb", callback);
+  }
+
   spawnEnderClawWave(spawner: EnderClawSpawner) {
     const __args = { spawner };
     let __writer = new BinaryWriter(1024);
@@ -1672,6 +1704,11 @@ export class SetReducerFlags {
     this.spawnDebugVoidChestFlags = flags;
   }
 
+  spawnDelayedAgnaFireOrbFlags: CallReducerFlags = 'FullUpdate';
+  spawnDelayedAgnaFireOrb(flags: CallReducerFlags) {
+    this.spawnDelayedAgnaFireOrbFlags = flags;
+  }
+
   spawnEnderClawWaveFlags: CallReducerFlags = 'FullUpdate';
   spawnEnderClawWave(flags: CallReducerFlags) {
     this.spawnEnderClawWaveFlags = flags;
@@ -1776,6 +1813,10 @@ export class RemoteTables {
 
   get activeMonsterAttacks(): ActiveMonsterAttacksTableHandle {
     return new ActiveMonsterAttacksTableHandle(this.connection.clientCache.getOrCreateTable<ActiveMonsterAttack>(REMOTE_MODULE.tables.active_monster_attacks));
+  }
+
+  get agnaDelayedOrbScheduler(): AgnaDelayedOrbSchedulerTableHandle {
+    return new AgnaDelayedOrbSchedulerTableHandle(this.connection.clientCache.getOrCreateTable<AgnaDelayedOrbScheduler>(REMOTE_MODULE.tables.agna_delayed_orb_scheduler));
   }
 
   get agnaFireOrbScheduler(): AgnaFireOrbSchedulerTableHandle {

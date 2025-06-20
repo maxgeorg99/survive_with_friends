@@ -516,7 +516,8 @@ pub fn game_tick(ctx: &ReducerContext, _timer: GameTickTimer) {
     process_attack_movements(ctx);
 
     // Update Agna magic circles
-    crate::boss_agna_defs::update_agna_magic_circles(ctx);
+    let collision_cache = crate::monsters_def::get_collision_cache();
+    crate::boss_agna_defs::update_agna_magic_circles(ctx, collision_cache);
 
     process_monster_attack_movements(ctx);
 

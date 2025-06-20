@@ -6,33 +6,40 @@ use crate::monster_attacks_def::active_monster_attacks;
 use crate::monster_ai_defs::monster_state_changes;
 use std::time::Duration;
 
+// General constants
+const AGNA_IDLE_DURATION_MS: u64 = 3000;               // 3 seconds idle time between patterns
+
 // Configuration constants for Agna Flamethrower pattern
 const AGNA_FLAMETHROWER_DURATION_MS: u64 = 10000;     // 10 seconds flamethrower phase
-const AGNA_FLAMETHROWER_SPEED_MULTIPLIER: f32 = 1.6;  // Speed boost while chasing
+const AGNA_FLAMETHROWER_SPEED_MULTIPLIER: f32 = 1.3;  // Speed boost while chasing
 const AGNA_FLAMETHROWER_JET_INTERVAL_MS: u64 = 100;   // Fire rapidly every 100ms
 const AGNA_FLAMETHROWER_CIRCLE_RADIUS: f32 = 128.0;   // Radius of circle around target for random positions
 
 // Configuration constants for AgnaFlamethrowerJet projectiles
 const AGNA_FLAMETHROWER_JET_DAMAGE: u32 = 25;         // Damage per projectile
-const AGNA_FLAMETHROWER_JET_SPEED: f32 = 600.0;       // Movement speed
+const AGNA_FLAMETHROWER_JET_SPEED: f32 = 500.0;       // Movement speed
 const AGNA_FLAMETHROWER_JET_INITIAL_RADIUS: f32 = 16.0; // Starting radius
 const AGNA_FLAMETHROWER_JET_FINAL_RADIUS: f32 = 64.0;   // Final radius
 const AGNA_FLAMETHROWER_JET_DURATION_MS: u64 = 3000;    // 3 seconds lifespan
 
 // Configuration constants for Agna Magic Circle pattern
 const AGNA_MAGIC_CIRCLE_DURATION_MS: u64 = 15000;      // 15 seconds magic circle phase
-const AGNA_MAGIC_CIRCLE_ORBIT_RADIUS: f32 = 96.0;      // Distance circles orbit around player
+const AGNA_MAGIC_CIRCLE_ORBIT_RADIUS: f32 = 256.0;      // Distance circles orbit around player
 const AGNA_MAGIC_CIRCLE_ORBIT_SPEED: f32 = 90.0;       // Degrees per second orbit speed
 const AGNA_MAGIC_CIRCLES_PER_PLAYER: u32 = 4;          // 4 circles per player
 
 
 
 // Configuration constants for AgnaFireOrb projectiles  
-const AGNA_FIRE_ORB_DAMAGE: u32 = 30;                  // Damage per fire orb
-const AGNA_FIRE_ORB_SPEED: f32 = 250.0;                // Movement speed (slower than flamethrower)
+const AGNA_FIRE_ORB_DAMAGE: u32 = 20;                  // Damage per fire orb
+const AGNA_FIRE_ORB_SPEED: f32 = 275.0;                // Movement speed (slower than flamethrower)
 const AGNA_FIRE_ORB_RADIUS: f32 = 24.0;                // Collision radius
-const AGNA_FIRE_ORB_DURATION_MS: u64 = 4000;           // 4 seconds lifespan
+const AGNA_FIRE_ORB_DURATION_MS: u64 = 3000;           // 4 seconds lifespan
 const AGNA_FIRE_ORB_SPAWN_INTERVAL_MS: u64 = 1000;     // Spawn orb every 1 second per player
+
+// Configuration constants for AgnaOrbSpawn telegraph
+const AGNA_ORB_SPAWN_TELEGRAPH_MS: u64 = 150;          // Telegraph appears
+const AGNA_ORB_SPAWN_DURATION_MS: u64 = 50;           // Telegraph lasts
 
 // Table to track the last chosen pattern for each Agna boss to avoid repetition
 #[table(name = boss_agna_last_patterns, public)]
@@ -82,6 +89,21 @@ pub struct AgnaFireOrbScheduler {
     
     pub boss_monster_id: u32,     // The Agna boss that owns this pattern
     pub target_player_id: u32,    // The player being targeted
+}
+
+// Scheduled table for delayed real fire orb spawning (after telegraph)
+#[table(name = agna_delayed_orb_scheduler, scheduled(spawn_delayed_agna_fire_orb), public)]
+pub struct AgnaDelayedOrbScheduler {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    
+    pub scheduled_at: ScheduleAt,
+    
+    pub boss_monster_id: u32,     // The Agna boss that owns this pattern
+    pub target_player_id: u32,    // The player being targeted
+    pub circle_position: DbVector2, // Position where the orb should spawn
+    pub circle_index: u32,        // Which circle fired this orb (0-3)
 }
 
 
@@ -311,19 +333,16 @@ pub fn execute_boss_agna_flamethrower_behavior(ctx: &ReducerContext, monster: &c
 // Execute behavior when entering BossAgnaIdle state
 pub fn execute_boss_agna_idle_behavior(ctx: &ReducerContext, monster: &crate::Monsters) {
     log::info!("Agna boss {} entering idle state", monster.monster_id);
-    
-    // Cleanup any active flamethrower schedules
-    cleanup_agna_flamethrower_schedules(ctx, monster.monster_id);
-    
-    // Cleanup any active magic circle schedules (including dance state)
-    cleanup_agna_magic_circle_schedules(ctx, monster.monster_id);
-    
-    // Reset speed to bestiary value
+
+    // Reset speed to base value when entering idle (ensures clean state between patterns)
     reset_monster_speed_to_bestiary(ctx, monster);
-    
-    // Schedule next pattern after idle duration
-    let idle_duration_ms = 3000; // 3 seconds idle
-    schedule_random_boss_agna_pattern(ctx, monster.monster_id, idle_duration_ms);
+
+    // When entering idle, ensure all previous attack schedules are cleaned up
+    cleanup_agna_flamethrower_schedules(ctx, monster.monster_id);
+    cleanup_agna_magic_circle_schedules(ctx, monster.monster_id);
+
+    // Schedule the next random pattern
+    schedule_random_boss_agna_pattern(ctx, monster.monster_id, AGNA_IDLE_DURATION_MS);
 }
 
 // Schedule a random Agna boss pattern
@@ -477,10 +496,9 @@ pub fn trigger_agna_fire_orb_attack(ctx: &ReducerContext, scheduler: AgnaFireOrb
         }
     };
 
-    // Find all magic circles for this player and boss
+    // Find all magic circles for this player
     let player_circles: Vec<_> = ctx.db.agna_magic_circles().iter()
-        .filter(|circle| circle.boss_monster_id == scheduler.boss_monster_id && 
-                        circle.target_player_id == scheduler.target_player_id)
+        .filter(|circle|  circle.target_player_id == scheduler.target_player_id)
         .collect();
 
     if player_circles.is_empty() {
@@ -495,36 +513,102 @@ pub fn trigger_agna_fire_orb_attack(ctx: &ReducerContext, scheduler: AgnaFireOrb
     // Calculate the circle's current position
     let circle_position = calculate_magic_circle_position(&target_player.position, chosen_circle);
 
-    // Calculate direction from circle to player center
+    // First, spawn the telegraph (warning indicator)
+    let orb_spawn_telegraph = crate::ActiveMonsterAttack {
+        active_monster_attack_id: 0, // Will be auto-assigned
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(AGNA_ORB_SPAWN_DURATION_MS)),
+        position: circle_position,
+        direction: DbVector2::new(0.0, 0.0), // Telegraph doesn't move
+        monster_attack_type: MonsterAttackType::AgnaOrbSpawn,
+        piercing: true, // Telegraph is piercing (no damage)
+        damage: 0, // Telegraph does no damage
+        radius: AGNA_FIRE_ORB_RADIUS, // Same visual size as the real orb
+        speed: 0.0, // Telegraph doesn't move
+        parameter_u: scheduler.target_player_id, // Store target player ID
+        parameter_f: chosen_circle.circle_index as f32, // Store which circle will fire this orb (0-3)
+        ticks_elapsed: 0,
+        from_shiny_monster: false, // Bosses are not shiny
+    };
+
+    ctx.db.active_monster_attacks().insert(orb_spawn_telegraph);
+
+    // Schedule the real fire orb to spawn after the telegraph delay
+    // We'll use a separate scheduler table for this delayed spawn
+    ctx.db.agna_delayed_orb_scheduler().insert(AgnaDelayedOrbScheduler {
+        scheduled_id: 0,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(AGNA_ORB_SPAWN_TELEGRAPH_MS)),
+        boss_monster_id: scheduler.boss_monster_id,
+        target_player_id: scheduler.target_player_id,
+        circle_position,
+        circle_index: chosen_circle.circle_index,
+    });
+
+    log::info!("Agna boss {} spawned orb spawn telegraph from circle {} targeting player {}", 
+              scheduler.boss_monster_id, chosen_circle.circle_index, scheduler.target_player_id);
+
+    // Schedule the next fire orb attack for this player
+    schedule_next_agna_fire_orb_attack(ctx, scheduler.boss_monster_id, scheduler.target_player_id);
+}
+
+// Reducer to spawn the actual fire orb after the telegraph delay
+#[reducer]
+pub fn spawn_delayed_agna_fire_orb(ctx: &ReducerContext, scheduler: AgnaDelayedOrbScheduler) {
+    if ctx.sender != ctx.identity() {
+        panic!("spawn_delayed_agna_fire_orb may not be invoked by clients, only via scheduling.");
+    }
+
+    // Check if the Agna boss still exists
+    let boss_opt = ctx.db.monsters().monster_id().find(&scheduler.boss_monster_id);
+    let boss = match boss_opt {
+        Some(monster) => monster,
+        None => {
+            log::info!("Agna boss {} no longer exists, cancelling delayed fire orb", scheduler.boss_monster_id);
+            return;
+        }
+    };
+
+    if boss.ai_state != crate::monster_ai_defs::AIState::BossAgnaMagicCircle {
+        log::info!("Agna boss {} no longer in magic circle state, cancelling delayed fire orb", scheduler.boss_monster_id);
+        return;
+    }
+
+    // Get the target player's current position (at time of actual orb spawn)
+    let target_player_opt = ctx.db.player().player_id().find(&scheduler.target_player_id);
+    let target_player = match target_player_opt {
+        Some(player) => player,
+        None => {
+            log::info!("Target player {} no longer exists, cancelling delayed fire orb", scheduler.target_player_id);
+            return;
+        }
+    };
+
+    // Calculate direction from circle to player center (at time of actual orb spawn)
     let direction_vector = DbVector2::new(
-        target_player.position.x - circle_position.x,
-        target_player.position.y - circle_position.y
+        target_player.position.x - scheduler.circle_position.x,
+        target_player.position.y - scheduler.circle_position.y
     ).normalize();
 
-    // Spawn the fire orb
+    // Spawn the actual fire orb
     let fire_orb_attack = crate::ActiveMonsterAttack {
         active_monster_attack_id: 0, // Will be auto-assigned
         scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(AGNA_FIRE_ORB_DURATION_MS)),
-        position: circle_position,
+        position: scheduler.circle_position,
         direction: direction_vector,
         monster_attack_type: MonsterAttackType::AgnaFireOrb,
         piercing: false, // Fire orbs don't pierce
         damage: AGNA_FIRE_ORB_DAMAGE,
         radius: AGNA_FIRE_ORB_RADIUS,
         speed: AGNA_FIRE_ORB_SPEED,
-        parameter_u: 0,
-        parameter_f: 0.0,
+        parameter_u: scheduler.target_player_id, // Store target player ID
+        parameter_f: scheduler.circle_index as f32, // Store which circle fired this orb (0-3)
         ticks_elapsed: 0,
         from_shiny_monster: false, // Bosses are not shiny
     };
 
     ctx.db.active_monster_attacks().insert(fire_orb_attack);
 
-    log::info!("Agna boss {} spawned fire orb from circle {} targeting player {}", 
-              scheduler.boss_monster_id, chosen_circle.circle_index, scheduler.target_player_id);
-
-    // Schedule the next fire orb attack for this player
-    schedule_next_agna_fire_orb_attack(ctx, scheduler.boss_monster_id, scheduler.target_player_id);
+    log::info!("Agna boss {} spawned delayed fire orb from circle {} targeting player {}", 
+              scheduler.boss_monster_id, scheduler.circle_index, scheduler.target_player_id);
 }
 
 // Calculate the current position of a magic circle
@@ -625,20 +709,21 @@ pub fn start_agna_fire_orb_attacks(ctx: &ReducerContext, boss_monster_id: u32, t
 }
 
 // Update magic circle positions (called from game tick)
-pub fn update_agna_magic_circles(ctx: &ReducerContext) {
+pub fn update_agna_magic_circles(ctx: &ReducerContext, cache: &crate::collision::CollisionCache) {
     // Update all magic circles' tick counts and positions
     for circle in ctx.db.agna_magic_circles().iter() {
         let mut updated_circle = circle;
         updated_circle.ticks_elapsed += 1;
         
-        // Get the target player's current position
-        let player_opt = ctx.db.player().player_id().find(&updated_circle.target_player_id);
-        let player_position = match player_opt {
-            Some(player) => player.position,
-            None => {
-                // Player no longer exists, magic circle will be cleaned up elsewhere
-                continue;
-            }
+        // Get the target player's current position from cache
+        let player_position = if let Some(&player_cache_idx) = cache.player.player_id_to_cache_index.get(&updated_circle.target_player_id) {
+            DbVector2::new(
+                cache.player.pos_x_player[player_cache_idx as usize],
+                cache.player.pos_y_player[player_cache_idx as usize]
+            )
+        } else {
+            // Player no longer exists in cache, magic circle will be cleaned up elsewhere
+            continue;
         };
         
         // Calculate the current position of the magic circle
@@ -646,8 +731,6 @@ pub fn update_agna_magic_circles(ctx: &ReducerContext) {
         
         ctx.db.agna_magic_circles().circle_id().update(updated_circle);
     }
-    
-
 }
 
 
@@ -676,8 +759,18 @@ pub fn cleanup_agna_magic_circle_schedules(ctx: &ReducerContext, boss_monster_id
         ctx.db.agna_fire_orb_scheduler().scheduled_id().delete(&scheduler.scheduled_id);
     }
     
-    log::info!("Cleaned up {} magic circles and {} fire orb schedulers for Agna boss {}", 
-              circles_count, schedulers_count, boss_monster_id);
+    // Delete all delayed orb schedulers for this boss
+    let delayed_schedulers_to_delete: Vec<_> = ctx.db.agna_delayed_orb_scheduler().iter()
+        .filter(|scheduler| scheduler.boss_monster_id == boss_monster_id)
+        .collect();
+    
+    let delayed_schedulers_count = delayed_schedulers_to_delete.len();
+    for scheduler in delayed_schedulers_to_delete {
+        ctx.db.agna_delayed_orb_scheduler().scheduled_id().delete(&scheduler.scheduled_id);
+    }
+    
+    log::info!("Cleaned up {} magic circles, {} fire orb schedulers, and {} delayed orb schedulers for Agna boss {}", 
+              circles_count, schedulers_count, delayed_schedulers_count, boss_monster_id);
 }
 
 // Execute behavior when entering BossAgnaMagicCircle state

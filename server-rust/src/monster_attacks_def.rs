@@ -71,6 +71,9 @@ pub fn process_monster_attack_movements(ctx: &ReducerContext) {
             MonsterAttackType::AgnaFlamethrowerJet => {
                 // This is handled by boss_agna_defs::handle_agna_attack_movement
             },
+            MonsterAttackType::AgnaOrbSpawn => {
+                // AgnaOrbSpawn stays stationary (it's just a visual telegraph)
+            },
             _ => {
                 // Regular projectile movement based on direction and speed
                 let move_speed = updated_active_monster_attack.speed;

@@ -86,6 +86,7 @@ pub enum MonsterAttackType {
     ChaosBall,
     VoidZone,
     AgnaFlamethrowerJet,
+    AgnaOrbSpawn,
     AgnaFireOrb,
 }
 

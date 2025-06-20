@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { EventContext, AgnaMagicCircle } from '../autobindings';
+import { EventContext, AgnaMagicCircle, ActiveMonsterAttack, MonsterAttackType } from '../autobindings';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 
 const MAGIC_CIRCLE_ASSET_KEY = 'agna_magic_circle';
@@ -18,6 +18,7 @@ export default class BossAgnaManager {
     private boundHandleCircleInsert: (ctx: EventContext, circle: AgnaMagicCircle) => void;
     private boundHandleCircleUpdate: (ctx: EventContext, oldCircle: AgnaMagicCircle, newCircle: AgnaMagicCircle) => void;
     private boundHandleCircleDelete: (ctx: EventContext, circle: AgnaMagicCircle) => void;
+    private boundHandleAttackInsert: (ctx: EventContext, attack: ActiveMonsterAttack) => void;
     
     // Flag to track if the manager has been shut down
     private isDestroyed: boolean = false;
@@ -31,13 +32,15 @@ export default class BossAgnaManager {
         this.boundHandleCircleInsert = this.handleCircleInsert.bind(this);
         this.boundHandleCircleUpdate = this.handleCircleUpdate.bind(this);
         this.boundHandleCircleDelete = this.handleCircleDelete.bind(this);
+        this.boundHandleAttackInsert = this.handleAttackInsert.bind(this);
         
-        // Set up event handlers for magic circle table events
+        // Set up event handlers for magic circle table events and active attacks
         const db = this.spacetimeDBClient.sdkConnection?.db;
         if (db) {
             db.agnaMagicCircles?.onInsert(this.boundHandleCircleInsert);
             db.agnaMagicCircles?.onUpdate(this.boundHandleCircleUpdate);
             db.agnaMagicCircles?.onDelete(this.boundHandleCircleDelete);
+            db.activeMonsterAttacks?.onInsert(this.boundHandleAttackInsert);
         } else {
             console.error("Could not set up BossAgnaManager database listeners (database not connected)");
         }
@@ -87,6 +90,19 @@ export default class BossAgnaManager {
         this.removeMagicCircle(circle.circleId);
     }
 
+    // Handle when a new active monster attack is inserted (for telegraph VFX)
+    private handleAttackInsert(ctx: EventContext, attack: ActiveMonsterAttack) {
+        if (this.isDestroyed) {
+            return;
+        }
+        
+        // Check if this is an AgnaOrbSpawn (telegraph) attack
+        if (attack.monsterAttackType.tag === "AgnaOrbSpawn") {
+            console.log("AgnaOrbSpawn telegraph detected:", attack);
+            this.playTelegraphVFX(attack);
+        }
+    }
+
     private createMagicCircle(circleData: AgnaMagicCircle): void {
         // Check if we already have a sprite for this circle
         if (this.magicCircles.has(circleData.circleId)) {
@@ -97,12 +113,17 @@ export default class BossAgnaManager {
         // Use the server-provided position directly
         const position = { x: circleData.position.x, y: circleData.position.y };
         
-        console.log(`Creating magic circle ${circleData.circleId} at server position (${position.x}, ${position.y}) for player ${circleData.targetPlayerId}`);
+        console.log(`Creating magic circle ${circleData.circleId} at server position (${position.x}, ${position.y}) for player ${circleData.targetPlayerId}, circle index ${circleData.circleIndex}`);
         
         // Create the magic circle sprite
         const circleSprite = this.scene.add.image(position.x, position.y, MAGIC_CIRCLE_ASSET_KEY);
         circleSprite.setScale(0.8); // Adjust size as needed
         circleSprite.setAlpha(0); // Start invisible for fade in
+        
+        // Store associated data on the sprite for easy access
+        (circleSprite as any).targetPlayerId = circleData.targetPlayerId;
+        (circleSprite as any).circleIndex = circleData.circleIndex;
+        (circleSprite as any).circleId = circleData.circleId;
         
         // Use proper depth - above ground and sprites but below UI
         circleSprite.setDepth(BASE_DEPTH + position.y + 10); // Above sprites at same y position
@@ -121,7 +142,7 @@ export default class BossAgnaManager {
         // Store the sprite
         this.magicCircles.set(circleData.circleId, circleSprite);
         
-        console.log(`Magic circle ${circleData.circleId} created successfully with depth ${circleSprite.depth}`);
+        console.log(`Magic circle ${circleData.circleId} created successfully with depth ${circleSprite.depth}, player ${circleData.targetPlayerId}, index ${circleData.circleIndex}`);
     }
 
     private updateMagicCirclePosition(circleData: AgnaMagicCircle): void {
@@ -142,6 +163,89 @@ export default class BossAgnaManager {
         
         // Add a subtle rotation to make it more magical
         circleSprite.setRotation(circleSprite.rotation + 0.02);
+    }
+
+    private playTelegraphVFX(attack: ActiveMonsterAttack): void {
+        const targetPlayerId = attack.parameterU; // Target player ID stored in parameterU
+        const circleIndex = Math.round(attack.parameterF); // Circle index (0-3) stored in parameterF, cast from float
+        
+        console.log(`Playing telegraph VFX for player ${targetPlayerId}, circle index ${circleIndex}`);
+        
+        // Find the matching magic circle sprite by target player AND circle index
+        let matchingCircle: Phaser.GameObjects.Image | null = null;
+        for (const [circleId, circleSprite] of this.magicCircles) {
+            const spriteTargetPlayerId = (circleSprite as any).targetPlayerId;
+            const spriteCircleIndex = (circleSprite as any).circleIndex;
+            
+            if (spriteTargetPlayerId === targetPlayerId && spriteCircleIndex === circleIndex) {
+                matchingCircle = circleSprite;
+                console.log(`Found matching circle: ID ${(circleSprite as any).circleId}, player ${spriteTargetPlayerId}, index ${spriteCircleIndex}`);
+                break;
+            }
+        }
+        
+        if (!matchingCircle) {
+            console.warn(`Could not find matching magic circle for player ${targetPlayerId}, circle index ${circleIndex}`);
+            return;
+        }
+        
+        // Create red flash effect on the circle
+        this.createRangeFlash(matchingCircle);
+        
+        // Create red particle effect at the circle's current position
+        this.createRedParticles(matchingCircle.x, matchingCircle.y);
+    }
+
+
+
+    private createRangeFlash(circleSprite: Phaser.GameObjects.Image): void {
+        // Create a red tint flash on the magic circle
+        const originalTint = circleSprite.tint;
+        
+        // Flash red
+        circleSprite.setTint(0xff4444);
+        
+        // Tween back to original color
+        this.scene.tweens.add({
+            targets: circleSprite,
+            duration: 200,
+            ease: 'Power2',
+            onComplete: () => {
+                circleSprite.setTint(originalTint);
+            }
+        });
+        
+        // Also create a brief scale pulse
+        const originalScale = circleSprite.scaleX;
+        this.scene.tweens.add({
+            targets: circleSprite,
+            scaleX: originalScale * 1.2,
+            scaleY: originalScale * 1.2,
+            duration: 100,
+            ease: 'Power2',
+            yoyo: true
+        });
+    }
+
+    private createRedParticles(x: number, y: number): void {
+        // Create red particle effect at the telegraph position
+        const particles = this.scene.add.particles(x, y, 'white_pixel', {
+            scale: { start: 0.3, end: 0.1 },
+            speed: { min: 50, max: 100 },
+            lifespan: 300,
+            quantity: 8,
+            tint: 0xff4444, // Red color
+            alpha: { start: 0.8, end: 0 },
+            blendMode: 'ADD'
+        });
+        
+        // Set proper depth
+        particles.setDepth(BASE_DEPTH + y + 20);
+        
+        // Auto-destroy the particle emitter after a short time
+        this.scene.time.delayedCall(500, () => {
+            particles.destroy();
+        });
     }
 
 
@@ -203,6 +307,7 @@ export default class BossAgnaManager {
             db.agnaMagicCircles?.removeOnInsert(this.boundHandleCircleInsert);
             db.agnaMagicCircles?.removeOnUpdate(this.boundHandleCircleUpdate);
             db.agnaMagicCircles?.removeOnDelete(this.boundHandleCircleDelete);
+            db.activeMonsterAttacks?.removeOnInsert(this.boundHandleAttackInsert);
             console.log("BossAgnaManager database listeners removed");
         }
     }
