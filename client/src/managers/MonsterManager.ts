@@ -638,6 +638,11 @@ export default class MonsterManager {
                 console.log(`*** Agna boss ${newMonster.monsterId} entered flamethrower mode! ***`);
                 this.soundManager.playSound('agna_burned', 0.8);
                 break;
+            case 'BossAgnaMagicCircle':
+                // Play Agna magic circle sound
+                console.log(`*** Agna boss ${newMonster.monsterId} entered magic circle mode! ***`);
+                this.soundManager.playSound('agna_closing_in', 0.8);
+                break;
             default:
                 // No sound for other states (BossIdle, Default, Stationary)
                 break;

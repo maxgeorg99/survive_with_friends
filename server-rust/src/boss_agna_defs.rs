@@ -1,7 +1,7 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, ScheduleAt, SpacetimeType, rand::Rng};
-use crate::{DbVector2, MonsterType, MonsterAttackType, config, player, bestiary, monsters, monsters_boid, MonsterSpawners, 
+use crate::{DbVector2, MonsterType, MonsterAttackType, config, player, bestiary, monsters, monsters_boid, MonsterSpawners,
            DELTA_TIME, get_world_cell_from_position, spatial_hash_collision_checker,
-           WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT};
+           WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT, WORLD_SIZE};
 use crate::monster_attacks_def::active_monster_attacks;
 use crate::monster_ai_defs::monster_state_changes;
 use std::time::Duration;
@@ -18,6 +18,21 @@ const AGNA_FLAMETHROWER_JET_SPEED: f32 = 600.0;       // Movement speed
 const AGNA_FLAMETHROWER_JET_INITIAL_RADIUS: f32 = 16.0; // Starting radius
 const AGNA_FLAMETHROWER_JET_FINAL_RADIUS: f32 = 64.0;   // Final radius
 const AGNA_FLAMETHROWER_JET_DURATION_MS: u64 = 3000;    // 3 seconds lifespan
+
+// Configuration constants for Agna Magic Circle pattern
+const AGNA_MAGIC_CIRCLE_DURATION_MS: u64 = 15000;      // 15 seconds magic circle phase
+const AGNA_MAGIC_CIRCLE_ORBIT_RADIUS: f32 = 96.0;      // Distance circles orbit around player
+const AGNA_MAGIC_CIRCLE_ORBIT_SPEED: f32 = 90.0;       // Degrees per second orbit speed
+const AGNA_MAGIC_CIRCLES_PER_PLAYER: u32 = 4;          // 4 circles per player
+
+
+
+// Configuration constants for AgnaFireOrb projectiles  
+const AGNA_FIRE_ORB_DAMAGE: u32 = 30;                  // Damage per fire orb
+const AGNA_FIRE_ORB_SPEED: f32 = 250.0;                // Movement speed (slower than flamethrower)
+const AGNA_FIRE_ORB_RADIUS: f32 = 24.0;                // Collision radius
+const AGNA_FIRE_ORB_DURATION_MS: u64 = 4000;           // 4 seconds lifespan
+const AGNA_FIRE_ORB_SPAWN_INTERVAL_MS: u64 = 1000;     // Spawn orb every 1 second per player
 
 // Table to track the last chosen pattern for each Agna boss to avoid repetition
 #[table(name = boss_agna_last_patterns, public)]
@@ -37,10 +52,39 @@ pub struct AgnaFlamethrowerScheduler {
     
     pub scheduled_at: ScheduleAt, // When the next flamethrower jet should fire
     
-    #[index(btree)]
     pub boss_monster_id: u32,     // The boss monster that will fire the jet
     pub target_player_id: u32,    // The target player being chased
 }
+
+// Table for tracking magic circles that orbit around players
+#[table(name = agna_magic_circles, public)]
+pub struct AgnaMagicCircle {
+    #[primary_key]
+    #[auto_inc]
+    pub circle_id: u64,
+    
+    pub boss_monster_id: u32,     // The Agna boss that spawned this circle
+    pub target_player_id: u32,    // The player this circle orbits around
+    pub circle_index: u32,        // Which of the 4 circles this is (0-3)
+    pub initial_rotation: f32,    // Starting rotation angle in radians
+    pub ticks_elapsed: u32,       // How many ticks since spawn
+    pub position: DbVector2,      // Current position of the magic circle
+}
+
+// Scheduled table for AgnaFireOrb attacks during magic circle pattern
+#[table(name = agna_fire_orb_scheduler, scheduled(trigger_agna_fire_orb_attack), public)]
+pub struct AgnaFireOrbScheduler {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    
+    pub scheduled_at: ScheduleAt,
+    
+    pub boss_monster_id: u32,     // The Agna boss that owns this pattern
+    pub target_player_id: u32,    // The player being targeted
+}
+
+
 
 // Handle movement for Agna's special attacks
 pub fn handle_agna_attack_movement(ctx: &ReducerContext, attack: &mut crate::ActiveMonsterAttack) {
@@ -271,6 +315,9 @@ pub fn execute_boss_agna_idle_behavior(ctx: &ReducerContext, monster: &crate::Mo
     // Cleanup any active flamethrower schedules
     cleanup_agna_flamethrower_schedules(ctx, monster.monster_id);
     
+    // Cleanup any active magic circle schedules (including dance state)
+    cleanup_agna_magic_circle_schedules(ctx, monster.monster_id);
+    
     // Reset speed to bestiary value
     reset_monster_speed_to_bestiary(ctx, monster);
     
@@ -283,8 +330,29 @@ pub fn execute_boss_agna_idle_behavior(ctx: &ReducerContext, monster: &crate::Mo
 pub fn schedule_random_boss_agna_pattern(ctx: &ReducerContext, monster_id: u32, delay_ms: u64) {
     log::info!("Scheduling random Agna pattern for monster {} in {}ms", monster_id, delay_ms);
     
-    // For now, just use flamethrower pattern - we can add more patterns later
-    let chosen_pattern = crate::monster_ai_defs::AIState::BossAgnaFlamethrower;
+    // Choose between available patterns
+    let available_patterns = vec![
+        crate::monster_ai_defs::AIState::BossAgnaFlamethrower,
+        crate::monster_ai_defs::AIState::BossAgnaMagicCircle,
+    ];
+    
+    // Get last pattern to avoid repetition
+    let last_pattern_opt = ctx.db.boss_agna_last_patterns().monster_id().find(&monster_id);
+    let last_pattern = last_pattern_opt.as_ref().map(|p| p.last_pattern);
+    
+    // Filter out the last pattern if possible
+    let filtered_patterns: Vec<_> = if available_patterns.len() > 1 {
+        available_patterns.into_iter()
+            .filter(|pattern| Some(*pattern) != last_pattern)
+            .collect()
+    } else {
+        available_patterns
+    };
+    
+    // Choose random pattern
+    let mut rng = ctx.rng();
+    let pattern_index = rng.gen::<usize>() % filtered_patterns.len();
+    let chosen_pattern = filtered_patterns[pattern_index];
     
     // Update last pattern tracking
     let last_pattern_opt = ctx.db.boss_agna_last_patterns().monster_id().find(&monster_id);
@@ -366,9 +434,268 @@ pub fn cleanup_agna_ai_schedules(ctx: &ReducerContext, monster_id: u32) {
     // Cleanup flamethrower schedules
     cleanup_agna_flamethrower_schedules(ctx, monster_id);
     
+    // Cleanup magic circle schedules
+    cleanup_agna_magic_circle_schedules(ctx, monster_id);
+    
     // Remove last pattern tracking
     if ctx.db.boss_agna_last_patterns().monster_id().find(&monster_id).is_some() {
         ctx.db.boss_agna_last_patterns().monster_id().delete(&monster_id);
         log::info!("Removed last pattern tracking for Agna boss {}", monster_id);
     }
-} 
+}
+
+// Reducer to spawn a fire orb from one of the magic circles
+#[reducer]
+pub fn trigger_agna_fire_orb_attack(ctx: &ReducerContext, scheduler: AgnaFireOrbScheduler) {
+    if ctx.sender != ctx.identity() {
+        panic!("trigger_agna_fire_orb_attack may not be invoked by clients, only via scheduling.");
+    }
+
+    // Check if the Agna boss still exists
+    let boss_opt = ctx.db.monsters().monster_id().find(&scheduler.boss_monster_id);
+    let boss = match boss_opt {
+        Some(monster) => monster,
+        None => {
+            log::info!("Agna boss {} no longer exists, stopping fire orb attacks", scheduler.boss_monster_id);
+            return;
+        }
+    };
+
+    // Check if boss is still in magic circle state
+    if boss.ai_state != crate::monster_ai_defs::AIState::BossAgnaMagicCircle {
+        log::info!("Agna boss {} no longer in magic circle state, stopping fire orb attacks", scheduler.boss_monster_id);
+        return;
+    }
+
+    // Get the target player
+    let target_player_opt = ctx.db.player().player_id().find(&scheduler.target_player_id);
+    let target_player = match target_player_opt {
+        Some(player) => player,
+        None => {
+            log::info!("Target player {} no longer exists for fire orb attack", scheduler.target_player_id);
+            return;
+        }
+    };
+
+    // Find all magic circles for this player and boss
+    let player_circles: Vec<_> = ctx.db.agna_magic_circles().iter()
+        .filter(|circle| circle.boss_monster_id == scheduler.boss_monster_id && 
+                        circle.target_player_id == scheduler.target_player_id)
+        .collect();
+
+    if player_circles.is_empty() {
+        log::info!("No magic circles found for player {}, cannot spawn fire orb", scheduler.target_player_id);
+        return;
+    }
+
+    // Choose a random circle to spawn the fire orb from
+    let mut rng = ctx.rng();
+    let chosen_circle = &player_circles[rng.gen::<usize>() % player_circles.len()];
+
+    // Calculate the circle's current position
+    let circle_position = calculate_magic_circle_position(&target_player.position, chosen_circle);
+
+    // Calculate direction from circle to player center
+    let direction_vector = DbVector2::new(
+        target_player.position.x - circle_position.x,
+        target_player.position.y - circle_position.y
+    ).normalize();
+
+    // Spawn the fire orb
+    let fire_orb_attack = crate::ActiveMonsterAttack {
+        active_monster_attack_id: 0, // Will be auto-assigned
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(AGNA_FIRE_ORB_DURATION_MS)),
+        position: circle_position,
+        direction: direction_vector,
+        monster_attack_type: MonsterAttackType::AgnaFireOrb,
+        piercing: false, // Fire orbs don't pierce
+        damage: AGNA_FIRE_ORB_DAMAGE,
+        radius: AGNA_FIRE_ORB_RADIUS,
+        speed: AGNA_FIRE_ORB_SPEED,
+        parameter_u: 0,
+        parameter_f: 0.0,
+        ticks_elapsed: 0,
+        from_shiny_monster: false, // Bosses are not shiny
+    };
+
+    ctx.db.active_monster_attacks().insert(fire_orb_attack);
+
+    log::info!("Agna boss {} spawned fire orb from circle {} targeting player {}", 
+              scheduler.boss_monster_id, chosen_circle.circle_index, scheduler.target_player_id);
+
+    // Schedule the next fire orb attack for this player
+    schedule_next_agna_fire_orb_attack(ctx, scheduler.boss_monster_id, scheduler.target_player_id);
+}
+
+// Calculate the current position of a magic circle
+fn calculate_magic_circle_position(player_position: &DbVector2, circle: &AgnaMagicCircle) -> DbVector2 {
+    // Calculate how far the circle has rotated
+    let time_elapsed_seconds = circle.ticks_elapsed as f32 * DELTA_TIME;
+    let rotation_radians = (AGNA_MAGIC_CIRCLE_ORBIT_SPEED * time_elapsed_seconds).to_radians();
+    let current_angle = circle.initial_rotation + rotation_radians;
+    
+    // Calculate position around the player
+    DbVector2::new(
+        player_position.x + AGNA_MAGIC_CIRCLE_ORBIT_RADIUS * current_angle.cos(),
+        player_position.y + AGNA_MAGIC_CIRCLE_ORBIT_RADIUS * current_angle.sin()
+    )
+}
+
+// Schedule the next fire orb attack for a player
+fn schedule_next_agna_fire_orb_attack(ctx: &ReducerContext, boss_monster_id: u32, target_player_id: u32) {
+    ctx.db.agna_fire_orb_scheduler().insert(AgnaFireOrbScheduler {
+        scheduled_id: 0,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(AGNA_FIRE_ORB_SPAWN_INTERVAL_MS)),
+        boss_monster_id,
+        target_player_id,
+    });
+}
+
+// Spawn magic circles around all players for an Agna boss
+pub fn spawn_agna_magic_circles(ctx: &ReducerContext, boss_monster_id: u32) {
+    log::info!("Spawning magic circles for Agna boss {}", boss_monster_id);
+    
+    // Count players first
+    let players: Vec<_> = ctx.db.player().iter().collect();
+    log::info!("Found {} players to spawn magic circles around", players.len());
+    
+    // Spawn circles around each player
+    for player in players {
+        log::info!("Spawning magic circles for player {}", player.player_id);
+        spawn_magic_circles_for_player(ctx, boss_monster_id, player.player_id);
+        
+        // Start fire orb attacks for this player
+        start_agna_fire_orb_attacks(ctx, boss_monster_id, player.player_id);
+    }
+    
+    // Verify circles were created
+    let total_circles = ctx.db.agna_magic_circles().iter().count();
+    log::info!("Total magic circles in database after spawning: {}", total_circles);
+}
+
+// Spawn 4 magic circles around a specific player
+fn spawn_magic_circles_for_player(ctx: &ReducerContext, boss_monster_id: u32, player_id: u32) {
+    // Get the target player's position
+    let player_opt = ctx.db.player().player_id().find(&player_id);
+    let player_position = match player_opt {
+        Some(player) => player.position,
+        None => {
+            log::warn!("Player {} not found when spawning magic circles", player_id);
+            return;
+        }
+    };
+    
+    let base_angle_offset = std::f32::consts::PI / 4.0; // 45 degree offset between circles
+    
+    for i in 0..AGNA_MAGIC_CIRCLES_PER_PLAYER {
+        let initial_rotation = (i as f32) * (2.0 * std::f32::consts::PI / AGNA_MAGIC_CIRCLES_PER_PLAYER as f32) + base_angle_offset;
+        
+        // Calculate initial position for the magic circle
+        let initial_position = DbVector2::new(
+            player_position.x + AGNA_MAGIC_CIRCLE_ORBIT_RADIUS * initial_rotation.cos(),
+            player_position.y + AGNA_MAGIC_CIRCLE_ORBIT_RADIUS * initial_rotation.sin()
+        );
+        
+        ctx.db.agna_magic_circles().insert(AgnaMagicCircle {
+            circle_id: 0, // Will be auto-assigned
+            boss_monster_id,
+            target_player_id: player_id,
+            circle_index: i,
+            initial_rotation,
+            ticks_elapsed: 0,
+            position: initial_position,
+        });
+    }
+    
+    log::info!("Spawned {} magic circles around player {} at position ({}, {})", 
+              AGNA_MAGIC_CIRCLES_PER_PLAYER, player_id, player_position.x, player_position.y);
+}
+
+// Start fire orb attacks for a specific player
+pub fn start_agna_fire_orb_attacks(ctx: &ReducerContext, boss_monster_id: u32, target_player_id: u32) {
+    log::info!("Starting fire orb attacks for Agna boss {} targeting player {}", boss_monster_id, target_player_id);
+    
+    // Schedule the first fire orb attack with initial delay
+    ctx.db.agna_fire_orb_scheduler().insert(AgnaFireOrbScheduler {
+        scheduled_id: 0,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(AGNA_FIRE_ORB_SPAWN_INTERVAL_MS)),
+        boss_monster_id,
+        target_player_id,
+    });
+}
+
+// Update magic circle positions (called from game tick)
+pub fn update_agna_magic_circles(ctx: &ReducerContext) {
+    // Update all magic circles' tick counts and positions
+    for circle in ctx.db.agna_magic_circles().iter() {
+        let mut updated_circle = circle;
+        updated_circle.ticks_elapsed += 1;
+        
+        // Get the target player's current position
+        let player_opt = ctx.db.player().player_id().find(&updated_circle.target_player_id);
+        let player_position = match player_opt {
+            Some(player) => player.position,
+            None => {
+                // Player no longer exists, magic circle will be cleaned up elsewhere
+                continue;
+            }
+        };
+        
+        // Calculate the current position of the magic circle
+        updated_circle.position = calculate_magic_circle_position(&player_position, &updated_circle);
+        
+        ctx.db.agna_magic_circles().circle_id().update(updated_circle);
+    }
+    
+
+}
+
+
+
+// Cleanup magic circles and fire orb schedules for a boss
+pub fn cleanup_agna_magic_circle_schedules(ctx: &ReducerContext, boss_monster_id: u32) {
+    log::info!("Cleaning up magic circle schedules for Agna boss {}", boss_monster_id);
+    
+    // Delete all magic circles for this boss
+    let circles_to_delete: Vec<_> = ctx.db.agna_magic_circles().iter()
+        .filter(|circle| circle.boss_monster_id == boss_monster_id)
+        .collect();
+    
+    let circles_count = circles_to_delete.len();
+    for circle in circles_to_delete {
+        ctx.db.agna_magic_circles().circle_id().delete(&circle.circle_id);
+    }
+    
+    // Delete all fire orb schedulers for this boss
+    let schedulers_to_delete: Vec<_> = ctx.db.agna_fire_orb_scheduler().iter()
+        .filter(|scheduler| scheduler.boss_monster_id == boss_monster_id)
+        .collect();
+    
+    let schedulers_count = schedulers_to_delete.len();
+    for scheduler in schedulers_to_delete {
+        ctx.db.agna_fire_orb_scheduler().scheduled_id().delete(&scheduler.scheduled_id);
+    }
+    
+    log::info!("Cleaned up {} magic circles and {} fire orb schedulers for Agna boss {}", 
+              circles_count, schedulers_count, boss_monster_id);
+}
+
+// Execute behavior when entering BossAgnaMagicCircle state
+pub fn execute_boss_agna_magic_circle_behavior(ctx: &ReducerContext, monster: &crate::Monsters) {
+    log::info!("Agna boss {} entering magic circle state", monster.monster_id);
+
+    // Reset speed to normal (no speed boost for magic circle)
+    reset_monster_speed_to_bestiary(ctx, monster);
+    
+
+    
+    // Spawn magic circles around all players and start fire orb attacks
+    log::info!("About to spawn magic circles for Agna boss {}", monster.monster_id);
+    spawn_agna_magic_circles(ctx, monster.monster_id);
+    log::info!("Finished spawning magic circles for Agna boss {}", monster.monster_id);
+    
+    // Schedule return to idle after magic circle duration
+    schedule_state_change(ctx, monster.monster_id, crate::monster_ai_defs::AIState::BossAgnaIdle, AGNA_MAGIC_CIRCLE_DURATION_MS);
+}
+
+ 

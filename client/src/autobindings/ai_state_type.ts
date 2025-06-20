@@ -46,6 +46,7 @@ export namespace AiState {
   export type Stationary = { tag: "Stationary" };
   export type BossAgnaIdle = { tag: "BossAgnaIdle" };
   export type BossAgnaFlamethrower = { tag: "BossAgnaFlamethrower" };
+  export type BossAgnaMagicCircle = { tag: "BossAgnaMagicCircle" };
 
   // Helper functions for constructing each variant of the tagged union.
   // ```
@@ -64,6 +65,7 @@ export namespace AiState {
   export const Stationary = { tag: "Stationary" };
   export const BossAgnaIdle = { tag: "BossAgnaIdle" };
   export const BossAgnaFlamethrower = { tag: "BossAgnaFlamethrower" };
+  export const BossAgnaMagicCircle = { tag: "BossAgnaMagicCircle" };
 
   export function getTypeScriptAlgebraicType(): AlgebraicType {
     return AlgebraicType.createSumType([
@@ -78,6 +80,7 @@ export namespace AiState {
       new SumTypeVariant("Stationary", AlgebraicType.createProductType([])),
       new SumTypeVariant("BossAgnaIdle", AlgebraicType.createProductType([])),
       new SumTypeVariant("BossAgnaFlamethrower", AlgebraicType.createProductType([])),
+      new SumTypeVariant("BossAgnaMagicCircle", AlgebraicType.createProductType([])),
     ]);
   }
 
@@ -92,7 +95,7 @@ export namespace AiState {
 }
 
 // The tagged union or sum type for the algebraic type `AiState`.
-export type AiState = AiState.Default | AiState.BossEnderIdle | AiState.BossEnderChase | AiState.BossEnderDance | AiState.BossEnderVanish | AiState.BossEnderLurk | AiState.BossEnderTeleport | AiState.BossEnderTransform | AiState.Stationary | AiState.BossAgnaIdle | AiState.BossAgnaFlamethrower;
+export type AiState = AiState.Default | AiState.BossEnderIdle | AiState.BossEnderChase | AiState.BossEnderDance | AiState.BossEnderVanish | AiState.BossEnderLurk | AiState.BossEnderTeleport | AiState.BossEnderTransform | AiState.Stationary | AiState.BossAgnaIdle | AiState.BossAgnaFlamethrower | AiState.BossAgnaMagicCircle;
 
 export default AiState;
 

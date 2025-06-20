@@ -192,6 +192,8 @@ export class MonsterAttackManager {
             spriteKey = 'void_zone';
         } else if (attackType === 'AgnaFlamethrowerJet') {
             spriteKey = 'agna_flamethrower';
+        } else if (attackType === 'AgnaFireOrb') {
+            spriteKey = 'agna_circle_orb';
         }
         
         // Verify the texture exists

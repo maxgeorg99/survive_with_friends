@@ -166,8 +166,10 @@ pub fn process_monster_attack_collisions_spatial_hash(ctx: &ReducerContext) {
 
                         cache.player.damage_to_player[pid] += damage;
                         
+                        /*
                         log::info!("Monster attack {} hit player {} for {} damage", 
                                   active_monster_attack.active_monster_attack_id, player_id, damage);
+                        */
                     }
 
                     aid = cache.monster_attack.nexts_monster_attack[aid_usize];

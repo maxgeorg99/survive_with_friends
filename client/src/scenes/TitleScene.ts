@@ -104,6 +104,8 @@ export default class TitleScene extends Phaser.Scene {
         this.load.image('boss_agna_1', '/assets/boss_agna_1.png');
         this.load.image('boss_agna_2', '/assets/boss_agna_2.png');
         this.load.image('agna_flamethrower', '/assets/agna_flamethrower.png');
+        this.load.image('agna_magic_circle', '/assets/agna_magic_circle.png');
+        this.load.image('agna_circle_orb', '/assets/agna_circle_orb.png');
         
         // Load special monster assets
         this.load.image('treasure_chest', '/assets/treasure_chest.png');
@@ -157,6 +159,7 @@ export default class TitleScene extends Phaser.Scene {
         this.load.audio('voice_agna_2', '/assets/sounds/narrator_agna_2.mp3');
         this.load.audio('agna_phase_2', '/assets/sounds/agna_phase_2.mp3');
         this.load.audio('agna_burned', '/assets/sounds/agna_burned.mp3');
+        this.load.audio('agna_closing_in', '/assets/sounds/agna_closing_in.mp3');
                 
                 // Load UI and menu sound effects
                 this.load.audio('voice_name', '/assets/sounds/voice_name.mp3');

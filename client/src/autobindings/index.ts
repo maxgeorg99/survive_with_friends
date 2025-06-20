@@ -108,6 +108,8 @@ import { TransitionDeadToChoosingClass } from "./transition_dead_to_choosing_cla
 export { TransitionDeadToChoosingClass };
 import { TransitionWinnerToChoosingClass } from "./transition_winner_to_choosing_class_reducer.ts";
 export { TransitionWinnerToChoosingClass };
+import { TriggerAgnaFireOrbAttack } from "./trigger_agna_fire_orb_attack_reducer.ts";
+export { TriggerAgnaFireOrbAttack };
 import { TriggerAgnaFlamethrowerAttack } from "./trigger_agna_flamethrower_attack_reducer.ts";
 export { TriggerAgnaFlamethrowerAttack };
 import { TriggerBossTargetSwitch } from "./trigger_boss_target_switch_reducer.ts";
@@ -132,8 +134,12 @@ import { ActiveAttacksTableHandle } from "./active_attacks_table.ts";
 export { ActiveAttacksTableHandle };
 import { ActiveMonsterAttacksTableHandle } from "./active_monster_attacks_table.ts";
 export { ActiveMonsterAttacksTableHandle };
+import { AgnaFireOrbSchedulerTableHandle } from "./agna_fire_orb_scheduler_table.ts";
+export { AgnaFireOrbSchedulerTableHandle };
 import { AgnaFlamethrowerSchedulerTableHandle } from "./agna_flamethrower_scheduler_table.ts";
 export { AgnaFlamethrowerSchedulerTableHandle };
+import { AgnaMagicCirclesTableHandle } from "./agna_magic_circles_table.ts";
+export { AgnaMagicCirclesTableHandle };
 import { AttackBurstCooldownsTableHandle } from "./attack_burst_cooldowns_table.ts";
 export { AttackBurstCooldownsTableHandle };
 import { AttackDataTableHandle } from "./attack_data_table.ts";
@@ -230,8 +236,12 @@ import { ActiveAttackCleanup } from "./active_attack_cleanup_type.ts";
 export { ActiveAttackCleanup };
 import { ActiveMonsterAttack } from "./active_monster_attack_type.ts";
 export { ActiveMonsterAttack };
+import { AgnaFireOrbScheduler } from "./agna_fire_orb_scheduler_type.ts";
+export { AgnaFireOrbScheduler };
 import { AgnaFlamethrowerScheduler } from "./agna_flamethrower_scheduler_type.ts";
 export { AgnaFlamethrowerScheduler };
+import { AgnaMagicCircle } from "./agna_magic_circle_type.ts";
+export { AgnaMagicCircle };
 import { AttackBurstCooldown } from "./attack_burst_cooldown_type.ts";
 export { AttackBurstCooldown };
 import { AttackData } from "./attack_data_type.ts";
@@ -355,10 +365,20 @@ const REMOTE_MODULE = {
       rowType: ActiveMonsterAttack.getTypeScriptAlgebraicType(),
       primaryKey: "activeMonsterAttackId",
     },
+    agna_fire_orb_scheduler: {
+      tableName: "agna_fire_orb_scheduler",
+      rowType: AgnaFireOrbScheduler.getTypeScriptAlgebraicType(),
+      primaryKey: "scheduledId",
+    },
     agna_flamethrower_scheduler: {
       tableName: "agna_flamethrower_scheduler",
       rowType: AgnaFlamethrowerScheduler.getTypeScriptAlgebraicType(),
       primaryKey: "scheduledId",
+    },
+    agna_magic_circles: {
+      tableName: "agna_magic_circles",
+      rowType: AgnaMagicCircle.getTypeScriptAlgebraicType(),
+      primaryKey: "circleId",
     },
     attack_burst_cooldowns: {
       tableName: "attack_burst_cooldowns",
@@ -719,6 +739,10 @@ const REMOTE_MODULE = {
       reducerName: "transition_winner_to_choosing_class",
       argsType: TransitionWinnerToChoosingClass.getTypeScriptAlgebraicType(),
     },
+    trigger_agna_fire_orb_attack: {
+      reducerName: "trigger_agna_fire_orb_attack",
+      argsType: TriggerAgnaFireOrbAttack.getTypeScriptAlgebraicType(),
+    },
     trigger_agna_flamethrower_attack: {
       reducerName: "trigger_agna_flamethrower_attack",
       argsType: TriggerAgnaFlamethrowerAttack.getTypeScriptAlgebraicType(),
@@ -812,6 +836,7 @@ export type Reducer = never
 | { name: "SpawnPlayer", args: SpawnPlayer }
 | { name: "TransitionDeadToChoosingClass", args: TransitionDeadToChoosingClass }
 | { name: "TransitionWinnerToChoosingClass", args: TransitionWinnerToChoosingClass }
+| { name: "TriggerAgnaFireOrbAttack", args: TriggerAgnaFireOrbAttack }
 | { name: "TriggerAgnaFlamethrowerAttack", args: TriggerAgnaFlamethrowerAttack }
 | { name: "TriggerBossTargetSwitch", args: TriggerBossTargetSwitch }
 | { name: "TriggerChaosBallAttack", args: TriggerChaosBallAttack }
@@ -1380,6 +1405,22 @@ export class RemoteReducers {
     this.connection.offReducer("transition_winner_to_choosing_class", callback);
   }
 
+  triggerAgnaFireOrbAttack(scheduler: AgnaFireOrbScheduler) {
+    const __args = { scheduler };
+    let __writer = new BinaryWriter(1024);
+    TriggerAgnaFireOrbAttack.getTypeScriptAlgebraicType().serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("trigger_agna_fire_orb_attack", __argsBuffer, this.setCallReducerFlags.triggerAgnaFireOrbAttackFlags);
+  }
+
+  onTriggerAgnaFireOrbAttack(callback: (ctx: ReducerEventContext, scheduler: AgnaFireOrbScheduler) => void) {
+    this.connection.onReducer("trigger_agna_fire_orb_attack", callback);
+  }
+
+  removeOnTriggerAgnaFireOrbAttack(callback: (ctx: ReducerEventContext, scheduler: AgnaFireOrbScheduler) => void) {
+    this.connection.offReducer("trigger_agna_fire_orb_attack", callback);
+  }
+
   triggerAgnaFlamethrowerAttack(scheduler: AgnaFlamethrowerScheduler) {
     const __args = { scheduler };
     let __writer = new BinaryWriter(1024);
@@ -1676,6 +1717,11 @@ export class SetReducerFlags {
     this.transitionWinnerToChoosingClassFlags = flags;
   }
 
+  triggerAgnaFireOrbAttackFlags: CallReducerFlags = 'FullUpdate';
+  triggerAgnaFireOrbAttack(flags: CallReducerFlags) {
+    this.triggerAgnaFireOrbAttackFlags = flags;
+  }
+
   triggerAgnaFlamethrowerAttackFlags: CallReducerFlags = 'FullUpdate';
   triggerAgnaFlamethrowerAttack(flags: CallReducerFlags) {
     this.triggerAgnaFlamethrowerAttackFlags = flags;
@@ -1732,8 +1778,16 @@ export class RemoteTables {
     return new ActiveMonsterAttacksTableHandle(this.connection.clientCache.getOrCreateTable<ActiveMonsterAttack>(REMOTE_MODULE.tables.active_monster_attacks));
   }
 
+  get agnaFireOrbScheduler(): AgnaFireOrbSchedulerTableHandle {
+    return new AgnaFireOrbSchedulerTableHandle(this.connection.clientCache.getOrCreateTable<AgnaFireOrbScheduler>(REMOTE_MODULE.tables.agna_fire_orb_scheduler));
+  }
+
   get agnaFlamethrowerScheduler(): AgnaFlamethrowerSchedulerTableHandle {
     return new AgnaFlamethrowerSchedulerTableHandle(this.connection.clientCache.getOrCreateTable<AgnaFlamethrowerScheduler>(REMOTE_MODULE.tables.agna_flamethrower_scheduler));
+  }
+
+  get agnaMagicCircles(): AgnaMagicCirclesTableHandle {
+    return new AgnaMagicCirclesTableHandle(this.connection.clientCache.getOrCreateTable<AgnaMagicCircle>(REMOTE_MODULE.tables.agna_magic_circles));
   }
 
   get attackBurstCooldowns(): AttackBurstCooldownsTableHandle {

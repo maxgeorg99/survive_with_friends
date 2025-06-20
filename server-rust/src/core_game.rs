@@ -482,6 +482,10 @@ pub fn game_tick(ctx: &ReducerContext, _timer: GameTickTimer) {
                 time_since_last_tick_ms = tick_rate as f64;
             }
         }
+
+        if(time_since_last_tick_ms > 100.0) {
+            log::warn!("Game tick took too long! {}ms", time_since_last_tick_ms);
+        }
         
         // Update timestamp for next tick
         world.last_tick_time = current_timestamp;
@@ -510,6 +514,9 @@ pub fn game_tick(ctx: &ReducerContext, _timer: GameTickTimer) {
     process_monster_movements(ctx);
 
     process_attack_movements(ctx);
+
+    // Update Agna magic circles
+    crate::boss_agna_defs::update_agna_magic_circles(ctx);
 
     process_monster_attack_movements(ctx);
 

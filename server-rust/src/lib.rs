@@ -86,6 +86,7 @@ pub enum MonsterAttackType {
     ChaosBall,
     VoidZone,
     AgnaFlamethrowerJet,
+    AgnaFireOrb,
 }
 
 // Monster variant enum for shiny monsters

@@ -101,7 +101,8 @@ class SpacetimeDBClient {
                 "SELECT * FROM monster_spawners",
                 "SELECT * FROM game_state",
                 "SELECT * FROM boss_spawn_timer",
-                "SELECT * FROM loot_capsules"
+                "SELECT * FROM loot_capsules",
+                "SELECT * FROM agna_magic_circles"
             ]);
 
         // Register table event callbacks

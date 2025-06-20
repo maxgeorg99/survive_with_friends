@@ -16,6 +16,7 @@ pub enum AIState {
     Stationary = 8,
     BossAgnaIdle = 9,
     BossAgnaFlamethrower = 10,
+    BossAgnaMagicCircle = 11,
 }
 
 // Scheduled table for changing monster AI states
@@ -128,6 +129,13 @@ fn execute_state_entry_behavior(ctx: &ReducerContext, monster: &crate::Monsters,
             
             // Then execute the behavior
             crate::boss_agna_defs::execute_boss_agna_flamethrower_behavior(ctx, monster);
+        },
+        
+        AIState::BossAgnaMagicCircle => {
+            log::info!("Monster {} entering BossAgnaMagicCircle state", monster.monster_id);
+            
+            // Delegate to boss_agna_defs for Agna boss specific behavior
+            crate::boss_agna_defs::execute_boss_agna_magic_circle_behavior(ctx, monster);
         },
         
         AIState::Default => {
@@ -259,6 +267,7 @@ pub fn get_movement_behavior_for_state(state: &AIState) -> MovementBehavior {
         AIState::BossEnderTransform => MovementBehavior::StandStill,
         AIState::BossAgnaIdle => MovementBehavior::Normal,
         AIState::BossAgnaFlamethrower => MovementBehavior::Normal, // Use chase behavior for flamethrower
+        AIState::BossAgnaMagicCircle => MovementBehavior::StandStill, // Agna stands still during magic circle
         AIState::Stationary => MovementBehavior::StandStill,
     }
 }
@@ -327,6 +336,7 @@ pub fn can_monster_deal_damage(state: &AIState) -> bool {
         AIState::BossEnderTransform => true,
         AIState::BossAgnaIdle => true,
         AIState::BossAgnaFlamethrower => true,
+        AIState::BossAgnaMagicCircle => true,
         AIState::Stationary => true,
     }
 }

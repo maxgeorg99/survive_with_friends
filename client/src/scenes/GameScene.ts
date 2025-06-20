@@ -8,6 +8,7 @@ import { AttackManager } from '../managers/AttackManager';
 import { MonsterAttackManager } from '../managers/MonsterAttackManager';
 import GemManager from '../managers/GemManager';
 import LootCapsuleManager from '../managers/LootCapsuleManager';
+import BossAgnaManager from '../managers/BossAgnaManager';
 import { createPlayerDamageEffect, createMonsterDamageEffect } from '../utils/DamageEffects';
 import UpgradeUI from '../ui/UpgradeUI';
 import PlayerHUD from '../ui/PlayerHUD';
@@ -104,6 +105,9 @@ export default class GameScene extends Phaser.Scene {
     
     // Add loot capsule manager for loot capsule visualization
     private lootCapsuleManager: LootCapsuleManager | null = null;
+    
+    // Add boss Agna manager for magic circle visualization
+    private bossAgnaManager: BossAgnaManager | null = null;
     
     // Add upgrade UI manager
     private upgradeUI: UpgradeUI | null = null;
@@ -214,6 +218,8 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('boss_agna_1', '/assets/boss_agna_1.png');
         this.load.image('boss_agna_2', '/assets/boss_agna_2.png');
         this.load.image('agna_flamethrower', '/assets/agna_flamethrower.png');
+        this.load.image('agna_magic_circle', '/assets/agna_magic_circle.png');
+        this.load.image('agna_circle_orb', '/assets/agna_circle_orb.png');
         
         // Load special monster assets
         this.load.image('treasure_chest', '/assets/treasure_chest.png');
@@ -305,6 +311,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.audio('voice_agna_2', '/assets/sounds/narrator_agna_2.mp3');
         this.load.audio('agna_phase_2', '/assets/sounds/agna_phase_2.mp3');
         this.load.audio('agna_burned', '/assets/sounds/agna_burned.mp3');
+        this.load.audio('agna_closing_in', '/assets/sounds/agna_closing_in.mp3');
         
         // Add error handling for file loading errors
         this.load.on('loaderror', (fileObj: any) => {
@@ -855,6 +862,12 @@ export default class GameScene extends Phaser.Scene {
         // Create and initialize the loot capsule manager
         this.lootCapsuleManager = new LootCapsuleManager(this, this.spacetimeDBClient);
         this.lootCapsuleManager.initializeLootCapsules(ctx);
+
+        // Create and initialize the boss Agna manager
+        this.bossAgnaManager = new BossAgnaManager(this, this.spacetimeDBClient);
+        console.log("BossAgnaManager created successfully");
+        this.bossAgnaManager.initializeMagicCircles(ctx);
+        console.log("BossAgnaManager initialized with existing magic circles");
 
         // Ensure appropriate music is playing based on current game state
         if (this.musicManager) {
@@ -1964,6 +1977,8 @@ export default class GameScene extends Phaser.Scene {
             this.soulUI.update();
         }
 
+        // Boss Agna Manager now handles updates automatically via event subscriptions
+
         // Update minimap
         this.updateMinimap();
     }
@@ -2111,6 +2126,10 @@ export default class GameScene extends Phaser.Scene {
         // Clean up LootCapsuleManager
         this.lootCapsuleManager?.shutdown();
         this.lootCapsuleManager = null;
+        
+        // Clean up BossAgnaManager
+        this.bossAgnaManager?.shutdown();
+        this.bossAgnaManager = null;
         
         // Clean up UpgradeUI
         if (this.upgradeUI) {
