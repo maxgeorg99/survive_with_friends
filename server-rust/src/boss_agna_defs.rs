@@ -25,16 +25,16 @@ const AGNA_FLAMETHROWER_JET_DURATION_MS: u64 = 3000;    // 3 seconds lifespan
 // Configuration constants for Agna Magic Circle pattern
 const AGNA_MAGIC_CIRCLE_DURATION_MS: u64 = 15000;      // 15 seconds magic circle phase
 const AGNA_MAGIC_CIRCLE_ORBIT_RADIUS: f32 = 256.0;      // Distance circles orbit around player
-const AGNA_MAGIC_CIRCLE_ORBIT_SPEED: f32 = 90.0;       // Degrees per second orbit speed
+const AGNA_MAGIC_CIRCLE_ORBIT_SPEED: f32 = 80.0;       // Degrees per second orbit speed
 const AGNA_MAGIC_CIRCLES_PER_PLAYER: u32 = 4;          // 4 circles per player
 
 
 
 // Configuration constants for AgnaFireOrb projectiles  
 const AGNA_FIRE_ORB_DAMAGE: u32 = 20;                  // Damage per fire orb
-const AGNA_FIRE_ORB_SPEED: f32 = 275.0;                // Movement speed (slower than flamethrower)
+const AGNA_FIRE_ORB_SPEED: f32 = 300.0;                // Movement speed (slower than flamethrower)
 const AGNA_FIRE_ORB_RADIUS: f32 = 24.0;                // Collision radius
-const AGNA_FIRE_ORB_DURATION_MS: u64 = 3000;           // 4 seconds lifespan
+const AGNA_FIRE_ORB_DURATION_MS: u64 = 2500;           // 4 seconds lifespan
 const AGNA_FIRE_ORB_SPAWN_INTERVAL_MS: u64 = 1000;     // Spawn orb every 1 second per player
 
 // Configuration constants for AgnaOrbSpawn telegraph

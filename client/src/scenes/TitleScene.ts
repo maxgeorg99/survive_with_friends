@@ -160,6 +160,8 @@ export default class TitleScene extends Phaser.Scene {
         this.load.audio('agna_phase_2', '/assets/sounds/agna_phase_2.mp3');
         this.load.audio('agna_burned', '/assets/sounds/agna_burned.mp3');
         this.load.audio('agna_closing_in', '/assets/sounds/agna_closing_in.mp3');
+        this.load.audio('agna_fire_orb', '/assets/sounds/agna_fire_orb.mp3');
+        this.load.audio('agna_flamethrower', '/assets/sounds/agna_flamethrower.mp3');
                 
                 // Load UI and menu sound effects
                 this.load.audio('voice_name', '/assets/sounds/voice_name.mp3');

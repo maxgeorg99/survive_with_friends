@@ -1,5 +1,5 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp};
-use crate::{entity, monsters, monsters_boid, gems, monster_spawners, boss_spawn_timer, boss_phase_two_timer, game_state, monster_spawn_timer, monster_hit_cleanup, active_attack_cleanup, attack_burst_cooldowns, player_scheduled_attacks, monster_damage, player, upgrade_options, active_attacks, loot_capsule_defs, winner_transition_timer, dead_player_transition_timer, void_zone_scheduler, chaos_ball_scheduler, active_monster_attacks};
+use crate::{entity, monsters, monsters_boid, gems, monster_spawners, boss_spawn_timer, boss_phase_two_timer, game_state, monster_spawn_timer, monster_hit_cleanup, active_attack_cleanup, attack_burst_cooldowns, player_scheduled_attacks, monster_damage, player, upgrade_options, active_attacks, loot_capsule_defs, winner_transition_timer, dead_player_transition_timer, void_zone_scheduler, chaos_ball_scheduler, active_monster_attacks, agna_magic_circles, agna_fire_orb_scheduler, agna_delayed_orb_scheduler, agna_flamethrower_scheduler};
 
 // ResetWorld reducer - clears all monsters, gems, monster spawners, and resets boss state
 // This should be called when the last player dies
@@ -202,6 +202,38 @@ pub fn reset_world(ctx: &ReducerContext) {
     
     log::info!("ResetWorld: Cleaned up {} void zone schedulers, {} chaos ball schedulers, and {} active monster attacks", 
               void_zone_scheduler_count, chaos_ball_scheduler_count, active_monster_attack_count);
+    
+    // 16. Clean up all Agna boss attack schedules (magic circles, flamethrower, fire orbs, delayed orbs)
+    let mut agna_magic_circle_count = 0;
+    let agna_magic_circles_to_delete: Vec<u64> = ctx.db.agna_magic_circles().iter().map(|c| c.circle_id).collect();
+    for circle_id in agna_magic_circles_to_delete {
+        ctx.db.agna_magic_circles().circle_id().delete(&circle_id);
+        agna_magic_circle_count += 1;
+    }
+    
+    let mut agna_fire_orb_scheduler_count = 0;
+    let agna_fire_orb_schedulers_to_delete: Vec<u64> = ctx.db.agna_fire_orb_scheduler().iter().map(|s| s.scheduled_id).collect();
+    for scheduled_id in agna_fire_orb_schedulers_to_delete {
+        ctx.db.agna_fire_orb_scheduler().scheduled_id().delete(&scheduled_id);
+        agna_fire_orb_scheduler_count += 1;
+    }
+    
+    let mut agna_delayed_orb_scheduler_count = 0;
+    let agna_delayed_orb_schedulers_to_delete: Vec<u64> = ctx.db.agna_delayed_orb_scheduler().iter().map(|s| s.scheduled_id).collect();
+    for scheduled_id in agna_delayed_orb_schedulers_to_delete {
+        ctx.db.agna_delayed_orb_scheduler().scheduled_id().delete(&scheduled_id);
+        agna_delayed_orb_scheduler_count += 1;
+    }
+    
+    let mut agna_flamethrower_scheduler_count = 0;
+    let agna_flamethrower_schedulers_to_delete: Vec<u64> = ctx.db.agna_flamethrower_scheduler().iter().map(|s| s.scheduled_id).collect();
+    for scheduled_id in agna_flamethrower_schedulers_to_delete {
+        ctx.db.agna_flamethrower_scheduler().scheduled_id().delete(&scheduled_id);
+        agna_flamethrower_scheduler_count += 1;
+    }
+    
+    log::info!("ResetWorld: Cleaned up {} Agna magic circles, {} fire orb schedulers, {} delayed orb schedulers, and {} flamethrower schedulers", 
+              agna_magic_circle_count, agna_fire_orb_scheduler_count, agna_delayed_orb_scheduler_count, agna_flamethrower_scheduler_count);
     
     // Note: Monster spawning will be rescheduled when the first player joins
     // This ensures spawning only occurs when players are present

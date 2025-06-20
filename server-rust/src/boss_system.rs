@@ -315,6 +315,8 @@ pub fn handle_boss_defeated(ctx: &ReducerContext) {
         crate::boss_ender_defs::cleanup_void_zone_schedules(ctx, game_state.boss_monster_id);
         // Clean up boss target switching schedules for Phase 2 boss
         crate::boss_ender_defs::cleanup_boss_target_switching(ctx, game_state.boss_monster_id);
+        // Clean up Agna boss attack schedules (magic circles, flamethrower, fire orbs)
+        crate::boss_agna_defs::cleanup_agna_ai_schedules(ctx, game_state.boss_monster_id);
     }
     
     // Reset game state

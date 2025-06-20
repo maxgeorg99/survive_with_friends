@@ -40,6 +40,7 @@ pub use gem_drop_defs::*;
 pub use loot_capsule_defs::*;
 pub use boss_system::*;
 pub use boss_ender_defs::*;
+pub use boss_agna_defs::*;
 pub use monsters_def::*;
 pub use monster_ai_defs::*;
 pub use monster_spawn_defs::*;

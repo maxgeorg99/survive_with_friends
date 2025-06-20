@@ -312,6 +312,8 @@ export default class GameScene extends Phaser.Scene {
         this.load.audio('agna_phase_2', '/assets/sounds/agna_phase_2.mp3');
         this.load.audio('agna_burned', '/assets/sounds/agna_burned.mp3');
         this.load.audio('agna_closing_in', '/assets/sounds/agna_closing_in.mp3');
+        this.load.audio('agna_fire_orb', '/assets/sounds/agna_fire_orb.mp3');
+        this.load.audio('agna_flamethrower', '/assets/sounds/agna_flamethrower.mp3');
         
         // Add error handling for file loading errors
         this.load.on('loaderror', (fileObj: any) => {

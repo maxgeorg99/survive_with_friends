@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { EventContext, AgnaMagicCircle, ActiveMonsterAttack, MonsterAttackType } from '../autobindings';
+import { EventContext, AgnaMagicCircle, ActiveMonsterAttack, MonsterAttackType, Monsters, AiState } from '../autobindings';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 
 const MAGIC_CIRCLE_ASSET_KEY = 'agna_magic_circle';
@@ -19,9 +19,15 @@ export default class BossAgnaManager {
     private boundHandleCircleUpdate: (ctx: EventContext, oldCircle: AgnaMagicCircle, newCircle: AgnaMagicCircle) => void;
     private boundHandleCircleDelete: (ctx: EventContext, circle: AgnaMagicCircle) => void;
     private boundHandleAttackInsert: (ctx: EventContext, attack: ActiveMonsterAttack) => void;
+    private boundHandleMonsterUpdate: (ctx: EventContext, oldMonster: Monsters, newMonster: Monsters) => void;
+    private boundHandleMonsterDelete: (ctx: EventContext, monster: Monsters) => void;
     
     // Flag to track if the manager has been shut down
     private isDestroyed: boolean = false;
+    
+    // Flamethrower sound management
+    private flamethrowerSound: Phaser.Sound.BaseSound | null = null;
+    private agnaBossesInFlamethrowerMode: Set<number> = new Set();
 
     constructor(scene: Phaser.Scene, client: SpacetimeDBClient) {
         this.scene = scene;
@@ -33,14 +39,18 @@ export default class BossAgnaManager {
         this.boundHandleCircleUpdate = this.handleCircleUpdate.bind(this);
         this.boundHandleCircleDelete = this.handleCircleDelete.bind(this);
         this.boundHandleAttackInsert = this.handleAttackInsert.bind(this);
+        this.boundHandleMonsterUpdate = this.handleMonsterUpdate.bind(this);
+        this.boundHandleMonsterDelete = this.handleMonsterDelete.bind(this);
         
-        // Set up event handlers for magic circle table events and active attacks
+        // Set up event handlers for magic circle table events, active attacks, and monster updates
         const db = this.spacetimeDBClient.sdkConnection?.db;
         if (db) {
             db.agnaMagicCircles?.onInsert(this.boundHandleCircleInsert);
             db.agnaMagicCircles?.onUpdate(this.boundHandleCircleUpdate);
             db.agnaMagicCircles?.onDelete(this.boundHandleCircleDelete);
             db.activeMonsterAttacks?.onInsert(this.boundHandleAttackInsert);
+            db.monsters?.onUpdate(this.boundHandleMonsterUpdate);
+            db.monsters?.onDelete(this.boundHandleMonsterDelete);
         } else {
             console.error("Could not set up BossAgnaManager database listeners (database not connected)");
         }
@@ -57,6 +67,14 @@ export default class BossAgnaManager {
         
         for (const circle of ctx.db?.agnaMagicCircles?.iter() || []) {
             this.createMagicCircle(circle);
+        }
+        
+        // Also check for any existing Agna bosses in flamethrower mode
+        for (const monster of ctx.db?.monsters?.iter() || []) {
+            if (this.isAgnaBoss(monster) && this.isFlamethrowerState(monster.aiState)) {
+                console.log(`Found existing Agna boss ${monster.monsterId} in flamethrower mode during initialization`);
+                this.startFlamethrowerSound(monster.monsterId);
+            }
         }
     }
 
@@ -100,6 +118,101 @@ export default class BossAgnaManager {
         if (attack.monsterAttackType.tag === "AgnaOrbSpawn") {
             //console.log("AgnaOrbSpawn telegraph detected:", attack);
             this.playTelegraphVFX(attack);
+        }
+    }
+
+    // Handle when a monster is updated (for flamethrower state detection)
+    private handleMonsterUpdate(ctx: EventContext, oldMonster: Monsters, newMonster: Monsters) {
+        if (this.isDestroyed) {
+            return;
+        }
+        
+        // Only process Agna bosses
+        if (!this.isAgnaBoss(newMonster)) {
+            return;
+        }
+        
+        const wasInFlamethrower = this.isFlamethrowerState(oldMonster.aiState);
+        const isInFlamethrower = this.isFlamethrowerState(newMonster.aiState);
+        
+        // Check for flamethrower state transitions
+        if (!wasInFlamethrower && isInFlamethrower) {
+            console.log(`Agna boss ${newMonster.monsterId} entered flamethrower mode`);
+            this.startFlamethrowerSound(newMonster.monsterId);
+        } else if (wasInFlamethrower && !isInFlamethrower) {
+            console.log(`Agna boss ${newMonster.monsterId} left flamethrower mode`);
+            this.stopFlamethrowerSound(newMonster.monsterId);
+        }
+    }
+
+    // Handle when a monster is deleted (for cleanup when Agna bosses are destroyed)
+    private handleMonsterDelete(ctx: EventContext, monster: Monsters) {
+        if (this.isDestroyed) {
+            return;
+        }
+        
+        // Only process Agna bosses
+        if (!this.isAgnaBoss(monster)) {
+            return;
+        }
+        
+        console.log(`Agna boss ${monster.monsterId} was destroyed`);
+        this.stopFlamethrowerSound(monster.monsterId);
+    }
+
+    // Helper methods for monster type and state checking
+    private isAgnaBoss(monster: Monsters): boolean {
+        const monsterType = monster.bestiaryId;
+        return monsterType?.tag === 'BossAgnaPhase1' || monsterType?.tag === 'BossAgnaPhase2';
+    }
+
+    private isFlamethrowerState(aiState: AiState): boolean {
+        return aiState.tag === 'BossAgnaFlamethrower';
+    }
+
+    // Flamethrower sound management
+    private startFlamethrowerSound(monsterId: number) {
+        if (this.agnaBossesInFlamethrowerMode.has(monsterId)) {
+            return; // Already tracking this boss
+        }
+        
+        this.agnaBossesInFlamethrowerMode.add(monsterId);
+        
+        // Start flamethrower sound if not already playing
+        if (!this.flamethrowerSound || !this.flamethrowerSound.isPlaying) {
+            const soundManager = (window as any).soundManager;
+            if (soundManager) {
+                console.log("Starting Agna flamethrower sound");
+                
+                // Stop any existing flamethrower sound first
+                this.stopFlamethrowerSoundImmediate();
+                
+                // Create and play the flamethrower sound (looped)
+                if (this.scene.cache.audio.exists('agna_flamethrower')) {
+                    this.flamethrowerSound = this.scene.sound.add('agna_flamethrower', {
+                        volume: 0.7,
+                        loop: true
+                    });
+                    this.flamethrowerSound.play();
+                } else {
+                    console.warn("Agna flamethrower sound not found in cache");
+                }
+            }
+        }
+    }
+
+    private stopFlamethrowerSound(monsterId: number) {
+        // Since there's only ever one Agna boss, just clear the set and stop the sound
+        this.agnaBossesInFlamethrowerMode.clear();
+        this.stopFlamethrowerSoundImmediate();
+    }
+
+    private stopFlamethrowerSoundImmediate() {
+        if (this.flamethrowerSound) {
+            console.log("Stopping Agna flamethrower sound");
+            this.flamethrowerSound.stop();
+            this.flamethrowerSound.destroy();
+            this.flamethrowerSound = null;
         }
     }
 
@@ -189,14 +302,18 @@ export default class BossAgnaManager {
             return;
         }
         
+        // Play fire orb telegraph sound
+        const soundManager = (window as any).soundManager;
+        if (soundManager) {
+            soundManager.playSound('agna_fire_orb', 0.8);
+        }
+        
         // Create red flash effect on the circle
         this.createRangeFlash(matchingCircle);
         
         // Create red particle effect at the circle's current position
         this.createRedParticles(matchingCircle.x, matchingCircle.y);
     }
-
-
 
     private createRangeFlash(circleSprite: Phaser.GameObjects.Image): void {
         // Create a more prominent flash effect on the magic circle
@@ -271,8 +388,6 @@ export default class BossAgnaManager {
         });
     }
 
-
-
     private removeMagicCircle(circleId: bigint): void {
         const circleSprite = this.magicCircles.get(circleId);
         if (!circleSprite) {
@@ -308,6 +423,10 @@ export default class BossAgnaManager {
         // Mark as destroyed to prevent further processing
         this.isDestroyed = true;
         
+        // Stop flamethrower sound immediately
+        this.stopFlamethrowerSoundImmediate();
+        this.agnaBossesInFlamethrowerMode.clear();
+        
         // Unregister database event listeners first
         this.unregisterListeners();
         
@@ -331,6 +450,8 @@ export default class BossAgnaManager {
             db.agnaMagicCircles?.removeOnUpdate(this.boundHandleCircleUpdate);
             db.agnaMagicCircles?.removeOnDelete(this.boundHandleCircleDelete);
             db.activeMonsterAttacks?.removeOnInsert(this.boundHandleAttackInsert);
+            db.monsters?.removeOnUpdate(this.boundHandleMonsterUpdate);
+            db.monsters?.removeOnDelete(this.boundHandleMonsterDelete);
             console.log("BossAgnaManager database listeners removed");
         }
     }
