@@ -12,6 +12,7 @@ export const MONSTER_ASSET_KEYS: Record<string, string> = {
     "BossEnderPhase2": 'final_boss_phase2',
     "BossAgnaPhase1": 'boss_agna_1',
     "BossAgnaPhase2": 'boss_agna_2',
+    "AgnaCandle": 'agna_candle',
     "VoidChest": 'treasure_chest',
     "EnderClaw": 'monster_void_claw'
 };
@@ -28,6 +29,7 @@ export const MONSTER_SHADOW_OFFSETS_X: Record<string, number> = {
     "BossEnderPhase2": -68,   // Even larger final form, largest shadow offset
     "BossAgnaPhase1": -24,   // Large boss, similar to Ender Phase 1
     "BossAgnaPhase2": -64,   // Large final form, similar to Ender Phase 2
+    "AgnaCandle": -16,    // Medium candle monster, moderate offset
     "VoidChest": -28,    // Chest is centered
     "EnderClaw": -4    // Medium aggressive creature, slight offset
 };
@@ -44,6 +46,7 @@ export const MONSTER_SHADOW_OFFSETS_Y: Record<string, number> = {
     "BossEnderPhase2": -78,   // Even larger final form, largest shadow offset
     "BossAgnaPhase1": -2,   // Large boss, similar to Ender Phase 1
     "BossAgnaPhase2": -74,  // Large final form, similar to Ender Phase 2
+    "AgnaCandle": -30,   // Candle sits on ground, similar to chest
     "VoidChest": -66,    // Chest sits on the ground with small offset
     "EnderClaw": -8    // Medium sized creature, moderate offset
 };
@@ -59,6 +62,7 @@ export const MONSTER_SHADOW_SCALE: Record<string, number> = {
     "BossEnderPhase2": 6.5,
     "BossAgnaPhase1": 1.9,   // Slightly smaller than Ender Phase 1
     "BossAgnaPhase2": 6.2,   // Slightly smaller than Ender Phase 2
+    "AgnaCandle": 1.0,    // Normal scale for medium candle
     "VoidChest": 2.75,
     "EnderClaw": 1.1  // Slightly larger shadow for aggressive creature
 };

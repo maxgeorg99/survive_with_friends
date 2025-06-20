@@ -35,6 +35,7 @@ const MONSTER_BASE_SIZES: { [key: string]: number } = {
     "BossEnderPhase2": 128.0,
     "BossAgnaPhase1": 88.0,
     "BossAgnaPhase2": 120.0,
+    "AgnaCandle": 32.0,
     "VoidChest": 82.0,
     "Imp": 34.0,
     "Zombie": 42.0,

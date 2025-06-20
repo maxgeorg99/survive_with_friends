@@ -194,6 +194,8 @@ export class MonsterAttackManager {
             spriteKey = 'agna_flamethrower';
         } else if (attackType === 'AgnaFireOrb') {
             spriteKey = 'agna_circle_orb';
+        } else if (attackType === 'AgnaCandleBolt') {
+            spriteKey = 'monster_attack_firebolt';
         }
         
         // Verify the texture exists
@@ -232,6 +234,11 @@ export class MonsterAttackManager {
         switch (attackGraphicData.attackType) {
             case 'ImpBolt':
                 // ImpBolt should be rotated to face its direction using parameterF
+                sprite.setRotation(attackGraphicData.parameterF);
+                break;
+                
+            case 'AgnaCandleBolt':
+                // AgnaCandleBolt should be rotated to face its direction using parameterF
                 sprite.setRotation(attackGraphicData.parameterF);
                 break;
                 

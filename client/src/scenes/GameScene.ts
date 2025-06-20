@@ -220,6 +220,8 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('agna_flamethrower', '/assets/agna_flamethrower.png');
         this.load.image('agna_magic_circle', '/assets/agna_magic_circle.png');
         this.load.image('agna_circle_orb', '/assets/agna_circle_orb.png');
+        this.load.image('agna_candle', '/assets/agna_candle.png');
+        this.load.image('agna_candle_off', '/assets/agna_candle_off.png');
         
         // Load special monster assets
         this.load.image('treasure_chest', '/assets/treasure_chest.png');

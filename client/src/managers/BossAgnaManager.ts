@@ -1,11 +1,13 @@
 import Phaser from 'phaser';
-import { EventContext, AgnaMagicCircle, ActiveMonsterAttack, MonsterAttackType, Monsters, AiState, Player } from '../autobindings';
+import { EventContext, AgnaMagicCircle, AgnaCandleSpawn, ActiveMonsterAttack, MonsterAttackType, Monsters, AiState, Player } from '../autobindings';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 
 const MAGIC_CIRCLE_ASSET_KEY = 'agna_magic_circle';
+const CANDLE_SPAWN_ASSET_KEY = 'agna_candle_off';
 const FADE_IN_DURATION = 500;
 const FADE_OUT_DURATION = 300;
 const BASE_DEPTH = 1000;
+const MONSTER_DEPTH_BASE = 2000; // Similar depth to monsters
 const ORBIT_RADIUS = 96;
 const ORBIT_SPEED = 90; // degrees per second
 
@@ -13,11 +15,15 @@ export default class BossAgnaManager {
     private scene: Phaser.Scene;
     private spacetimeDBClient: SpacetimeDBClient;
     private magicCircles: Map<bigint, Phaser.GameObjects.Image> = new Map();
+    private candleSpawns: Map<bigint, Phaser.GameObjects.Image> = new Map();
     
     // Store bound event handlers for proper cleanup
     private boundHandleCircleInsert: (ctx: EventContext, circle: AgnaMagicCircle) => void;
     private boundHandleCircleUpdate: (ctx: EventContext, oldCircle: AgnaMagicCircle, newCircle: AgnaMagicCircle) => void;
     private boundHandleCircleDelete: (ctx: EventContext, circle: AgnaMagicCircle) => void;
+    private boundHandleCandleSpawnInsert: (ctx: EventContext, candleSpawn: AgnaCandleSpawn) => void;
+    private boundHandleCandleSpawnUpdate: (ctx: EventContext, oldCandleSpawn: AgnaCandleSpawn, newCandleSpawn: AgnaCandleSpawn) => void;
+    private boundHandleCandleSpawnDelete: (ctx: EventContext, candleSpawn: AgnaCandleSpawn) => void;
     private boundHandleAttackInsert: (ctx: EventContext, attack: ActiveMonsterAttack) => void;
     private boundHandleMonsterUpdate: (ctx: EventContext, oldMonster: Monsters, newMonster: Monsters) => void;
     private boundHandleMonsterDelete: (ctx: EventContext, monster: Monsters) => void;
@@ -39,17 +45,23 @@ export default class BossAgnaManager {
         this.boundHandleCircleInsert = this.handleCircleInsert.bind(this);
         this.boundHandleCircleUpdate = this.handleCircleUpdate.bind(this);
         this.boundHandleCircleDelete = this.handleCircleDelete.bind(this);
+        this.boundHandleCandleSpawnInsert = this.handleCandleSpawnInsert.bind(this);
+        this.boundHandleCandleSpawnUpdate = this.handleCandleSpawnUpdate.bind(this);
+        this.boundHandleCandleSpawnDelete = this.handleCandleSpawnDelete.bind(this);
         this.boundHandleAttackInsert = this.handleAttackInsert.bind(this);
         this.boundHandleMonsterUpdate = this.handleMonsterUpdate.bind(this);
         this.boundHandleMonsterDelete = this.handleMonsterDelete.bind(this);
         this.boundHandlePlayerDelete = this.handlePlayerDelete.bind(this);
         
-        // Set up event handlers for magic circle table events, active attacks, monster updates, and player deletes
+        // Set up event handlers for magic circle table events, candle spawn events, active attacks, monster updates, and player deletes
         const db = this.spacetimeDBClient.sdkConnection?.db;
         if (db) {
             db.agnaMagicCircles?.onInsert(this.boundHandleCircleInsert);
             db.agnaMagicCircles?.onUpdate(this.boundHandleCircleUpdate);
             db.agnaMagicCircles?.onDelete(this.boundHandleCircleDelete);
+            db.agnaCandleSpawns?.onInsert(this.boundHandleCandleSpawnInsert);
+            db.agnaCandleSpawns?.onUpdate(this.boundHandleCandleSpawnUpdate);
+            db.agnaCandleSpawns?.onDelete(this.boundHandleCandleSpawnDelete);
             db.activeMonsterAttacks?.onInsert(this.boundHandleAttackInsert);
             db.monsters?.onUpdate(this.boundHandleMonsterUpdate);
             db.monsters?.onDelete(this.boundHandleMonsterDelete);
@@ -59,17 +71,21 @@ export default class BossAgnaManager {
         }
     }
 
-    // Initialize magic circles from current database state
+    // Initialize magic circles and candle spawns from current database state
     public initializeMagicCircles(ctx: EventContext) {
         if (!this.spacetimeDBClient?.sdkConnection?.db) {
-            console.error("Cannot initialize magic circles: database connection not available");
+            console.error("Cannot initialize magic circles and candle spawns: database connection not available");
             return;
         }
 
-        console.log("BossAgnaManager initializing magic circles");
+        console.log("BossAgnaManager initializing magic circles and candle spawns");
         
         for (const circle of ctx.db?.agnaMagicCircles?.iter() || []) {
             this.createMagicCircle(circle);
+        }
+        
+        for (const candleSpawn of ctx.db?.agnaCandleSpawns?.iter() || []) {
+            this.createCandleSpawn(candleSpawn);
         }
         
         // Also check for any existing Agna bosses in flamethrower mode or ritual states
@@ -113,6 +129,37 @@ export default class BossAgnaManager {
         
         //console.log("Magic circle deleted:", circle);
         this.removeMagicCircle(circle.circleId);
+    }
+
+    // Handle when a new candle spawn is inserted
+    private handleCandleSpawnInsert(ctx: EventContext, candleSpawn: AgnaCandleSpawn) {
+        if (this.isDestroyed) {
+            return;
+        }
+        
+        console.log("Candle spawn inserted:", candleSpawn);
+        this.createCandleSpawn(candleSpawn);
+    }
+
+    // Handle when a candle spawn is updated
+    private handleCandleSpawnUpdate(ctx: EventContext, oldCandleSpawn: AgnaCandleSpawn, newCandleSpawn: AgnaCandleSpawn) {
+        if (this.isDestroyed) {
+            return;
+        }
+        
+        console.log("Candle spawn updated:", oldCandleSpawn, "->", newCandleSpawn);
+        // Candle spawns typically don't move, so we may not need to update position
+        // But we can update if needed (e.g., if candle_monster_id changes)
+    }
+
+    // Handle when a candle spawn is deleted
+    private handleCandleSpawnDelete(ctx: EventContext, candleSpawn: AgnaCandleSpawn) {
+        if (this.isDestroyed) {
+            return;
+        }
+        
+        console.log("Candle spawn deleted:", candleSpawn);
+        this.removeCandleSpawn(candleSpawn.spawnId);
     }
 
     // Handle when a new active monster attack is inserted (for telegraph VFX)
@@ -506,6 +553,76 @@ export default class BossAgnaManager {
         });
     }
 
+    private createCandleSpawn(candleSpawnData: AgnaCandleSpawn): void {
+        // Check if we already have a sprite for this candle spawn
+        if (this.candleSpawns.has(candleSpawnData.spawnId)) {
+            console.log(`Candle spawn ${candleSpawnData.spawnId} already exists`);
+            return;
+        }
+        
+        // Use the server-provided position directly
+        const position = { x: candleSpawnData.position.x, y: candleSpawnData.position.y };
+        
+        console.log(`Creating candle spawn ${candleSpawnData.spawnId} at position (${position.x}, ${position.y}) for boss ${candleSpawnData.bossMonsterId}, candle index ${candleSpawnData.candleIndex}`);
+        
+        // Create the candle spawn sprite using "agna_candle_off" asset
+        const candleSprite = this.scene.add.image(position.x, position.y, CANDLE_SPAWN_ASSET_KEY);
+        candleSprite.setScale(0.8); // Adjust size as needed
+        candleSprite.setAlpha(0); // Start invisible for fade in
+        
+        // Store associated data on the sprite for easy access
+        (candleSprite as any).bossMonsterId = candleSpawnData.bossMonsterId;
+        (candleSprite as any).candleIndex = candleSpawnData.candleIndex;
+        (candleSprite as any).spawnId = candleSpawnData.spawnId;
+        
+        // Use monster-like depth (similar depth to monsters)
+        candleSprite.setDepth(MONSTER_DEPTH_BASE + position.y);
+        
+        // Ensure it follows the camera
+        candleSprite.setScrollFactor(1, 1);
+        
+        // Fade in animation
+        this.scene.tweens.add({
+            targets: candleSprite,
+            alpha: 0.9,
+            duration: FADE_IN_DURATION,
+            ease: 'Power2'
+        });
+
+        // Store the sprite
+        this.candleSpawns.set(candleSpawnData.spawnId, candleSprite);
+        
+        console.log(`Candle spawn ${candleSpawnData.spawnId} created successfully with depth ${candleSprite.depth}, boss ${candleSpawnData.bossMonsterId}, index ${candleSpawnData.candleIndex}`);
+    }
+
+    private removeCandleSpawn(spawnId: bigint): void {
+        const candleSprite = this.candleSpawns.get(spawnId);
+        if (!candleSprite) {
+            console.log(`Candle spawn ${spawnId} already removed or not found`);
+            return;
+        }
+        
+        // Stop any active tweens for this sprite
+        this.scene.tweens.killTweensOf(candleSprite);
+        
+        // Fade out animation before destroying
+        this.scene.tweens.add({
+            targets: candleSprite,
+            alpha: 0,
+            duration: 50,
+            ease: 'Power2',
+            onComplete: () => {
+                try {
+                    candleSprite.destroy();
+                } catch (e) {
+                    console.warn(`Error destroying candle spawn ${spawnId}:`, e);
+                }
+                this.candleSpawns.delete(spawnId);
+                console.log(`Candle spawn ${spawnId} cleaned up successfully`);
+            }
+        });
+    }
+
     // Clean up all magic circles (call this when scene is shut down)
     public shutdown() {
         console.log("Shutting down BossAgnaManager");
@@ -520,14 +637,19 @@ export default class BossAgnaManager {
         // Unregister database event listeners first
         this.unregisterListeners();
         
-        // Stop all active tweens for magic circles
+        // Stop all active tweens for magic circles and candle spawns
         this.magicCircles.forEach(circleSprite => {
             this.scene.tweens.killTweensOf(circleSprite);
         });
+        this.candleSpawns.forEach(candleSprite => {
+            this.scene.tweens.killTweensOf(candleSprite);
+        });
         
-        // Destroy all magic circle sprites
+        // Destroy all magic circle sprites and candle spawn sprites
         this.magicCircles.forEach(circleSprite => circleSprite.destroy());
         this.magicCircles.clear();
+        this.candleSpawns.forEach(candleSprite => candleSprite.destroy());
+        this.candleSpawns.clear();
         
         console.log("BossAgnaManager shutdown complete");
     }
@@ -539,6 +661,9 @@ export default class BossAgnaManager {
             db.agnaMagicCircles?.removeOnInsert(this.boundHandleCircleInsert);
             db.agnaMagicCircles?.removeOnUpdate(this.boundHandleCircleUpdate);
             db.agnaMagicCircles?.removeOnDelete(this.boundHandleCircleDelete);
+            db.agnaCandleSpawns?.removeOnInsert(this.boundHandleCandleSpawnInsert);
+            db.agnaCandleSpawns?.removeOnUpdate(this.boundHandleCandleSpawnUpdate);
+            db.agnaCandleSpawns?.removeOnDelete(this.boundHandleCandleSpawnDelete);
             db.activeMonsterAttacks?.removeOnInsert(this.boundHandleAttackInsert);
             db.monsters?.removeOnUpdate(this.boundHandleMonsterUpdate);
             db.monsters?.removeOnDelete(this.boundHandleMonsterDelete);
