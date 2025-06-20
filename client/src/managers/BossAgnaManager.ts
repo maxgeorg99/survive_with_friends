@@ -66,7 +66,7 @@ export default class BossAgnaManager {
             return;
         }
         
-        console.log("Magic circle inserted:", circle);
+        //console.log("Magic circle inserted:", circle);
         this.createMagicCircle(circle);
     }
 
@@ -76,7 +76,7 @@ export default class BossAgnaManager {
             return;
         }
         
-        console.log("Magic circle updated:", oldCircle, "->", newCircle);
+        //console.log("Magic circle updated:", oldCircle, "->", newCircle);
         this.updateMagicCirclePosition(newCircle);
     }
 
@@ -86,7 +86,7 @@ export default class BossAgnaManager {
             return;
         }
         
-        console.log("Magic circle deleted:", circle);
+        //console.log("Magic circle deleted:", circle);
         this.removeMagicCircle(circle.circleId);
     }
 
@@ -98,7 +98,7 @@ export default class BossAgnaManager {
         
         // Check if this is an AgnaOrbSpawn (telegraph) attack
         if (attack.monsterAttackType.tag === "AgnaOrbSpawn") {
-            console.log("AgnaOrbSpawn telegraph detected:", attack);
+            //console.log("AgnaOrbSpawn telegraph detected:", attack);
             this.playTelegraphVFX(attack);
         }
     }
@@ -199,31 +199,54 @@ export default class BossAgnaManager {
 
 
     private createRangeFlash(circleSprite: Phaser.GameObjects.Image): void {
-        // Create a red tint flash on the magic circle
+        // Create a more prominent flash effect on the magic circle
         const originalTint = circleSprite.tint;
+        const originalAlpha = circleSprite.alpha;
         
-        // Flash red
-        circleSprite.setTint(0xff4444);
+        // Bright red flash with increased alpha
+        circleSprite.setTint(0xff0000); // Bright red
+        circleSprite.setAlpha(1.0); // Full opacity
         
-        // Tween back to original color
+        // Tween back to original color and alpha
         this.scene.tweens.add({
             targets: circleSprite,
             duration: 200,
             ease: 'Power2',
             onComplete: () => {
                 circleSprite.setTint(originalTint);
+                circleSprite.setAlpha(originalAlpha);
             }
         });
         
-        // Also create a brief scale pulse
+        // Create a more dramatic scale pulse
         const originalScale = circleSprite.scaleX;
         this.scene.tweens.add({
             targets: circleSprite,
-            scaleX: originalScale * 1.2,
-            scaleY: originalScale * 1.2,
-            duration: 100,
-            ease: 'Power2',
+            scaleX: originalScale * 1.25,
+            scaleY: originalScale * 1.25,
+            duration: 200,
+            ease: 'Back.easeOut',
             yoyo: true
+        });
+        
+        // Add a brief glow effect by creating a temporary duplicate
+        const glowSprite = this.scene.add.image(circleSprite.x, circleSprite.y, MAGIC_CIRCLE_ASSET_KEY);
+        glowSprite.setScale(circleSprite.scaleX * 1.3);
+        glowSprite.setTint(0xff4444);
+        glowSprite.setAlpha(0.6);
+        glowSprite.setDepth(circleSprite.depth - 1);
+        glowSprite.setBlendMode(Phaser.BlendModes.ADD);
+        
+        // Fade out and destroy the glow
+        this.scene.tweens.add({
+            targets: glowSprite,
+            alpha: 0,
+            scale: circleSprite.scaleX * 1.8,
+            duration: 400,
+            ease: 'Power2',
+            onComplete: () => {
+                glowSprite.destroy();
+            }
         });
     }
 
