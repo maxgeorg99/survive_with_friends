@@ -504,7 +504,8 @@ fn populate_monster_cache(ctx: &ReducerContext, cache: &mut crate::collision::Co
            monster.bestiary_id == MonsterType::BossEnderPhase1 || 
            monster.bestiary_id == MonsterType::BossEnderPhase2 ||
            monster.bestiary_id == MonsterType::BossAgnaPhase1 ||
-           monster.bestiary_id == MonsterType::BossAgnaPhase2 {
+           monster.bestiary_id == MonsterType::BossAgnaPhase2 ||
+           monster.bestiary_id == MonsterType::AgnaCandle {
             cache.monster.push_ratio_monster[idx] = 0;
         }
         else {

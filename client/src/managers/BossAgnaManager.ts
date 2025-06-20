@@ -27,6 +27,7 @@ export default class BossAgnaManager {
     private boundHandleAttackInsert: (ctx: EventContext, attack: ActiveMonsterAttack) => void;
     private boundHandleMonsterUpdate: (ctx: EventContext, oldMonster: Monsters, newMonster: Monsters) => void;
     private boundHandleMonsterDelete: (ctx: EventContext, monster: Monsters) => void;
+    private boundHandlePlayerUpdate: (ctx: EventContext, oldPlayer: Player, newPlayer: Player) => void;
     private boundHandlePlayerDelete: (ctx: EventContext, player: Player) => void;
     
     // Flag to track if the manager has been shut down
@@ -35,6 +36,11 @@ export default class BossAgnaManager {
     // Flamethrower sound management
     private flamethrowerSound: Phaser.Sound.BaseSound | null = null;
     private agnaBossesInFlamethrowerMode: Set<number> = new Set();
+    
+    // Ritual completion visualization
+    private ritualCompleteHaze: Phaser.GameObjects.Rectangle | null = null;
+    private playerRitualCircles: Map<number, Phaser.GameObjects.Image> = new Map();
+    private isRitualCompleteActive: boolean = false;
 
     constructor(scene: Phaser.Scene, client: SpacetimeDBClient) {
         this.scene = scene;
@@ -51,6 +57,7 @@ export default class BossAgnaManager {
         this.boundHandleAttackInsert = this.handleAttackInsert.bind(this);
         this.boundHandleMonsterUpdate = this.handleMonsterUpdate.bind(this);
         this.boundHandleMonsterDelete = this.handleMonsterDelete.bind(this);
+        this.boundHandlePlayerUpdate = this.handlePlayerUpdate.bind(this);
         this.boundHandlePlayerDelete = this.handlePlayerDelete.bind(this);
         
         // Set up event handlers for magic circle table events, candle spawn events, active attacks, monster updates, and player deletes
@@ -65,6 +72,7 @@ export default class BossAgnaManager {
             db.activeMonsterAttacks?.onInsert(this.boundHandleAttackInsert);
             db.monsters?.onUpdate(this.boundHandleMonsterUpdate);
             db.monsters?.onDelete(this.boundHandleMonsterDelete);
+            db.player?.onUpdate(this.boundHandlePlayerUpdate);
             db.player?.onDelete(this.boundHandlePlayerDelete);
         } else {
             console.error("Could not set up BossAgnaManager database listeners (database not connected)");
@@ -94,6 +102,10 @@ export default class BossAgnaManager {
                 if (this.isFlamethrowerState(monster.aiState)) {
                     console.log(`Found existing Agna boss ${monster.monsterId} in flamethrower mode during initialization`);
                     this.startFlamethrowerSound(monster.monsterId);
+                }
+                if (this.isRitualCompleteState(monster.aiState)) {
+                    console.log(`Found existing Agna boss ${monster.monsterId} in ritual complete state during initialization`);
+                    this.startRitualCompleteVisualization();
                 }
                 // Note: Ritual sounds are one-shot, so we don't need to replay them during initialization
                 // They are triggered by state transitions, not sustained like flamethrower
@@ -218,9 +230,16 @@ export default class BossAgnaManager {
         } else if (!wasInRitualComplete && isInRitualComplete) {
             console.log(`Agna boss ${newMonster.monsterId} entered ritual complete phase`);
             this.playRitualSound('agna_extinguished', 0.9);
+            this.startRitualCompleteVisualization();
         } else if (!wasInRitualFailed && isInRitualFailed) {
             console.log(`Agna boss ${newMonster.monsterId} entered ritual failed phase`);
             this.playRitualSound('agna_ritual_fail', 0.8);
+        }
+        
+        // Check if we need to stop ritual complete visualization
+        if (wasInRitualComplete && !isInRitualComplete) {
+            console.log(`Agna boss ${newMonster.monsterId} left ritual complete phase`);
+            this.stopRitualCompleteVisualization();
         }
     }
 
@@ -239,13 +258,33 @@ export default class BossAgnaManager {
         this.stopFlamethrowerSound(monster.monsterId);
     }
 
+    // Handle when a player is updated (for ritual circle position updates)
+    private handlePlayerUpdate(ctx: EventContext, oldPlayer: Player, newPlayer: Player) {
+        if (this.isDestroyed || !this.isRitualCompleteActive) {
+            return;
+        }
+        
+        // Check if position changed
+        if (oldPlayer.position.x !== newPlayer.position.x || oldPlayer.position.y !== newPlayer.position.y) {
+            // Update ritual circle position if it exists for this player
+            const circle = this.playerRitualCircles.get(newPlayer.playerId);
+            if (circle) {
+                circle.setPosition(newPlayer.position.x, newPlayer.position.y);
+                circle.setDepth(MONSTER_DEPTH_BASE + newPlayer.position.y - 1);
+            } else {
+                // Create circle for this player if ritual is active and circle doesn't exist
+                this.createPlayerRitualCircle(newPlayer.playerId, newPlayer.position.x, newPlayer.position.y);
+            }
+        }
+    }
+
     // Handle when a player is deleted (hide magic circles targeting that player)
     private handlePlayerDelete(ctx: EventContext, player: Player) {
         if (this.isDestroyed) {
             return;
         }
         
-        console.log(`Player ${player.playerId} was deleted, cleaning up magic circles`);
+        console.log(`Player ${player.playerId} was deleted, cleaning up magic circles and ritual circles`);
         
         // Find and remove all magic circles targeting this player
         const circlesToRemove: bigint[] = [];
@@ -267,6 +306,9 @@ export default class BossAgnaManager {
         if (circlesToRemove.length > 0) {
             console.log(`Cleaned up ${circlesToRemove.length} magic circles for deleted player ${player.playerId}`);
         }
+        
+        // Remove ritual circle for this player if it exists
+        this.removePlayerRitualCircle(player.playerId);
     }
 
     // Helper methods for monster type and state checking
@@ -352,6 +394,129 @@ export default class BossAgnaManager {
             console.warn("Sound manager not available for ritual sound playback");
         }
     }
+
+    // Ritual completion visualization management
+    private startRitualCompleteVisualization() {
+        if (this.isRitualCompleteActive) {
+            return; // Already active
+        }
+        
+        console.log("Starting ritual complete visualization - red haze and player circles");
+        this.isRitualCompleteActive = true;
+        
+        // Create red haze overlay covering the entire screen
+        this.createRitualCompleteHaze();
+        
+        // Create magic circles under all active players
+        this.createPlayerRitualCircles();
+    }
+
+    private stopRitualCompleteVisualization() {
+        if (!this.isRitualCompleteActive) {
+            return; // Not active
+        }
+        
+        console.log("Stopping ritual complete visualization");
+        this.isRitualCompleteActive = false;
+        
+        // Remove red haze overlay
+        this.removeRitualCompleteHaze();
+        
+        // Remove all player ritual circles
+        this.removeAllPlayerRitualCircles();
+    }
+
+    private createRitualCompleteHaze() {
+        if (this.ritualCompleteHaze) {
+            return; // Already exists
+        }
+        
+        // Get camera dimensions for full screen coverage
+        const camera = this.scene.cameras.main;
+        const screenWidth = camera.width;
+        const screenHeight = camera.height;
+        
+        // Create red haze rectangle covering the entire screen
+        this.ritualCompleteHaze = this.scene.add.rectangle(
+            camera.centerX, 
+            camera.centerY, 
+            screenWidth, 
+            screenHeight, 
+            0xff0000, // Red color
+            0.2 // 20% opacity
+        );
+        
+        // Set high depth to appear over most elements but below UI
+        this.ritualCompleteHaze.setDepth(10000);
+        
+        // Make it follow the camera
+        this.ritualCompleteHaze.setScrollFactor(0);
+        
+        console.log("Created ritual complete red haze overlay");
+    }
+
+    private removeRitualCompleteHaze() {
+        if (this.ritualCompleteHaze) {
+            this.ritualCompleteHaze.destroy();
+            this.ritualCompleteHaze = null;
+            console.log("Removed ritual complete red haze overlay");
+        }
+    }
+
+    private createPlayerRitualCircles() {
+        // Get all active players from the database
+        const db = this.spacetimeDBClient.sdkConnection?.db;
+        if (!db) {
+            console.warn("Cannot create player ritual circles - database not available");
+            return;
+        }
+        
+        for (const player of db.player.iter()) {
+            this.createPlayerRitualCircle(player.playerId, player.position.x, player.position.y);
+        }
+    }
+
+    private createPlayerRitualCircle(playerId: number, x: number, y: number) {
+        // Don't create if already exists
+        if (this.playerRitualCircles.has(playerId)) {
+            return;
+        }
+        
+        // Create magic circle sprite under the player
+        const circle = this.scene.add.image(x, y, MAGIC_CIRCLE_ASSET_KEY);
+        circle.setScale(1.2); // Larger than normal magic circles for more dramatic effect
+        circle.setAlpha(0.5); // More transparent for subtle but visible effect
+        
+        // Set depth to be 1 below the player (assuming player depth is around 2000 + y)
+        circle.setDepth(MONSTER_DEPTH_BASE + y - 1);
+        
+        // Ensure it follows the camera
+        circle.setScrollFactor(1, 1);
+        
+        // Store the circle
+        this.playerRitualCircles.set(playerId, circle);
+        
+        console.log(`Created ritual circle for player ${playerId} at (${x}, ${y})`);
+    }
+
+    private removePlayerRitualCircle(playerId: number) {
+        const circle = this.playerRitualCircles.get(playerId);
+        if (circle) {
+            circle.destroy();
+            this.playerRitualCircles.delete(playerId);
+            console.log(`Removed ritual circle for player ${playerId}`);
+        }
+    }
+
+    private removeAllPlayerRitualCircles() {
+        for (const [playerId, circle] of this.playerRitualCircles) {
+            circle.destroy();
+        }
+        this.playerRitualCircles.clear();
+        console.log("Removed all player ritual circles");
+    }
+
+
 
     private createMagicCircle(circleData: AgnaMagicCircle): void {
         // Check if we already have a sprite for this circle
@@ -637,6 +802,9 @@ export default class BossAgnaManager {
         // Unregister database event listeners first
         this.unregisterListeners();
         
+        // Stop ritual complete visualization if active
+        this.stopRitualCompleteVisualization();
+        
         // Stop all active tweens for magic circles and candle spawns
         this.magicCircles.forEach(circleSprite => {
             this.scene.tweens.killTweensOf(circleSprite);
@@ -667,6 +835,7 @@ export default class BossAgnaManager {
             db.activeMonsterAttacks?.removeOnInsert(this.boundHandleAttackInsert);
             db.monsters?.removeOnUpdate(this.boundHandleMonsterUpdate);
             db.monsters?.removeOnDelete(this.boundHandleMonsterDelete);
+            db.player?.removeOnUpdate(this.boundHandlePlayerUpdate);
             db.player?.removeOnDelete(this.boundHandlePlayerDelete);
             console.log("BossAgnaManager database listeners removed");
         }
