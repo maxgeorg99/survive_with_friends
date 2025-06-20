@@ -15,4 +15,5 @@ pub enum MonsterType {
     BossEnderPhase2 = 9,
     BossAgnaPhase1 = 10,
     BossAgnaPhase2 = 11,
+    AgnaCandle = 12,
 } 

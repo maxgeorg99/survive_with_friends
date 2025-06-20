@@ -948,6 +948,7 @@ fn get_monster_type_name(bestiary_id: &MonsterType) -> &'static str {
         MonsterType::Imp => "Imp",
         MonsterType::Zombie => "Zombie",
         MonsterType::EnderClaw => "EnderClaw",
+        MonsterType::AgnaCandle => "AgnaCandle",
         MonsterType::Bat => "Bat",
     }
 }

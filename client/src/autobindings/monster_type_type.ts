@@ -47,6 +47,7 @@ export namespace MonsterType {
   export type BossEnderPhase2 = { tag: "BossEnderPhase2" };
   export type BossAgnaPhase1 = { tag: "BossAgnaPhase1" };
   export type BossAgnaPhase2 = { tag: "BossAgnaPhase2" };
+  export type AgnaCandle = { tag: "AgnaCandle" };
 
   // Helper functions for constructing each variant of the tagged union.
   // ```
@@ -66,6 +67,7 @@ export namespace MonsterType {
   export const BossEnderPhase2 = { tag: "BossEnderPhase2" };
   export const BossAgnaPhase1 = { tag: "BossAgnaPhase1" };
   export const BossAgnaPhase2 = { tag: "BossAgnaPhase2" };
+  export const AgnaCandle = { tag: "AgnaCandle" };
 
   export function getTypeScriptAlgebraicType(): AlgebraicType {
     return AlgebraicType.createSumType([
@@ -81,6 +83,7 @@ export namespace MonsterType {
       new SumTypeVariant("BossEnderPhase2", AlgebraicType.createProductType([])),
       new SumTypeVariant("BossAgnaPhase1", AlgebraicType.createProductType([])),
       new SumTypeVariant("BossAgnaPhase2", AlgebraicType.createProductType([])),
+      new SumTypeVariant("AgnaCandle", AlgebraicType.createProductType([])),
     ]);
   }
 
@@ -95,7 +98,7 @@ export namespace MonsterType {
 }
 
 // The tagged union or sum type for the algebraic type `MonsterType`.
-export type MonsterType = MonsterType.Rat | MonsterType.Slime | MonsterType.Bat | MonsterType.Orc | MonsterType.Imp | MonsterType.Zombie | MonsterType.VoidChest | MonsterType.EnderClaw | MonsterType.BossEnderPhase1 | MonsterType.BossEnderPhase2 | MonsterType.BossAgnaPhase1 | MonsterType.BossAgnaPhase2;
+export type MonsterType = MonsterType.Rat | MonsterType.Slime | MonsterType.Bat | MonsterType.Orc | MonsterType.Imp | MonsterType.Zombie | MonsterType.VoidChest | MonsterType.EnderClaw | MonsterType.BossEnderPhase1 | MonsterType.BossEnderPhase2 | MonsterType.BossAgnaPhase1 | MonsterType.BossAgnaPhase2 | MonsterType.AgnaCandle;
 
 export default MonsterType;
 

@@ -17,6 +17,10 @@ pub enum AIState {
     BossAgnaIdle = 9,
     BossAgnaFlamethrower = 10,
     BossAgnaMagicCircle = 11,
+    BossAgnaRitualMatch = 12,
+    BossAgnaRitualWick = 13,
+    BossAgnaRitualFailed = 14,
+    BossAgnaRitualComplete = 15,
 }
 
 // Scheduled table for changing monster AI states
@@ -136,6 +140,34 @@ fn execute_state_entry_behavior(ctx: &ReducerContext, monster: &crate::Monsters,
             
             // Delegate to boss_agna_defs for Agna boss specific behavior
             crate::boss_agna_defs::execute_boss_agna_magic_circle_behavior(ctx, monster);
+        },
+        
+        AIState::BossAgnaRitualMatch => {
+            log::info!("Monster {} entering BossAgnaRitualMatch state", monster.monster_id);
+            
+            // Delegate to boss_agna_defs for Agna ritual behavior
+            crate::boss_agna_defs::execute_boss_agna_ritual_match_behavior(ctx, monster);
+        },
+        
+        AIState::BossAgnaRitualWick => {
+            log::info!("Monster {} entering BossAgnaRitualWick state", monster.monster_id);
+            
+            // Delegate to boss_agna_defs for Agna ritual behavior
+            crate::boss_agna_defs::execute_boss_agna_ritual_wick_behavior(ctx, monster);
+        },
+        
+        AIState::BossAgnaRitualFailed => {
+            log::info!("Monster {} entering BossAgnaRitualFailed state", monster.monster_id);
+            
+            // Delegate to boss_agna_defs for Agna ritual behavior
+            crate::boss_agna_defs::execute_boss_agna_ritual_failed_behavior(ctx, monster);
+        },
+        
+        AIState::BossAgnaRitualComplete => {
+            log::info!("Monster {} entering BossAgnaRitualComplete state", monster.monster_id);
+            
+            // Delegate to boss_agna_defs for Agna ritual behavior
+            crate::boss_agna_defs::execute_boss_agna_ritual_complete_behavior(ctx, monster);
         },
         
         AIState::Default => {
@@ -268,6 +300,10 @@ pub fn get_movement_behavior_for_state(state: &AIState) -> MovementBehavior {
         AIState::BossAgnaIdle => MovementBehavior::Normal,
         AIState::BossAgnaFlamethrower => MovementBehavior::Normal, // Use chase behavior for flamethrower
         AIState::BossAgnaMagicCircle => MovementBehavior::StandStill, // Agna stands still during magic circle
+        AIState::BossAgnaRitualMatch => MovementBehavior::StandStill, // Agna stands still during ritual
+        AIState::BossAgnaRitualWick => MovementBehavior::StandStill, // Agna stands still during ritual
+        AIState::BossAgnaRitualFailed => MovementBehavior::StandStill, // Agna stands still when vulnerable
+        AIState::BossAgnaRitualComplete => MovementBehavior::StandStill, // Agna stands still during completion
         AIState::Stationary => MovementBehavior::StandStill,
     }
 }
@@ -337,6 +373,10 @@ pub fn can_monster_deal_damage(state: &AIState) -> bool {
         AIState::BossAgnaIdle => true,
         AIState::BossAgnaFlamethrower => true,
         AIState::BossAgnaMagicCircle => true,
+        AIState::BossAgnaRitualMatch => false, // Invulnerable during ritual match
+        AIState::BossAgnaRitualWick => false, // Invulnerable during ritual wick
+        AIState::BossAgnaRitualFailed => true, // Vulnerable when ritual failed
+        AIState::BossAgnaRitualComplete => false, // Invulnerable during completion
         AIState::Stationary => true,
     }
 }

@@ -158,5 +158,16 @@ pub fn init_bestiary(ctx: &ReducerContext) {
         radius: 120.0,     // Slightly smaller than Ender Phase 2
     });
 
+    // Insert Agna Candle stats - stationary ritual candles
+    ctx.db.bestiary().insert(Bestiary {
+        bestiary_id: MonsterType::AgnaCandle as u32,
+        monster_type: MonsterType::AgnaCandle,
+        tier: 3,
+        max_hp: 40,        // Medium HP (destructible but not too easy)
+        speed: 0.0,        // Stationary (no movement)
+        atk: 0.0,          // No melee attack (only ranged bolts)
+        radius: 32.0,      // Medium radius for collision
+    });
+
     log::info!("Bestiary initialization complete");
 } 

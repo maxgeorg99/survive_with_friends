@@ -1505,5 +1505,6 @@ fn get_monster_type_name(bestiary_id: &MonsterType) -> &'static str {
         MonsterType::BossEnderPhase2 => "BossEnderPhase2",
         MonsterType::BossAgnaPhase1 => "BossAgnaPhase1",
         MonsterType::BossAgnaPhase2 => "BossAgnaPhase2",
+        MonsterType::AgnaCandle => "AgnaCandle",
     }
 }

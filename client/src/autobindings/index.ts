@@ -34,6 +34,8 @@ import {
 // Import and reexport all reducer arg types
 import { ChangeMonsterState } from "./change_monster_state_reducer.ts";
 export { ChangeMonsterState };
+import { CheckAgnaRitualCompletion } from "./check_agna_ritual_completion_reducer.ts";
+export { CheckAgnaRitualCompletion };
 import { ChooseUpgrade } from "./choose_upgrade_reducer.ts";
 export { ChooseUpgrade };
 import { CleanupActiveAttack } from "./cleanup_active_attack_reducer.ts";
@@ -76,6 +78,8 @@ import { SetPlayerPvpMode } from "./set_player_pvp_mode_reducer.ts";
 export { SetPlayerPvpMode };
 import { SetPlayerWaypoint } from "./set_player_waypoint_reducer.ts";
 export { SetPlayerWaypoint };
+import { SpawnAgnaCandle } from "./spawn_agna_candle_reducer.ts";
+export { SpawnAgnaCandle };
 import { SpawnBossForTesting } from "./spawn_boss_for_testing_reducer.ts";
 export { SpawnBossForTesting };
 import { SpawnBossPhaseOne } from "./spawn_boss_phase_one_reducer.ts";
@@ -110,6 +114,8 @@ import { TransitionDeadToChoosingClass } from "./transition_dead_to_choosing_cla
 export { TransitionDeadToChoosingClass };
 import { TransitionWinnerToChoosingClass } from "./transition_winner_to_choosing_class_reducer.ts";
 export { TransitionWinnerToChoosingClass };
+import { TriggerAgnaCandleBolt } from "./trigger_agna_candle_bolt_reducer.ts";
+export { TriggerAgnaCandleBolt };
 import { TriggerAgnaFireOrbAttack } from "./trigger_agna_fire_orb_attack_reducer.ts";
 export { TriggerAgnaFireOrbAttack };
 import { TriggerAgnaFlamethrowerAttack } from "./trigger_agna_flamethrower_attack_reducer.ts";
@@ -136,6 +142,12 @@ import { ActiveAttacksTableHandle } from "./active_attacks_table.ts";
 export { ActiveAttacksTableHandle };
 import { ActiveMonsterAttacksTableHandle } from "./active_monster_attacks_table.ts";
 export { ActiveMonsterAttacksTableHandle };
+import { AgnaCandleBoltSchedulerTableHandle } from "./agna_candle_bolt_scheduler_table.ts";
+export { AgnaCandleBoltSchedulerTableHandle };
+import { AgnaCandleSchedulerTableHandle } from "./agna_candle_scheduler_table.ts";
+export { AgnaCandleSchedulerTableHandle };
+import { AgnaCandleSpawnsTableHandle } from "./agna_candle_spawns_table.ts";
+export { AgnaCandleSpawnsTableHandle };
 import { AgnaDelayedOrbSchedulerTableHandle } from "./agna_delayed_orb_scheduler_table.ts";
 export { AgnaDelayedOrbSchedulerTableHandle };
 import { AgnaFireOrbSchedulerTableHandle } from "./agna_fire_orb_scheduler_table.ts";
@@ -144,6 +156,8 @@ import { AgnaFlamethrowerSchedulerTableHandle } from "./agna_flamethrower_schedu
 export { AgnaFlamethrowerSchedulerTableHandle };
 import { AgnaMagicCirclesTableHandle } from "./agna_magic_circles_table.ts";
 export { AgnaMagicCirclesTableHandle };
+import { AgnaRitualCompletionCheckTableHandle } from "./agna_ritual_completion_check_table.ts";
+export { AgnaRitualCompletionCheckTableHandle };
 import { AttackBurstCooldownsTableHandle } from "./attack_burst_cooldowns_table.ts";
 export { AttackBurstCooldownsTableHandle };
 import { AttackDataTableHandle } from "./attack_data_table.ts";
@@ -240,6 +254,12 @@ import { ActiveAttackCleanup } from "./active_attack_cleanup_type.ts";
 export { ActiveAttackCleanup };
 import { ActiveMonsterAttack } from "./active_monster_attack_type.ts";
 export { ActiveMonsterAttack };
+import { AgnaCandleBoltScheduler } from "./agna_candle_bolt_scheduler_type.ts";
+export { AgnaCandleBoltScheduler };
+import { AgnaCandleScheduler } from "./agna_candle_scheduler_type.ts";
+export { AgnaCandleScheduler };
+import { AgnaCandleSpawn } from "./agna_candle_spawn_type.ts";
+export { AgnaCandleSpawn };
 import { AgnaDelayedOrbScheduler } from "./agna_delayed_orb_scheduler_type.ts";
 export { AgnaDelayedOrbScheduler };
 import { AgnaFireOrbScheduler } from "./agna_fire_orb_scheduler_type.ts";
@@ -248,6 +268,8 @@ import { AgnaFlamethrowerScheduler } from "./agna_flamethrower_scheduler_type.ts
 export { AgnaFlamethrowerScheduler };
 import { AgnaMagicCircle } from "./agna_magic_circle_type.ts";
 export { AgnaMagicCircle };
+import { AgnaRitualCompletionCheck } from "./agna_ritual_completion_check_type.ts";
+export { AgnaRitualCompletionCheck };
 import { AttackBurstCooldown } from "./attack_burst_cooldown_type.ts";
 export { AttackBurstCooldown };
 import { AttackData } from "./attack_data_type.ts";
@@ -371,6 +393,21 @@ const REMOTE_MODULE = {
       rowType: ActiveMonsterAttack.getTypeScriptAlgebraicType(),
       primaryKey: "activeMonsterAttackId",
     },
+    agna_candle_bolt_scheduler: {
+      tableName: "agna_candle_bolt_scheduler",
+      rowType: AgnaCandleBoltScheduler.getTypeScriptAlgebraicType(),
+      primaryKey: "scheduledId",
+    },
+    agna_candle_scheduler: {
+      tableName: "agna_candle_scheduler",
+      rowType: AgnaCandleScheduler.getTypeScriptAlgebraicType(),
+      primaryKey: "scheduledId",
+    },
+    agna_candle_spawns: {
+      tableName: "agna_candle_spawns",
+      rowType: AgnaCandleSpawn.getTypeScriptAlgebraicType(),
+      primaryKey: "spawnId",
+    },
     agna_delayed_orb_scheduler: {
       tableName: "agna_delayed_orb_scheduler",
       rowType: AgnaDelayedOrbScheduler.getTypeScriptAlgebraicType(),
@@ -390,6 +427,11 @@ const REMOTE_MODULE = {
       tableName: "agna_magic_circles",
       rowType: AgnaMagicCircle.getTypeScriptAlgebraicType(),
       primaryKey: "circleId",
+    },
+    agna_ritual_completion_check: {
+      tableName: "agna_ritual_completion_check",
+      rowType: AgnaRitualCompletionCheck.getTypeScriptAlgebraicType(),
+      primaryKey: "scheduledId",
     },
     attack_burst_cooldowns: {
       tableName: "attack_burst_cooldowns",
@@ -602,6 +644,10 @@ const REMOTE_MODULE = {
       reducerName: "change_monster_state",
       argsType: ChangeMonsterState.getTypeScriptAlgebraicType(),
     },
+    check_agna_ritual_completion: {
+      reducerName: "check_agna_ritual_completion",
+      argsType: CheckAgnaRitualCompletion.getTypeScriptAlgebraicType(),
+    },
     choose_upgrade: {
       reducerName: "choose_upgrade",
       argsType: ChooseUpgrade.getTypeScriptAlgebraicType(),
@@ -686,6 +732,10 @@ const REMOTE_MODULE = {
       reducerName: "set_player_waypoint",
       argsType: SetPlayerWaypoint.getTypeScriptAlgebraicType(),
     },
+    spawn_agna_candle: {
+      reducerName: "spawn_agna_candle",
+      argsType: SpawnAgnaCandle.getTypeScriptAlgebraicType(),
+    },
     spawn_boss_for_testing: {
       reducerName: "spawn_boss_for_testing",
       argsType: SpawnBossForTesting.getTypeScriptAlgebraicType(),
@@ -754,6 +804,10 @@ const REMOTE_MODULE = {
       reducerName: "transition_winner_to_choosing_class",
       argsType: TransitionWinnerToChoosingClass.getTypeScriptAlgebraicType(),
     },
+    trigger_agna_candle_bolt: {
+      reducerName: "trigger_agna_candle_bolt",
+      argsType: TriggerAgnaCandleBolt.getTypeScriptAlgebraicType(),
+    },
     trigger_agna_fire_orb_attack: {
       reducerName: "trigger_agna_fire_orb_attack",
       argsType: TriggerAgnaFireOrbAttack.getTypeScriptAlgebraicType(),
@@ -814,6 +868,7 @@ const REMOTE_MODULE = {
 // A type representing all the possible variants of a reducer.
 export type Reducer = never
 | { name: "ChangeMonsterState", args: ChangeMonsterState }
+| { name: "CheckAgnaRitualCompletion", args: CheckAgnaRitualCompletion }
 | { name: "ChooseUpgrade", args: ChooseUpgrade }
 | { name: "CleanupActiveAttack", args: CleanupActiveAttack }
 | { name: "CleanupMonsterHitRecord", args: CleanupMonsterHitRecord }
@@ -835,6 +890,7 @@ export type Reducer = never
 | { name: "SetName", args: SetName }
 | { name: "SetPlayerPvpMode", args: SetPlayerPvpMode }
 | { name: "SetPlayerWaypoint", args: SetPlayerWaypoint }
+| { name: "SpawnAgnaCandle", args: SpawnAgnaCandle }
 | { name: "SpawnBossForTesting", args: SpawnBossForTesting }
 | { name: "SpawnBossPhaseOne", args: SpawnBossPhaseOne }
 | { name: "SpawnBossPhaseTwoDelayed", args: SpawnBossPhaseTwoDelayed }
@@ -852,6 +908,7 @@ export type Reducer = never
 | { name: "SpawnPlayer", args: SpawnPlayer }
 | { name: "TransitionDeadToChoosingClass", args: TransitionDeadToChoosingClass }
 | { name: "TransitionWinnerToChoosingClass", args: TransitionWinnerToChoosingClass }
+| { name: "TriggerAgnaCandleBolt", args: TriggerAgnaCandleBolt }
 | { name: "TriggerAgnaFireOrbAttack", args: TriggerAgnaFireOrbAttack }
 | { name: "TriggerAgnaFlamethrowerAttack", args: TriggerAgnaFlamethrowerAttack }
 | { name: "TriggerBossTargetSwitch", args: TriggerBossTargetSwitch }
@@ -879,6 +936,22 @@ export class RemoteReducers {
 
   removeOnChangeMonsterState(callback: (ctx: ReducerEventContext, stateChange: MonsterStateChange) => void) {
     this.connection.offReducer("change_monster_state", callback);
+  }
+
+  checkAgnaRitualCompletion(checker: AgnaRitualCompletionCheck) {
+    const __args = { checker };
+    let __writer = new BinaryWriter(1024);
+    CheckAgnaRitualCompletion.getTypeScriptAlgebraicType().serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("check_agna_ritual_completion", __argsBuffer, this.setCallReducerFlags.checkAgnaRitualCompletionFlags);
+  }
+
+  onCheckAgnaRitualCompletion(callback: (ctx: ReducerEventContext, checker: AgnaRitualCompletionCheck) => void) {
+    this.connection.onReducer("check_agna_ritual_completion", callback);
+  }
+
+  removeOnCheckAgnaRitualCompletion(callback: (ctx: ReducerEventContext, checker: AgnaRitualCompletionCheck) => void) {
+    this.connection.offReducer("check_agna_ritual_completion", callback);
   }
 
   chooseUpgrade(playerId: number, upgradeIndex: number) {
@@ -1185,6 +1258,22 @@ export class RemoteReducers {
     this.connection.offReducer("set_player_waypoint", callback);
   }
 
+  spawnAgnaCandle(scheduler: AgnaCandleScheduler) {
+    const __args = { scheduler };
+    let __writer = new BinaryWriter(1024);
+    SpawnAgnaCandle.getTypeScriptAlgebraicType().serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("spawn_agna_candle", __argsBuffer, this.setCallReducerFlags.spawnAgnaCandleFlags);
+  }
+
+  onSpawnAgnaCandle(callback: (ctx: ReducerEventContext, scheduler: AgnaCandleScheduler) => void) {
+    this.connection.onReducer("spawn_agna_candle", callback);
+  }
+
+  removeOnSpawnAgnaCandle(callback: (ctx: ReducerEventContext, scheduler: AgnaCandleScheduler) => void) {
+    this.connection.offReducer("spawn_agna_candle", callback);
+  }
+
   spawnBossForTesting() {
     this.connection.callReducer("spawn_boss_for_testing", new Uint8Array(0), this.setCallReducerFlags.spawnBossForTestingFlags);
   }
@@ -1437,6 +1526,22 @@ export class RemoteReducers {
     this.connection.offReducer("transition_winner_to_choosing_class", callback);
   }
 
+  triggerAgnaCandleBolt(scheduler: AgnaCandleBoltScheduler) {
+    const __args = { scheduler };
+    let __writer = new BinaryWriter(1024);
+    TriggerAgnaCandleBolt.getTypeScriptAlgebraicType().serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("trigger_agna_candle_bolt", __argsBuffer, this.setCallReducerFlags.triggerAgnaCandleBoltFlags);
+  }
+
+  onTriggerAgnaCandleBolt(callback: (ctx: ReducerEventContext, scheduler: AgnaCandleBoltScheduler) => void) {
+    this.connection.onReducer("trigger_agna_candle_bolt", callback);
+  }
+
+  removeOnTriggerAgnaCandleBolt(callback: (ctx: ReducerEventContext, scheduler: AgnaCandleBoltScheduler) => void) {
+    this.connection.offReducer("trigger_agna_candle_bolt", callback);
+  }
+
   triggerAgnaFireOrbAttack(scheduler: AgnaFireOrbScheduler) {
     const __args = { scheduler };
     let __writer = new BinaryWriter(1024);
@@ -1569,6 +1674,11 @@ export class SetReducerFlags {
     this.changeMonsterStateFlags = flags;
   }
 
+  checkAgnaRitualCompletionFlags: CallReducerFlags = 'FullUpdate';
+  checkAgnaRitualCompletion(flags: CallReducerFlags) {
+    this.checkAgnaRitualCompletionFlags = flags;
+  }
+
   chooseUpgradeFlags: CallReducerFlags = 'FullUpdate';
   chooseUpgrade(flags: CallReducerFlags) {
     this.chooseUpgradeFlags = flags;
@@ -1669,6 +1779,11 @@ export class SetReducerFlags {
     this.setPlayerWaypointFlags = flags;
   }
 
+  spawnAgnaCandleFlags: CallReducerFlags = 'FullUpdate';
+  spawnAgnaCandle(flags: CallReducerFlags) {
+    this.spawnAgnaCandleFlags = flags;
+  }
+
   spawnBossForTestingFlags: CallReducerFlags = 'FullUpdate';
   spawnBossForTesting(flags: CallReducerFlags) {
     this.spawnBossForTestingFlags = flags;
@@ -1754,6 +1869,11 @@ export class SetReducerFlags {
     this.transitionWinnerToChoosingClassFlags = flags;
   }
 
+  triggerAgnaCandleBoltFlags: CallReducerFlags = 'FullUpdate';
+  triggerAgnaCandleBolt(flags: CallReducerFlags) {
+    this.triggerAgnaCandleBoltFlags = flags;
+  }
+
   triggerAgnaFireOrbAttackFlags: CallReducerFlags = 'FullUpdate';
   triggerAgnaFireOrbAttack(flags: CallReducerFlags) {
     this.triggerAgnaFireOrbAttackFlags = flags;
@@ -1815,6 +1935,18 @@ export class RemoteTables {
     return new ActiveMonsterAttacksTableHandle(this.connection.clientCache.getOrCreateTable<ActiveMonsterAttack>(REMOTE_MODULE.tables.active_monster_attacks));
   }
 
+  get agnaCandleBoltScheduler(): AgnaCandleBoltSchedulerTableHandle {
+    return new AgnaCandleBoltSchedulerTableHandle(this.connection.clientCache.getOrCreateTable<AgnaCandleBoltScheduler>(REMOTE_MODULE.tables.agna_candle_bolt_scheduler));
+  }
+
+  get agnaCandleScheduler(): AgnaCandleSchedulerTableHandle {
+    return new AgnaCandleSchedulerTableHandle(this.connection.clientCache.getOrCreateTable<AgnaCandleScheduler>(REMOTE_MODULE.tables.agna_candle_scheduler));
+  }
+
+  get agnaCandleSpawns(): AgnaCandleSpawnsTableHandle {
+    return new AgnaCandleSpawnsTableHandle(this.connection.clientCache.getOrCreateTable<AgnaCandleSpawn>(REMOTE_MODULE.tables.agna_candle_spawns));
+  }
+
   get agnaDelayedOrbScheduler(): AgnaDelayedOrbSchedulerTableHandle {
     return new AgnaDelayedOrbSchedulerTableHandle(this.connection.clientCache.getOrCreateTable<AgnaDelayedOrbScheduler>(REMOTE_MODULE.tables.agna_delayed_orb_scheduler));
   }
@@ -1829,6 +1961,10 @@ export class RemoteTables {
 
   get agnaMagicCircles(): AgnaMagicCirclesTableHandle {
     return new AgnaMagicCirclesTableHandle(this.connection.clientCache.getOrCreateTable<AgnaMagicCircle>(REMOTE_MODULE.tables.agna_magic_circles));
+  }
+
+  get agnaRitualCompletionCheck(): AgnaRitualCompletionCheckTableHandle {
+    return new AgnaRitualCompletionCheckTableHandle(this.connection.clientCache.getOrCreateTable<AgnaRitualCompletionCheck>(REMOTE_MODULE.tables.agna_ritual_completion_check));
   }
 
   get attackBurstCooldowns(): AttackBurstCooldownsTableHandle {

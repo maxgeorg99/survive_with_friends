@@ -47,6 +47,10 @@ export namespace AiState {
   export type BossAgnaIdle = { tag: "BossAgnaIdle" };
   export type BossAgnaFlamethrower = { tag: "BossAgnaFlamethrower" };
   export type BossAgnaMagicCircle = { tag: "BossAgnaMagicCircle" };
+  export type BossAgnaRitualMatch = { tag: "BossAgnaRitualMatch" };
+  export type BossAgnaRitualWick = { tag: "BossAgnaRitualWick" };
+  export type BossAgnaRitualFailed = { tag: "BossAgnaRitualFailed" };
+  export type BossAgnaRitualComplete = { tag: "BossAgnaRitualComplete" };
 
   // Helper functions for constructing each variant of the tagged union.
   // ```
@@ -66,6 +70,10 @@ export namespace AiState {
   export const BossAgnaIdle = { tag: "BossAgnaIdle" };
   export const BossAgnaFlamethrower = { tag: "BossAgnaFlamethrower" };
   export const BossAgnaMagicCircle = { tag: "BossAgnaMagicCircle" };
+  export const BossAgnaRitualMatch = { tag: "BossAgnaRitualMatch" };
+  export const BossAgnaRitualWick = { tag: "BossAgnaRitualWick" };
+  export const BossAgnaRitualFailed = { tag: "BossAgnaRitualFailed" };
+  export const BossAgnaRitualComplete = { tag: "BossAgnaRitualComplete" };
 
   export function getTypeScriptAlgebraicType(): AlgebraicType {
     return AlgebraicType.createSumType([
@@ -81,6 +89,10 @@ export namespace AiState {
       new SumTypeVariant("BossAgnaIdle", AlgebraicType.createProductType([])),
       new SumTypeVariant("BossAgnaFlamethrower", AlgebraicType.createProductType([])),
       new SumTypeVariant("BossAgnaMagicCircle", AlgebraicType.createProductType([])),
+      new SumTypeVariant("BossAgnaRitualMatch", AlgebraicType.createProductType([])),
+      new SumTypeVariant("BossAgnaRitualWick", AlgebraicType.createProductType([])),
+      new SumTypeVariant("BossAgnaRitualFailed", AlgebraicType.createProductType([])),
+      new SumTypeVariant("BossAgnaRitualComplete", AlgebraicType.createProductType([])),
     ]);
   }
 
@@ -95,7 +107,7 @@ export namespace AiState {
 }
 
 // The tagged union or sum type for the algebraic type `AiState`.
-export type AiState = AiState.Default | AiState.BossEnderIdle | AiState.BossEnderChase | AiState.BossEnderDance | AiState.BossEnderVanish | AiState.BossEnderLurk | AiState.BossEnderTeleport | AiState.BossEnderTransform | AiState.Stationary | AiState.BossAgnaIdle | AiState.BossAgnaFlamethrower | AiState.BossAgnaMagicCircle;
+export type AiState = AiState.Default | AiState.BossEnderIdle | AiState.BossEnderChase | AiState.BossEnderDance | AiState.BossEnderVanish | AiState.BossEnderLurk | AiState.BossEnderTeleport | AiState.BossEnderTransform | AiState.Stationary | AiState.BossAgnaIdle | AiState.BossAgnaFlamethrower | AiState.BossAgnaMagicCircle | AiState.BossAgnaRitualMatch | AiState.BossAgnaRitualWick | AiState.BossAgnaRitualFailed | AiState.BossAgnaRitualComplete;
 
 export default AiState;
 

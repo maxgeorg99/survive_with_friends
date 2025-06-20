@@ -1,7 +1,7 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, ScheduleAt, SpacetimeType, rand::Rng};
-use crate::{DbVector2, MonsterType, MonsterAttackType, config, player, bestiary, monsters, monsters_boid, MonsterSpawners,
+use crate::{DbVector2, MonsterType, MonsterAttackType, MonsterVariant, config, player, bestiary, monsters, monsters_boid, MonsterSpawners,
            DELTA_TIME, get_world_cell_from_position, spatial_hash_collision_checker,
-           WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT, WORLD_SIZE};
+           WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT, WORLD_SIZE, game_state};
 use crate::monster_attacks_def::active_monster_attacks;
 use crate::monster_ai_defs::monster_state_changes;
 use std::time::Duration;
@@ -40,6 +40,19 @@ const AGNA_FIRE_ORB_SPAWN_INTERVAL_MS: u64 = 1000;     // Spawn orb every 1 seco
 // Configuration constants for AgnaOrbSpawn telegraph
 const AGNA_ORB_SPAWN_TELEGRAPH_MS: u64 = 150;          // Telegraph appears
 const AGNA_ORB_SPAWN_DURATION_MS: u64 = 50;           // Telegraph lasts
+
+// Configuration constants for Agna Ritual pattern
+const AGNA_RITUAL_MATCH_DURATION_MS: u64 = 4000;       // 4 seconds to create candles
+const AGNA_RITUAL_WICK_DURATION_MS: u64 = 13000;       // 13 seconds for candle phase
+const AGNA_RITUAL_FAILED_DURATION_MS: u64 = 3000;      // 3 seconds vulnerable if failed
+const AGNA_RITUAL_COMPLETE_DAMAGE: u32 = 13;           // Damage per tick to all players
+const AGNA_RITUAL_CANDLE_COUNT: u32 = 13;              // Number of candles to spawn
+const AGNA_RITUAL_CIRCLE_RADIUS: f32 = 200.0;          // Radius of candle circle
+const AGNA_CANDLE_BOLT_DAMAGE: u32 = 20;               // Damage per candle bolt
+const AGNA_CANDLE_BOLT_SPEED: f32 = 400.0;             // Movement speed of candle bolts
+const AGNA_CANDLE_BOLT_RADIUS: f32 = 24.0;             // Collision radius of candle bolts
+const AGNA_CANDLE_BOLT_INTERVAL_MS: u64 = 1500;        // Candles fire every 1.5 seconds
+const AGNA_CANDLE_SPAWN_INTERVAL_MS: u64 = 307;        // 4000ms / 13 candles ~= 307ms per candle
 
 // Table to track the last chosen pattern for each Agna boss to avoid repetition
 #[table(name = boss_agna_last_patterns, public)]
@@ -104,6 +117,58 @@ pub struct AgnaDelayedOrbScheduler {
     pub target_player_id: u32,    // The player being targeted
     pub circle_position: DbVector2, // Position where the orb should spawn
     pub circle_index: u32,        // Which circle fired this orb (0-3)
+}
+
+// Table for tracking candle spawn positions during ritual
+#[table(name = agna_candle_spawns, public)]
+#[derive(Clone)]
+pub struct AgnaCandleSpawn {
+    #[primary_key]
+    #[auto_inc]
+    pub spawn_id: u64,
+    
+    pub boss_monster_id: u32,     // The Agna boss that created this spawn
+    pub position: DbVector2,      // Position where the candle should spawn
+    pub candle_index: u32,        // Which candle this is (0-12)
+    pub candle_monster_id: u32,   // The monster ID of the spawned candle (0 if not yet spawned)
+}
+
+// Scheduled table for spawning candles during ritual wick phase
+#[table(name = agna_candle_scheduler, scheduled(spawn_agna_candle), public)]
+pub struct AgnaCandleScheduler {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    
+    pub scheduled_at: ScheduleAt,
+    
+    pub boss_monster_id: u32,     // The Agna boss that owns this ritual
+    pub spawn_id: u64,            // The AgnaCandleSpawn this scheduler will spawn
+}
+
+// Scheduled table for candle bolt attacks
+#[table(name = agna_candle_bolt_scheduler, scheduled(trigger_agna_candle_bolt), public)]
+pub struct AgnaCandleBoltScheduler {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    
+    pub scheduled_at: ScheduleAt,
+    
+    pub candle_monster_id: u32,   // The candle monster that will fire
+    pub target_player_id: u32,    // The target player
+}
+
+// Scheduled table for checking ritual completion
+#[table(name = agna_ritual_completion_check, scheduled(check_agna_ritual_completion), public)]
+pub struct AgnaRitualCompletionCheck {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    
+    pub scheduled_at: ScheduleAt,
+    
+    pub boss_monster_id: u32,     // The Agna boss to check
 }
 
 
@@ -323,29 +388,23 @@ pub fn execute_boss_agna_flamethrower_behavior(ctx: &ReducerContext, monster: &c
     // Apply speed boost first (called once on state entry)
     apply_agna_flamethrower_speed_boost(ctx, monster);
     
-    // Use the boss's current target player instead of random
-    let target_player_id = monster.target_player_id;
+    // Always pick a new random target when entering flamethrower mode for variety
+    let target_player_id = match find_random_player(ctx) {
+        Some(player_id) => player_id,
+        None => {
+            log::info!("No players available for flamethrower targeting, returning to idle");
+            schedule_state_change(ctx, monster.monster_id, crate::monster_ai_defs::AIState::BossAgnaIdle, 1000);
+            return;
+        }
+    };
     
-    // Verify the target player still exists
-    if ctx.db.player().player_id().find(&target_player_id).is_none() {
-        log::info!("Agna boss {} current target player {} no longer exists, finding new target", monster.monster_id, target_player_id);
-        
-        // Find a random player as fallback
-        let fallback_target = match find_random_player(ctx) {
-            Some(player_id) => player_id,
-            None => {
-                log::info!("No players available for flamethrower targeting, returning to idle");
-                schedule_state_change(ctx, monster.monster_id, crate::monster_ai_defs::AIState::BossAgnaIdle, 1000);
-                return;
-            }
-        };
-        
-        log::info!("Agna boss {} switching to fallback target player {} for flamethrower attack", monster.monster_id, fallback_target);
-        start_agna_flamethrower_attacks(ctx, monster.monster_id, fallback_target);
-    } else {
-        log::info!("Agna boss {} targeting current chase target player {} for flamethrower attack", monster.monster_id, target_player_id);
-        start_agna_flamethrower_attacks(ctx, monster.monster_id, target_player_id);
-    }
+    // Update the boss's chase target to match the flamethrower target
+    let mut updated_monster = monster.clone();
+    updated_monster.target_player_id = target_player_id;
+    ctx.db.monsters().monster_id().update(updated_monster);
+    
+    log::info!("Agna boss {} selected new random target player {} for flamethrower attack and chase", monster.monster_id, target_player_id);
+    start_agna_flamethrower_attacks(ctx, monster.monster_id, target_player_id);
     
     // Schedule return to idle after flamethrower duration
     schedule_state_change(ctx, monster.monster_id, crate::monster_ai_defs::AIState::BossAgnaIdle, AGNA_FLAMETHROWER_DURATION_MS);
@@ -374,6 +433,7 @@ pub fn schedule_random_boss_agna_pattern(ctx: &ReducerContext, monster_id: u32, 
     let available_patterns = vec![
         crate::monster_ai_defs::AIState::BossAgnaFlamethrower,
         crate::monster_ai_defs::AIState::BossAgnaMagicCircle,
+        crate::monster_ai_defs::AIState::BossAgnaRitualMatch,
     ];
     
     // Get last pattern to avoid repetition
@@ -476,6 +536,13 @@ pub fn cleanup_agna_ai_schedules(ctx: &ReducerContext, monster_id: u32) {
     
     // Cleanup magic circle schedules
     cleanup_agna_magic_circle_schedules(ctx, monster_id);
+    
+    // Cleanup candle schedules and spawns
+    cleanup_agna_candle_spawns(ctx, monster_id);
+    cleanup_agna_candle_schedules(ctx, monster_id);
+    
+    // Cleanup ritual completion checks
+    cleanup_agna_ritual_completion_checks(ctx, monster_id);
     
     // Remove last pattern tracking
     if ctx.db.boss_agna_last_patterns().monster_id().find(&monster_id).is_some() {
@@ -810,6 +877,506 @@ pub fn execute_boss_agna_magic_circle_behavior(ctx: &ReducerContext, monster: &c
     
     // Schedule return to idle after magic circle duration
     schedule_state_change(ctx, monster.monster_id, crate::monster_ai_defs::AIState::BossAgnaIdle, AGNA_MAGIC_CIRCLE_DURATION_MS);
+}
+
+// Execute behavior when entering BossAgnaRitualMatch state
+pub fn execute_boss_agna_ritual_match_behavior(ctx: &ReducerContext, monster: &crate::Monsters) {
+    log::info!("Starting Agna ritual match phase for boss {}", monster.monster_id);
+    
+    // Make Agna stationary and invulnerable
+    reset_monster_speed_to_bestiary(ctx, monster);
+    
+    // Clear any existing candle spawns for this boss
+    cleanup_agna_candle_spawns(ctx, monster.monster_id);
+    
+    // Get Agna's position from monsters_boid table
+    let boid_opt = ctx.db.monsters_boid().monster_id().find(&monster.monster_id);
+    let boid = match boid_opt {
+        Some(boid) => boid,
+        None => {
+            log::info!("Boid {} not found for ritual candle spawn creation", monster.monster_id);
+            return;
+        }
+    };
+    
+    // Create candle spawn positions in a circle around Agna
+    create_ritual_candle_spawns(ctx, monster.monster_id, &boid.position);
+    
+    // Schedule transition to wick phase after match duration
+    schedule_state_change(ctx, monster.monster_id, crate::monster_ai_defs::AIState::BossAgnaRitualWick, AGNA_RITUAL_MATCH_DURATION_MS);
+}
+
+// Execute behavior when entering BossAgnaRitualWick state
+pub fn execute_boss_agna_ritual_wick_behavior(ctx: &ReducerContext, monster: &crate::Monsters) {
+    log::info!("Starting Agna ritual wick phase for boss {}", monster.monster_id);
+    
+    // Spawn all the candle monsters immediately
+    spawn_all_ritual_candles(ctx, monster.monster_id);
+    
+    // Schedule check for ritual completion after wick duration
+    ctx.db.agna_ritual_completion_check().insert(AgnaRitualCompletionCheck {
+        scheduled_id: 0,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(AGNA_RITUAL_WICK_DURATION_MS)),
+        boss_monster_id: monster.monster_id,
+    });
+}
+
+// Execute behavior when entering BossAgnaRitualFailed state (vulnerable)
+pub fn execute_boss_agna_ritual_failed_behavior(ctx: &ReducerContext, monster: &crate::Monsters) {
+    log::info!("Agna ritual failed for boss {} - now vulnerable", monster.monster_id);
+    
+    // Clean up any remaining candles and schedules
+    cleanup_agna_candle_spawns(ctx, monster.monster_id);
+    cleanup_agna_candle_schedules(ctx, monster.monster_id);
+    
+    // Schedule return to idle state after failed duration
+    schedule_state_change(ctx, monster.monster_id, crate::monster_ai_defs::AIState::BossAgnaIdle, AGNA_RITUAL_FAILED_DURATION_MS);
+}
+
+// Execute behavior when entering BossAgnaRitualComplete state (damage all players)
+pub fn execute_boss_agna_ritual_complete_behavior(ctx: &ReducerContext, monster: &crate::Monsters) {
+    log::info!("Agna ritual completed for boss {} - dealing damage to all players", monster.monster_id);
+    
+    // Damage all living players every tick while in this state
+    // This will be handled in the core game tick by checking the AI state
+    
+    // Clean up candles and schedules
+    cleanup_agna_candle_spawns(ctx, monster.monster_id);
+    cleanup_agna_candle_schedules(ctx, monster.monster_id);
+    
+    // Return to idle after a brief completion period
+    schedule_state_change(ctx, monster.monster_id, crate::monster_ai_defs::AIState::BossAgnaIdle, 2000); // 2 seconds
+}
+
+// Helper function to create candle spawn positions in a circle
+fn create_ritual_candle_spawns(ctx: &ReducerContext, boss_monster_id: u32, boss_position: &DbVector2) {
+    log::info!("Creating {} candle spawns around boss {}", AGNA_RITUAL_CANDLE_COUNT, boss_monster_id);
+    
+    for i in 0..AGNA_RITUAL_CANDLE_COUNT {
+        let angle = (i as f32 / AGNA_RITUAL_CANDLE_COUNT as f32) * 2.0 * std::f32::consts::PI;
+        let spawn_position = DbVector2::new(
+            boss_position.x + AGNA_RITUAL_CIRCLE_RADIUS * angle.cos(),
+            boss_position.y + AGNA_RITUAL_CIRCLE_RADIUS * angle.sin()
+        );
+        
+        ctx.db.agna_candle_spawns().insert(AgnaCandleSpawn {
+            spawn_id: 0, // Auto-incremented
+            boss_monster_id,
+            position: spawn_position,
+            candle_index: i,
+            candle_monster_id: 0, // Not yet spawned
+        });
+        
+        log::info!("Created candle spawn {} at ({}, {})", i, spawn_position.x, spawn_position.y);
+    }
+}
+
+// Helper function to spawn all candles for ritual wick phase
+fn spawn_all_ritual_candles(ctx: &ReducerContext, boss_monster_id: u32) {
+    let spawns: Vec<_> = ctx.db.agna_candle_spawns()
+        .iter()
+        .filter(|spawn| spawn.boss_monster_id == boss_monster_id && spawn.candle_monster_id == 0)
+        .collect();
+    
+    log::info!("Spawning {} candles for boss {}", spawns.len(), boss_monster_id);
+    
+    for spawn in spawns {
+        // Get bestiary entry for candle
+        let bestiary_entry = ctx.db.bestiary().bestiary_id().find(&(MonsterType::AgnaCandle as u32))
+            .expect("Could not find bestiary entry for AgnaCandle");
+        
+        // Create the candle monster
+        let candle_monster = ctx.db.monsters().insert(crate::Monsters {
+            monster_id: 0, // Auto-incremented
+            bestiary_id: MonsterType::AgnaCandle,
+            variant: MonsterVariant::Default,
+            hp: bestiary_entry.max_hp,
+            max_hp: bestiary_entry.max_hp,
+            atk: bestiary_entry.atk,
+            speed: bestiary_entry.speed,
+            target_player_id: 0, // Candles don't have targets
+            radius: bestiary_entry.radius,
+            spawn_position: spawn.position,
+            ai_state: crate::monster_ai_defs::AIState::Stationary,
+        });
+        
+        // Create the boid for the candle
+        ctx.db.monsters_boid().insert(crate::MonsterBoid {
+            monster_id: candle_monster.monster_id,
+            position: spawn.position,
+        });
+        
+        let candle_monster_id = candle_monster.monster_id;
+
+        log::info!("Spawned Agna candle {} at position ({}, {})", 
+                  candle_monster_id, spawn.position.x, spawn.position.y);
+
+        // Update the spawn record with the candle monster ID
+        let mut updated_spawn = spawn.clone();
+        updated_spawn.candle_monster_id = candle_monster_id;
+        ctx.db.agna_candle_spawns().spawn_id().update(updated_spawn);
+
+        // Start the candle's bolt attacks
+        start_candle_bolt_attacks(ctx, candle_monster_id);
+    }
+}
+
+// Helper function to start candle bolt attacks
+fn start_candle_bolt_attacks(ctx: &ReducerContext, candle_monster_id: u32) {
+    if let Some(target_player_id) = find_random_player(ctx) {
+        schedule_next_candle_bolt(ctx, candle_monster_id, target_player_id);
+    }
+}
+
+// Helper function to schedule next candle bolt
+fn schedule_next_candle_bolt(ctx: &ReducerContext, candle_monster_id: u32, target_player_id: u32) {
+    let delay_ms = AGNA_CANDLE_BOLT_INTERVAL_MS;
+    let schedule_at = ScheduleAt::Time(ctx.timestamp + Duration::from_millis(delay_ms));
+    
+    ctx.db.agna_candle_bolt_scheduler().insert(AgnaCandleBoltScheduler {
+        scheduled_id: 0,
+        scheduled_at: schedule_at,
+        candle_monster_id,
+        target_player_id,
+    });
+}
+
+// Helper function to fire a candle bolt
+fn fire_candle_bolt(ctx: &ReducerContext, candle: &crate::Monsters, target_player_id: u32) {
+    let target_opt = ctx.db.player().player_id().find(&target_player_id);
+    let target = match target_opt {
+        Some(player) => player,
+        None => return,
+    };
+    
+    // Get candle position from boid table
+    let candle_boid_opt = ctx.db.monsters_boid().monster_id().find(&candle.monster_id);
+    let candle_boid = match candle_boid_opt {
+        Some(boid) => boid,
+        None => {
+            log::info!("Candle {} has no boid data, cannot fire bolt", candle.monster_id);
+            return;
+        }
+    };
+    
+    // Calculate direction to target
+    let direction = DbVector2::new(
+        target.position.x - candle_boid.position.x,
+        target.position.y - candle_boid.position.y
+    ).normalize();
+    
+    // Create the candle bolt attack
+    let bolt_attack = crate::ActiveMonsterAttack {
+        active_monster_attack_id: 0, // Auto-incremented
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(3000)), // 3 second lifespan
+        position: candle_boid.position,
+        direction,
+        monster_attack_type: MonsterAttackType::AgnaCandleBolt,
+        piercing: false,
+        damage: AGNA_CANDLE_BOLT_DAMAGE,
+        radius: AGNA_CANDLE_BOLT_RADIUS,
+        speed: AGNA_CANDLE_BOLT_SPEED,
+        parameter_u: 0,
+        parameter_f: 0.0,
+        ticks_elapsed: 0,
+        from_shiny_monster: false,
+    };
+    
+    ctx.db.active_monster_attacks().insert(bolt_attack);
+    
+    log::info!("Candle {} fired bolt at player {}", candle.monster_id, target_player_id);
+}
+
+// Helper function to clean up candle spawns
+fn cleanup_agna_candle_spawns(ctx: &ReducerContext, boss_monster_id: u32) {
+    let spawns_to_delete: Vec<_> = ctx.db.agna_candle_spawns()
+        .iter()
+        .filter(|spawn| spawn.boss_monster_id == boss_monster_id)
+        .collect();
+    
+    for spawn in spawns_to_delete {
+        // If a candle monster was spawned, delete it
+        if spawn.candle_monster_id != 0 {
+            if let Some(_candle) = ctx.db.monsters().monster_id().find(&spawn.candle_monster_id) {
+                ctx.db.monsters().monster_id().delete(&spawn.candle_monster_id);
+                log::info!("Deleted candle monster {}", spawn.candle_monster_id);
+            }
+        }
+        
+        // Delete the spawn record
+        ctx.db.agna_candle_spawns().spawn_id().delete(&spawn.spawn_id);
+    }
+    
+    log::info!("Cleaned up candle spawns for boss {}", boss_monster_id);
+}
+
+// Helper function to clean up candle schedules
+fn cleanup_agna_candle_schedules(ctx: &ReducerContext, boss_monster_id: u32) {
+    // Clean up candle bolt schedulers
+    let bolt_schedulers: Vec<_> = ctx.db.agna_candle_bolt_scheduler()
+        .iter()
+        .collect();
+    
+    for scheduler in bolt_schedulers {
+        // Check if this candle belongs to the boss
+        if let Some(_candle) = ctx.db.monsters().monster_id().find(&scheduler.candle_monster_id) {
+            // Check if this candle is from our boss (via spawn records)
+            let spawn_exists = ctx.db.agna_candle_spawns()
+                .iter()
+                .any(|spawn| spawn.boss_monster_id == boss_monster_id && spawn.candle_monster_id == scheduler.candle_monster_id);
+            
+            if spawn_exists {
+                ctx.db.agna_candle_bolt_scheduler().scheduled_id().delete(&scheduler.scheduled_id);
+            }
+        }
+    }
+    
+    log::info!("Cleaned up candle schedules for boss {}", boss_monster_id);
+}
+
+// Helper function to clean up ritual completion checks
+fn cleanup_agna_ritual_completion_checks(ctx: &ReducerContext, boss_monster_id: u32) {
+    let checks_to_delete: Vec<_> = ctx.db.agna_ritual_completion_check()
+        .iter()
+        .filter(|check| check.boss_monster_id == boss_monster_id)
+        .collect();
+    
+    for check in checks_to_delete {
+        ctx.db.agna_ritual_completion_check().scheduled_id().delete(&check.scheduled_id);
+    }
+    
+    log::info!("Cleaned up ritual completion checks for boss {}", boss_monster_id);
+}
+
+// Reducer to spawn a candle monster
+#[reducer]
+pub fn spawn_agna_candle(ctx: &ReducerContext, scheduler: AgnaCandleScheduler) {
+    if ctx.sender != ctx.identity() {
+        panic!("spawn_agna_candle may not be invoked by clients, only via scheduling.");
+    }
+
+    // Find the candle spawn record
+    let spawn_opt = ctx.db.agna_candle_spawns().spawn_id().find(&scheduler.spawn_id);
+    let spawn = match spawn_opt {
+        Some(spawn) => spawn,
+        None => {
+            log::info!("Candle spawn {} no longer exists", scheduler.spawn_id);
+            return;
+        }
+    };
+
+    // Check if the boss still exists
+    let boss_opt = ctx.db.monsters().monster_id().find(&scheduler.boss_monster_id);
+    if boss_opt.is_none() {
+        log::info!("Agna boss {} no longer exists, cancelling candle spawn", scheduler.boss_monster_id);
+        return;
+    }
+
+    // Get bestiary entry for candle
+    let bestiary_entry = ctx.db.bestiary().bestiary_id().find(&(MonsterType::AgnaCandle as u32))
+        .expect("Could not find bestiary entry for AgnaCandle");
+    
+    // Create the candle monster
+    let candle_monster = ctx.db.monsters().insert(crate::Monsters {
+        monster_id: 0, // Auto-incremented
+        bestiary_id: MonsterType::AgnaCandle,
+        variant: MonsterVariant::Default,
+        hp: bestiary_entry.max_hp,
+        max_hp: bestiary_entry.max_hp,
+        atk: bestiary_entry.atk,
+        speed: bestiary_entry.speed,
+        target_player_id: 0, // Candles don't have targets
+        radius: bestiary_entry.radius,
+        spawn_position: spawn.position,
+        ai_state: crate::monster_ai_defs::AIState::Stationary,
+    });
+    
+    // Create the boid for the candle
+    ctx.db.monsters_boid().insert(crate::MonsterBoid {
+        monster_id: candle_monster.monster_id,
+        position: spawn.position,
+    });
+
+    log::info!("Spawned Agna candle {} at position ({}, {})", 
+              candle_monster.monster_id, spawn.position.x, spawn.position.y);
+
+    // Update the spawn record with the candle monster ID
+    let mut updated_spawn = spawn.clone();
+    updated_spawn.candle_monster_id = candle_monster.monster_id;
+    ctx.db.agna_candle_spawns().spawn_id().update(updated_spawn);
+
+    // Start the candle's bolt attacks
+    start_candle_bolt_attacks(ctx, candle_monster.monster_id);
+}
+
+// Reducer to fire a candle bolt
+#[reducer] 
+pub fn trigger_agna_candle_bolt(ctx: &ReducerContext, scheduler: AgnaCandleBoltScheduler) {
+    if ctx.sender != ctx.identity() {
+        panic!("trigger_agna_candle_bolt may not be invoked by clients, only via scheduling.");
+    }
+
+    // Check if the candle monster still exists
+    let candle_opt = ctx.db.monsters().monster_id().find(&scheduler.candle_monster_id);
+    let candle = match candle_opt {
+        Some(monster) => monster,
+        None => {
+            log::info!("Candle monster {} no longer exists", scheduler.candle_monster_id);
+            return;
+        }
+    };
+
+    // Check if the target player exists
+    let target_opt = ctx.db.player().player_id().find(&scheduler.target_player_id);
+    let target = match target_opt {
+        Some(player) => player,
+        None => {
+            // Find a new random target
+            if let Some(random_player_id) = find_random_player(ctx) {
+                log::info!("Target player {} no longer exists, switching to {}", scheduler.target_player_id, random_player_id);
+                fire_candle_bolt(ctx, &candle, random_player_id);
+                schedule_next_candle_bolt(ctx, scheduler.candle_monster_id, random_player_id);
+            }
+            return;
+        }
+    };
+
+    // Fire the bolt
+    fire_candle_bolt(ctx, &candle, target.player_id);
+    
+    // Schedule the next bolt
+    schedule_next_candle_bolt(ctx, scheduler.candle_monster_id, target.player_id);
+}
+
+// Reducer to check ritual completion  
+#[reducer]
+pub fn check_agna_ritual_completion(ctx: &ReducerContext, checker: AgnaRitualCompletionCheck) {
+    if ctx.sender != ctx.identity() {
+        panic!("check_agna_ritual_completion may not be invoked by clients, only via scheduling.");
+    }
+
+    // Check if the boss still exists
+    let boss_opt = ctx.db.monsters().monster_id().find(&checker.boss_monster_id);
+    let boss = match boss_opt {
+        Some(monster) => monster,
+        None => {
+            log::info!("Boss {} no longer exists for ritual completion check", checker.boss_monster_id);
+            return;
+        }
+    };
+
+    // Check if boss is still in ritual wick state
+    if boss.ai_state != crate::monster_ai_defs::AIState::BossAgnaRitualWick {
+        log::info!("Boss {} no longer in ritual wick state, skipping completion check", checker.boss_monster_id);
+        return;
+    }
+
+    // Count living candles for this boss
+    let living_candles = count_living_candles(ctx, checker.boss_monster_id);
+    
+    if living_candles == 0 {
+        // All candles destroyed - ritual failed!
+        log::info!("All candles destroyed! Ritual failed for boss {}", checker.boss_monster_id);
+        
+        // Transition to failed state
+        let mut updated_boss = boss.clone();
+        updated_boss.ai_state = crate::monster_ai_defs::AIState::BossAgnaRitualFailed;
+        ctx.db.monsters().monster_id().update(updated_boss);
+        
+        // Execute failed behavior
+        execute_boss_agna_ritual_failed_behavior(ctx, &boss);
+    } else {
+        // Candles still alive - ritual completed!
+        log::info!("Ritual completed! {} candles survived for boss {}", living_candles, checker.boss_monster_id);
+        
+        // Transition to complete state
+        let mut updated_boss = boss.clone();
+        updated_boss.ai_state = crate::monster_ai_defs::AIState::BossAgnaRitualComplete;
+        ctx.db.monsters().monster_id().update(updated_boss);
+        
+        // Execute complete behavior
+        execute_boss_agna_ritual_complete_behavior(ctx, &boss);
+    }
+}
+
+// Helper function to count living candles for a boss
+fn count_living_candles(ctx: &ReducerContext, boss_monster_id: u32) -> u32 {
+    let spawns: Vec<_> = ctx.db.agna_candle_spawns()
+        .iter()
+        .filter(|spawn| spawn.boss_monster_id == boss_monster_id && spawn.candle_monster_id != 0)
+        .collect();
+    
+    let mut living_count = 0;
+    for spawn in spawns {
+        // Check if the candle monster still exists
+        if let Some(_candle) = ctx.db.monsters().monster_id().find(&spawn.candle_monster_id) {
+            living_count += 1;
+        }
+    }
+    
+    living_count
+}
+
+// Public function to handle ritual complete damage (called from core game tick)
+pub fn process_agna_ritual_complete_damage(ctx: &ReducerContext) {
+    // Early bailout if we're not in a boss phase - no point checking for ritual bosses
+    let game_state_opt = ctx.db.game_state().id().find(&0);
+    let game_state = match game_state_opt {
+        Some(state) => state,
+        None => return, // No game state, skip processing
+    };
+    
+    if !game_state.boss_active || (game_state.boss_phase != 1) {
+        return; // Not in a boss phase, skip processing
+    }
+    
+    // Find all Agna bosses in ritual complete state
+    let ritual_complete_bosses: Vec<_> = ctx.db.monsters()
+        .iter()
+        .filter(|monster| {
+            (monster.bestiary_id == MonsterType::BossAgnaPhase1 || 
+             monster.bestiary_id == MonsterType::BossAgnaPhase2) &&
+            monster.ai_state == crate::monster_ai_defs::AIState::BossAgnaRitualComplete
+        })
+        .collect();
+    
+    if ritual_complete_bosses.is_empty() {
+        return; // No bosses in ritual complete state
+    }
+    
+    // Damage all living players
+    let damage_per_boss = AGNA_RITUAL_COMPLETE_DAMAGE as f32;
+    let total_damage = damage_per_boss * ritual_complete_bosses.len() as f32;
+    
+    for player in ctx.db.player().iter() {
+        if player.hp > 0.0 { // Only damage living players
+            let player_id = player.player_id;
+            let old_hp = player.hp;
+            let new_hp = if player.hp > total_damage {
+                player.hp - total_damage
+            } else {
+                0.0
+            };
+            
+            let mut updated_player = player;
+            updated_player.hp = new_hp;
+            ctx.db.player().player_id().update(updated_player);
+            
+            log::info!("Ritual complete: Player {} took {} damage (HP: {} -> {})", 
+                      player_id, total_damage, old_hp, new_hp);
+            
+            // Check if player died
+            if new_hp <= 0.0 {
+                log::info!("Player {} killed by Agna ritual completion", player_id);
+                crate::transition_player_to_dead_state(ctx, player_id);
+            }
+        }
+    }
+    
+    if !ritual_complete_bosses.is_empty() {
+        log::info!("Agna ritual complete damage: {} damage dealt to all living players by {} boss(es)", 
+                  total_damage, ritual_complete_bosses.len());
+    }
 }
 
  
