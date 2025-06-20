@@ -192,6 +192,10 @@ export class MonsterAttackManager {
             spriteKey = 'void_zone';
         } else if (attackType === 'AgnaFlamethrowerJet') {
             spriteKey = 'agna_flamethrower';
+        } else if (attackType === 'AgnaPhase2FlameJet') {
+            spriteKey = 'agna_flamethrower';
+        } else if (attackType === 'AgnaGroundFlame') {
+            spriteKey = 'agna_flame_ground';
         } else if (attackType === 'AgnaFireOrb') {
             spriteKey = 'agna_circle_orb';
         } else if (attackType === 'AgnaCandleBolt') {
@@ -217,6 +221,11 @@ export class MonsterAttackManager {
         } else if (attackType === 'AgnaFlamethrowerJet') {
             alpha = 1.0; // Start at full alpha
             sprite.setScale(0.25); // Start at quarter scale
+        } else if (attackType === 'AgnaPhase2FlameJet') {
+            alpha = 1.0; // Start at full alpha
+            sprite.setScale(0.25); // Start at quarter scale
+        } else if (attackType === 'AgnaGroundFlame') {
+            alpha = 0.8; // Start semi-transparent
         }
         sprite.setAlpha(alpha);
         
@@ -294,6 +303,50 @@ export class MonsterAttackManager {
                 sprite.setAlpha(alpha);
                 break;
                 
+            case 'AgnaPhase2FlameJet':
+                // AgnaPhase2FlameJet rotates in direction of motion (same as Phase 1)
+                if (attackGraphicData.direction.length() > 0) {
+                    sprite.setRotation(Math.atan2(attackGraphicData.direction.y, attackGraphicData.direction.x));
+                }
+                
+                // Handle growing scale and fading alpha over lifetime (same as Phase 1)
+                // Assuming 3-second lifespan (3000ms) based on server config
+                const phase2LifespanMs = 3000;
+                const phase2ElapsedMs = attackGraphicData.ticksElapsed * 50; // Assume 50ms per tick (20 TPS)
+                const phase2LinearProgress = Math.min(phase2ElapsedMs / phase2LifespanMs, 1.0); // Clamp to 1.0
+                
+                // Use asymptotic easing: fast growth initially, slow approach to final value
+                // Using exponential ease-out: 1 - (1-t)^2 for smooth asymptotic curve
+                const phase2EasedProgress = 1 - Math.pow(1 - phase2LinearProgress, 2);
+                
+                // Scale grows from 0.25 to 1.0 over lifetime with asymptotic easing
+                const phase2Scale = 0.25 + (0.75 * phase2EasedProgress);
+                sprite.setScale(phase2Scale);
+                
+                // Alpha fades from 1.0 to 0.5 over lifetime
+                const phase2Alpha = 1.0 - (0.5 * phase2LinearProgress);
+                sprite.setAlpha(phase2Alpha);
+                break;
+                
+            case 'AgnaGroundFlame':
+                // AgnaGroundFlame is stationary - no rotation
+                sprite.setRotation(0);
+                
+                // Handle varying alpha over time for flame flickering effect
+                // 2-minute lifespan (120000ms) based on server config
+                const groundFlameLifespanMs = 120000;
+                const groundFlameElapsedMs = attackGraphicData.ticksElapsed * 50; // Assume 50ms per tick (20 TPS)
+                const groundFlameProgress = Math.min(groundFlameElapsedMs / groundFlameLifespanMs, 1.0);
+                
+                // Create flickering effect with sine wave + gradual fade
+                const timeInSeconds = groundFlameElapsedMs / 1000.0;
+                const flickerAlpha = 0.3 + 0.3 * Math.sin(timeInSeconds * 4.0); // Flicker between 0.3 and 0.6
+                const fadeAlpha = 0.8 - (0.3 * groundFlameProgress); // Fade from 0.8 to 0.5 over lifespan
+                const finalAlpha = Math.min(flickerAlpha, fadeAlpha);
+                
+                sprite.setAlpha(finalAlpha);
+                break;
+                
             default:
                 // Default rotation based on direction
                 if (attackGraphicData.direction.length() > 0) {
@@ -340,6 +393,10 @@ export class MonsterAttackManager {
             } else if (attackGraphicData.attackType === 'EnderScythe') {
                 // EnderScythe attacks have orbital movement around boss - rely on server updates
                 // Don't do linear prediction, just update rotation
+                this.updateMonsterAttackGraphic(attackGraphicData);
+            } else if (attackGraphicData.attackType === 'AgnaGroundFlame') {
+                // AgnaGroundFlame attacks are stationary - no movement prediction
+                // Just update the graphic for alpha flickering effect
                 this.updateMonsterAttackGraphic(attackGraphicData);
             } else if (attackGraphicData.direction.length() > 0) {
                 // Normal projectile with directional movement

@@ -288,9 +288,8 @@ pub fn spawn_boss_phase_two(ctx: &ReducerContext, position: DbVector2) {
             crate::boss_ender_defs::start_boss_target_switching(ctx, monster.monster_id);
         },
         BossType::Agna => {
-            // Initialize Agna Phase 2 boss AI (BossAgnaIdle only, no attacks yet)
-            log::info!("Initializing Agna Phase 2 boss {} AI (BossAgnaIdle only, no patterns)", monster.monster_id);
-            // For now, Agna just uses idle behavior - we'll add attacks later
+            // Initialize Agna Phase 2 boss AI with summoning circles, target switching, and flamethrower
+            crate::monster_ai_defs::initialize_phase2_boss_ai(ctx, monster.monster_id);
         },
     }
 }

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { EventContext, AgnaMagicCircle, AgnaCandleSpawn, ActiveMonsterAttack, MonsterAttackType, Monsters, AiState, Player } from '../autobindings';
+import { EventContext, AgnaMagicCircle, AgnaCandleSpawn, ActiveMonsterAttack, MonsterAttackType, Monsters, AiState, Player, AgnaSummoningCircleSpawner } from '../autobindings';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 
 const MAGIC_CIRCLE_ASSET_KEY = 'agna_magic_circle';
@@ -16,6 +16,7 @@ export default class BossAgnaManager {
     private spacetimeDBClient: SpacetimeDBClient;
     private magicCircles: Map<bigint, Phaser.GameObjects.Image> = new Map();
     private candleSpawns: Map<bigint, Phaser.GameObjects.Image> = new Map();
+    private summoningCircles: Map<bigint, Phaser.GameObjects.Image> = new Map();
     
     // Store bound event handlers for proper cleanup
     private boundHandleCircleInsert: (ctx: EventContext, circle: AgnaMagicCircle) => void;
@@ -29,6 +30,8 @@ export default class BossAgnaManager {
     private boundHandleMonsterDelete: (ctx: EventContext, monster: Monsters) => void;
     private boundHandlePlayerUpdate: (ctx: EventContext, oldPlayer: Player, newPlayer: Player) => void;
     private boundHandlePlayerDelete: (ctx: EventContext, player: Player) => void;
+    private boundHandleSummoningCircleInsert: (ctx: EventContext, spawner: AgnaSummoningCircleSpawner) => void;
+    private boundHandleSummoningCircleDelete: (ctx: EventContext, spawner: AgnaSummoningCircleSpawner) => void;
     
     // Flag to track if the manager has been shut down
     private isDestroyed: boolean = false;
@@ -59,6 +62,8 @@ export default class BossAgnaManager {
         this.boundHandleMonsterDelete = this.handleMonsterDelete.bind(this);
         this.boundHandlePlayerUpdate = this.handlePlayerUpdate.bind(this);
         this.boundHandlePlayerDelete = this.handlePlayerDelete.bind(this);
+        this.boundHandleSummoningCircleInsert = this.handleSummoningCircleInsert.bind(this);
+        this.boundHandleSummoningCircleDelete = this.handleSummoningCircleDelete.bind(this);
         
         // Set up event handlers for magic circle table events, candle spawn events, active attacks, monster updates, and player deletes
         const db = this.spacetimeDBClient.sdkConnection?.db;
@@ -74,6 +79,8 @@ export default class BossAgnaManager {
             db.monsters?.onDelete(this.boundHandleMonsterDelete);
             db.player?.onUpdate(this.boundHandlePlayerUpdate);
             db.player?.onDelete(this.boundHandlePlayerDelete);
+            db.agnaSummoningCircleSpawner?.onInsert(this.boundHandleSummoningCircleInsert);
+            db.agnaSummoningCircleSpawner?.onDelete(this.boundHandleSummoningCircleDelete);
         } else {
             console.error("Could not set up BossAgnaManager database listeners (database not connected)");
         }
@@ -241,6 +248,13 @@ export default class BossAgnaManager {
             console.log(`Agna boss ${newMonster.monsterId} left ritual complete phase`);
             this.stopRitualCompleteVisualization();
         }
+
+        // Check for target changes in Phase 2 Agna (play laugh sound)
+        if (newMonster.bestiaryId?.tag === 'BossAgnaPhase2' && 
+            oldMonster.targetPlayerId !== newMonster.targetPlayerId) {
+            console.log(`Agna Phase 2 boss ${newMonster.monsterId} changed target from ${oldMonster.targetPlayerId} to ${newMonster.targetPlayerId}`);
+            this.playRitualSound('agna_laugh', 0.7);
+        }
     }
 
     // Handle when a monster is deleted (for cleanup when Agna bosses are destroyed)
@@ -309,6 +323,26 @@ export default class BossAgnaManager {
         
         // Remove ritual circle for this player if it exists
         this.removePlayerRitualCircle(player.playerId);
+    }
+
+    // Handle when a summoning circle spawner is inserted
+    private handleSummoningCircleInsert(ctx: EventContext, spawner: AgnaSummoningCircleSpawner) {
+        if (this.isDestroyed) {
+            return;
+        }
+        
+        console.log("Summoning circle spawner inserted:", spawner);
+        this.createSummoningCircle(spawner);
+    }
+
+    // Handle when a summoning circle spawner is deleted
+    private handleSummoningCircleDelete(ctx: EventContext, spawner: AgnaSummoningCircleSpawner) {
+        if (this.isDestroyed) {
+            return;
+        }
+        
+        console.log("Summoning circle spawner deleted:", spawner);
+        this.removeSummoningCircle(spawner.scheduledId);
     }
 
     // Helper methods for monster type and state checking
@@ -788,6 +822,51 @@ export default class BossAgnaManager {
         });
     }
 
+    // Create a summoning circle visual at the spawner position
+    private createSummoningCircle(spawner: AgnaSummoningCircleSpawner): void {
+        console.log("Creating summoning circle visual for spawner", spawner.scheduledId);
+        
+        // Note: We don't have position data in the spawner table since it's determined when the reducer runs
+        // For now, we'll just track the spawner but not create a visual until the actual summoning happens
+        // In the future, if we need to show a visual preview, we'd need position data in the spawner table
+        
+        // Create a transparent magic circle at a placeholder position (we'll move it when we get position data)
+        const summoningCircleSprite = this.scene.add.image(0, 0, MAGIC_CIRCLE_ASSET_KEY);
+        summoningCircleSprite.setVisible(false); // Hide initially until we get position
+        summoningCircleSprite.setAlpha(0.4); // Semi-transparent for summoning circles
+        summoningCircleSprite.setDepth(BASE_DEPTH);
+        summoningCircleSprite.setTint(0xff6600); // Orange tint to distinguish from regular magic circles
+        
+        // Store the sprite
+        this.summoningCircles.set(spawner.scheduledId, summoningCircleSprite);
+        
+        // Add to scene (but keep invisible for now)
+        console.log(`Created summoning circle visual for spawner ${spawner.scheduledId}`);
+    }
+
+    // Remove a summoning circle visual
+    private removeSummoningCircle(spawnerId: bigint): void {
+        const summoningCircleSprite = this.summoningCircles.get(spawnerId);
+        if (!summoningCircleSprite) {
+            return;
+        }
+        
+        console.log(`Removing summoning circle visual for spawner ${spawnerId}`);
+        
+        // Fade out and remove
+        this.scene.tweens.add({
+            targets: summoningCircleSprite,
+            alpha: 0,
+            duration: FADE_OUT_DURATION,
+            onComplete: () => {
+                summoningCircleSprite.destroy();
+            }
+        });
+        
+        this.summoningCircles.delete(spawnerId);
+        console.log(`Removed summoning circle visual for spawner ${spawnerId}`);
+    }
+
     // Clean up all magic circles (call this when scene is shut down)
     public shutdown() {
         console.log("Shutting down BossAgnaManager");
@@ -805,19 +884,24 @@ export default class BossAgnaManager {
         // Stop ritual complete visualization if active
         this.stopRitualCompleteVisualization();
         
-        // Stop all active tweens for magic circles and candle spawns
+        // Stop all active tweens for magic circles, candle spawns, and summoning circles
         this.magicCircles.forEach(circleSprite => {
             this.scene.tweens.killTweensOf(circleSprite);
         });
         this.candleSpawns.forEach(candleSprite => {
             this.scene.tweens.killTweensOf(candleSprite);
         });
+        this.summoningCircles.forEach(summoningSprite => {
+            this.scene.tweens.killTweensOf(summoningSprite);
+        });
         
-        // Destroy all magic circle sprites and candle spawn sprites
+        // Destroy all magic circle sprites, candle spawn sprites, and summoning circle sprites
         this.magicCircles.forEach(circleSprite => circleSprite.destroy());
         this.magicCircles.clear();
         this.candleSpawns.forEach(candleSprite => candleSprite.destroy());
         this.candleSpawns.clear();
+        this.summoningCircles.forEach(summoningSprite => summoningSprite.destroy());
+        this.summoningCircles.clear();
         
         console.log("BossAgnaManager shutdown complete");
     }
@@ -837,6 +921,8 @@ export default class BossAgnaManager {
             db.monsters?.removeOnDelete(this.boundHandleMonsterDelete);
             db.player?.removeOnUpdate(this.boundHandlePlayerUpdate);
             db.player?.removeOnDelete(this.boundHandlePlayerDelete);
+            db.agnaSummoningCircleSpawner?.removeOnInsert(this.boundHandleSummoningCircleInsert);
+            db.agnaSummoningCircleSpawner?.removeOnDelete(this.boundHandleSummoningCircleDelete);
             console.log("BossAgnaManager database listeners removed");
         }
     }
