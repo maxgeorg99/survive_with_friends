@@ -633,6 +633,11 @@ export default class MonsterManager {
                 const transformBossType = this.getMonsterTypeName(newMonster.bestiaryId);
                 this.soundManager.playBossTransformSound(transformBossType);
                 break;
+            case 'BossAgnaFlamethrower':
+                // Play Agna flamethrower sound
+                console.log(`*** Agna boss ${newMonster.monsterId} entered flamethrower mode! ***`);
+                this.soundManager.playSound('agna_burned', 0.8);
+                break;
             default:
                 // No sound for other states (BossIdle, Default, Stationary)
                 break;

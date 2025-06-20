@@ -213,6 +213,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('final_boss_phase2', '/assets/final_boss_phase_2.png');
         this.load.image('boss_agna_1', '/assets/boss_agna_1.png');
         this.load.image('boss_agna_2', '/assets/boss_agna_2.png');
+        this.load.image('agna_flamethrower', '/assets/agna_flamethrower.png');
         
         // Load special monster assets
         this.load.image('treasure_chest', '/assets/treasure_chest.png');
@@ -303,6 +304,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.audio('voice_agna_1', '/assets/sounds/narrator_agna_1.mp3');
         this.load.audio('voice_agna_2', '/assets/sounds/narrator_agna_2.mp3');
         this.load.audio('agna_phase_2', '/assets/sounds/agna_phase_2.mp3');
+        this.load.audio('agna_burned', '/assets/sounds/agna_burned.mp3');
         
         // Add error handling for file loading errors
         this.load.on('loaderror', (fileObj: any) => {

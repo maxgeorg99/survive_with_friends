@@ -15,6 +15,7 @@ pub enum AIState {
     BossEnderTransform = 7,
     Stationary = 8,
     BossAgnaIdle = 9,
+    BossAgnaFlamethrower = 10,
 }
 
 // Scheduled table for changing monster AI states
@@ -118,8 +119,15 @@ fn execute_state_entry_behavior(ctx: &ReducerContext, monster: &crate::Monsters,
         AIState::BossAgnaIdle => {
             log::info!("Monster {} entering BossAgnaIdle state", monster.monster_id);
             
-            // For now, Agna just has idle behavior - we'll add attacks later
-            // No special behavior needed, just normal movement toward target
+            // Delegate to boss_agna_defs for Agna boss specific behavior
+            crate::boss_agna_defs::execute_boss_agna_idle_behavior(ctx, monster);
+        },
+        
+        AIState::BossAgnaFlamethrower => {
+            log::info!("Monster {} entering BossAgnaFlamethrower state", monster.monster_id);
+            
+            // Then execute the behavior
+            crate::boss_agna_defs::execute_boss_agna_flamethrower_behavior(ctx, monster);
         },
         
         AIState::Default => {
@@ -161,6 +169,9 @@ fn cancel_scheduled_state_changes(ctx: &ReducerContext, monster_id: u32) {
     
     // Also cleanup any pending EnderScythe attacks for this boss
     crate::boss_ender_defs::cleanup_ender_scythe_schedules(ctx, monster_id);
+    
+    // Also cleanup any pending Agna attacks for this boss
+    crate::boss_agna_defs::cleanup_agna_ai_schedules(ctx, monster_id);
 }
 
 // Public function to cleanup all AI schedules for a monster (used during boss transitions)
@@ -197,9 +208,9 @@ pub fn initialize_boss_ai(ctx: &ReducerContext, monster_id: u32) {
             crate::boss_ender_defs::initialize_boss_ender_ai(ctx, monster_id);
         },
         MonsterType::BossAgnaPhase1 | MonsterType::BossAgnaPhase2 => {
-            log::info!("Initializing Agna boss AI for monster {} (BossAgnaIdle only, no patterns)", monster_id);
-            // For now, Agna just uses idle behavior - we'll add attacks later
-            // No special initialization needed beyond the default AI state
+            log::info!("Initializing Agna boss AI for monster {}", monster_id);
+            // Delegate to boss_agna_defs for Agna boss specific initialization
+            crate::boss_agna_defs::initialize_boss_agna_ai(ctx, monster_id);
         },
         _ => {
             log::warn!("initialize_boss_ai called for non-boss monster {} of type {:?}", monster_id, monster.bestiary_id);
@@ -225,9 +236,9 @@ pub fn initialize_phase2_boss_ai(ctx: &ReducerContext, monster_id: u32) {
             crate::boss_ender_defs::initialize_phase2_boss_ender_ai(ctx, monster_id);
         },
         MonsterType::BossAgnaPhase2 => {
-            log::info!("Initializing Phase 2 Agna boss AI for monster {} (BossAgnaIdle only, no patterns)", monster_id);
-            // For now, Agna just uses idle behavior - we'll add attacks later
-            // No special initialization needed beyond the default AI state
+            log::info!("Initializing Phase 2 Agna boss AI for monster {}", monster_id);
+            // Delegate to boss_agna_defs for Agna boss specific initialization
+            crate::boss_agna_defs::initialize_phase2_boss_agna_ai(ctx, monster_id);
         },
         _ => {
             log::warn!("initialize_phase2_boss_ai called for non-phase-2-boss monster {} of type {:?}", monster_id, monster.bestiary_id);
@@ -247,6 +258,7 @@ pub fn get_movement_behavior_for_state(state: &AIState) -> MovementBehavior {
         AIState::BossEnderTeleport => MovementBehavior::StandStill,
         AIState::BossEnderTransform => MovementBehavior::StandStill,
         AIState::BossAgnaIdle => MovementBehavior::Normal,
+        AIState::BossAgnaFlamethrower => MovementBehavior::Normal, // Use chase behavior for flamethrower
         AIState::Stationary => MovementBehavior::StandStill,
     }
 }
@@ -314,6 +326,7 @@ pub fn can_monster_deal_damage(state: &AIState) -> bool {
         AIState::BossEnderTeleport => true, 
         AIState::BossEnderTransform => true,
         AIState::BossAgnaIdle => true,
+        AIState::BossAgnaFlamethrower => true,
         AIState::Stationary => true,
     }
 }

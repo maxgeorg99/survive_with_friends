@@ -108,6 +108,8 @@ import { TransitionDeadToChoosingClass } from "./transition_dead_to_choosing_cla
 export { TransitionDeadToChoosingClass };
 import { TransitionWinnerToChoosingClass } from "./transition_winner_to_choosing_class_reducer.ts";
 export { TransitionWinnerToChoosingClass };
+import { TriggerAgnaFlamethrowerAttack } from "./trigger_agna_flamethrower_attack_reducer.ts";
+export { TriggerAgnaFlamethrowerAttack };
 import { TriggerBossTargetSwitch } from "./trigger_boss_target_switch_reducer.ts";
 export { TriggerBossTargetSwitch };
 import { TriggerChaosBallAttack } from "./trigger_chaos_ball_attack_reducer.ts";
@@ -130,12 +132,16 @@ import { ActiveAttacksTableHandle } from "./active_attacks_table.ts";
 export { ActiveAttacksTableHandle };
 import { ActiveMonsterAttacksTableHandle } from "./active_monster_attacks_table.ts";
 export { ActiveMonsterAttacksTableHandle };
+import { AgnaFlamethrowerSchedulerTableHandle } from "./agna_flamethrower_scheduler_table.ts";
+export { AgnaFlamethrowerSchedulerTableHandle };
 import { AttackBurstCooldownsTableHandle } from "./attack_burst_cooldowns_table.ts";
 export { AttackBurstCooldownsTableHandle };
 import { AttackDataTableHandle } from "./attack_data_table.ts";
 export { AttackDataTableHandle };
 import { BestiaryTableHandle } from "./bestiary_table.ts";
 export { BestiaryTableHandle };
+import { BossAgnaLastPatternsTableHandle } from "./boss_agna_last_patterns_table.ts";
+export { BossAgnaLastPatternsTableHandle };
 import { BossEnderLastPatternsTableHandle } from "./boss_ender_last_patterns_table.ts";
 export { BossEnderLastPatternsTableHandle };
 import { BossPhaseTwoTimerTableHandle } from "./boss_phase_two_timer_table.ts";
@@ -224,6 +230,8 @@ import { ActiveAttackCleanup } from "./active_attack_cleanup_type.ts";
 export { ActiveAttackCleanup };
 import { ActiveMonsterAttack } from "./active_monster_attack_type.ts";
 export { ActiveMonsterAttack };
+import { AgnaFlamethrowerScheduler } from "./agna_flamethrower_scheduler_type.ts";
+export { AgnaFlamethrowerScheduler };
 import { AttackBurstCooldown } from "./attack_burst_cooldown_type.ts";
 export { AttackBurstCooldown };
 import { AttackData } from "./attack_data_type.ts";
@@ -232,6 +240,8 @@ import { AttackType } from "./attack_type_type.ts";
 export { AttackType };
 import { Bestiary } from "./bestiary_type.ts";
 export { Bestiary };
+import { BossAgnaLastPattern } from "./boss_agna_last_pattern_type.ts";
+export { BossAgnaLastPattern };
 import { BossEnderLastPattern } from "./boss_ender_last_pattern_type.ts";
 export { BossEnderLastPattern };
 import { BossPhase2Timer } from "./boss_phase_2_timer_type.ts";
@@ -345,6 +355,11 @@ const REMOTE_MODULE = {
       rowType: ActiveMonsterAttack.getTypeScriptAlgebraicType(),
       primaryKey: "activeMonsterAttackId",
     },
+    agna_flamethrower_scheduler: {
+      tableName: "agna_flamethrower_scheduler",
+      rowType: AgnaFlamethrowerScheduler.getTypeScriptAlgebraicType(),
+      primaryKey: "scheduledId",
+    },
     attack_burst_cooldowns: {
       tableName: "attack_burst_cooldowns",
       rowType: AttackBurstCooldown.getTypeScriptAlgebraicType(),
@@ -359,6 +374,11 @@ const REMOTE_MODULE = {
       tableName: "bestiary",
       rowType: Bestiary.getTypeScriptAlgebraicType(),
       primaryKey: "bestiaryId",
+    },
+    boss_agna_last_patterns: {
+      tableName: "boss_agna_last_patterns",
+      rowType: BossAgnaLastPattern.getTypeScriptAlgebraicType(),
+      primaryKey: "monsterId",
     },
     boss_ender_last_patterns: {
       tableName: "boss_ender_last_patterns",
@@ -699,6 +719,10 @@ const REMOTE_MODULE = {
       reducerName: "transition_winner_to_choosing_class",
       argsType: TransitionWinnerToChoosingClass.getTypeScriptAlgebraicType(),
     },
+    trigger_agna_flamethrower_attack: {
+      reducerName: "trigger_agna_flamethrower_attack",
+      argsType: TriggerAgnaFlamethrowerAttack.getTypeScriptAlgebraicType(),
+    },
     trigger_boss_target_switch: {
       reducerName: "trigger_boss_target_switch",
       argsType: TriggerBossTargetSwitch.getTypeScriptAlgebraicType(),
@@ -788,6 +812,7 @@ export type Reducer = never
 | { name: "SpawnPlayer", args: SpawnPlayer }
 | { name: "TransitionDeadToChoosingClass", args: TransitionDeadToChoosingClass }
 | { name: "TransitionWinnerToChoosingClass", args: TransitionWinnerToChoosingClass }
+| { name: "TriggerAgnaFlamethrowerAttack", args: TriggerAgnaFlamethrowerAttack }
 | { name: "TriggerBossTargetSwitch", args: TriggerBossTargetSwitch }
 | { name: "TriggerChaosBallAttack", args: TriggerChaosBallAttack }
 | { name: "TriggerEnderBoltAttack", args: TriggerEnderBoltAttack }
@@ -1355,6 +1380,22 @@ export class RemoteReducers {
     this.connection.offReducer("transition_winner_to_choosing_class", callback);
   }
 
+  triggerAgnaFlamethrowerAttack(scheduler: AgnaFlamethrowerScheduler) {
+    const __args = { scheduler };
+    let __writer = new BinaryWriter(1024);
+    TriggerAgnaFlamethrowerAttack.getTypeScriptAlgebraicType().serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("trigger_agna_flamethrower_attack", __argsBuffer, this.setCallReducerFlags.triggerAgnaFlamethrowerAttackFlags);
+  }
+
+  onTriggerAgnaFlamethrowerAttack(callback: (ctx: ReducerEventContext, scheduler: AgnaFlamethrowerScheduler) => void) {
+    this.connection.onReducer("trigger_agna_flamethrower_attack", callback);
+  }
+
+  removeOnTriggerAgnaFlamethrowerAttack(callback: (ctx: ReducerEventContext, scheduler: AgnaFlamethrowerScheduler) => void) {
+    this.connection.offReducer("trigger_agna_flamethrower_attack", callback);
+  }
+
   triggerBossTargetSwitch(scheduler: BossTargetSwitchScheduler) {
     const __args = { scheduler };
     let __writer = new BinaryWriter(1024);
@@ -1635,6 +1676,11 @@ export class SetReducerFlags {
     this.transitionWinnerToChoosingClassFlags = flags;
   }
 
+  triggerAgnaFlamethrowerAttackFlags: CallReducerFlags = 'FullUpdate';
+  triggerAgnaFlamethrowerAttack(flags: CallReducerFlags) {
+    this.triggerAgnaFlamethrowerAttackFlags = flags;
+  }
+
   triggerBossTargetSwitchFlags: CallReducerFlags = 'FullUpdate';
   triggerBossTargetSwitch(flags: CallReducerFlags) {
     this.triggerBossTargetSwitchFlags = flags;
@@ -1686,6 +1732,10 @@ export class RemoteTables {
     return new ActiveMonsterAttacksTableHandle(this.connection.clientCache.getOrCreateTable<ActiveMonsterAttack>(REMOTE_MODULE.tables.active_monster_attacks));
   }
 
+  get agnaFlamethrowerScheduler(): AgnaFlamethrowerSchedulerTableHandle {
+    return new AgnaFlamethrowerSchedulerTableHandle(this.connection.clientCache.getOrCreateTable<AgnaFlamethrowerScheduler>(REMOTE_MODULE.tables.agna_flamethrower_scheduler));
+  }
+
   get attackBurstCooldowns(): AttackBurstCooldownsTableHandle {
     return new AttackBurstCooldownsTableHandle(this.connection.clientCache.getOrCreateTable<AttackBurstCooldown>(REMOTE_MODULE.tables.attack_burst_cooldowns));
   }
@@ -1696,6 +1746,10 @@ export class RemoteTables {
 
   get bestiary(): BestiaryTableHandle {
     return new BestiaryTableHandle(this.connection.clientCache.getOrCreateTable<Bestiary>(REMOTE_MODULE.tables.bestiary));
+  }
+
+  get bossAgnaLastPatterns(): BossAgnaLastPatternsTableHandle {
+    return new BossAgnaLastPatternsTableHandle(this.connection.clientCache.getOrCreateTable<BossAgnaLastPattern>(REMOTE_MODULE.tables.boss_agna_last_patterns));
   }
 
   get bossEnderLastPatterns(): BossEnderLastPatternsTableHandle {

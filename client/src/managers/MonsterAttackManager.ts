@@ -120,6 +120,8 @@ export class MonsterAttackManager {
                 alpha = ENDER_SCYTHE_SPAWN_ALPHA;
             } else if (attackType === 'EnderScythe') {
                 alpha = ENDER_SCYTHE_ALPHA;
+            } else if (attackType === 'AgnaFlamethrowerJet') {
+                alpha = 1.0; // Start at full alpha for flamethrower jets
             }
             
             // Store the monster attack graphic data with prediction values
@@ -188,6 +190,8 @@ export class MonsterAttackManager {
             spriteKey = 'void_ball';
         } else if (attackType === 'VoidZone') {
             spriteKey = 'void_zone';
+        } else if (attackType === 'AgnaFlamethrowerJet') {
+            spriteKey = 'agna_flamethrower';
         }
         
         // Verify the texture exists
@@ -200,12 +204,15 @@ export class MonsterAttackManager {
         const sprite = this.scene.add.sprite(x, y, spriteKey);
         sprite.setDepth(1.5); // Set depth higher than circles but below UI
         
-        // Set alpha based on attack type
+        // Set alpha and scale based on attack type
         let alpha = MONSTER_ATTACK_ALPHA;
         if (attackType === 'EnderScytheSpawn') {
             alpha = ENDER_SCYTHE_SPAWN_ALPHA;
         } else if (attackType === 'EnderScythe') {
             alpha = ENDER_SCYTHE_ALPHA;
+        } else if (attackType === 'AgnaFlamethrowerJet') {
+            alpha = 1.0; // Start at full alpha
+            sprite.setScale(0.25); // Start at quarter scale
         }
         sprite.setAlpha(alpha);
         
@@ -251,6 +258,31 @@ export class MonsterAttackManager {
             case 'VoidZone':
                 // VoidZone is stationary and doesn't rotate
                 sprite.setRotation(0);
+                break;
+                
+            case 'AgnaFlamethrowerJet':
+                // AgnaFlamethrowerJet rotates in direction of motion
+                if (attackGraphicData.direction.length() > 0) {
+                    sprite.setRotation(Math.atan2(attackGraphicData.direction.y, attackGraphicData.direction.x));
+                }
+                
+                // Handle growing scale and fading alpha over lifetime
+                // Assuming 3-second lifespan (3000ms) based on server config
+                const lifespanMs = 3000;
+                const elapsedMs = attackGraphicData.ticksElapsed * 50; // Assume 50ms per tick (20 TPS)
+                const linearProgress = Math.min(elapsedMs / lifespanMs, 1.0); // Clamp to 1.0
+                
+                // Use asymptotic easing: fast growth initially, slow approach to final value
+                // Using exponential ease-out: 1 - (1-t)^2 for smooth asymptotic curve
+                const easedProgress = 1 - Math.pow(1 - linearProgress, 2);
+                
+                // Scale grows from 0.25 to 1.0 over lifetime with asymptotic easing
+                const scale = 0.25 + (0.75 * easedProgress);
+                sprite.setScale(scale);
+                
+                // Alpha fades from 1.0 to 0.5 over lifetime
+                const alpha = 1.0 - (0.5 * linearProgress);
+                sprite.setAlpha(alpha);
                 break;
                 
             default:

@@ -41,6 +41,7 @@ export namespace MonsterAttackType {
   export type EnderScythe = { tag: "EnderScythe" };
   export type ChaosBall = { tag: "ChaosBall" };
   export type VoidZone = { tag: "VoidZone" };
+  export type AgnaFlamethrowerJet = { tag: "AgnaFlamethrowerJet" };
 
   // Helper functions for constructing each variant of the tagged union.
   // ```
@@ -54,6 +55,7 @@ export namespace MonsterAttackType {
   export const EnderScythe = { tag: "EnderScythe" };
   export const ChaosBall = { tag: "ChaosBall" };
   export const VoidZone = { tag: "VoidZone" };
+  export const AgnaFlamethrowerJet = { tag: "AgnaFlamethrowerJet" };
 
   export function getTypeScriptAlgebraicType(): AlgebraicType {
     return AlgebraicType.createSumType([
@@ -63,6 +65,7 @@ export namespace MonsterAttackType {
       new SumTypeVariant("EnderScythe", AlgebraicType.createProductType([])),
       new SumTypeVariant("ChaosBall", AlgebraicType.createProductType([])),
       new SumTypeVariant("VoidZone", AlgebraicType.createProductType([])),
+      new SumTypeVariant("AgnaFlamethrowerJet", AlgebraicType.createProductType([])),
     ]);
   }
 
@@ -77,7 +80,7 @@ export namespace MonsterAttackType {
 }
 
 // The tagged union or sum type for the algebraic type `MonsterAttackType`.
-export type MonsterAttackType = MonsterAttackType.ImpBolt | MonsterAttackType.EnderBolt | MonsterAttackType.EnderScytheSpawn | MonsterAttackType.EnderScythe | MonsterAttackType.ChaosBall | MonsterAttackType.VoidZone;
+export type MonsterAttackType = MonsterAttackType.ImpBolt | MonsterAttackType.EnderBolt | MonsterAttackType.EnderScytheSpawn | MonsterAttackType.EnderScythe | MonsterAttackType.ChaosBall | MonsterAttackType.VoidZone | MonsterAttackType.AgnaFlamethrowerJet;
 
 export default MonsterAttackType;
 

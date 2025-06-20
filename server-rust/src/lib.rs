@@ -16,6 +16,7 @@ pub mod gem_drop_defs;
 pub mod loot_capsule_defs;
 pub mod boss_system;
 pub mod boss_ender_defs;
+pub mod boss_agna_defs;
 pub mod monsters_def;
 pub mod monster_ai_defs;
 pub mod monster_spawn_defs;
@@ -84,6 +85,7 @@ pub enum MonsterAttackType {
     EnderScythe,
     ChaosBall,
     VoidZone,
+    AgnaFlamethrowerJet,
 }
 
 // Monster variant enum for shiny monsters

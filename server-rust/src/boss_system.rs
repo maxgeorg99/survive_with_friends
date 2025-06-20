@@ -352,11 +352,11 @@ pub fn handle_boss_defeated(ctx: &ReducerContext) {
     log::info!("{} players marked as True Survivors and transitioned to Winner state!", true_survivors_count);
     
     // Now that all players have been removed, call reset_world to clean up everything else
-    // This will clean up all monsters, gems, spawners, attacks, cooldowns, etc. and reschedule monster spawning
+    // This will clean up all monsters, gems, spawners, attacks, cooldowns, etc.
     crate::reset_world::reset_world(ctx);
     
-    // Schedule the next boss spawn
-    schedule_boss_spawn(ctx);
+    // Note: Boss spawn will be scheduled when the first player joins again (via spawn_player in lib.rs)
+    // This prevents the boss timer from appearing when no players are active
 }
 
 // Test/debug utility to manually spawn the boss for testing

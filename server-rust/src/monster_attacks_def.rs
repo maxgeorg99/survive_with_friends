@@ -61,11 +61,15 @@ pub fn process_monster_attack_movements(ctx: &ReducerContext) {
         // Handle different movement patterns based on attack type
         // First check if this is a boss attack that needs special handling
         crate::boss_ender_defs::handle_boss_attack_movement(ctx, &mut updated_active_monster_attack);
+        crate::boss_agna_defs::handle_agna_attack_movement(ctx, &mut updated_active_monster_attack);
         
         // Then handle regular projectile movement for non-boss attacks
         match updated_active_monster_attack.monster_attack_type {
             MonsterAttackType::EnderScythe | MonsterAttackType::EnderScytheSpawn => {
                 // These are handled by boss_ender_defs::handle_boss_attack_movement
+            },
+            MonsterAttackType::AgnaFlamethrowerJet => {
+                // This is handled by boss_agna_defs::handle_agna_attack_movement
             },
             _ => {
                 // Regular projectile movement based on direction and speed
