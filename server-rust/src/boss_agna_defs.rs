@@ -170,12 +170,24 @@ pub fn trigger_agna_flamethrower_attack(ctx: &ReducerContext, scheduler: AgnaFla
         return;
     }
 
-    // Get the target player
-    let target_player_opt = ctx.db.player().player_id().find(&scheduler.target_player_id);
+    // Ensure the scheduled target matches the boss's current target
+    let current_target = boss.target_player_id;
+    let scheduled_target = scheduler.target_player_id;
+    
+    let final_target_player_id = if current_target != scheduled_target {
+        log::info!("Agna boss {} target changed from {} to {}, updating flamethrower target", 
+                  scheduler.boss_monster_id, scheduled_target, current_target);
+        current_target
+    } else {
+        scheduled_target
+    };
+
+    // Get the target player (using the corrected target)
+    let target_player_opt = ctx.db.player().player_id().find(&final_target_player_id);
     let target_player = match target_player_opt {
         Some(player) => player,
         None => {
-            log::info!("Target player {} no longer exists, continuing flamethrower with random target", scheduler.target_player_id);
+            log::info!("Target player {} no longer exists, continuing flamethrower with random target", final_target_player_id);
             // Try to find a random player instead
             match find_random_player(ctx) {
                 Some(player_id) => {
@@ -243,8 +255,8 @@ pub fn trigger_agna_flamethrower_attack(ctx: &ReducerContext, scheduler: AgnaFla
     log::info!("Agna boss {} fired flamethrower jet towards ({}, {})", 
               scheduler.boss_monster_id, target_position.x, target_position.y);
 
-    // Schedule the next flamethrower attack
-    schedule_next_agna_flamethrower_attack(ctx, scheduler.boss_monster_id, scheduler.target_player_id);
+    // Schedule the next flamethrower attack using the corrected target
+    schedule_next_agna_flamethrower_attack(ctx, scheduler.boss_monster_id, target_player.player_id);
 }
 
 // Schedule the next flamethrower attack
@@ -311,20 +323,29 @@ pub fn execute_boss_agna_flamethrower_behavior(ctx: &ReducerContext, monster: &c
     // Apply speed boost first (called once on state entry)
     apply_agna_flamethrower_speed_boost(ctx, monster);
     
-    // Find a random target player
-    let target_player_id = match find_random_player(ctx) {
-        Some(player_id) => player_id,
-        None => {
-            log::info!("No players available for flamethrower targeting, returning to idle");
-            schedule_state_change(ctx, monster.monster_id, crate::monster_ai_defs::AIState::BossAgnaIdle, 1000);
-            return;
-        }
-    };
+    // Use the boss's current target player instead of random
+    let target_player_id = monster.target_player_id;
     
-    log::info!("Agna boss {} targeting player {} for flamethrower attack", monster.monster_id, target_player_id);
-    
-    // Start firing flamethrower jets
-    start_agna_flamethrower_attacks(ctx, monster.monster_id, target_player_id);
+    // Verify the target player still exists
+    if ctx.db.player().player_id().find(&target_player_id).is_none() {
+        log::info!("Agna boss {} current target player {} no longer exists, finding new target", monster.monster_id, target_player_id);
+        
+        // Find a random player as fallback
+        let fallback_target = match find_random_player(ctx) {
+            Some(player_id) => player_id,
+            None => {
+                log::info!("No players available for flamethrower targeting, returning to idle");
+                schedule_state_change(ctx, monster.monster_id, crate::monster_ai_defs::AIState::BossAgnaIdle, 1000);
+                return;
+            }
+        };
+        
+        log::info!("Agna boss {} switching to fallback target player {} for flamethrower attack", monster.monster_id, fallback_target);
+        start_agna_flamethrower_attacks(ctx, monster.monster_id, fallback_target);
+    } else {
+        log::info!("Agna boss {} targeting current chase target player {} for flamethrower attack", monster.monster_id, target_player_id);
+        start_agna_flamethrower_attacks(ctx, monster.monster_id, target_player_id);
+    }
     
     // Schedule return to idle after flamethrower duration
     schedule_state_change(ctx, monster.monster_id, crate::monster_ai_defs::AIState::BossAgnaIdle, AGNA_FLAMETHROWER_DURATION_MS);
