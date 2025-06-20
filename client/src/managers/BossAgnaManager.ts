@@ -746,10 +746,10 @@ export default class BossAgnaManager {
         // Ensure it follows the camera
         candleSprite.setScrollFactor(1, 1);
         
-        // Fade in animation
+        // Fade in animation (more transparent for subtlety)
         this.scene.tweens.add({
             targets: candleSprite,
-            alpha: 0.9,
+            alpha: 0.6,
             duration: FADE_IN_DURATION,
             ease: 'Power2'
         });
