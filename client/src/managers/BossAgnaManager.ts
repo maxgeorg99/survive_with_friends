@@ -72,11 +72,15 @@ export default class BossAgnaManager {
             this.createMagicCircle(circle);
         }
         
-        // Also check for any existing Agna bosses in flamethrower mode
+        // Also check for any existing Agna bosses in flamethrower mode or ritual states
         for (const monster of ctx.db?.monsters?.iter() || []) {
-            if (this.isAgnaBoss(monster) && this.isFlamethrowerState(monster.aiState)) {
-                console.log(`Found existing Agna boss ${monster.monsterId} in flamethrower mode during initialization`);
-                this.startFlamethrowerSound(monster.monsterId);
+            if (this.isAgnaBoss(monster)) {
+                if (this.isFlamethrowerState(monster.aiState)) {
+                    console.log(`Found existing Agna boss ${monster.monsterId} in flamethrower mode during initialization`);
+                    this.startFlamethrowerSound(monster.monsterId);
+                }
+                // Note: Ritual sounds are one-shot, so we don't need to replay them during initialization
+                // They are triggered by state transitions, not sustained like flamethrower
             }
         }
     }
@@ -146,6 +150,31 @@ export default class BossAgnaManager {
             console.log(`Agna boss ${newMonster.monsterId} left flamethrower mode`);
             this.stopFlamethrowerSound(newMonster.monsterId);
         }
+
+        // Check for ritual state transitions
+        const wasInRitualMatch = this.isRitualMatchState(oldMonster.aiState);
+        const isInRitualMatch = this.isRitualMatchState(newMonster.aiState);
+        const wasInRitualWick = this.isRitualWickState(oldMonster.aiState);
+        const isInRitualWick = this.isRitualWickState(newMonster.aiState);
+        const wasInRitualComplete = this.isRitualCompleteState(oldMonster.aiState);
+        const isInRitualComplete = this.isRitualCompleteState(newMonster.aiState);
+        const wasInRitualFailed = this.isRitualFailedState(oldMonster.aiState);
+        const isInRitualFailed = this.isRitualFailedState(newMonster.aiState);
+
+        // Play ritual sounds when entering states
+        if (!wasInRitualMatch && isInRitualMatch) {
+            console.log(`Agna boss ${newMonster.monsterId} entered ritual match phase`);
+            this.playRitualSound('agna_match', 0.8);
+        } else if (!wasInRitualWick && isInRitualWick) {
+            console.log(`Agna boss ${newMonster.monsterId} entered ritual wick phase`);
+            this.playRitualSound('agna_wick', 0.8);
+        } else if (!wasInRitualComplete && isInRitualComplete) {
+            console.log(`Agna boss ${newMonster.monsterId} entered ritual complete phase`);
+            this.playRitualSound('agna_extinguished', 0.9);
+        } else if (!wasInRitualFailed && isInRitualFailed) {
+            console.log(`Agna boss ${newMonster.monsterId} entered ritual failed phase`);
+            this.playRitualSound('agna_ritual_fail', 0.8);
+        }
     }
 
     // Handle when a monster is deleted (for cleanup when Agna bosses are destroyed)
@@ -203,6 +232,23 @@ export default class BossAgnaManager {
         return aiState.tag === 'BossAgnaFlamethrower';
     }
 
+    // Helper methods for ritual state detection
+    private isRitualMatchState(aiState: AiState): boolean {
+        return aiState.tag === 'BossAgnaRitualMatch';
+    }
+
+    private isRitualWickState(aiState: AiState): boolean {
+        return aiState.tag === 'BossAgnaRitualWick';
+    }
+
+    private isRitualCompleteState(aiState: AiState): boolean {
+        return aiState.tag === 'BossAgnaRitualComplete';
+    }
+
+    private isRitualFailedState(aiState: AiState): boolean {
+        return aiState.tag === 'BossAgnaRitualFailed';
+    }
+
     // Flamethrower sound management
     private startFlamethrowerSound(monsterId: number) {
         if (this.agnaBossesInFlamethrowerMode.has(monsterId)) {
@@ -246,6 +292,17 @@ export default class BossAgnaManager {
             this.flamethrowerSound.stop();
             this.flamethrowerSound.destroy();
             this.flamethrowerSound = null;
+        }
+    }
+
+    // Ritual sound management
+    private playRitualSound(soundKey: string, volume: number = 0.8) {
+        const soundManager = (window as any).soundManager;
+        if (soundManager) {
+            console.log(`Playing Agna ritual sound: ${soundKey}`);
+            soundManager.playSound(soundKey, volume);
+        } else {
+            console.warn("Sound manager not available for ritual sound playback");
         }
     }
 
