@@ -141,7 +141,7 @@ pub fn init_bestiary(ctx: &ReducerContext) {
         bestiary_id: MonsterType::BossAgnaPhase1 as u32,
         monster_type: MonsterType::BossAgnaPhase1,
         tier: 5,
-        max_hp: 450,       // Slightly less HP than Ender Phase 1
+        max_hp: 500,       // Slightly less HP than Ender Phase 1
         speed: 90.0,       // Slightly slower than Ender Phase 1
         atk: 8.5,          // Slightly less attack than Ender Phase 1
         radius: 88.0,      // Slightly smaller than Ender Phase 1
@@ -152,10 +152,10 @@ pub fn init_bestiary(ctx: &ReducerContext) {
         bestiary_id: MonsterType::BossAgnaPhase2 as u32,
         monster_type: MonsterType::BossAgnaPhase2,
         tier: 5,
-        max_hp: 450,       // Slightly less HP than Ender Phase 2
-        speed: 110.0,      // Slightly slower than Ender Phase 2  
-        atk: 11.0,         // Slightly less attack than Ender Phase 2
-        radius: 120.0,     // Slightly smaller than Ender Phase 2
+        max_hp: 500,       
+        speed: 110.0,      
+        atk: 15.0,         
+        radius: 128.0,     
     });
 
     // Insert Agna Candle stats - stationary ritual candles

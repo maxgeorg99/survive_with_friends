@@ -340,8 +340,8 @@ export class MonsterAttackManager {
                 
                 // Create flickering effect with sine wave + gradual fade
                 const timeInSeconds = groundFlameElapsedMs / 1000.0;
-                const flickerAlpha = 0.3 + 0.3 * Math.sin(timeInSeconds * 4.0); // Flicker between 0.3 and 0.6
-                const fadeAlpha = 0.8 - (0.3 * groundFlameProgress); // Fade from 0.8 to 0.5 over lifespan
+                const flickerAlpha = 0.6 + 0.2 * Math.sin(timeInSeconds * 4.0); // Flicker between 0.6 and 0.8
+                const fadeAlpha = 0.9 - (0.2 * groundFlameProgress); // Fade from 0.9 to 0.7 over lifespan
                 const finalAlpha = Math.min(flickerAlpha, fadeAlpha);
                 
                 sprite.setAlpha(finalAlpha);

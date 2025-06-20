@@ -51,13 +51,14 @@ const AGNA_RITUAL_CIRCLE_RADIUS: f32 = 200.0;          // Radius of candle circl
 const AGNA_CANDLE_BOLT_DAMAGE: u32 = 20;               // Damage per candle bolt
 const AGNA_CANDLE_BOLT_SPEED: f32 = 400.0;             // Movement speed of candle bolts
 const AGNA_CANDLE_BOLT_RADIUS: f32 = 24.0;             // Collision radius of candle bolts
-const AGNA_CANDLE_BOLT_INTERVAL_MS: u64 = 1500;        // Candles fire every 1.5 seconds
+const AGNA_CANDLE_BOLT_INTERVAL_MS: u64 = 3000;        // Candles fire every 1.5 seconds
+const AGNA_CANDLE_BOLT_INTERVAL_VARIATION_MS: u64 = 1500; // Variation in interval
 const AGNA_RITUAL_COMPLETE_DURATION_MS: u64 = 4000;    // 4 second duration for ritual complete
 
 // Configuration constants for Agna Phase 2
 const AGNA_PHASE2_SUMMONING_RITUAL_SPAWN_RADIUS_MIN: f32 = 400.0; // Radius of summoning ritual
 const AGNA_PHASE2_SUMMONING_RITUAL_SPAWN_RADIUS_RANGE: f32 = 400.0; // Radius of summoning ritual
-const AGNA_PHASE2_SUMMONING_INITIAL_INTERVAL_MS: u64 = 5000;   // Start spawning every 8 seconds
+const AGNA_PHASE2_SUMMONING_INITIAL_INTERVAL_MS: u64 = 4000;   // Start spawning every 8 seconds
 const AGNA_PHASE2_SUMMONING_MIN_INTERVAL_MS: u64 = 1500;       // Minimum spawn interval (3 seconds)
 const AGNA_PHASE2_SUMMONING_INTERVAL_REDUCTION_RATIO: f32 = 0.95; // Reduce interval by 10% each wave
 const AGNA_PHASE2_TARGET_SWITCH_BASE_INTERVAL_MS: u64 = 12000;  // Base interval for target switching
@@ -70,12 +71,12 @@ const AGNA_PHASE2_FLAME_JET_SPEED: f32 = 550.0;        // Faster than phase 1 je
 const AGNA_PHASE2_FLAME_JET_INITIAL_RADIUS: f32 = 16.0; // Starting radius (same as phase 1)
 const AGNA_PHASE2_FLAME_JET_FINAL_RADIUS: f32 = 64.0;   // Final radius (same as phase 1)
 const AGNA_PHASE2_FLAME_JET_DURATION_MS: u64 = 3000;   // 3 seconds lifespan
-const AGNA_PHASE2_FLAME_JET_INTERVAL_MS: u64 = 150;    // Fire every 800ms for continuous effect
+const AGNA_PHASE2_FLAME_JET_INTERVAL_MS: u64 = 100;    // Fire every 800ms for continuous effect
 
 // Configuration constants for AgnaGroundFlame attacks
 const AGNA_GROUND_FLAME_DAMAGE: u32 = 35;              // High damage ground effect
-const AGNA_GROUND_FLAME_RADIUS: f32 = 80.0;            // Large area effect
-const AGNA_GROUND_FLAME_DURATION_MS: u64 = 120000;     // 2 minutes duration (very long)
+const AGNA_GROUND_FLAME_RADIUS: f32 = 60.0;            // Large area effect
+const AGNA_GROUND_FLAME_DURATION_MS: u64 = 300000;     // 5 minutes duration (very long)
 
 // Table to track the last chosen pattern for each Agna boss to avoid repetition
 #[table(name = boss_agna_last_patterns, public)]
@@ -1139,7 +1140,7 @@ fn start_candle_bolt_attacks(ctx: &ReducerContext, candle_monster_id: u32) {
 fn schedule_next_candle_bolt(ctx: &ReducerContext, candle_monster_id: u32, target_player_id: u32) {
     // Add variance to candle bolt timing: base interval ±500ms (1000ms to 2000ms range)
     let mut rng = ctx.rng();
-    let variance_ms = 500;
+    let variance_ms = AGNA_CANDLE_BOLT_INTERVAL_VARIATION_MS;
     let delay_ms = AGNA_CANDLE_BOLT_INTERVAL_MS - variance_ms + (rng.gen::<f32>() * (variance_ms * 2) as f32) as u64;
     let schedule_at = ScheduleAt::Time(ctx.timestamp + Duration::from_millis(delay_ms));
     

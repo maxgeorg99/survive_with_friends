@@ -192,6 +192,12 @@ export default class BossAgnaManager {
             //console.log("AgnaOrbSpawn telegraph detected:", attack);
             this.playTelegraphVFX(attack);
         }
+        
+        // Check if this is an AgnaGroundFlame attack (play sound when ground fire spawns)
+        if (attack.monsterAttackType.tag === "AgnaGroundFlame") {
+            console.log("AgnaGroundFlame attack detected, playing fire orb sound");
+            this.playRitualSound('agna_fire_orb', 0.6);
+        }
     }
 
     // Handle when a monster is updated (for flamethrower state detection)
@@ -208,12 +214,24 @@ export default class BossAgnaManager {
         const wasInFlamethrower = this.isFlamethrowerState(oldMonster.aiState);
         const isInFlamethrower = this.isFlamethrowerState(newMonster.aiState);
         
-        // Check for flamethrower state transitions
+        // Check for flamethrower state transitions (Phase 1)
         if (!wasInFlamethrower && isInFlamethrower) {
             console.log(`Agna boss ${newMonster.monsterId} entered flamethrower mode`);
             this.startFlamethrowerSound(newMonster.monsterId);
         } else if (wasInFlamethrower && !isInFlamethrower) {
             console.log(`Agna boss ${newMonster.monsterId} left flamethrower mode`);
+            this.stopFlamethrowerSound(newMonster.monsterId);
+        }
+
+        // Check for Phase 2 transitions (continuous flamethrower throughout phase)
+        const wasPhase2 = oldMonster.bestiaryId?.tag === 'BossAgnaPhase2';
+        const isPhase2 = newMonster.bestiaryId?.tag === 'BossAgnaPhase2';
+        
+        if (!wasPhase2 && isPhase2) {
+            console.log(`Agna boss ${newMonster.monsterId} entered Phase 2 - starting continuous flamethrower sound`);
+            this.startFlamethrowerSound(newMonster.monsterId);
+        } else if (wasPhase2 && !isPhase2) {
+            console.log(`Agna boss ${newMonster.monsterId} left Phase 2 - stopping continuous flamethrower sound`);
             this.stopFlamethrowerSound(newMonster.monsterId);
         }
 

@@ -74,7 +74,7 @@ pub fn initialize_class_data(ctx: &ReducerContext) {
     ctx.db.class_data().insert(ClassData {
         class_id: PlayerClass::Paladin as u32,
         player_class: PlayerClass::Paladin,
-        max_hp: 10000,
+        max_hp: 100,
         armor: 0,
         speed: 200.0,
         starting_attack_type: AttackType::Shield,
