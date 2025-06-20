@@ -45,6 +45,8 @@ export namespace MonsterAttackType {
   export type AgnaOrbSpawn = { tag: "AgnaOrbSpawn" };
   export type AgnaFireOrb = { tag: "AgnaFireOrb" };
   export type AgnaCandleBolt = { tag: "AgnaCandleBolt" };
+  export type AgnaPhase2FlameJet = { tag: "AgnaPhase2FlameJet" };
+  export type AgnaGroundFlame = { tag: "AgnaGroundFlame" };
 
   // Helper functions for constructing each variant of the tagged union.
   // ```
@@ -62,6 +64,8 @@ export namespace MonsterAttackType {
   export const AgnaOrbSpawn = { tag: "AgnaOrbSpawn" };
   export const AgnaFireOrb = { tag: "AgnaFireOrb" };
   export const AgnaCandleBolt = { tag: "AgnaCandleBolt" };
+  export const AgnaPhase2FlameJet = { tag: "AgnaPhase2FlameJet" };
+  export const AgnaGroundFlame = { tag: "AgnaGroundFlame" };
 
   export function getTypeScriptAlgebraicType(): AlgebraicType {
     return AlgebraicType.createSumType([
@@ -75,6 +79,8 @@ export namespace MonsterAttackType {
       new SumTypeVariant("AgnaOrbSpawn", AlgebraicType.createProductType([])),
       new SumTypeVariant("AgnaFireOrb", AlgebraicType.createProductType([])),
       new SumTypeVariant("AgnaCandleBolt", AlgebraicType.createProductType([])),
+      new SumTypeVariant("AgnaPhase2FlameJet", AlgebraicType.createProductType([])),
+      new SumTypeVariant("AgnaGroundFlame", AlgebraicType.createProductType([])),
     ]);
   }
 
@@ -89,7 +95,7 @@ export namespace MonsterAttackType {
 }
 
 // The tagged union or sum type for the algebraic type `MonsterAttackType`.
-export type MonsterAttackType = MonsterAttackType.ImpBolt | MonsterAttackType.EnderBolt | MonsterAttackType.EnderScytheSpawn | MonsterAttackType.EnderScythe | MonsterAttackType.ChaosBall | MonsterAttackType.VoidZone | MonsterAttackType.AgnaFlamethrowerJet | MonsterAttackType.AgnaOrbSpawn | MonsterAttackType.AgnaFireOrb | MonsterAttackType.AgnaCandleBolt;
+export type MonsterAttackType = MonsterAttackType.ImpBolt | MonsterAttackType.EnderBolt | MonsterAttackType.EnderScytheSpawn | MonsterAttackType.EnderScythe | MonsterAttackType.ChaosBall | MonsterAttackType.VoidZone | MonsterAttackType.AgnaFlamethrowerJet | MonsterAttackType.AgnaOrbSpawn | MonsterAttackType.AgnaFireOrb | MonsterAttackType.AgnaCandleBolt | MonsterAttackType.AgnaPhase2FlameJet | MonsterAttackType.AgnaGroundFlame;
 
 export default MonsterAttackType;
 

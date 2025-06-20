@@ -90,6 +90,8 @@ pub enum MonsterAttackType {
     AgnaOrbSpawn,
     AgnaFireOrb,
     AgnaCandleBolt,
+    AgnaPhase2FlameJet,
+    AgnaGroundFlame,
 }
 
 // Monster variant enum for shiny monsters

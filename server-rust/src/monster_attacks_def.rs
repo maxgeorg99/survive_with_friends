@@ -71,8 +71,14 @@ pub fn process_monster_attack_movements(ctx: &ReducerContext) {
             MonsterAttackType::AgnaFlamethrowerJet => {
                 // This is handled by boss_agna_defs::handle_agna_attack_movement
             },
+            MonsterAttackType::AgnaPhase2FlameJet => {
+                // This is handled by boss_agna_defs::handle_agna_attack_movement
+            },
             MonsterAttackType::AgnaOrbSpawn => {
                 // AgnaOrbSpawn stays stationary (it's just a visual telegraph)
+            },
+            MonsterAttackType::AgnaGroundFlame => {
+                // AgnaGroundFlame stays stationary (it's a ground effect)
             },
             _ => {
                 // Regular projectile movement based on direction and speed

@@ -54,6 +54,29 @@ const AGNA_CANDLE_BOLT_RADIUS: f32 = 24.0;             // Collision radius of ca
 const AGNA_CANDLE_BOLT_INTERVAL_MS: u64 = 1500;        // Candles fire every 1.5 seconds
 const AGNA_RITUAL_COMPLETE_DURATION_MS: u64 = 4000;    // 4 second duration for ritual complete
 
+// Configuration constants for Agna Phase 2
+const AGNA_PHASE2_SUMMONING_RITUAL_SPAWN_RADIUS_MIN: f32 = 400.0; // Radius of summoning ritual
+const AGNA_PHASE2_SUMMONING_RITUAL_SPAWN_RADIUS_RANGE: f32 = 400.0; // Radius of summoning ritual
+const AGNA_PHASE2_SUMMONING_INITIAL_INTERVAL_MS: u64 = 5000;   // Start spawning every 8 seconds
+const AGNA_PHASE2_SUMMONING_MIN_INTERVAL_MS: u64 = 1500;       // Minimum spawn interval (3 seconds)
+const AGNA_PHASE2_SUMMONING_INTERVAL_REDUCTION_RATIO: f32 = 0.95; // Reduce interval by 10% each wave
+const AGNA_PHASE2_TARGET_SWITCH_BASE_INTERVAL_MS: u64 = 12000;  // Base interval for target switching
+const AGNA_PHASE2_TARGET_SWITCH_VARIATION_MS: u64 = 4000;      // Random variation (±4 seconds)
+const AGNA_PHASE2_TARGET_SWITCH_INITIAL_DELAY_MS: u64 = 8000;   // Initial delay before first switch
+
+// Configuration constants for AgnaPhase2FlameJet attacks
+const AGNA_PHASE2_FLAME_JET_DAMAGE: u32 = 28;          // Higher damage than phase 1 jets
+const AGNA_PHASE2_FLAME_JET_SPEED: f32 = 550.0;        // Faster than phase 1 jets
+const AGNA_PHASE2_FLAME_JET_INITIAL_RADIUS: f32 = 16.0; // Starting radius (same as phase 1)
+const AGNA_PHASE2_FLAME_JET_FINAL_RADIUS: f32 = 64.0;   // Final radius (same as phase 1)
+const AGNA_PHASE2_FLAME_JET_DURATION_MS: u64 = 3000;   // 3 seconds lifespan
+const AGNA_PHASE2_FLAME_JET_INTERVAL_MS: u64 = 150;    // Fire every 800ms for continuous effect
+
+// Configuration constants for AgnaGroundFlame attacks
+const AGNA_GROUND_FLAME_DAMAGE: u32 = 35;              // High damage ground effect
+const AGNA_GROUND_FLAME_RADIUS: f32 = 80.0;            // Large area effect
+const AGNA_GROUND_FLAME_DURATION_MS: u64 = 120000;     // 2 minutes duration (very long)
+
 // Table to track the last chosen pattern for each Agna boss to avoid repetition
 #[table(name = boss_agna_last_patterns, public)]
 pub struct BossAgnaLastPattern {
@@ -171,6 +194,45 @@ pub struct AgnaRitualCompletionCheck {
     pub boss_monster_id: u32,     // The Agna boss to check
 }
 
+// Scheduled table for Agna Phase 2 summoning circles
+#[table(name = agna_summoning_circle_spawner, scheduled(spawn_agna_summoning_circle), public)]
+pub struct AgnaSummoningCircleSpawner {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    
+    #[index(btree)]
+    pub boss_monster_id: u32,     // The Phase 2 Agna boss ID
+    pub spawn_interval_ms: u64,   // Current spawn interval (decreases over time)
+    pub scheduled_at: ScheduleAt, // When to spawn the next summoning circle
+}
+
+// Scheduled table for Agna Phase 2 target switching
+#[table(name = agna_target_switch_scheduler, scheduled(trigger_agna_target_switch), public)]
+pub struct AgnaTargetSwitchScheduler {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    
+    pub scheduled_at: ScheduleAt, // When the boss should switch targets
+    
+    #[index(btree)]
+    pub boss_monster_id: u32,     // The Phase 2 Agna boss that will switch targets
+}
+
+// Scheduled table for Agna Phase 2 continuous flamethrower attacks
+#[table(name = agna_phase2_flamethrower_scheduler, scheduled(trigger_agna_phase2_flamethrower_attack), public)]
+pub struct AgnaPhase2FlamethrowerScheduler {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    
+    pub scheduled_at: ScheduleAt, // When the next flamethrower jet should fire
+    
+    #[index(btree)]
+    pub boss_monster_id: u32,     // The Phase 2 Agna boss that will fire the jet
+}
+
 
 
 // Handle movement for Agna's special attacks
@@ -199,6 +261,28 @@ pub fn handle_agna_attack_movement(ctx: &ReducerContext, attack: &mut crate::Act
             log::info!("AgnaFlamethrowerJet {} grew to radius {} after {} ticks", 
                       attack.active_monster_attack_id, attack.radius, attack.ticks_elapsed);
             */
+        },
+        MonsterAttackType::AgnaPhase2FlameJet => {
+            // Phase 2 flame jets have the same radius growth as Phase 1
+            let move_speed = attack.speed;
+            let move_distance = move_speed * DELTA_TIME;
+            let move_offset = attack.direction * move_distance;
+            attack.position = attack.position + move_offset;
+            
+            // Handle radius growth based on ticks elapsed using asymptotic easing
+            let time_elapsed_seconds = attack.ticks_elapsed as f32 * DELTA_TIME;
+            let duration_seconds = AGNA_PHASE2_FLAME_JET_DURATION_MS as f32 / 1000.0;
+            let linear_progress = (time_elapsed_seconds / duration_seconds).min(1.0);
+            
+            // Use same asymptotic easing as client: 1 - (1-t)^2
+            let eased_progress = 1.0 - (1.0 - linear_progress).powf(2.0);
+            
+            // Apply eased progress to radius growth from initial to final
+            let radius_range = AGNA_PHASE2_FLAME_JET_FINAL_RADIUS - AGNA_PHASE2_FLAME_JET_INITIAL_RADIUS;
+            attack.radius = AGNA_PHASE2_FLAME_JET_INITIAL_RADIUS + (radius_range * eased_progress);
+        },
+        MonsterAttackType::AgnaGroundFlame => {
+            // Ground flames are stationary - no movement
         },
         _ => {
             // Other attacks use default behavior
@@ -487,8 +571,17 @@ pub fn initialize_boss_agna_ai(ctx: &ReducerContext, monster_id: u32) {
 pub fn initialize_phase2_boss_agna_ai(ctx: &ReducerContext, monster_id: u32) {
     log::info!("Initializing Phase 2 Agna boss AI for monster {}", monster_id);
     
-    // Phase 2 Agna uses the same patterns as Phase 1 for now
-    initialize_boss_agna_ai(ctx, monster_id);
+    // Phase 2 Agna has different behavior than Phase 1
+    // Start summoning circles that spawn Imps and ground flames
+    start_agna_phase2_summoning_circles(ctx, monster_id);
+    
+    // Start target switching for variety
+    start_agna_phase2_target_switching(ctx, monster_id);
+    
+    // Start continuous flamethrower attacks
+    start_agna_phase2_flamethrower_attacks(ctx, monster_id);
+    
+    log::info!("Phase 2 Agna boss {} initialized with summoning circles, target switching, and continuous flamethrower", monster_id);
 }
 
 // Helper function to reset monster speed to bestiary entry
@@ -535,18 +628,15 @@ fn schedule_state_change(ctx: &ReducerContext, monster_id: u32, target_state: cr
 pub fn cleanup_agna_ai_schedules(ctx: &ReducerContext, monster_id: u32) {
     log::info!("Cleaning up all Agna AI schedules for monster {}", monster_id);
     
-    // Cleanup flamethrower schedules
+    // Cleanup Phase 1 schedules
     cleanup_agna_flamethrower_schedules(ctx, monster_id);
-    
-    // Cleanup magic circle schedules
     cleanup_agna_magic_circle_schedules(ctx, monster_id);
-    
-    // Cleanup candle schedules and spawns
     cleanup_agna_candle_spawns(ctx, monster_id);
     cleanup_agna_candle_schedules(ctx, monster_id);
-    
-    // Cleanup ritual completion checks
     cleanup_agna_ritual_completion_checks(ctx, monster_id);
+    
+    // Cleanup Phase 2 schedules
+    cleanup_agna_phase2_schedules(ctx, monster_id);
     
     // Remove last pattern tracking
     if ctx.db.boss_agna_last_patterns().monster_id().find(&monster_id).is_some() {
@@ -1417,6 +1507,424 @@ pub fn process_agna_ritual_complete_damage(ctx: &ReducerContext) {
     if !ritual_complete_bosses.is_empty() {
         log::info!("Agna ritual complete damage: {} damage dealt to all living players by {} boss(es)", 
                   total_damage, ritual_complete_bosses.len());
+    }
+}
+
+// ================================================================================================
+// AGNA PHASE 2 BEHAVIOR FUNCTIONS
+// ================================================================================================
+
+// Reducer to spawn a summoning circle that creates an Imp and ground flame
+#[reducer]
+pub fn spawn_agna_summoning_circle(ctx: &ReducerContext, spawner: AgnaSummoningCircleSpawner) {
+    if ctx.sender != ctx.identity() {
+        panic!("spawn_agna_summoning_circle may not be invoked by clients, only via scheduling.");
+    }
+
+    // Check if the Phase 2 Agna boss still exists
+    let boss_opt = ctx.db.monsters().monster_id().find(&spawner.boss_monster_id);
+    let boss = match boss_opt {
+        Some(monster) => monster,
+        None => {
+            log::info!("Phase 2 Agna boss {} no longer exists, stopping summoning circle spawning", spawner.boss_monster_id);
+            return;
+        }
+    };
+
+    // Verify this is actually a Phase 2 Agna boss
+    if boss.bestiary_id != MonsterType::BossAgnaPhase2 {
+        log::info!("Boss {} is not Agna Phase 2, stopping summoning circle spawning", spawner.boss_monster_id);
+        return;
+    }
+
+    // Get all active players
+    let players: Vec<_> = ctx.db.player().iter().collect();
+    let player_count = players.len();
+    
+    if player_count == 0 {
+        log::info!("No players online, skipping summoning circle spawn");
+        schedule_next_agna_summoning_circle(ctx, spawner.boss_monster_id, spawner.spawn_interval_ms);
+        return;
+    }
+
+    // Choose a random player to spawn the summoning circle near
+    let mut rng = ctx.rng();
+    let target_player = &players[rng.gen::<usize>() % players.len()];
+
+    // Calculate spawn position near the target player (200-400 pixels away)
+    let spawn_distance = AGNA_PHASE2_SUMMONING_RITUAL_SPAWN_RADIUS_MIN 
+        + (rng.gen::<f32>() * AGNA_PHASE2_SUMMONING_RITUAL_SPAWN_RADIUS_RANGE);
+    let spawn_angle = rng.gen::<f32>() * std::f32::consts::PI * 2.0; // Random angle
+
+    let mut spawn_position = DbVector2::new(
+        target_player.position.x + spawn_distance * spawn_angle.cos(),
+        target_player.position.y + spawn_distance * spawn_angle.sin()
+    );
+
+    // Get world boundaries from config
+    let config = ctx.db.config().id().find(&0)
+        .expect("spawn_agna_summoning_circle: Could not find game configuration!");
+    
+    // Clamp to world boundaries
+    spawn_position.x = spawn_position.x.clamp(100.0, config.world_size as f32 - 100.0);
+    spawn_position.y = spawn_position.y.clamp(100.0, config.world_size as f32 - 100.0);
+
+    log::info!("Spawning Agna summoning circle at position ({:.1}, {:.1}) near player {}", 
+              spawn_position.x, spawn_position.y, target_player.name);
+
+    // Spawn an Imp monster at the summoning circle location
+    let bestiary_entry = ctx.db.bestiary().bestiary_id().find(&(MonsterType::Imp as u32))
+        .expect("spawn_agna_summoning_circle: Could not find bestiary entry for Imp");
+
+    let imp_monster = ctx.db.monsters().insert(crate::Monsters {
+        monster_id: 0, // Auto-incremented
+        bestiary_id: MonsterType::Imp,
+        variant: crate::MonsterVariant::Default,
+        hp: bestiary_entry.max_hp,
+        max_hp: bestiary_entry.max_hp,
+        atk: bestiary_entry.atk,
+        speed: bestiary_entry.speed,
+        target_player_id: target_player.player_id,
+        radius: bestiary_entry.radius,
+        spawn_position,
+        ai_state: crate::monster_ai_defs::AIState::Default,
+    });
+
+    // Create the boid for the Imp
+    ctx.db.monsters_boid().insert(crate::MonsterBoid {
+        monster_id: imp_monster.monster_id,
+        position: spawn_position,
+    });
+
+    // Start the Imp's attack schedule
+    crate::monster_attacks_def::start_imp_attack_schedule(ctx, imp_monster.monster_id);
+
+    log::info!("Spawned Imp {} at summoning circle", imp_monster.monster_id);
+
+    // Spawn an AgnaGroundFlame attack at the same location
+    let ground_flame_attack = crate::ActiveMonsterAttack {
+        active_monster_attack_id: 0, // Will be auto-assigned
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(AGNA_GROUND_FLAME_DURATION_MS)),
+        position: spawn_position,
+        direction: DbVector2::new(0.0, 0.0), // Stationary
+        monster_attack_type: MonsterAttackType::AgnaGroundFlame,
+        piercing: false, // Ground flames are not piercing
+        damage: AGNA_GROUND_FLAME_DAMAGE,
+        radius: AGNA_GROUND_FLAME_RADIUS,
+        speed: 0.0, // Stationary
+        parameter_u: spawner.boss_monster_id, // Store boss ID
+        parameter_f: 0.0, // No special parameter needed
+        ticks_elapsed: 0,
+        from_shiny_monster: false, // Boss attacks are not from shiny monsters
+    };
+
+    ctx.db.active_monster_attacks().insert(ground_flame_attack);
+
+    log::info!("Spawned AgnaGroundFlame at summoning circle position ({:.1}, {:.1})", 
+              spawn_position.x, spawn_position.y);
+
+    // Schedule the next summoning circle with reduced interval
+    schedule_next_agna_summoning_circle(ctx, spawner.boss_monster_id, spawner.spawn_interval_ms);
+}
+
+// Helper function to schedule the next summoning circle with interval reduction
+fn schedule_next_agna_summoning_circle(ctx: &ReducerContext, boss_monster_id: u32, current_interval_ms: u64) {
+    // Calculate next interval (reduce by 10% each wave, but don't go below minimum)
+    let next_interval_ms = ((current_interval_ms as f32 * AGNA_PHASE2_SUMMONING_INTERVAL_REDUCTION_RATIO) as u64)
+        .max(AGNA_PHASE2_SUMMONING_MIN_INTERVAL_MS);
+
+    // Schedule the next summoning circle
+    ctx.db.agna_summoning_circle_spawner().insert(AgnaSummoningCircleSpawner {
+        scheduled_id: 0,
+        boss_monster_id,
+        spawn_interval_ms: next_interval_ms,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(next_interval_ms)),
+    });
+
+    log::info!("Scheduled next Agna summoning circle for boss {} in {}ms (reduced from {}ms)", 
+              boss_monster_id, next_interval_ms, current_interval_ms);
+}
+
+// Reducer called when Agna Phase 2 boss should switch targets
+#[reducer]
+pub fn trigger_agna_target_switch(ctx: &ReducerContext, scheduler: AgnaTargetSwitchScheduler) {
+    if ctx.sender != ctx.identity() {
+        panic!("trigger_agna_target_switch may not be invoked by clients, only via scheduling.");
+    }
+
+    // Check if the boss monster still exists and is a Phase 2 Agna boss
+    let boss_opt = ctx.db.monsters().monster_id().find(&scheduler.boss_monster_id);
+    let boss = match boss_opt {
+        Some(monster) => monster,
+        None => {
+            log::info!("Boss {} no longer exists, stopping Agna target switching", scheduler.boss_monster_id);
+            return;
+        }
+    };
+
+    // Verify this is a Phase 2 Agna boss
+    if boss.bestiary_id != crate::MonsterType::BossAgnaPhase2 {
+        log::info!("Boss {} is not Agna Phase 2, stopping target switching", scheduler.boss_monster_id);
+        return;
+    }
+
+    // Get all active players
+    let players: Vec<_> = ctx.db.player().iter().collect();
+    let player_count = players.len();
+    
+    if player_count == 0 {
+        log::info!("No players online for Agna boss {} target switch, stopping", scheduler.boss_monster_id);
+        return;
+    }
+    
+    if player_count == 1 {
+        // Only one player, no need to switch, just schedule next check
+        schedule_next_agna_target_switch(ctx, scheduler.boss_monster_id);
+        return;
+    }
+
+    // Find a new target different from current target
+    let current_target_id = boss.target_player_id;
+    let mut available_players: Vec<_> = players.into_iter()
+        .filter(|p| p.player_id != current_target_id)
+        .collect();
+    
+    if available_players.is_empty() {
+        // Fallback: use any player if filtering left us with none
+        available_players = ctx.db.player().iter().collect();
+    }
+    
+    // Select a random new target
+    let mut rng = ctx.rng();
+    let random_index = (rng.gen::<f32>() * available_players.len() as f32) as usize;
+    let new_target = &available_players[random_index];
+    
+    // Update the boss's target
+    let mut updated_boss = boss;
+    updated_boss.target_player_id = new_target.player_id;
+    ctx.db.monsters().monster_id().update(updated_boss);
+    
+    log::info!("Agna boss {} switched target from player {} to player {} ({})", 
+              scheduler.boss_monster_id, current_target_id, new_target.player_id, new_target.name);
+
+    // Schedule the next target switch
+    schedule_next_agna_target_switch(ctx, scheduler.boss_monster_id);
+}
+
+// Helper function to schedule the next Agna target switch with random variation
+fn schedule_next_agna_target_switch(ctx: &ReducerContext, boss_monster_id: u32) {
+    // Add random variation to the base interval
+    let mut rng = ctx.rng();
+    let variation = (rng.gen::<f32>() * 2.0 - 1.0) * AGNA_PHASE2_TARGET_SWITCH_VARIATION_MS as f32;
+    let next_interval_ms = (AGNA_PHASE2_TARGET_SWITCH_BASE_INTERVAL_MS as f32 + variation) as u64;
+    
+    // Ensure minimum interval of 6 seconds
+    let next_interval_ms = next_interval_ms.max(6000);
+    
+    ctx.db.agna_target_switch_scheduler().insert(AgnaTargetSwitchScheduler {
+        scheduled_id: 0,
+        boss_monster_id,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(next_interval_ms)),
+    });
+    
+    log::info!("Scheduled next Agna target switch for boss {} in {}ms", 
+              boss_monster_id, next_interval_ms);
+}
+
+// Reducer to fire a Phase 2 flamethrower jet at a random player
+#[reducer]
+pub fn trigger_agna_phase2_flamethrower_attack(ctx: &ReducerContext, scheduler: AgnaPhase2FlamethrowerScheduler) {
+    if ctx.sender != ctx.identity() {
+        panic!("trigger_agna_phase2_flamethrower_attack may not be invoked by clients, only via scheduling.");
+    }
+
+    // Check if the Agna Phase 2 boss still exists
+    let boss_opt = ctx.db.monsters().monster_id().find(&scheduler.boss_monster_id);
+    let boss = match boss_opt {
+        Some(monster) => monster,
+        None => {
+            log::info!("Agna Phase 2 boss {} no longer exists, stopping flamethrower attacks", scheduler.boss_monster_id);
+            return;
+        }
+    };
+
+    // Verify this is actually an Agna Phase 2 boss
+    if boss.bestiary_id != MonsterType::BossAgnaPhase2 {
+        log::info!("Boss {} is not Agna Phase 2, stopping flamethrower attacks", scheduler.boss_monster_id);
+        return;
+    }
+
+    // Get boss position from boid table
+    let boss_boid_opt = ctx.db.monsters_boid().monster_id().find(&boss.monster_id);
+    let boss_position = match boss_boid_opt {
+        Some(boid) => boid.position,
+        None => {
+            log::info!("Boss {} boid not found, stopping flamethrower attacks", boss.monster_id);
+            return;
+        }
+    };
+
+    // Find a random player to target
+    let target_player_opt = find_random_player(ctx);
+    let target_player_id = match target_player_opt {
+        Some(player_id) => player_id,
+        None => {
+            log::info!("No players available for Phase 2 flamethrower attack");
+            schedule_next_agna_phase2_flamethrower_attack(ctx, scheduler.boss_monster_id);
+            return;
+        }
+    };
+
+    // Get the target player
+    let target_player_opt = ctx.db.player().player_id().find(&target_player_id);
+    let target_player = match target_player_opt {
+        Some(player) => player,
+        None => {
+            log::info!("Target player {} no longer exists", target_player_id);
+            schedule_next_agna_phase2_flamethrower_attack(ctx, scheduler.boss_monster_id);
+            return;
+        }
+    };
+
+    // Calculate direction from boss to target player (direct targeting)
+    let direction_vector = DbVector2::new(
+        target_player.position.x - boss_position.x,
+        target_player.position.y - boss_position.y
+    ).normalize();
+
+    // Spawn the Phase 2 flamethrower jet
+    let jet_attack = crate::ActiveMonsterAttack {
+        active_monster_attack_id: 0, // Will be auto-assigned
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(AGNA_PHASE2_FLAME_JET_DURATION_MS)),
+        position: boss_position,
+        direction: direction_vector,
+        monster_attack_type: MonsterAttackType::AgnaPhase2FlameJet,
+        piercing: false, // Phase 2 jets are not piercing
+        damage: AGNA_PHASE2_FLAME_JET_DAMAGE,
+        radius: AGNA_PHASE2_FLAME_JET_INITIAL_RADIUS, // Start with initial radius
+        speed: AGNA_PHASE2_FLAME_JET_SPEED,
+        parameter_u: target_player_id, // Store target player ID
+        parameter_f: 0.0, // No special parameter needed
+        ticks_elapsed: 0,
+        from_shiny_monster: false, // Bosses are not shiny
+    };
+
+    ctx.db.active_monster_attacks().insert(jet_attack);
+
+    log::info!("Agna Phase 2 boss {} fired flame jet at player {} ({})", 
+              scheduler.boss_monster_id, target_player_id, target_player.name);
+
+    // Schedule the next flamethrower attack
+    schedule_next_agna_phase2_flamethrower_attack(ctx, scheduler.boss_monster_id);
+}
+
+// Helper function to schedule the next Phase 2 flamethrower attack
+fn schedule_next_agna_phase2_flamethrower_attack(ctx: &ReducerContext, boss_monster_id: u32) {
+    ctx.db.agna_phase2_flamethrower_scheduler().insert(AgnaPhase2FlamethrowerScheduler {
+        scheduled_id: 0,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(AGNA_PHASE2_FLAME_JET_INTERVAL_MS)),
+        boss_monster_id,
+    });
+}
+
+// Function to start Agna Phase 2 summoning circle spawning
+pub fn start_agna_phase2_summoning_circles(ctx: &ReducerContext, boss_monster_id: u32) {
+    log::info!("Starting Agna Phase 2 summoning circles for boss {}", boss_monster_id);
+
+    // Schedule the first summoning circle
+    ctx.db.agna_summoning_circle_spawner().insert(AgnaSummoningCircleSpawner {
+        scheduled_id: 0,
+        boss_monster_id,
+        spawn_interval_ms: AGNA_PHASE2_SUMMONING_INITIAL_INTERVAL_MS,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(AGNA_PHASE2_SUMMONING_INITIAL_INTERVAL_MS)),
+    });
+
+    log::info!("Agna Phase 2 summoning circles scheduled for boss {} (first circle in {}ms)", 
+              boss_monster_id, AGNA_PHASE2_SUMMONING_INITIAL_INTERVAL_MS);
+}
+
+// Function to start Agna Phase 2 target switching
+pub fn start_agna_phase2_target_switching(ctx: &ReducerContext, boss_monster_id: u32) {
+    ctx.db.agna_target_switch_scheduler().insert(AgnaTargetSwitchScheduler {
+        scheduled_id: 0,
+        boss_monster_id,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(AGNA_PHASE2_TARGET_SWITCH_INITIAL_DELAY_MS)),
+    });
+
+    log::info!("Started Agna Phase 2 target switching for boss {} (first switch in {}ms)", 
+              boss_monster_id, AGNA_PHASE2_TARGET_SWITCH_INITIAL_DELAY_MS);
+}
+
+// Function to start Agna Phase 2 continuous flamethrower attacks
+pub fn start_agna_phase2_flamethrower_attacks(ctx: &ReducerContext, boss_monster_id: u32) {
+    ctx.db.agna_phase2_flamethrower_scheduler().insert(AgnaPhase2FlamethrowerScheduler {
+        scheduled_id: 0,
+        boss_monster_id,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(AGNA_PHASE2_FLAME_JET_INTERVAL_MS)),
+    });
+
+    log::info!("Started Agna Phase 2 flamethrower attacks for boss {} (first attack in {}ms)", 
+              boss_monster_id, AGNA_PHASE2_FLAME_JET_INTERVAL_MS);
+}
+
+// Function to cleanup all Agna Phase 2 schedules when boss dies
+pub fn cleanup_agna_phase2_schedules(ctx: &ReducerContext, boss_monster_id: u32) {
+    log::info!("Cleaning up all Agna Phase 2 schedules for boss {}", boss_monster_id);
+    
+    // Cleanup summoning circle spawners
+    let summoning_schedulers_to_delete: Vec<u64> = ctx.db.agna_summoning_circle_spawner()
+        .boss_monster_id()
+        .filter(&boss_monster_id)
+        .map(|scheduler| scheduler.scheduled_id)
+        .collect();
+    
+    let summoning_count = summoning_schedulers_to_delete.len();
+    for scheduled_id in summoning_schedulers_to_delete {
+        ctx.db.agna_summoning_circle_spawner().scheduled_id().delete(&scheduled_id);
+    }
+    
+    // Cleanup target switch schedulers
+    let target_schedulers_to_delete: Vec<u64> = ctx.db.agna_target_switch_scheduler()
+        .boss_monster_id()
+        .filter(&boss_monster_id)
+        .map(|scheduler| scheduler.scheduled_id)
+        .collect();
+    
+    let target_count = target_schedulers_to_delete.len();
+    for scheduled_id in target_schedulers_to_delete {
+        ctx.db.agna_target_switch_scheduler().scheduled_id().delete(&scheduled_id);
+    }
+    
+    // Cleanup flamethrower schedulers
+    let flamethrower_schedulers_to_delete: Vec<u64> = ctx.db.agna_phase2_flamethrower_scheduler()
+        .boss_monster_id()
+        .filter(&boss_monster_id)
+        .map(|scheduler| scheduler.scheduled_id)
+        .collect();
+    
+    let flamethrower_count = flamethrower_schedulers_to_delete.len();
+    for scheduled_id in flamethrower_schedulers_to_delete {
+        ctx.db.agna_phase2_flamethrower_scheduler().scheduled_id().delete(&scheduled_id);
+    }
+    
+    // Cleanup active Phase 2 attacks
+    let active_attacks_to_delete: Vec<u64> = ctx.db.active_monster_attacks().iter()
+        .filter(|attack| {
+            (attack.monster_attack_type == MonsterAttackType::AgnaPhase2FlameJet ||
+             attack.monster_attack_type == MonsterAttackType::AgnaGroundFlame) &&
+            attack.parameter_u == boss_monster_id
+        })
+        .map(|attack| attack.active_monster_attack_id)
+        .collect();
+    
+    let active_count = active_attacks_to_delete.len();
+    for attack_id in active_attacks_to_delete {
+        ctx.db.active_monster_attacks().active_monster_attack_id().delete(&attack_id);
+    }
+
+    if summoning_count > 0 || target_count > 0 || flamethrower_count > 0 || active_count > 0 {
+        log::info!("Cleaned up {} summoning schedulers, {} target schedulers, {} flamethrower schedulers, and {} active attacks for Agna Phase 2 boss {}", 
+                  summoning_count, target_count, flamethrower_count, active_count, boss_monster_id);
     }
 }
 
