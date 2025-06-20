@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { EventContext, AgnaMagicCircle, ActiveMonsterAttack, MonsterAttackType, Monsters, AiState } from '../autobindings';
+import { EventContext, AgnaMagicCircle, ActiveMonsterAttack, MonsterAttackType, Monsters, AiState, Player } from '../autobindings';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 
 const MAGIC_CIRCLE_ASSET_KEY = 'agna_magic_circle';
@@ -21,6 +21,7 @@ export default class BossAgnaManager {
     private boundHandleAttackInsert: (ctx: EventContext, attack: ActiveMonsterAttack) => void;
     private boundHandleMonsterUpdate: (ctx: EventContext, oldMonster: Monsters, newMonster: Monsters) => void;
     private boundHandleMonsterDelete: (ctx: EventContext, monster: Monsters) => void;
+    private boundHandlePlayerDelete: (ctx: EventContext, player: Player) => void;
     
     // Flag to track if the manager has been shut down
     private isDestroyed: boolean = false;
@@ -41,8 +42,9 @@ export default class BossAgnaManager {
         this.boundHandleAttackInsert = this.handleAttackInsert.bind(this);
         this.boundHandleMonsterUpdate = this.handleMonsterUpdate.bind(this);
         this.boundHandleMonsterDelete = this.handleMonsterDelete.bind(this);
+        this.boundHandlePlayerDelete = this.handlePlayerDelete.bind(this);
         
-        // Set up event handlers for magic circle table events, active attacks, and monster updates
+        // Set up event handlers for magic circle table events, active attacks, monster updates, and player deletes
         const db = this.spacetimeDBClient.sdkConnection?.db;
         if (db) {
             db.agnaMagicCircles?.onInsert(this.boundHandleCircleInsert);
@@ -51,6 +53,7 @@ export default class BossAgnaManager {
             db.activeMonsterAttacks?.onInsert(this.boundHandleAttackInsert);
             db.monsters?.onUpdate(this.boundHandleMonsterUpdate);
             db.monsters?.onDelete(this.boundHandleMonsterDelete);
+            db.player?.onDelete(this.boundHandlePlayerDelete);
         } else {
             console.error("Could not set up BossAgnaManager database listeners (database not connected)");
         }
@@ -158,6 +161,36 @@ export default class BossAgnaManager {
         
         console.log(`Agna boss ${monster.monsterId} was destroyed`);
         this.stopFlamethrowerSound(monster.monsterId);
+    }
+
+    // Handle when a player is deleted (hide magic circles targeting that player)
+    private handlePlayerDelete(ctx: EventContext, player: Player) {
+        if (this.isDestroyed) {
+            return;
+        }
+        
+        console.log(`Player ${player.playerId} was deleted, cleaning up magic circles`);
+        
+        // Find and remove all magic circles targeting this player
+        const circlesToRemove: bigint[] = [];
+        
+        for (const [circleId, circleSprite] of this.magicCircles) {
+            const targetPlayerId = (circleSprite as any).targetPlayerId;
+            
+            if (targetPlayerId === player.playerId) {
+                console.log(`Removing magic circle ${circleId} that was targeting deleted player ${player.playerId}`);
+                circlesToRemove.push(circleId);
+            }
+        }
+        
+        // Remove the circles
+        for (const circleId of circlesToRemove) {
+            this.removeMagicCircle(circleId);
+        }
+        
+        if (circlesToRemove.length > 0) {
+            console.log(`Cleaned up ${circlesToRemove.length} magic circles for deleted player ${player.playerId}`);
+        }
     }
 
     // Helper methods for monster type and state checking
@@ -452,6 +485,7 @@ export default class BossAgnaManager {
             db.activeMonsterAttacks?.removeOnInsert(this.boundHandleAttackInsert);
             db.monsters?.removeOnUpdate(this.boundHandleMonsterUpdate);
             db.monsters?.removeOnDelete(this.boundHandleMonsterDelete);
+            db.player?.removeOnDelete(this.boundHandlePlayerDelete);
             console.log("BossAgnaManager database listeners removed");
         }
     }
