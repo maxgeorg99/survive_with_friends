@@ -13,6 +13,7 @@ pub enum GemLevel {
     Fries,      // Special gem that heals 100 HP
     Dice,       // Special gem that grants extra reroll
     BoosterPack, // Special gem that grants immediate upgrade
+    LoreScroll, // Special gem that levels player up exactly once (values 0-12)
 }
 
 // Table for storing gem objects in the game
@@ -97,6 +98,7 @@ pub fn create_gem(ctx: &ReducerContext, position: DbVector2, level: GemLevel) ->
         GemLevel::Fries => 0, // Special gems don't use exp values
         GemLevel::Dice => 0, // Special gems don't use exp values
         GemLevel::BoosterPack => 0, // Special gems don't use exp values
+        GemLevel::LoreScroll => 0, // Lore scrolls have their value set separately (level-up amount)
     };
 
     // Create an entity for the gem
@@ -156,6 +158,45 @@ pub fn create_soul_gem(ctx: &ReducerContext, position: DbVector2, exp_value: u32
 
     let gem = gem_opt;
     log::info!("Created Soul gem (ID: {}) worth {} exp at position {}, {}", gem.gem_id, gem.value, position.x, position.y);
+    gem.gem_id
+}
+
+// Creates a Lore Scroll with a specific type (0-12) at the given position
+pub fn create_lore_scroll(ctx: &ReducerContext, position: DbVector2, scroll_type: u32) -> u32 {
+    let config = ctx.db.exp_config().config_id().find(&0);
+    if config.is_none() {
+        log::error!("Experience system not initialized");
+        return 0;
+    }
+
+    let config = config.unwrap();
+    let gem_radius = config.gem_radius;
+
+    // Clamp scroll type to valid range (0-12)
+    let clamped_scroll_type = scroll_type.min(12);
+
+    // Create an entity for the lore scroll
+    let gem_entity_opt = ctx.db.entity().insert(crate::Entity {
+        entity_id: 0,
+        position,
+        direction: DbVector2::new(0.0, 0.0), // Lore scrolls don't move
+        radius: gem_radius, // Fixed radius for gems
+        waypoint: DbVector2::new(0.0, 0.0),
+        has_waypoint: false,
+    });
+
+    let gem_entity = gem_entity_opt;
+
+    // Create the lore scroll with the specified type
+    let gem_opt = ctx.db.gems().insert(Gem {
+        gem_id: 0,
+        entity_id: gem_entity.entity_id,
+        level: GemLevel::LoreScroll,
+        value: clamped_scroll_type, // Store the scroll type (0-12) in the value field
+    });
+
+    let gem = gem_opt;
+    log::info!("Created Lore Scroll (ID: {}, Type: {}) at position {}, {}", gem.gem_id, clamped_scroll_type, position.x, position.y);
     gem.gem_id
 }
 
@@ -299,6 +340,7 @@ pub fn get_exp_value_for_gem(ctx: &ReducerContext, level: &GemLevel) -> u32 {
             GemLevel::Fries => 0, // Special gems don't use exp values
             GemLevel::Dice => 0, // Special gems don't use exp values
             GemLevel::BoosterPack => 0, // Special gems don't use exp values
+            GemLevel::LoreScroll => 0, // Lore scrolls have their value stored in the gem record
         };
     }
 
@@ -312,6 +354,7 @@ pub fn get_exp_value_for_gem(ctx: &ReducerContext, level: &GemLevel) -> u32 {
         GemLevel::Fries => 0, // Special gems don't use exp values
         GemLevel::Dice => 0, // Special gems don't use exp values
         GemLevel::BoosterPack => 0, // Special gems don't use exp values
+        GemLevel::LoreScroll => 0, // Lore scrolls have their value stored in the gem record
     }
 }
 
@@ -433,6 +476,24 @@ pub fn collect_gem(ctx: &ReducerContext, gem_id: u32, player_id: u32) {
                 if new_upgrades == 1 {
                     crate::upgrades_def::draw_upgrade_options(ctx, player_id);
                 }
+            }
+        },
+        GemLevel::LoreScroll => {
+            // Lore Scroll levels the player up exactly once
+            let player_opt = ctx.db.player().player_id().find(&player_id);
+            if let Some(player) = player_opt {
+                // Calculate exactly how much exp is needed to level up once
+                let exp_needed_for_next_level = player.exp_for_next_level - player.exp;
+                
+                // Use the give_player_exp function to handle the level up logic
+                give_player_exp(ctx, player_id, exp_needed_for_next_level);
+                
+                let scroll_type = gem.value; // 0-12 representing different lore scroll types
+                log::info!("Player {} collected Lore Scroll (Type {}) and leveled up! Granted {} exp to reach next level", 
+                          player_id, scroll_type, exp_needed_for_next_level);
+                
+                // Log the lore scroll pickup in the tracking table
+                crate::lorescrolls_defs::log_lore_scroll_pickup(ctx, player_id, scroll_type);
             }
         },
         _ => {
@@ -593,6 +654,63 @@ pub fn spawn_debug_special_gem(ctx: &ReducerContext) {
             _ => "Unknown"
         },
         gem_id,
+        spawn_position.x,
+        spawn_position.y,
+        player.name,
+        player.player_id
+    );
+}
+
+// Debug reducer to spawn lore scrolls for testing
+#[reducer]
+pub fn spawn_debug_lore_scroll(ctx: &ReducerContext) {
+    // Check admin access first
+    crate::require_admin_access(ctx, "SpawnDebugLoreScroll");
+    
+    // Get the caller's identity
+    let caller_identity = ctx.sender;
+    
+    // Find the caller's account
+    let account_opt = ctx.db.account().identity().find(&caller_identity);
+    if account_opt.is_none() {
+        log::error!("spawn_debug_lore_scroll: Account not found for caller");
+        return;
+    }
+    
+    let account = account_opt.unwrap();
+    if account.current_player_id == 0 {
+        log::error!("spawn_debug_lore_scroll: Caller has no active player");
+        return;
+    }
+    
+    // Find the player
+    let player_opt = ctx.db.player().player_id().find(&account.current_player_id);
+    if player_opt.is_none() {
+        log::error!("spawn_debug_lore_scroll: Player {} not found", account.current_player_id);
+        return;
+    }
+    
+    let player = player_opt.unwrap();
+    
+    // Generate a random position near the player (within 100 units)
+    let mut rng = ctx.rng();
+    let offset_x = rng.gen_range(-100.0..100.0);
+    let offset_y = rng.gen_range(-100.0..100.0);
+    let spawn_position = DbVector2::new(
+        player.position.x + offset_x,
+        player.position.y + offset_y,
+    );
+    
+    // Randomly select a lore scroll type (0-12)
+    let scroll_type = rng.gen_range(0..=12);
+    
+    // Create the lore scroll
+    let scroll_id = create_lore_scroll(ctx, spawn_position, scroll_type);
+    
+    log::info!(
+        "Debug: Spawned Lore Scroll (ID: {}, Type: {}) at position ({:.1}, {:.1}) for player {} ({})",
+        scroll_id,
+        scroll_type,
         spawn_position.x,
         spawn_position.y,
         player.name,

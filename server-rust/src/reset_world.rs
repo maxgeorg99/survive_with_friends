@@ -294,6 +294,9 @@ pub fn reset_world(ctx: &ReducerContext) {
     log::info!("ResetWorld: Cleaned up {} Agna magic circles, {} fire orb schedulers, {} delayed orb schedulers, {} flamethrower schedulers, {} candle spawns, {} candle schedulers, {} candle bolt schedulers, {} ritual completion checks, {} summoning spawners, {} target switch schedulers, {} phase 2 flamethrower schedulers, and {} last pattern records", 
               agna_magic_circle_count, agna_fire_orb_scheduler_count, agna_delayed_orb_scheduler_count, agna_flamethrower_scheduler_count, agna_candle_spawn_count, agna_candle_scheduler_count, agna_candle_bolt_scheduler_count, agna_ritual_completion_count, agna_summoning_spawner_count, agna_target_switch_count, agna_phase2_flamethrower_count, agna_last_pattern_count);
     
+    // 17. Clean up lore scroll pickup records
+    crate::lorescrolls_defs::clear_lore_scroll_pickups(ctx);
+    
     // Note: Monster spawning will be rescheduled when the first player joins
     // This ensures spawning only occurs when players are present
     

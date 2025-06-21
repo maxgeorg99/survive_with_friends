@@ -26,6 +26,7 @@ export class DebugManager {
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.G).on('down', this.spawnDebugSpecialGem, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.V).on('down', this.spawnDebugVoidChest, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C).on('down', this.spawnDebugLootCapsule, this);
+            this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E).on('down', this.spawnDebugLoreScroll, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P).on('down', this.enableBotPvp, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR).on('down', this.setBossTypeEnder, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FIVE).on('down', this.setBossTypeAgna, this);
@@ -46,6 +47,7 @@ export class DebugManager {
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.G);
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.V);
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.C);
+            this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.E);
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.P);
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.FOUR);
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.FIVE);
@@ -103,6 +105,15 @@ export class DebugManager {
             this.spacetimedb.sdkConnection.reducers.spawnDebugLootCapsule();
         } else {
             console.warn("DebugManager: SpacetimeDB connection or player position not available for spawning debug loot capsule.");
+        }
+    }
+
+    private spawnDebugLoreScroll(): void {
+        if (this.spacetimedb && this.spacetimedb.sdkConnection) {
+            console.log("DebugManager: Spawning debug Lore Scroll near player...");
+            this.spacetimedb.sdkConnection.reducers.spawnDebugLoreScroll();
+        } else {
+            console.warn("DebugManager: SpacetimeDB connection or player position not available for spawning debug lore scroll.");
         }
     }
 

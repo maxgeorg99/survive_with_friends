@@ -11,7 +11,8 @@ export const GEM_ASSET_KEYS: { [key: string]: string } = {
     'Soul': 'soul',             // Soul gem (created from player deaths)
     'Fries': 'fries',           // Special gem that heals HP
     'Dice': 'dice',             // Special gem that grants rerolls
-    'BoosterPack': 'booster_pack' // Special gem that grants upgrade points
+    'BoosterPack': 'booster_pack', // Special gem that grants upgrade points
+    'LoreScroll': 'lore_scroll' // Special gem that levels player up exactly once
 };
 
 // Animation configuration for gems
@@ -31,7 +32,8 @@ export const GEM_PARTICLE_COLORS: { [key: string]: number } = {
     'Soul': 0x9966ff,           // Purple for soul gems
     'Fries': 0xffaa00,          // Orange for fries (healing)
     'Dice': 0x00ffff,           // Cyan for dice (reroll)
-    'BoosterPack': 0xff6600     // Orange-red for booster packs (upgrades)
+    'BoosterPack': 0xff6600,    // Orange-red for booster packs (upgrades)
+    'LoreScroll': 0xffd700      // Gold for lore scrolls (ancient knowledge)
 };
 
 // Sound configuration for gems

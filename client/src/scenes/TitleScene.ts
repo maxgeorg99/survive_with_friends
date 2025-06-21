@@ -90,6 +90,7 @@ export default class TitleScene extends Phaser.Scene {
         this.load.image('fries', '/assets/fries.png');
         this.load.image('dice', '/assets/dice.png');
         this.load.image('booster_pack', '/assets/booster_pack.png');
+        this.load.image('lore_scroll', '/assets/lore_scroll.png');
         
         // Preload monster assets for seamless gameplay
         this.load.image('monster_rat', '/assets/monster_rat.png');

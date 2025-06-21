@@ -9,6 +9,7 @@ import { MonsterAttackManager } from '../managers/MonsterAttackManager';
 import GemManager from '../managers/GemManager';
 import LootCapsuleManager from '../managers/LootCapsuleManager';
 import BossAgnaManager from '../managers/BossAgnaManager';
+import LoreScrollManager from '../managers/LoreScrollManager';
 import { createPlayerDamageEffect, createMonsterDamageEffect } from '../utils/DamageEffects';
 import UpgradeUI from '../ui/UpgradeUI';
 import PlayerHUD from '../ui/PlayerHUD';
@@ -104,6 +105,7 @@ export default class GameScene extends Phaser.Scene {
     
     // Add boss Agna manager for magic circle visualization
     private bossAgnaManager: BossAgnaManager | null = null;
+    private loreScrollManager: LoreScrollManager | null = null;
     
     // Add upgrade UI manager
     private upgradeUI: UpgradeUI | null = null;
@@ -268,6 +270,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('fries', '/assets/fries.png');
         this.load.image('dice', '/assets/dice.png');
         this.load.image('booster_pack', '/assets/booster_pack.png');
+        this.load.image('lore_scroll', '/assets/lore_scroll.png');
         
         // Load loot capsule assets
         this.load.image('void_capsule', '/assets/void_capsule.png');
@@ -292,6 +295,11 @@ export default class GameScene extends Phaser.Scene {
         this.load.audio('attack_soft', '/assets/sounds/attack_soft.mp3');
         this.load.audio('monster_death', '/assets/sounds/monster_death.mp3');
         this.load.audio('level_up', '/assets/sounds/level_up.mp3');
+        
+        // Load lore scroll voice files (viberians_1 to viberians_13)
+        for (let i = 1; i <= 13; i++) {
+            this.load.audio(`viberians_${i}`, `/assets/sounds/viberians_${i}.mp3`);
+        }
         this.load.audio('voice_level', '/assets/sounds/voice_level.mp3');
         this.load.audio('voice_chest', '/assets/sounds/voice_chest.mp3');
         this.load.audio('alert_event', '/assets/sounds/alert_event.mp3');
@@ -889,8 +897,11 @@ export default class GameScene extends Phaser.Scene {
 
         // Create and initialize the boss Agna manager
         this.bossAgnaManager = new BossAgnaManager(this, this.spacetimeDBClient);
+        this.loreScrollManager = new LoreScrollManager(this, this.spacetimeDBClient);
         console.log("BossAgnaManager created successfully");
         this.bossAgnaManager.initializeMagicCircles(ctx);
+        console.log("LoreScrollManager created successfully");
+        this.loreScrollManager.initializeLoreScrolls(ctx);
         console.log("BossAgnaManager initialized with existing magic circles");
 
         // Ensure appropriate music is playing based on current game state
@@ -2137,7 +2148,9 @@ export default class GameScene extends Phaser.Scene {
         
         // Clean up BossAgnaManager
         this.bossAgnaManager?.shutdown();
+        this.loreScrollManager?.shutdown();
         this.bossAgnaManager = null;
+        this.loreScrollManager = null;
         
         // Clean up UpgradeUI
         if (this.upgradeUI) {

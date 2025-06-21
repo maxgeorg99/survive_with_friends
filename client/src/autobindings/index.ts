@@ -98,6 +98,8 @@ import { SpawnBot } from "./spawn_bot_reducer.ts";
 export { SpawnBot };
 import { SpawnDebugLootCapsule } from "./spawn_debug_loot_capsule_reducer.ts";
 export { SpawnDebugLootCapsule };
+import { SpawnDebugLoreScroll } from "./spawn_debug_lore_scroll_reducer.ts";
+export { SpawnDebugLoreScroll };
 import { SpawnDebugSpecialGem } from "./spawn_debug_special_gem_reducer.ts";
 export { SpawnDebugSpecialGem };
 import { SpawnDebugVoidChest } from "./spawn_debug_void_chest_reducer.ts";
@@ -218,6 +220,8 @@ import { EntityTableHandle } from "./entity_table.ts";
 export { EntityTableHandle };
 import { ExpConfigTableHandle } from "./exp_config_table.ts";
 export { ExpConfigTableHandle };
+import { FoundLoreScrollsTableHandle } from "./found_lore_scrolls_table.ts";
+export { FoundLoreScrollsTableHandle };
 import { GameStateTableHandle } from "./game_state_table.ts";
 export { GameStateTableHandle };
 import { GameTickTimerTableHandle } from "./game_tick_timer_table.ts";
@@ -346,6 +350,8 @@ import { Entity } from "./entity_type.ts";
 export { Entity };
 import { ExpConfig } from "./exp_config_type.ts";
 export { ExpConfig };
+import { FoundLoreScrolls } from "./found_lore_scrolls_type.ts";
+export { FoundLoreScrolls };
 import { GameState } from "./game_state_type.ts";
 export { GameState };
 import { GameTickTimer } from "./game_tick_timer_type.ts";
@@ -584,6 +590,11 @@ const REMOTE_MODULE = {
       tableName: "exp_config",
       rowType: ExpConfig.getTypeScriptAlgebraicType(),
       primaryKey: "configId",
+    },
+    found_lore_scrolls: {
+      tableName: "found_lore_scrolls",
+      rowType: FoundLoreScrolls.getTypeScriptAlgebraicType(),
+      primaryKey: "pickupId",
     },
     game_state: {
       tableName: "game_state",
@@ -829,6 +840,10 @@ const REMOTE_MODULE = {
       reducerName: "spawn_debug_loot_capsule",
       argsType: SpawnDebugLootCapsule.getTypeScriptAlgebraicType(),
     },
+    spawn_debug_lore_scroll: {
+      reducerName: "spawn_debug_lore_scroll",
+      argsType: SpawnDebugLoreScroll.getTypeScriptAlgebraicType(),
+    },
     spawn_debug_special_gem: {
       reducerName: "spawn_debug_special_gem",
       argsType: SpawnDebugSpecialGem.getTypeScriptAlgebraicType(),
@@ -981,6 +996,7 @@ export type Reducer = never
 | { name: "SpawnBossPhaseTwoDelayed", args: SpawnBossPhaseTwoDelayed }
 | { name: "SpawnBot", args: SpawnBot }
 | { name: "SpawnDebugLootCapsule", args: SpawnDebugLootCapsule }
+| { name: "SpawnDebugLoreScroll", args: SpawnDebugLoreScroll }
 | { name: "SpawnDebugSpecialGem", args: SpawnDebugSpecialGem }
 | { name: "SpawnDebugVoidChest", args: SpawnDebugVoidChest }
 | { name: "SpawnDelayedAgnaFireOrb", args: SpawnDelayedAgnaFireOrb }
@@ -1479,6 +1495,18 @@ export class RemoteReducers {
 
   removeOnSpawnDebugLootCapsule(callback: (ctx: ReducerEventContext) => void) {
     this.connection.offReducer("spawn_debug_loot_capsule", callback);
+  }
+
+  spawnDebugLoreScroll() {
+    this.connection.callReducer("spawn_debug_lore_scroll", new Uint8Array(0), this.setCallReducerFlags.spawnDebugLoreScrollFlags);
+  }
+
+  onSpawnDebugLoreScroll(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.onReducer("spawn_debug_lore_scroll", callback);
+  }
+
+  removeOnSpawnDebugLoreScroll(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.offReducer("spawn_debug_lore_scroll", callback);
   }
 
   spawnDebugSpecialGem() {
@@ -2000,6 +2028,11 @@ export class SetReducerFlags {
     this.spawnDebugLootCapsuleFlags = flags;
   }
 
+  spawnDebugLoreScrollFlags: CallReducerFlags = 'FullUpdate';
+  spawnDebugLoreScroll(flags: CallReducerFlags) {
+    this.spawnDebugLoreScrollFlags = flags;
+  }
+
   spawnDebugSpecialGemFlags: CallReducerFlags = 'FullUpdate';
   spawnDebugSpecialGem(flags: CallReducerFlags) {
     this.spawnDebugSpecialGemFlags = flags;
@@ -2262,6 +2295,10 @@ export class RemoteTables {
 
   get expConfig(): ExpConfigTableHandle {
     return new ExpConfigTableHandle(this.connection.clientCache.getOrCreateTable<ExpConfig>(REMOTE_MODULE.tables.exp_config));
+  }
+
+  get foundLoreScrolls(): FoundLoreScrollsTableHandle {
+    return new FoundLoreScrollsTableHandle(this.connection.clientCache.getOrCreateTable<FoundLoreScrolls>(REMOTE_MODULE.tables.found_lore_scrolls));
   }
 
   get gameState(): GameStateTableHandle {

@@ -209,7 +209,28 @@ pub fn trigger_structure_death_loot(ctx: &ReducerContext, monster: &crate::Monst
         );
     }
     
-    log::info!("Structure death loot complete - {} capsules spawned", loot_count);
+    // Special handling for Statue structures - also spawn a lore scroll
+    if monster.bestiary_id == MonsterType::Statue {
+        // Generate a random lore scroll type (0-12)
+        let mut rng = ctx.rng();
+        let scroll_type = rng.gen_range(0..=12);
+        
+        // Spawn the lore scroll near the statue
+        let scroll_offset_x = rng.gen_range(-64.0..64.0);
+        let scroll_offset_y = rng.gen_range(-64.0..64.0);
+        let scroll_position = DbVector2::new(
+            structure_position.x + scroll_offset_x,
+            structure_position.y + scroll_offset_y
+        );
+        
+        let scroll_id = crate::gems_def::create_lore_scroll(ctx, scroll_position, scroll_type);
+        log::info!("Statue destroyed! Spawned Lore Scroll (ID: {}, Type: {}) at position ({:.1}, {:.1})", 
+                  scroll_id, scroll_type, scroll_position.x, scroll_position.y);
+    }
+    
+    log::info!("Structure death loot complete - {} capsules spawned{}", 
+              loot_count, 
+              if monster.bestiary_id == MonsterType::Statue { " + 1 lore scroll" } else { "" });
 }
 
 // Helper function to check if a monster type is a structure

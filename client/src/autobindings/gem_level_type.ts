@@ -43,6 +43,7 @@ export namespace GemLevel {
   export type Fries = { tag: "Fries" };
   export type Dice = { tag: "Dice" };
   export type BoosterPack = { tag: "BoosterPack" };
+  export type LoreScroll = { tag: "LoreScroll" };
 
   // Helper functions for constructing each variant of the tagged union.
   // ```
@@ -58,6 +59,7 @@ export namespace GemLevel {
   export const Fries = { tag: "Fries" };
   export const Dice = { tag: "Dice" };
   export const BoosterPack = { tag: "BoosterPack" };
+  export const LoreScroll = { tag: "LoreScroll" };
 
   export function getTypeScriptAlgebraicType(): AlgebraicType {
     return AlgebraicType.createSumType([
@@ -69,6 +71,7 @@ export namespace GemLevel {
       new SumTypeVariant("Fries", AlgebraicType.createProductType([])),
       new SumTypeVariant("Dice", AlgebraicType.createProductType([])),
       new SumTypeVariant("BoosterPack", AlgebraicType.createProductType([])),
+      new SumTypeVariant("LoreScroll", AlgebraicType.createProductType([])),
     ]);
   }
 
@@ -83,7 +86,7 @@ export namespace GemLevel {
 }
 
 // The tagged union or sum type for the algebraic type `GemLevel`.
-export type GemLevel = GemLevel.Small | GemLevel.Medium | GemLevel.Large | GemLevel.Huge | GemLevel.Soul | GemLevel.Fries | GemLevel.Dice | GemLevel.BoosterPack;
+export type GemLevel = GemLevel.Small | GemLevel.Medium | GemLevel.Large | GemLevel.Huge | GemLevel.Soul | GemLevel.Fries | GemLevel.Dice | GemLevel.BoosterPack | GemLevel.LoreScroll;
 
 export default GemLevel;
 
