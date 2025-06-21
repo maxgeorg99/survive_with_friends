@@ -1,0 +1,10 @@
+This project is a multiplayer online game which combines "vampire survivors" gameplay with some "agar.io".
+The client is in Typescript using the Phaser 3 framework.
+The server is in Rust using the SpacetimeDB framework. 
+
+SpacetimeDB creates auto-bindings for the client based on the database schema which requires a specific command to be run.
+If you detect a change in the schema that requires new bindings you must let me know so I can run it.
+
+Do not publish versions of the backend yourself as you can ruin live this way. Let the user publish.
+
+SpacetimeDB docs can be found at https://spacetimedb.com/llms.txt

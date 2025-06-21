@@ -51,9 +51,11 @@ const AGNA_RITUAL_CIRCLE_RADIUS: f32 = 200.0;          // Radius of candle circl
 const AGNA_CANDLE_BOLT_DAMAGE: u32 = 20;               // Damage per candle bolt
 const AGNA_CANDLE_BOLT_SPEED: f32 = 400.0;             // Movement speed of candle bolts
 const AGNA_CANDLE_BOLT_RADIUS: f32 = 24.0;             // Collision radius of candle bolts
-const AGNA_CANDLE_BOLT_INTERVAL_MS: u64 = 3000;        // Candles fire every 1.5 seconds
+const AGNA_CANDLE_BOLT_INTERVAL_MS: u64 = 3000;        // Candles fire every 3 seconds
 const AGNA_CANDLE_BOLT_INTERVAL_VARIATION_MS: u64 = 1500; // Variation in interval
+const AGNA_CANDLE_BOLT_INITIAL_DELAY_MS: u64 = 2000;   // Initial delay before candles start attacking (increased for earlier spawn)
 const AGNA_RITUAL_COMPLETE_DURATION_MS: u64 = 4000;    // 4 second duration for ritual complete
+const AGNA_RITUAL_CANDLE_SPAWN_INTERVAL_MS: u64 = AGNA_RITUAL_MATCH_DURATION_MS / (AGNA_RITUAL_CANDLE_COUNT as u64); // ~307ms between candle spawns
 
 // Configuration constants for Agna Phase 2
 const AGNA_PHASE2_SUMMONING_RITUAL_SPAWN_RADIUS_MIN: f32 = 400.0; // Radius of summoning ritual
@@ -997,18 +999,19 @@ pub fn execute_boss_agna_ritual_match_behavior(ctx: &ReducerContext, monster: &c
     // Create candle spawn positions in a circle around Agna
     create_ritual_candle_spawns(ctx, monster.monster_id, &boid.position);
     
+    // Schedule progressive candle spawning during match phase
+    schedule_progressive_candle_spawns(ctx, monster.monster_id);
+    
     // Schedule transition to wick phase after match duration
     schedule_state_change(ctx, monster.monster_id, crate::monster_ai_defs::AIState::BossAgnaRitualWick, AGNA_RITUAL_MATCH_DURATION_MS);
 }
 
 // Execute behavior when entering BossAgnaRitualWick state
 pub fn execute_boss_agna_ritual_wick_behavior(ctx: &ReducerContext, monster: &crate::Monsters) {
-    log::info!("Starting Agna ritual wick phase for boss {}", monster.monster_id);
+    log::info!("Starting Agna ritual wick phase for boss {} - candles already spawned during match phase", monster.monster_id);
     
-    // Spawn all the candle monsters immediately
-    spawn_all_ritual_candles(ctx, monster.monster_id);
-    
-    // Clean up the spawn indicators now that real candles have appeared
+    // Candles were already spawned progressively during the match phase
+    // Clean up the spawn indicators now that the match phase is complete
     cleanup_agna_candle_spawn_indicators(ctx, monster.monster_id);
     
     // Schedule check for ritual completion after wick duration
@@ -1050,8 +1053,12 @@ pub fn execute_boss_agna_ritual_complete_behavior(ctx: &ReducerContext, monster:
 fn create_ritual_candle_spawns(ctx: &ReducerContext, boss_monster_id: u32, boss_position: &DbVector2) {
     log::info!("Creating {} candle spawns around boss {}", AGNA_RITUAL_CANDLE_COUNT, boss_monster_id);
     
+    // Add 90-degree rotation so first candle spawns at 12 o'clock (top)
+    let rotation_offset = -80.0_f32.to_radians();
+    
     for i in 0..AGNA_RITUAL_CANDLE_COUNT {
-        let angle = (i as f32 / AGNA_RITUAL_CANDLE_COUNT as f32) * 2.0 * std::f32::consts::PI;
+        let base_angle = (i as f32 / AGNA_RITUAL_CANDLE_COUNT as f32) * 2.0 * std::f32::consts::PI;
+        let angle = base_angle + rotation_offset;
         let spawn_position = DbVector2::new(
             boss_position.x + AGNA_RITUAL_CIRCLE_RADIUS * angle.cos(),
             boss_position.y + AGNA_RITUAL_CIRCLE_RADIUS * angle.sin()
@@ -1065,8 +1072,41 @@ fn create_ritual_candle_spawns(ctx: &ReducerContext, boss_monster_id: u32, boss_
             candle_monster_id: 0, // Not yet spawned
         });
         
-        log::info!("Created candle spawn {} at ({}, {})", i, spawn_position.x, spawn_position.y);
+        log::info!("Created candle spawn {} at ({}, {}) with 90° rotation (12 o'clock start)", i, spawn_position.x, spawn_position.y);
     }
+}
+
+// Helper function to schedule progressive candle spawning during match phase
+fn schedule_progressive_candle_spawns(ctx: &ReducerContext, boss_monster_id: u32) {
+    log::info!("Scheduling progressive candle spawns for boss {} over {}ms", 
+              boss_monster_id, AGNA_RITUAL_MATCH_DURATION_MS);
+    
+    // Get all candle spawn positions for this boss and sort by candle_index to ensure proper order
+    let mut spawns: Vec<_> = ctx.db.agna_candle_spawns()
+        .iter()
+        .filter(|spawn| spawn.boss_monster_id == boss_monster_id)
+        .collect();
+    
+    // Sort by candle_index to ensure spawns happen in the intended rotational order
+    spawns.sort_by_key(|spawn| spawn.candle_index);
+    
+    // Schedule each candle to spawn at regular intervals during the match phase
+    for (index, spawn) in spawns.iter().enumerate() {
+        let delay_ms = (index as u64) * AGNA_RITUAL_CANDLE_SPAWN_INTERVAL_MS;
+        
+        ctx.db.agna_candle_scheduler().insert(AgnaCandleScheduler {
+            scheduled_id: 0,
+            scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(delay_ms)),
+            boss_monster_id,
+            spawn_id: spawn.spawn_id,
+        });
+        
+        log::info!("Scheduled candle {} (index {}) to spawn in {}ms at 12 o'clock + {} positions", 
+                  spawn.spawn_id, spawn.candle_index, delay_ms, spawn.candle_index);
+    }
+    
+    log::info!("Scheduled {} candles to spawn progressively for boss {} (interval: {}ms, starting from 12 o'clock)", 
+              spawns.len(), boss_monster_id, AGNA_RITUAL_CANDLE_SPAWN_INTERVAL_MS);
 }
 
 // Helper function to spawn all candles for ritual wick phase
@@ -1122,10 +1162,11 @@ fn spawn_all_ritual_candles(ctx: &ReducerContext, boss_monster_id: u32) {
 // Helper function to start candle bolt attacks
 fn start_candle_bolt_attacks(ctx: &ReducerContext, candle_monster_id: u32) {
     if let Some(target_player_id) = find_random_player(ctx) {
-        // Add initial variance so candles don't all start firing at once (0-1000ms delay)
+        // Use longer initial delay since candles spawn earlier, plus some variance
         let mut rng = ctx.rng();
-        let initial_delay_ms = (rng.gen::<f32>() * 1000.0) as u64;
-        let schedule_at = ScheduleAt::Time(ctx.timestamp + Duration::from_millis(initial_delay_ms));
+        let variance_ms = (rng.gen::<f32>() * 1000.0) as u64; // 0-1000ms additional variance
+        let total_delay_ms = AGNA_CANDLE_BOLT_INITIAL_DELAY_MS + variance_ms;
+        let schedule_at = ScheduleAt::Time(ctx.timestamp + Duration::from_millis(total_delay_ms));
         
         ctx.db.agna_candle_bolt_scheduler().insert(AgnaCandleBoltScheduler {
             scheduled_id: 0,
@@ -1326,7 +1367,7 @@ pub fn spawn_agna_candle(ctx: &ReducerContext, scheduler: AgnaCandleScheduler) {
         position: spawn.position,
     });
 
-    log::info!("Spawned Agna candle {} at position ({}, {})", 
+    log::info!("Spawned Agna candle {} at position ({}, {}) during match phase", 
               candle_monster.monster_id, spawn.position.x, spawn.position.y);
 
     // Update the spawn record with the candle monster ID
@@ -1334,7 +1375,7 @@ pub fn spawn_agna_candle(ctx: &ReducerContext, scheduler: AgnaCandleScheduler) {
     updated_spawn.candle_monster_id = candle_monster.monster_id;
     ctx.db.agna_candle_spawns().spawn_id().update(updated_spawn);
 
-    // Start the candle's bolt attacks
+    // Start the candle's bolt attacks with increased initial delay
     start_candle_bolt_attacks(ctx, candle_monster.monster_id);
 }
 
