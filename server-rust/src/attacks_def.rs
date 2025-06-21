@@ -230,7 +230,6 @@ fn trigger_attack_projectile(ctx: &ReducerContext, player_id: u32, attack_type: 
         entity_id: 0,
         position: DbVector2::new(player_x, player_y),
         direction,
-        is_moving: true,
         radius: scheduled_attack.radius,
         waypoint: DbVector2::new(0.0, 0.0),
         has_waypoint: false,

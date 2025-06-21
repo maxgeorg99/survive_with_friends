@@ -104,7 +104,6 @@ pub fn create_gem(ctx: &ReducerContext, position: DbVector2, level: GemLevel) ->
         entity_id: 0,
         position,
         direction: DbVector2::new(0.0, 0.0), // Gems don't move
-        is_moving: false,
         radius: gem_radius, // Fixed radius for gems
         waypoint: DbVector2::new(0.0, 0.0),
         has_waypoint: false,
@@ -140,7 +139,6 @@ pub fn create_soul_gem(ctx: &ReducerContext, position: DbVector2, exp_value: u32
         entity_id: 0,
         position,
         direction: DbVector2::new(0.0, 0.0), // Gems don't move
-        is_moving: false,
         radius: gem_radius, // Fixed radius for gems
         waypoint: DbVector2::new(0.0, 0.0),
         has_waypoint: false,

@@ -208,7 +208,6 @@ pub struct Entity {
     
     // Added direction and movement state directly to Entity
     pub direction: DbVector2,   // Direction vector (normalized)
-    pub is_moving: bool,        // Whether entity is actively moving
     pub radius: f32,            // Collision radius for this entity
     
     // Added waypoint for tap-to-move

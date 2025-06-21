@@ -133,7 +133,6 @@ export default class GameScene extends Phaser.Scene {
     private lastDirectionUpdateTime: number = 0;
     private serverPosition: Phaser.Math.Vector2 | null = null;
     private currentDirection: Phaser.Math.Vector2 = new Phaser.Math.Vector2(0, 0);
-    private isMoving: boolean = false;
 
     // Add a property to track tap target
     private tapTarget: Phaser.Math.Vector2 | null = null;
@@ -1924,7 +1923,6 @@ export default class GameScene extends Phaser.Scene {
             const WAYPOINT_REACHED_DISTANCE = 5.0;
             if (distanceToWaypoint < WAYPOINT_REACHED_DISTANCE) {
                 // Reached waypoint, stop moving
-                this.isMoving = false;
                 this.currentDirection.set(0, 0);
                 this.predictedPosition.set(playerData.waypoint.x, playerData.waypoint.y);
                 
@@ -1933,7 +1931,6 @@ export default class GameScene extends Phaser.Scene {
                 // tapMarker visibility is handled above by playerData.hasWaypoint
             } else {
                 // Continue moving towards waypoint
-                this.isMoving = true;
                 
                 // Use exact player speed from server
                 const playerSpeed = playerData.speed;
@@ -1956,7 +1953,6 @@ export default class GameScene extends Phaser.Scene {
             }
         } else {
             // Not moving or no waypoint
-            this.isMoving = false;
             this.currentDirection.set(0, 0);
             this.predictedPosition = null; // Clear prediction when not moving
 
@@ -2094,9 +2090,6 @@ export default class GameScene extends Phaser.Scene {
         if (this.tapMarker) {
             this.tapMarker.setVisible(false);
         }
-        
-        // Set flag to prevent movement in update()
-        this.isMoving = false;
         
         // Clear direction
         this.currentDirection.set(0, 0);
