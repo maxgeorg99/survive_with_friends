@@ -29,6 +29,7 @@ export class DebugManager {
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P).on('down', this.enableBotPvp, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR).on('down', this.setBossTypeEnder, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FIVE).on('down', this.setBossTypeAgna, this);
+            this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.H).on('down', this.setSuperHealth, this);
             console.log("DebugManager: Debug keys initialized.");
         } else {
             console.warn("DebugManager: Keyboard input not available on scene. Debug keys not initialized.");
@@ -46,6 +47,7 @@ export class DebugManager {
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.P);
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.FOUR);
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.FIVE);
+            this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.H);
         }
     }
 
@@ -124,6 +126,15 @@ export class DebugManager {
             this.spacetimedb.sdkConnection.reducers.debugSetBossType(5);
         } else {
             console.warn("DebugManager: SpacetimeDB connection not available for setting boss type to Agna.");
+        }
+    }
+
+    private setSuperHealth(): void {
+        if (this.spacetimedb && this.spacetimedb.sdkConnection) {
+            console.log("DebugManager: Setting super health (10000 HP)...");
+            this.spacetimedb.sdkConnection.reducers.debugSetSuperHealth();
+        } else {
+            console.warn("DebugManager: SpacetimeDB connection not available for setting super health.");
         }
     }
 } 

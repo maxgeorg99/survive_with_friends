@@ -1,5 +1,5 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp};
-use crate::{entity, monsters, monsters_boid, gems, monster_spawners, boss_spawn_timer, boss_phase_two_timer, game_state, monster_spawn_timer, monster_hit_cleanup, active_attack_cleanup, attack_burst_cooldowns, player_scheduled_attacks, monster_damage, player, upgrade_options, active_attacks, loot_capsule_defs, winner_transition_timer, dead_player_transition_timer, void_zone_scheduler, chaos_ball_scheduler, active_monster_attacks, agna_magic_circles, agna_fire_orb_scheduler, agna_delayed_orb_scheduler, agna_flamethrower_scheduler};
+use crate::{entity, monsters, monsters_boid, gems, monster_spawners, boss_spawn_timer, boss_phase_two_timer, game_state, monster_spawn_timer, monster_hit_cleanup, active_attack_cleanup, attack_burst_cooldowns, player_scheduled_attacks, monster_damage, player, upgrade_options, active_attacks, loot_capsule_defs, winner_transition_timer, dead_player_transition_timer, void_zone_scheduler, chaos_ball_scheduler, active_monster_attacks, agna_magic_circles, agna_fire_orb_scheduler, agna_delayed_orb_scheduler, agna_flamethrower_scheduler, agna_candle_spawns, agna_candle_scheduler, agna_candle_bolt_scheduler, agna_ritual_completion_check, agna_summoning_circle_spawner, agna_target_switch_scheduler, agna_phase2_flamethrower_scheduler, boss_agna_last_patterns};
 
 // ResetWorld reducer - clears all monsters, gems, monster spawners, and resets boss state
 // This should be called when the last player dies
@@ -232,8 +232,67 @@ pub fn reset_world(ctx: &ReducerContext) {
         agna_flamethrower_scheduler_count += 1;
     }
     
-    log::info!("ResetWorld: Cleaned up {} Agna magic circles, {} fire orb schedulers, {} delayed orb schedulers, and {} flamethrower schedulers", 
-              agna_magic_circle_count, agna_fire_orb_scheduler_count, agna_delayed_orb_scheduler_count, agna_flamethrower_scheduler_count);
+    // Clean up Agna candle-related tables that were missing from cleanup
+    let mut agna_candle_spawn_count = 0;
+    let agna_candle_spawns_to_delete: Vec<u64> = ctx.db.agna_candle_spawns().iter().map(|s| s.spawn_id).collect();
+    for spawn_id in agna_candle_spawns_to_delete {
+        ctx.db.agna_candle_spawns().spawn_id().delete(&spawn_id);
+        agna_candle_spawn_count += 1;
+    }
+    
+    let mut agna_candle_scheduler_count = 0;
+    let agna_candle_schedulers_to_delete: Vec<u64> = ctx.db.agna_candle_scheduler().iter().map(|s| s.scheduled_id).collect();
+    for scheduled_id in agna_candle_schedulers_to_delete {
+        ctx.db.agna_candle_scheduler().scheduled_id().delete(&scheduled_id);
+        agna_candle_scheduler_count += 1;
+    }
+    
+    let mut agna_candle_bolt_scheduler_count = 0;
+    let agna_candle_bolt_schedulers_to_delete: Vec<u64> = ctx.db.agna_candle_bolt_scheduler().iter().map(|s| s.scheduled_id).collect();
+    for scheduled_id in agna_candle_bolt_schedulers_to_delete {
+        ctx.db.agna_candle_bolt_scheduler().scheduled_id().delete(&scheduled_id);
+        agna_candle_bolt_scheduler_count += 1;
+    }
+    
+    let mut agna_ritual_completion_count = 0;
+    let agna_ritual_completion_checks_to_delete: Vec<u64> = ctx.db.agna_ritual_completion_check().iter().map(|c| c.scheduled_id).collect();
+    for scheduled_id in agna_ritual_completion_checks_to_delete {
+        ctx.db.agna_ritual_completion_check().scheduled_id().delete(&scheduled_id);
+        agna_ritual_completion_count += 1;
+    }
+    
+    // Clean up Agna Phase 2 tables
+    let mut agna_summoning_spawner_count = 0;
+    let agna_summoning_spawners_to_delete: Vec<u64> = ctx.db.agna_summoning_circle_spawner().iter().map(|s| s.scheduled_id).collect();
+    for scheduled_id in agna_summoning_spawners_to_delete {
+        ctx.db.agna_summoning_circle_spawner().scheduled_id().delete(&scheduled_id);
+        agna_summoning_spawner_count += 1;
+    }
+    
+    let mut agna_target_switch_count = 0;
+    let agna_target_switch_schedulers_to_delete: Vec<u64> = ctx.db.agna_target_switch_scheduler().iter().map(|s| s.scheduled_id).collect();
+    for scheduled_id in agna_target_switch_schedulers_to_delete {
+        ctx.db.agna_target_switch_scheduler().scheduled_id().delete(&scheduled_id);
+        agna_target_switch_count += 1;
+    }
+    
+    let mut agna_phase2_flamethrower_count = 0;
+    let agna_phase2_flamethrower_schedulers_to_delete: Vec<u64> = ctx.db.agna_phase2_flamethrower_scheduler().iter().map(|s| s.scheduled_id).collect();
+    for scheduled_id in agna_phase2_flamethrower_schedulers_to_delete {
+        ctx.db.agna_phase2_flamethrower_scheduler().scheduled_id().delete(&scheduled_id);
+        agna_phase2_flamethrower_count += 1;
+    }
+    
+    // Clean up Agna last pattern tracking
+    let mut agna_last_pattern_count = 0;
+    let agna_last_patterns_to_delete: Vec<u32> = ctx.db.boss_agna_last_patterns().iter().map(|p| p.monster_id).collect();
+    for monster_id in agna_last_patterns_to_delete {
+        ctx.db.boss_agna_last_patterns().monster_id().delete(&monster_id);
+        agna_last_pattern_count += 1;
+    }
+    
+    log::info!("ResetWorld: Cleaned up {} Agna magic circles, {} fire orb schedulers, {} delayed orb schedulers, {} flamethrower schedulers, {} candle spawns, {} candle schedulers, {} candle bolt schedulers, {} ritual completion checks, {} summoning spawners, {} target switch schedulers, {} phase 2 flamethrower schedulers, and {} last pattern records", 
+              agna_magic_circle_count, agna_fire_orb_scheduler_count, agna_delayed_orb_scheduler_count, agna_flamethrower_scheduler_count, agna_candle_spawn_count, agna_candle_scheduler_count, agna_candle_bolt_scheduler_count, agna_ritual_completion_count, agna_summoning_spawner_count, agna_target_switch_count, agna_phase2_flamethrower_count, agna_last_pattern_count);
     
     // Note: Monster spawning will be rescheduled when the first player joins
     // This ensures spawning only occurs when players are present

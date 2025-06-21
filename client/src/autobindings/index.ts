@@ -52,6 +52,8 @@ import { DebugEnableBotPvp } from "./debug_enable_bot_pvp_reducer.ts";
 export { DebugEnableBotPvp };
 import { DebugSetBossType } from "./debug_set_boss_type_reducer.ts";
 export { DebugSetBossType };
+import { DebugSetSuperHealth } from "./debug_set_super_health_reducer.ts";
+export { DebugSetSuperHealth };
 import { ExpireMonsterAttack } from "./expire_monster_attack_reducer.ts";
 export { ExpireMonsterAttack };
 import { GameTick } from "./game_tick_reducer.ts";
@@ -713,6 +715,10 @@ const REMOTE_MODULE = {
       reducerName: "debug_set_boss_type",
       argsType: DebugSetBossType.getTypeScriptAlgebraicType(),
     },
+    debug_set_super_health: {
+      reducerName: "debug_set_super_health",
+      argsType: DebugSetSuperHealth.getTypeScriptAlgebraicType(),
+    },
     expire_monster_attack: {
       reducerName: "expire_monster_attack",
       argsType: ExpireMonsterAttack.getTypeScriptAlgebraicType(),
@@ -922,6 +928,7 @@ export type Reducer = never
 | { name: "DebugCheckTier", args: DebugCheckTier }
 | { name: "DebugEnableBotPvp", args: DebugEnableBotPvp }
 | { name: "DebugSetBossType", args: DebugSetBossType }
+| { name: "DebugSetSuperHealth", args: DebugSetSuperHealth }
 | { name: "ExpireMonsterAttack", args: ExpireMonsterAttack }
 | { name: "GameTick", args: GameTick }
 | { name: "HandleAttackBurstCooldown", args: HandleAttackBurstCooldown }
@@ -1108,6 +1115,18 @@ export class RemoteReducers {
 
   removeOnDebugSetBossType(callback: (ctx: ReducerEventContext, clientKey: number) => void) {
     this.connection.offReducer("debug_set_boss_type", callback);
+  }
+
+  debugSetSuperHealth() {
+    this.connection.callReducer("debug_set_super_health", new Uint8Array(0), this.setCallReducerFlags.debugSetSuperHealthFlags);
+  }
+
+  onDebugSetSuperHealth(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.onReducer("debug_set_super_health", callback);
+  }
+
+  removeOnDebugSetSuperHealth(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.offReducer("debug_set_super_health", callback);
   }
 
   expireMonsterAttack(attack: ActiveMonsterAttack) {
@@ -1808,6 +1827,11 @@ export class SetReducerFlags {
   debugSetBossTypeFlags: CallReducerFlags = 'FullUpdate';
   debugSetBossType(flags: CallReducerFlags) {
     this.debugSetBossTypeFlags = flags;
+  }
+
+  debugSetSuperHealthFlags: CallReducerFlags = 'FullUpdate';
+  debugSetSuperHealth(flags: CallReducerFlags) {
+    this.debugSetSuperHealthFlags = flags;
   }
 
   expireMonsterAttackFlags: CallReducerFlags = 'FullUpdate';

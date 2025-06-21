@@ -3,6 +3,7 @@ import { EventContext, AgnaMagicCircle, AgnaCandleSpawn, ActiveMonsterAttack, Mo
 import SpacetimeDBClient from '../SpacetimeDBClient';
 
 const MAGIC_CIRCLE_ASSET_KEY = 'agna_magic_circle';
+const BIG_MAGIC_CIRCLE_DEPTH = 1;
 const CANDLE_SPAWN_ASSET_KEY = 'agna_candle_off';
 const FADE_IN_DURATION = 500;
 const FADE_OUT_DURATION = 300;
@@ -44,6 +45,10 @@ export default class BossAgnaManager {
     private ritualCompleteHaze: Phaser.GameObjects.Rectangle | null = null;
     private playerRitualCircles: Map<number, Phaser.GameObjects.Image> = new Map();
     private isRitualCompleteActive: boolean = false;
+    
+    // Magic circle phase visualization
+    private playerGroundCircles: Map<number, Phaser.GameObjects.Image> = new Map();
+    private isMagicCirclePhaseActive: boolean = false;
 
     constructor(scene: Phaser.Scene, client: SpacetimeDBClient) {
         this.scene = scene;
@@ -113,6 +118,10 @@ export default class BossAgnaManager {
                 if (this.isRitualCompleteState(monster.aiState)) {
                     console.log(`Found existing Agna boss ${monster.monsterId} in ritual complete state during initialization`);
                     this.startRitualCompleteVisualization();
+                }
+                if (this.isMagicCircleState(monster.aiState)) {
+                    console.log(`Found existing Agna boss ${monster.monsterId} in magic circle state during initialization`);
+                    this.startMagicCirclePhaseVisualization();
                 }
                 // Note: Ritual sounds are one-shot, so we don't need to replay them during initialization
                 // They are triggered by state transitions, not sustained like flamethrower
@@ -235,6 +244,10 @@ export default class BossAgnaManager {
             this.stopFlamethrowerSound(newMonster.monsterId);
         }
 
+        // Check for magic circle state transitions
+        const wasInMagicCircle = this.isMagicCircleState(oldMonster.aiState);
+        const isInMagicCircle = this.isMagicCircleState(newMonster.aiState);
+
         // Check for ritual state transitions
         const wasInRitualMatch = this.isRitualMatchState(oldMonster.aiState);
         const isInRitualMatch = this.isRitualMatchState(newMonster.aiState);
@@ -244,6 +257,15 @@ export default class BossAgnaManager {
         const isInRitualComplete = this.isRitualCompleteState(newMonster.aiState);
         const wasInRitualFailed = this.isRitualFailedState(oldMonster.aiState);
         const isInRitualFailed = this.isRitualFailedState(newMonster.aiState);
+
+        // Handle magic circle phase visualization
+        if (!wasInMagicCircle && isInMagicCircle) {
+            console.log(`Agna boss ${newMonster.monsterId} entered magic circle phase`);
+            this.startMagicCirclePhaseVisualization();
+        } else if (wasInMagicCircle && !isInMagicCircle) {
+            console.log(`Agna boss ${newMonster.monsterId} left magic circle phase`);
+            this.stopMagicCirclePhaseVisualization();
+        }
 
         // Play ritual sounds when entering states
         if (!wasInRitualMatch && isInRitualMatch) {
@@ -290,22 +312,36 @@ export default class BossAgnaManager {
         this.stopFlamethrowerSound(monster.monsterId);
     }
 
-    // Handle when a player is updated (for ritual circle position updates)
+    // Handle when a player is updated (for ritual circle and ground circle position updates)
     private handlePlayerUpdate(ctx: EventContext, oldPlayer: Player, newPlayer: Player) {
-        if (this.isDestroyed || !this.isRitualCompleteActive) {
+        if (this.isDestroyed) {
             return;
         }
         
         // Check if position changed
         if (oldPlayer.position.x !== newPlayer.position.x || oldPlayer.position.y !== newPlayer.position.y) {
-            // Update ritual circle position if it exists for this player
-            const circle = this.playerRitualCircles.get(newPlayer.playerId);
-            if (circle) {
-                circle.setPosition(newPlayer.position.x, newPlayer.position.y);
-                circle.setDepth(MONSTER_DEPTH_BASE + newPlayer.position.y - 1);
-            } else {
-                // Create circle for this player if ritual is active and circle doesn't exist
-                this.createPlayerRitualCircle(newPlayer.playerId, newPlayer.position.x, newPlayer.position.y);
+            // Update ritual circle position if ritual is active
+            if (this.isRitualCompleteActive) {
+                const ritualCircle = this.playerRitualCircles.get(newPlayer.playerId);
+                if (ritualCircle) {
+                    ritualCircle.setPosition(newPlayer.position.x, newPlayer.position.y);
+                    ritualCircle.setDepth(MONSTER_DEPTH_BASE + newPlayer.position.y - 1);
+                } else {
+                    // Create circle for this player if ritual is active and circle doesn't exist
+                    this.createPlayerRitualCircle(newPlayer.playerId, newPlayer.position.x, newPlayer.position.y);
+                }
+            }
+            
+            // Update ground circle position if magic circle phase is active
+            if (this.isMagicCirclePhaseActive) {
+                const groundCircle = this.playerGroundCircles.get(newPlayer.playerId);
+                if (groundCircle) {
+                    groundCircle.setPosition(newPlayer.position.x, newPlayer.position.y);
+                    groundCircle.setDepth(BIG_MAGIC_CIRCLE_DEPTH);
+                } else {
+                    // Create ground circle for this player if magic circle phase is active and circle doesn't exist
+                    this.createPlayerGroundCircle(newPlayer.playerId, newPlayer.position.x, newPlayer.position.y);
+                }
             }
         }
     }
@@ -341,6 +377,9 @@ export default class BossAgnaManager {
         
         // Remove ritual circle for this player if it exists
         this.removePlayerRitualCircle(player.playerId);
+        
+        // Remove ground circle for this player if it exists
+        this.removePlayerGroundCircle(player.playerId);
     }
 
     // Handle when a summoning circle spawner is inserted
@@ -388,6 +427,10 @@ export default class BossAgnaManager {
 
     private isRitualFailedState(aiState: AiState): boolean {
         return aiState.tag === 'BossAgnaRitualFailed';
+    }
+
+    private isMagicCircleState(aiState: AiState): boolean {
+        return aiState.tag === 'BossAgnaMagicCircle';
     }
 
     // Flamethrower sound management
@@ -566,6 +609,84 @@ export default class BossAgnaManager {
         }
         this.playerRitualCircles.clear();
         console.log("Removed all player ritual circles");
+    }
+
+    // Magic circle phase visualization management
+    private startMagicCirclePhaseVisualization() {
+        if (this.isMagicCirclePhaseActive) {
+            return; // Already active
+        }
+        
+        console.log("Starting magic circle phase visualization - ground circles under players");
+        this.isMagicCirclePhaseActive = true;
+        
+        // Create ground circles under all active players
+        this.createPlayerGroundCircles();
+    }
+
+    private stopMagicCirclePhaseVisualization() {
+        if (!this.isMagicCirclePhaseActive) {
+            return; // Not active
+        }
+        
+        console.log("Stopping magic circle phase visualization");
+        this.isMagicCirclePhaseActive = false;
+        
+        // Remove all player ground circles
+        this.removeAllPlayerGroundCircles();
+    }
+
+    private createPlayerGroundCircles() {
+        // Get all active players from the database
+        const db = this.spacetimeDBClient.sdkConnection?.db;
+        if (!db) {
+            console.warn("Cannot create player ground circles - database not available");
+            return;
+        }
+        
+        for (const player of db.player.iter()) {
+            this.createPlayerGroundCircle(player.playerId, player.position.x, player.position.y);
+        }
+    }
+
+    private createPlayerGroundCircle(playerId: number, x: number, y: number) {
+        // Don't create if already exists
+        if (this.playerGroundCircles.has(playerId)) {
+            return;
+        }
+        
+        // Create ground circle sprite under the player
+        const circle = this.scene.add.image(x, y, 'agna_big_circle');
+        circle.setScale(1.0); // Normal size
+        circle.setAlpha(0.15); // Mid alpha as requested
+        
+        // Set depth to be well below the player (ground level)
+        circle.setDepth(BIG_MAGIC_CIRCLE_DEPTH);
+        
+        // Ensure it follows the camera
+        circle.setScrollFactor(1, 1);
+        
+        // Store the circle
+        this.playerGroundCircles.set(playerId, circle);
+        
+        console.log(`Created ground circle for player ${playerId} at (${x}, ${y})`);
+    }
+
+    private removePlayerGroundCircle(playerId: number) {
+        const circle = this.playerGroundCircles.get(playerId);
+        if (circle) {
+            circle.destroy();
+            this.playerGroundCircles.delete(playerId);
+            console.log(`Removed ground circle for player ${playerId}`);
+        }
+    }
+
+    private removeAllPlayerGroundCircles() {
+        for (const [playerId, circle] of this.playerGroundCircles) {
+            circle.destroy();
+        }
+        this.playerGroundCircles.clear();
+        console.log("Removed all player ground circles");
     }
 
 
@@ -901,6 +1022,9 @@ export default class BossAgnaManager {
         
         // Stop ritual complete visualization if active
         this.stopRitualCompleteVisualization();
+        
+        // Stop magic circle phase visualization if active
+        this.stopMagicCirclePhaseVisualization();
         
         // Stop all active tweens for magic circles, candle spawns, and summoning circles
         this.magicCircles.forEach(circleSprite => {

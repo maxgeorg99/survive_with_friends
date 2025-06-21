@@ -757,3 +757,36 @@ pub fn require_admin_access(ctx: &ReducerContext, function_name: &str) {
                function_name, caller_name, caller_identity);
     }
 }
+
+// Admin reducer to set player health to 10000 (both current and max)
+#[reducer]
+pub fn debug_set_super_health(ctx: &ReducerContext) {
+    require_admin_access(ctx, "debug_set_super_health");
+    
+    let caller_identity = ctx.sender;
+    
+    // Find the caller's account and their current player
+    if let Some(account) = ctx.db.account().identity().find(&caller_identity) {
+        if account.current_player_id == 0 {
+            log::warn!("Admin {} has no active player to set super health", account.name);
+            return;
+        }
+        
+        // Find and update the player
+        if let Some(mut player) = ctx.db.player().player_id().find(&account.current_player_id) {
+            let old_hp = player.hp;
+            let old_max_hp = player.max_hp;
+            
+            player.hp = 10000.0;
+            player.max_hp = 10000.0;
+            ctx.db.player().player_id().update(player);
+            
+            log::info!("Admin {} set super health: Player {} HP changed from {}/{} to 10000/10000", 
+                      account.name, account.current_player_id, old_hp, old_max_hp);
+        } else {
+            log::warn!("Admin {} player {} not found for super health", account.name, account.current_player_id);
+        }
+    } else {
+        log::warn!("Admin account not found for super health command");
+    }
+}
