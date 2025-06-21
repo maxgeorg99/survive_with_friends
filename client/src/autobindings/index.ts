@@ -64,6 +64,8 @@ import { InitAttackData } from "./init_attack_data_reducer.ts";
 export { InitAttackData };
 import { InitHealthRegenSystem } from "./init_health_regen_system_reducer.ts";
 export { InitHealthRegenSystem };
+import { LoadBuild } from "./load_build_reducer.ts";
+export { LoadBuild };
 import { PreSpawnMonsterWave } from "./pre_spawn_monster_wave_reducer.ts";
 export { PreSpawnMonsterWave };
 import { ProcessHealthRegen } from "./process_health_regen_reducer.ts";
@@ -72,6 +74,8 @@ import { RerollUpgrades } from "./reroll_upgrades_reducer.ts";
 export { RerollUpgrades };
 import { ResetWorld } from "./reset_world_reducer.ts";
 export { ResetWorld };
+import { SaveBuild } from "./save_build_reducer.ts";
+export { SaveBuild };
 import { ServerTriggerAttack } from "./server_trigger_attack_reducer.ts";
 export { ServerTriggerAttack };
 import { SetName } from "./set_name_reducer.ts";
@@ -246,6 +250,10 @@ import { PlayerTableHandle } from "./player_table.ts";
 export { PlayerTableHandle };
 import { PlayerScheduledAttacksTableHandle } from "./player_scheduled_attacks_table.ts";
 export { PlayerScheduledAttacksTableHandle };
+import { SavedAttacksTableHandle } from "./saved_attacks_table.ts";
+export { SavedAttacksTableHandle };
+import { SavedBuildTableHandle } from "./saved_build_table.ts";
+export { SavedBuildTableHandle };
 import { UpgradeOptionsTableHandle } from "./upgrade_options_table.ts";
 export { UpgradeOptionsTableHandle };
 import { VoidZoneSchedulerTableHandle } from "./void_zone_scheduler_table.ts";
@@ -380,6 +388,10 @@ import { PlayerClass } from "./player_class_type.ts";
 export { PlayerClass };
 import { PlayerScheduledAttack } from "./player_scheduled_attack_type.ts";
 export { PlayerScheduledAttack };
+import { SavedAttack } from "./saved_attack_type.ts";
+export { SavedAttack };
+import { SavedBuild } from "./saved_build_type.ts";
+export { SavedBuild };
 import { UpgradeOptionData } from "./upgrade_option_data_type.ts";
 export { UpgradeOptionData };
 import { UpgradeType } from "./upgrade_type_type.ts";
@@ -653,6 +665,16 @@ const REMOTE_MODULE = {
       rowType: PlayerScheduledAttack.getTypeScriptAlgebraicType(),
       primaryKey: "scheduledId",
     },
+    saved_attacks: {
+      tableName: "saved_attacks",
+      rowType: SavedAttack.getTypeScriptAlgebraicType(),
+      primaryKey: "savedAttackId",
+    },
+    saved_build: {
+      tableName: "saved_build",
+      rowType: SavedBuild.getTypeScriptAlgebraicType(),
+      primaryKey: "buildId",
+    },
     upgrade_options: {
       tableName: "upgrade_options",
       rowType: UpgradeOptionData.getTypeScriptAlgebraicType(),
@@ -739,6 +761,10 @@ const REMOTE_MODULE = {
       reducerName: "init_health_regen_system",
       argsType: InitHealthRegenSystem.getTypeScriptAlgebraicType(),
     },
+    load_build: {
+      reducerName: "load_build",
+      argsType: LoadBuild.getTypeScriptAlgebraicType(),
+    },
     pre_spawn_monster_wave: {
       reducerName: "pre_spawn_monster_wave",
       argsType: PreSpawnMonsterWave.getTypeScriptAlgebraicType(),
@@ -754,6 +780,10 @@ const REMOTE_MODULE = {
     reset_world: {
       reducerName: "reset_world",
       argsType: ResetWorld.getTypeScriptAlgebraicType(),
+    },
+    save_build: {
+      reducerName: "save_build",
+      argsType: SaveBuild.getTypeScriptAlgebraicType(),
     },
     server_trigger_attack: {
       reducerName: "server_trigger_attack",
@@ -934,10 +964,12 @@ export type Reducer = never
 | { name: "HandleAttackBurstCooldown", args: HandleAttackBurstCooldown }
 | { name: "InitAttackData", args: InitAttackData }
 | { name: "InitHealthRegenSystem", args: InitHealthRegenSystem }
+| { name: "LoadBuild", args: LoadBuild }
 | { name: "PreSpawnMonsterWave", args: PreSpawnMonsterWave }
 | { name: "ProcessHealthRegen", args: ProcessHealthRegen }
 | { name: "RerollUpgrades", args: RerollUpgrades }
 | { name: "ResetWorld", args: ResetWorld }
+| { name: "SaveBuild", args: SaveBuild }
 | { name: "ServerTriggerAttack", args: ServerTriggerAttack }
 | { name: "SetName", args: SetName }
 | { name: "SetPlayerPvpMode", args: SetPlayerPvpMode }
@@ -1201,6 +1233,18 @@ export class RemoteReducers {
     this.connection.offReducer("init_health_regen_system", callback);
   }
 
+  loadBuild() {
+    this.connection.callReducer("load_build", new Uint8Array(0), this.setCallReducerFlags.loadBuildFlags);
+  }
+
+  onLoadBuild(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.onReducer("load_build", callback);
+  }
+
+  removeOnLoadBuild(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.offReducer("load_build", callback);
+  }
+
   preSpawnMonsterWave(timer: MonsterSpawnTimer) {
     const __args = { timer };
     let __writer = new BinaryWriter(1024);
@@ -1259,6 +1303,18 @@ export class RemoteReducers {
 
   removeOnResetWorld(callback: (ctx: ReducerEventContext) => void) {
     this.connection.offReducer("reset_world", callback);
+  }
+
+  saveBuild() {
+    this.connection.callReducer("save_build", new Uint8Array(0), this.setCallReducerFlags.saveBuildFlags);
+  }
+
+  onSaveBuild(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.onReducer("save_build", callback);
+  }
+
+  removeOnSaveBuild(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.offReducer("save_build", callback);
   }
 
   serverTriggerAttack(attack: PlayerScheduledAttack) {
@@ -1859,6 +1915,11 @@ export class SetReducerFlags {
     this.initHealthRegenSystemFlags = flags;
   }
 
+  loadBuildFlags: CallReducerFlags = 'FullUpdate';
+  loadBuild(flags: CallReducerFlags) {
+    this.loadBuildFlags = flags;
+  }
+
   preSpawnMonsterWaveFlags: CallReducerFlags = 'FullUpdate';
   preSpawnMonsterWave(flags: CallReducerFlags) {
     this.preSpawnMonsterWaveFlags = flags;
@@ -1877,6 +1938,11 @@ export class SetReducerFlags {
   resetWorldFlags: CallReducerFlags = 'FullUpdate';
   resetWorld(flags: CallReducerFlags) {
     this.resetWorldFlags = flags;
+  }
+
+  saveBuildFlags: CallReducerFlags = 'FullUpdate';
+  saveBuild(flags: CallReducerFlags) {
+    this.saveBuildFlags = flags;
   }
 
   serverTriggerAttackFlags: CallReducerFlags = 'FullUpdate';
@@ -2260,6 +2326,14 @@ export class RemoteTables {
 
   get playerScheduledAttacks(): PlayerScheduledAttacksTableHandle {
     return new PlayerScheduledAttacksTableHandle(this.connection.clientCache.getOrCreateTable<PlayerScheduledAttack>(REMOTE_MODULE.tables.player_scheduled_attacks));
+  }
+
+  get savedAttacks(): SavedAttacksTableHandle {
+    return new SavedAttacksTableHandle(this.connection.clientCache.getOrCreateTable<SavedAttack>(REMOTE_MODULE.tables.saved_attacks));
+  }
+
+  get savedBuild(): SavedBuildTableHandle {
+    return new SavedBuildTableHandle(this.connection.clientCache.getOrCreateTable<SavedBuild>(REMOTE_MODULE.tables.saved_build));
   }
 
   get upgradeOptions(): UpgradeOptionsTableHandle {

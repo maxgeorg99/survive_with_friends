@@ -30,6 +30,8 @@ export class DebugManager {
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR).on('down', this.setBossTypeEnder, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FIVE).on('down', this.setBossTypeAgna, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.H).on('down', this.setSuperHealth, this);
+            this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S).on('down', this.saveBuild, this);
+            this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.O).on('down', this.loadBuild, this);
             console.log("DebugManager: Debug keys initialized.");
         } else {
             console.warn("DebugManager: Keyboard input not available on scene. Debug keys not initialized.");
@@ -48,6 +50,8 @@ export class DebugManager {
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.FOUR);
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.FIVE);
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.H);
+            this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.S);
+            this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.O);
         }
     }
 
@@ -135,6 +139,24 @@ export class DebugManager {
             this.spacetimedb.sdkConnection.reducers.debugSetSuperHealth();
         } else {
             console.warn("DebugManager: SpacetimeDB connection not available for setting super health.");
+        }
+    }
+
+    private saveBuild(): void {
+        if (this.spacetimedb && this.spacetimedb.sdkConnection) {
+            console.log("DebugManager: Saving current player build...");
+            this.spacetimedb.sdkConnection.reducers.saveBuild();
+        } else {
+            console.warn("DebugManager: SpacetimeDB connection not available for saving build.");
+        }
+    }
+
+    private loadBuild(): void {
+        if (this.spacetimedb && this.spacetimedb.sdkConnection) {
+            console.log("DebugManager: Loading saved player build...");
+            this.spacetimedb.sdkConnection.reducers.loadBuild();
+        } else {
+            console.warn("DebugManager: SpacetimeDB connection not available for loading build.");
         }
     }
 } 

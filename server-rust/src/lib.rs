@@ -25,6 +25,7 @@ pub mod monster_attacks_def;
 pub mod core_game;
 pub mod upgrades_def;
 pub mod structure_defs;
+pub mod cheats_def;
 
 // Re-export public items from modules
 pub use config_def::*;
@@ -50,6 +51,7 @@ pub use monster_attacks_def::*;
 pub use core_game::*;
 pub use upgrades_def::*;
 pub use structure_defs::*;
+pub use cheats_def::*;
 
 // --- Types ---
 #[derive(SpacetimeType, Clone, Debug, PartialEq)]
