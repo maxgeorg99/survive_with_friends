@@ -100,7 +100,12 @@ export class AttackManager {
         if (attack.playerId === this.localPlayerId) {
             const soundManager = (window as any).soundManager;
             if (soundManager) {
-                soundManager.playSound('attack_fire', 0.2); // Quiet sound as requested
+                // Play special thunder sound for Thunder Horn attacks
+                if (attack.attackType.tag === 'ThunderHorn') {
+                    soundManager.playSound('thunder', 0.6);
+                } else {
+                    soundManager.playSound('attack_fire', 0.2); // Quiet sound as requested
+                }
             }
         }
         
@@ -167,7 +172,7 @@ export class AttackManager {
             graphic.setDepth(1.4);
             
             // Create sprite based on attack type
-            const sprite = this.createAttackSprite(attackType, entity.position.x, entity.position.y);
+            const sprite = this.createAttackSprite(attackType, entity.position.x, entity.position.y, attack.radius);
             
             // Setup direction vector based on entity direction
             const direction = new Phaser.Math.Vector2(entity.direction.x, entity.direction.y);
@@ -217,7 +222,7 @@ export class AttackManager {
         this.updateAttackGraphic(attackGraphicData);
     }
 
-    private createAttackSprite(attackType: string, x: number, y: number): Phaser.GameObjects.Sprite | null {
+    private createAttackSprite(attackType: string, x: number, y: number, radius: number = 50): Phaser.GameObjects.Sprite | null {
         // Create a sprite based on attack type
         let spriteKey = '';
         
@@ -234,6 +239,9 @@ export class AttackManager {
             case 'Shield':
                 spriteKey = 'attack_shield';
                 break;
+            case 'ThunderHorn':
+                spriteKey = 'attack_horn';
+                break;
             default:
                 console.error(`Unknown attack type: ${attackType}`);
                 return null;
@@ -243,9 +251,60 @@ export class AttackManager {
         const sprite = this.scene.add.sprite(x, y, spriteKey);
         sprite.setDepth(1.5); // Set depth higher than circle but below UI
         
+        // For Thunder Horn, set alpha to 0 for debugging but create special VFX
+        if (attackType === 'ThunderHorn') {
+            sprite.setAlpha(0); // Hidden for debugging as requested
+            this.createThunderHornVFX(x, y, radius);
+        }
+        
         // The scale will be set in updateAttackGraphic based on radius comparison
         
         return sprite;
+    }
+
+    private createThunderHornVFX(x: number, y: number, radius: number): void {
+        // Create lightning sprite VFX
+        const lightningSprite = this.scene.add.sprite(x, y, 'attack_lightning');
+        lightningSprite.setDepth(2.0); // Higher than normal attacks
+        lightningSprite.setScale(1.5); // Make it bigger for impact
+        
+        // Create electrical blue circle
+        const vfxGraphics = this.scene.add.graphics();
+        vfxGraphics.setDepth(1.9); // Just below lightning sprite
+        
+        // Draw electrical blue circle using the actual attack radius
+        const electricBlue = 0x00BFFF; // Deep sky blue color
+        vfxGraphics.fillStyle(electricBlue, 0.7);
+        vfxGraphics.fillCircle(x, y, radius); // Use actual attack radius
+        
+        // Add a brighter border
+        vfxGraphics.lineStyle(3, 0x87CEEB, 0.9); // Sky blue border
+        vfxGraphics.strokeCircle(x, y, radius); // Use actual attack radius
+        
+        // Fade out lightning sprite very quickly
+        this.scene.tweens.add({
+            targets: lightningSprite,
+            alpha: 0,
+            scale: 2.0, // Grow while fading
+            duration: 150, // Very fast fade
+            ease: 'Power2.easeOut',
+            onComplete: () => {
+                lightningSprite.destroy();
+            }
+        });
+        
+        // Fade out circle very quickly
+        this.scene.tweens.add({
+            targets: vfxGraphics,
+            alpha: 0,
+            duration: 200, // Slightly longer than lightning
+            ease: 'Power2.easeOut',
+            onComplete: () => {
+                vfxGraphics.destroy();
+            }
+        });
+        
+        console.log(`Thunder Horn VFX created at (${x}, ${y}) with radius ${radius}`);
     }
 
     private updateAttackGraphic(attackGraphicData: AttackGraphicData) {
@@ -279,8 +338,10 @@ export class AttackManager {
             sprite.x = attackGraphicData.predictedPosition.x;
             sprite.y = attackGraphicData.predictedPosition.y;
             
-            // Apply alpha transparency based on PvP status
-            sprite.setAlpha(attackGraphicData.alpha);
+            // Apply alpha transparency based on PvP status (except Thunder Horn which stays at 0)
+            if (attackGraphicData.attackType !== 'ThunderHorn') {
+                sprite.setAlpha(attackGraphicData.alpha);
+            }
             
             // Calculate scale based on radius compared to base radius
             // Only apply if baseRadius is not zero to avoid division by zero
@@ -314,6 +375,12 @@ export class AttackManager {
                     // Shield just draws normally
                     sprite.setRotation(0); // Reset rotation
                     sprite.setFlipX(false); // Reset flip
+                    break;
+                    
+                case 'ThunderHorn':
+                    // Thunder Horn stays at position, no rotation needed
+                    sprite.setRotation(0);
+                    sprite.setFlipX(false);
                     break;
                     
                 default:
@@ -393,6 +460,10 @@ export class AttackManager {
                     // Draw at predicted position
                     this.updateAttackGraphic(attackGraphicData);
                 }
+            } else if (attackGraphicData.attackType === 'ThunderHorn') {
+                // Thunder Horn stays stationary - no movement needed
+                // Just update the graphic in case other properties changed
+                this.updateAttackGraphic(attackGraphicData);
             } else {
                 // Normal projectile with directional movement
                 if (attackGraphicData.direction.length() > 0) {

@@ -59,12 +59,14 @@ export default class TitleScene extends Phaser.Scene {
         this.load.image('player_rogue', '/assets/class_rogue_1.png');
         this.load.image('player_mage', '/assets/class_mage_1.png');
         this.load.image('player_paladin', '/assets/class_paladin_1.png');
+        this.load.image('player_valkyrie', '/assets/class_valkyrie_1.png');
         
         // Preload class selection icons
         this.load.image('fighter_icon', '/assets/attack_sword.png');
         this.load.image('rogue_icon', '/assets/attack_knife.png');
         this.load.image('mage_icon', '/assets/attack_wand.png');
         this.load.image('paladin_icon', '/assets/attack_shield.png');
+        this.load.image('valkyrie_icon', '/assets/attack_horn.png');
         
         // Preload upgrade UI assets to eliminate delays when leveling up
         this.load.image('card_blank', '/assets/card_blank.png');
@@ -124,6 +126,14 @@ export default class TitleScene extends Phaser.Scene {
         this.load.image('void_scythe', '/assets/void_scythe.png');
         this.load.image('void_bolt', '/assets/void_bolt.png');
         
+        // Load attack assets for seamless gameplay
+        this.load.image('attack_sword', '/assets/attack_sword.png');
+        this.load.image('attack_wand', '/assets/attack_wand.png');
+        this.load.image('attack_knife', '/assets/attack_knife.png');
+        this.load.image('attack_shield', '/assets/attack_shield.png');
+        this.load.image('attack_horn', '/assets/attack_horn.png');
+        this.load.image('attack_lightning', '/assets/attack_lightning.png');
+        
         console.log("TitleScene: Preloading ALL game assets for completely seamless gameplay experience");
     }
 
@@ -164,7 +174,7 @@ export default class TitleScene extends Phaser.Scene {
                 this.load.audio('boss_transform', '/assets/sounds/boss_transform.mp3');
                 this.load.audio('voice_boss_2', '/assets/sounds/voice_boss_2.mp3');
                 this.load.audio('voice_transform', '/assets/sounds/voice_transform.mp3');
-                        this.load.audio('voice_agna_1', '/assets/sounds/narrator_agna_1.mp3');
+                this.load.audio('voice_agna_1', '/assets/sounds/narrator_agna_1.mp3');
         this.load.audio('voice_agna_2', '/assets/sounds/narrator_agna_2.mp3');
         this.load.audio('agna_phase_2', '/assets/sounds/agna_phase_2.mp3');
         this.load.audio('agna_burned', '/assets/sounds/agna_burned.mp3');
@@ -198,6 +208,7 @@ export default class TitleScene extends Phaser.Scene {
                 this.load.audio('monster_death', '/assets/sounds/monster_death.mp3');
                 this.load.audio('attack_soft', '/assets/sounds/attack_soft.mp3');
                 this.load.audio('attack_fire', '/assets/sounds/attack_fire.mp3');
+                this.load.audio('thunder', '/assets/sounds/thunder.mp3');
                 this.load.audio('alert_event', '/assets/sounds/alert_event.mp3');
                 
                 // Add error handling for missing files

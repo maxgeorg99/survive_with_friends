@@ -177,6 +177,22 @@ pub fn init_attack_data(ctx: &ReducerContext) {
         armor_piercing: 10,       
     });
 
+    // Thunder Horn - long range instant strike
+    ctx.db.attack_data().insert(AttackData {
+        attack_id: 5,
+        attack_type: AttackType::ThunderHorn,
+        name: "Thunder Horn".to_string(),
+        cooldown: 3000,          // Long cooldown (3 seconds)
+        duration: 200,           // Very short duration (0.2 seconds)
+        projectiles: 1,          // Single target initially
+        fire_delay: 0,           // Instant burst
+        speed: 0.0,              // 0 speed - instant strike at target location
+        piercing: true,         // Does not pierce
+        radius: 48.0,            // Moderate radius
+        damage: 10,               // Big damage
+        armor_piercing: 15,      // Good armor penetration
+    });
+
     log::info!("Attack data initialized successfully.");
 }
 
@@ -225,11 +241,25 @@ fn trigger_attack_projectile(ctx: &ReducerContext, player_id: u32, attack_type: 
     // Get attack direction using AttackUtils, passing the upgraded projectiles count
     let direction = crate::attack_utils::determine_attack_direction(ctx, player_id, &attack_type, id_within_burst, parameter_u, parameter_i, scheduled_attack.projectiles);
     
+    // Special handling for Thunder Horn - place projectile directly at target location
+    let (projectile_position, final_direction) = if attack_type == AttackType::ThunderHorn {
+        // For Thunder Horn, find target and place attack there instantly
+        if let Some(target_position) = crate::attack_utils::find_random_target_in_radius(ctx, DbVector2::new(player_x, player_y), player_id, crate::attack_utils::THUNDER_HORN_TARGET_RADIUS) {
+            (target_position, direction)
+        } else {
+            // If no target, place at player position
+            (DbVector2::new(player_x, player_y), direction)
+        }
+    } else {
+        // For all other attacks, start at player position
+        (DbVector2::new(player_x, player_y), direction)
+    };
+    
     // Create a new entity for the projectile and get its ID
     let projectile_entity = ctx.db.entity().insert(Entity {
         entity_id: 0,
-        position: DbVector2::new(player_x, player_y),
-        direction,
+        position: projectile_position,
+        direction: final_direction,
         radius: scheduled_attack.radius,
         waypoint: DbVector2::new(0.0, 0.0),
         has_waypoint: false,
@@ -513,6 +543,9 @@ pub fn process_attack_movements(ctx: &ReducerContext) {
                 player_x + offset_x,
                 player_y + offset_y,
             );
+        } else if updated_active_attack.attack_type == AttackType::ThunderHorn {
+            // Thunder Horn stays at its initial position (0 speed instant strike)
+            // No position updates needed - it just stays where it was placed
         } else {
             // Regular projectile movement based on direction and speed
             let move_speed = attack_data.speed;

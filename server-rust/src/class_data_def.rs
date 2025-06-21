@@ -80,5 +80,15 @@ pub fn initialize_class_data(ctx: &ReducerContext) {
         starting_attack_type: AttackType::Shield,
     });
     
+    // Insert Valkyrie class data
+    ctx.db.class_data().insert(ClassData {
+        class_id: PlayerClass::Valkyrie as u32,
+        player_class: PlayerClass::Valkyrie,
+        max_hp: 100,
+        armor: 0,
+        speed: 200.0,
+        starting_attack_type: AttackType::ThunderHorn,
+    });
+    
     log::info!("Class data initialization complete.");
 }

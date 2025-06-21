@@ -2,6 +2,9 @@ use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, ra
 use crate::{AttackType, DbVector2, PlayerScheduledAttack, MonsterBoid, attacks_def::find_attack_data_by_type, monsters_boid, player};
 use std::f64::consts::PI;
 
+// Thunder Horn attack configuration constants
+pub const THUNDER_HORN_TARGET_RADIUS: f32 = 700.0;  // Maximum range for Thunder Horn targeting
+
 // Helper function to get parameter_u for an attack
 pub fn get_parameter_u(ctx: &ReducerContext, attack: &PlayerScheduledAttack) -> u32 {
     let attack_type = &attack.attack_type;
@@ -25,6 +28,11 @@ pub fn get_parameter_u(ctx: &ReducerContext, attack: &PlayerScheduledAttack) -> 
             let mut rng = ctx.rng();
             let angle = rng.gen_range(0.0..360.0);
             angle as u32
+        }
+        AttackType::ThunderHorn => {
+            // Store the target position in parameter_u and parameter_i
+            // We'll pack the position coordinates into these parameters
+            0 // Position will be determined in determine_attack_direction
         }
         _ => 0,
     }
@@ -82,6 +90,19 @@ pub fn determine_attack_direction(
         AttackType::Shield => {
             // Shield attacks have rotation motion
             DbVector2::new(0.0, 0.0)
+        }
+        AttackType::ThunderHorn => {
+            // Thunder Horn targets a random enemy within a large radius
+            if let Some(target_position) = find_random_target_in_radius(ctx, player.position, player_id, THUNDER_HORN_TARGET_RADIUS) {
+                // For instant attacks, we don't need a direction - the entity position will be set directly to target
+                // But we still need to return a normalized direction vector
+                let dx = target_position.x - player.position.x;
+                let dy = target_position.y - player.position.y;
+                DbVector2::new(dx, dy).normalize()
+            } else {
+                // If no target found, default direction
+                DbVector2::new(1.0, 0.0)
+            }
         }
     }
 }
@@ -162,4 +183,63 @@ pub fn find_nearest_target(ctx: &ReducerContext, attacker_position: DbVector2, a
     }
 
     nearest_target_position
+}
+
+// Find a random target (monster or player) within a given radius - used for Thunder Horn targeting
+pub fn find_random_target_in_radius(ctx: &ReducerContext, attacker_position: DbVector2, attacker_player_id: u32, max_radius: f32) -> Option<DbVector2> {
+    let mut targets_in_range: Vec<DbVector2> = Vec::new();
+    let max_radius_squared = max_radius * max_radius;
+
+    // Check all monsters within radius
+    for boid in ctx.db.monsters_boid().iter() {
+        let dx = boid.position.x - attacker_position.x;
+        let dy = boid.position.y - attacker_position.y;
+        let distance_squared = dx * dx + dy * dy;
+
+        if distance_squared <= max_radius_squared {
+            targets_in_range.push(boid.position);
+        }
+    }
+
+    // Get the collision cache to access cached player data
+    let cache = crate::monsters_def::get_collision_cache();
+    
+    // Get the attacking player's PvP status from cache
+    let attacker_pvp_enabled = if let Some(&cache_idx) = cache.player.player_id_to_cache_index.get(&attacker_player_id) {
+        cache.player.pvp_player[cache_idx as usize]
+    } else {
+        false // Default to false if player not found in cache
+    };
+
+    // Check all other cached players (excluding the attacker) within radius - only if attacking player has PvP enabled
+    if attacker_pvp_enabled {
+        for pid in 0..cache.player.cached_count_players as usize {
+            let player_id = cache.player.keys_player[pid];
+            
+            // Skip the attacking player
+            if player_id == attacker_player_id {
+                continue;
+            }
+
+            let player_x = cache.player.pos_x_player[pid];
+            let player_y = cache.player.pos_y_player[pid];
+            let dx = player_x - attacker_position.x;
+            let dy = player_y - attacker_position.y;
+            let distance_squared = dx * dx + dy * dy;
+
+            if distance_squared <= max_radius_squared {
+                targets_in_range.push(DbVector2::new(player_x, player_y));
+            }
+        }
+    }
+
+    // If no targets found, return None
+    if targets_in_range.is_empty() {
+        return None;
+    }
+
+    // Choose a random target from the list
+    let mut rng = ctx.rng();
+    let random_index = rng.gen_range(0..targets_in_range.len());
+    Some(targets_in_range[random_index])
 } 

@@ -1,6 +1,9 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, ScheduleAt, SpacetimeType, rand::Rng};
-use crate::{AttackType, Player, account, attack_data, active_attacks, entity, game_state, monsters, monsters_boid, gems, monster_spawners, boss_spawn_timer, monster_spawn_timer, monster_hit_cleanup, active_attack_cleanup, attack_burst_cooldowns, player_scheduled_attacks, monster_damage, player};
+use crate::{AttackType, Player, account, attack_data, active_attacks, entity, game_state, monsters, monsters_boid, gems, monster_spawners, boss_spawn_timer, monster_spawn_timer, monster_hit_cleanup, active_attack_cleanup, attack_burst_cooldowns, player_scheduled_attacks, monster_damage, player, WORLD_CELL_SIZE};
 use std::time::Duration;
+
+// Maximum radius limit to prevent breaking spatial hash collision system
+const MAX_RADIUS_LIMIT: f32 = WORLD_CELL_SIZE as f32;
 
 // Upgrade type enum
 #[derive(SpacetimeType, Clone, Debug, PartialEq)]
@@ -13,6 +16,7 @@ pub enum UpgradeType {
     AttackWand,
     AttackKnives,
     AttackShield,
+    AttackThunderHorn,
 }
 
 // Attack stat enum for upgrades
@@ -94,6 +98,7 @@ pub fn draw_upgrade_options(ctx: &ReducerContext, player_id: u32) {
         UpgradeType::AttackWand,
         UpgradeType::AttackKnives,
         UpgradeType::AttackShield,
+        UpgradeType::AttackThunderHorn,
     ];
     
     // Shuffle the list randomly using Fisher-Yates algorithm
@@ -126,7 +131,8 @@ fn create_upgrade_option_data(ctx: &ReducerContext, upgrade_type: UpgradeType, p
     // Check if this is an attack upgrade
     let is_attack_upgrade = match upgrade_type {
         UpgradeType::AttackSword | UpgradeType::AttackWand | 
-        UpgradeType::AttackKnives | UpgradeType::AttackShield => true,
+        UpgradeType::AttackKnives | UpgradeType::AttackShield |
+        UpgradeType::AttackThunderHorn => true,
         _ => false,
     };
 
@@ -244,7 +250,7 @@ fn create_upgrade_option_data(ctx: &ReducerContext, upgrade_type: UpgradeType, p
                 (AttackStat::Projectiles, 1),
                 (AttackStat::Speed, 100),
             ];
-            generate_attack_upgrade(ctx, 1, possible_stats, upgrade_type)
+            generate_attack_upgrade(ctx, player_id, 1, possible_stats, upgrade_type)
         }
         UpgradeType::AttackWand => {
             // Generate wand-specific stat upgrade
@@ -254,7 +260,7 @@ fn create_upgrade_option_data(ctx: &ReducerContext, upgrade_type: UpgradeType, p
                 (AttackStat::Projectiles, 1),
                 (AttackStat::Speed, 100),
             ];
-            generate_attack_upgrade(ctx, 2, possible_stats, upgrade_type)
+            generate_attack_upgrade(ctx, player_id, 2, possible_stats, upgrade_type)
         }
         UpgradeType::AttackKnives => {
             // Generate knives-specific stat upgrade
@@ -265,7 +271,7 @@ fn create_upgrade_option_data(ctx: &ReducerContext, upgrade_type: UpgradeType, p
                 (AttackStat::Speed, 200),
                 (AttackStat::Radius, 3),
             ];
-            generate_attack_upgrade(ctx, 3, possible_stats, upgrade_type)
+            generate_attack_upgrade(ctx, player_id, 3, possible_stats, upgrade_type)
         }
         UpgradeType::AttackShield => {
             // Generate shield-specific stat upgrade
@@ -276,24 +282,55 @@ fn create_upgrade_option_data(ctx: &ReducerContext, upgrade_type: UpgradeType, p
                 (AttackStat::Projectiles, 1),
                 (AttackStat::Speed, 45),
             ];
-            generate_attack_upgrade(ctx, 4, possible_stats, upgrade_type)
+            generate_attack_upgrade(ctx, player_id, 4, possible_stats, upgrade_type)
+        }
+        UpgradeType::AttackThunderHorn => {
+            // Generate thunder horn-specific stat upgrade
+            let possible_stats = vec![
+                (AttackStat::Damage, 10),            // High damage increase
+                (AttackStat::CooldownReduction, 30), // Significant cooldown reduction
+                (AttackStat::Projectiles, 1),        // Count upgrade (more strikes)
+                (AttackStat::Radius, 12),            // Size upgrade (larger area)
+            ];
+            generate_attack_upgrade(ctx, player_id, 5, possible_stats, upgrade_type)
         }
     }
 }
 
 // Helper method to generate attack upgrades with specific stat improvements
-fn generate_attack_upgrade(ctx: &ReducerContext, attack_type: u32, possible_stats: Vec<(AttackStat, u32)>, upgrade_type: UpgradeType) -> UpgradeOptionData {
-    // Choose a random stat to upgrade from the possible stats for this attack type
+fn generate_attack_upgrade(ctx: &ReducerContext, player_id: u32, attack_type: u32, possible_stats: Vec<(AttackStat, u32)>, upgrade_type: UpgradeType) -> UpgradeOptionData {
+    // Convert attack_type to AttackType enum for filtering
+    let attack_type_enum = match attack_type {
+        1 => AttackType::Sword,
+        2 => AttackType::Wand,
+        3 => AttackType::Knives,
+        4 => AttackType::Shield,
+        5 => AttackType::ThunderHorn,
+        _ => panic!("Invalid attack type: {}", attack_type),
+    };
+    
+    // Filter out radius upgrades if the attack is already at the limit
+    let filtered_stats = filter_stats_by_radius_limit(ctx, player_id, attack_type_enum.clone(), possible_stats);
+    
+    // If no stats remain after filtering, fallback to damage upgrade
+    let final_stats = if filtered_stats.is_empty() {
+        log::warn!("No valid stats remain for attack {:?} after filtering, falling back to damage upgrade", attack_type_enum);
+        vec![(AttackStat::Damage, 1)] // Minimal damage upgrade as fallback
+    } else {
+        filtered_stats
+    };
+    
+    // Choose a random stat to upgrade from the filtered possible stats
     let mut rng = ctx.rng();
-    let chosen_index = rng.gen_range(0..possible_stats.len());
-    let (chosen_stat, upgrade_value) = &possible_stats[chosen_index];
+    let chosen_index = rng.gen_range(0..final_stats.len());
+    let (chosen_stat, upgrade_value) = &final_stats[chosen_index];
     
     log::info!("Generated attack upgrade: {:?}, Stat: {:?}, Value: {}", upgrade_type, chosen_stat, upgrade_value);
     
     // Create base upgrade data with attack type and is_attack_upgrade flag
     let mut upgrade_data = UpgradeOptionData {
         upgrade_id: 0,
-        player_id: 0,
+        player_id,
         upgrade_index: 0,
         upgrade_type,
         is_attack_upgrade: true,
@@ -616,10 +653,20 @@ fn apply_player_upgrade(ctx: &ReducerContext, upgrade: &ChosenUpgradeData) {
         }
         
         if upgrade.radius > 0 {
-            // Attack radius upgrade
-            modified_attack.radius += upgrade.radius as f32;
+            // Attack radius upgrade - check against maximum limit
+            let new_radius = modified_attack.radius + upgrade.radius as f32;
+            if new_radius > MAX_RADIUS_LIMIT {
+                // Cap the radius at the maximum limit
+                let capped_radius = MAX_RADIUS_LIMIT;
+                let actual_increase = capped_radius - modified_attack.radius;
+                modified_attack.radius = capped_radius;
+                log::info!("Capped attack {:?} radius increase: requested +{}, actual +{}, final radius: {} (limit: {})", 
+                    attack_type, upgrade.radius, actual_increase, modified_attack.radius, MAX_RADIUS_LIMIT);
+            } else {
+                modified_attack.radius = new_radius;
+                log::info!("Increased attack {:?} radius by {} to {}", attack_type, upgrade.radius, modified_attack.radius);
+            }
             update_scheduled_attack = true;
-            log::info!("Increased attack {:?} radius by {} to {}", attack_type, upgrade.radius, modified_attack.radius);
         }
         
         // Handle cooldown reduction by updating the schedule interval
@@ -677,6 +724,7 @@ fn get_attack_type_from_upgrade(upgrade_type: &UpgradeType) -> AttackType {
         UpgradeType::AttackWand => AttackType::Wand,
         UpgradeType::AttackKnives => AttackType::Knives,
         UpgradeType::AttackShield => AttackType::Shield,
+        UpgradeType::AttackThunderHorn => AttackType::ThunderHorn,
         _ => panic!("Cannot convert upgrade type {:?} to attack type", upgrade_type),
     }
 }
@@ -751,4 +799,27 @@ pub fn cleanup_player_upgrade_options(ctx: &ReducerContext, player_id: u32) {
     }
     
     log::info!("Deleted {} upgrade options for player {}", upgrade_options_to_delete.len(), player_id);
+}
+
+// Helper function to check if an attack's current radius is at or near the limit
+fn is_attack_radius_at_limit(ctx: &ReducerContext, player_id: u32, attack_type: AttackType) -> bool {
+    // Find the player's current scheduled attack for this type
+    for attack in ctx.db.player_scheduled_attacks().player_id().filter(&player_id) {
+        if attack.attack_type == attack_type {
+            // Check if current radius is at or above 90% of the limit to avoid offering useless upgrades
+            let radius_threshold = MAX_RADIUS_LIMIT * 0.9;
+            return attack.radius >= radius_threshold;
+        }
+    }
+    false
+}
+
+// Helper function to filter radius upgrades from possible stats if at limit
+fn filter_stats_by_radius_limit(ctx: &ReducerContext, player_id: u32, attack_type: AttackType, mut possible_stats: Vec<(AttackStat, u32)>) -> Vec<(AttackStat, u32)> {
+    if is_attack_radius_at_limit(ctx, player_id, attack_type.clone()) {
+        // Remove radius upgrades from possible stats
+        possible_stats.retain(|(stat, _)| !matches!(stat, AttackStat::Radius));
+        log::info!("Player {} attack {:?} radius at limit, filtered out radius upgrades", player_id, attack_type);
+    }
+    possible_stats
 } 

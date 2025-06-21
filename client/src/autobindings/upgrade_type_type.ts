@@ -43,6 +43,7 @@ export namespace UpgradeType {
   export type AttackWand = { tag: "AttackWand" };
   export type AttackKnives = { tag: "AttackKnives" };
   export type AttackShield = { tag: "AttackShield" };
+  export type AttackThunderHorn = { tag: "AttackThunderHorn" };
 
   // Helper functions for constructing each variant of the tagged union.
   // ```
@@ -58,6 +59,7 @@ export namespace UpgradeType {
   export const AttackWand = { tag: "AttackWand" };
   export const AttackKnives = { tag: "AttackKnives" };
   export const AttackShield = { tag: "AttackShield" };
+  export const AttackThunderHorn = { tag: "AttackThunderHorn" };
 
   export function getTypeScriptAlgebraicType(): AlgebraicType {
     return AlgebraicType.createSumType([
@@ -69,6 +71,7 @@ export namespace UpgradeType {
       new SumTypeVariant("AttackWand", AlgebraicType.createProductType([])),
       new SumTypeVariant("AttackKnives", AlgebraicType.createProductType([])),
       new SumTypeVariant("AttackShield", AlgebraicType.createProductType([])),
+      new SumTypeVariant("AttackThunderHorn", AlgebraicType.createProductType([])),
     ]);
   }
 
@@ -83,7 +86,7 @@ export namespace UpgradeType {
 }
 
 // The tagged union or sum type for the algebraic type `UpgradeType`.
-export type UpgradeType = UpgradeType.MaxHp | UpgradeType.HpRegen | UpgradeType.Speed | UpgradeType.Armor | UpgradeType.AttackSword | UpgradeType.AttackWand | UpgradeType.AttackKnives | UpgradeType.AttackShield;
+export type UpgradeType = UpgradeType.MaxHp | UpgradeType.HpRegen | UpgradeType.Speed | UpgradeType.Armor | UpgradeType.AttackSword | UpgradeType.AttackWand | UpgradeType.AttackKnives | UpgradeType.AttackShield | UpgradeType.AttackThunderHorn;
 
 export default UpgradeType;
 

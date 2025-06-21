@@ -72,7 +72,8 @@ const CLASS_ASSET_KEYS: Record<string, string> = {
     "Fighter": 'player_fighter',
     "Rogue": 'player_rogue',
     "Mage": 'player_mage',
-    "Paladin": 'player_paladin'
+    "Paladin": 'player_paladin',
+    "Valkyrie": 'player_valkyrie'
 };
 
 export default class GameScene extends Phaser.Scene {
@@ -198,6 +199,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('player_rogue', '/assets/class_rogue_1.png');
         this.load.image('player_mage', '/assets/class_mage_1.png');
         this.load.image('player_paladin', '/assets/class_paladin_1.png');
+        this.load.image('player_valkyrie', '/assets/class_valkyrie_1.png');
         this.load.image(GRASS_ASSET_KEY, '/assets/grass.png');
         this.load.image(SHADOW_ASSET_KEY, '/assets/shadow.png');
         
@@ -237,6 +239,8 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('attack_wand', '/assets/attack_wand.png');
         this.load.image('attack_knife', '/assets/attack_knife.png');
         this.load.image('attack_shield', '/assets/attack_shield.png');
+        this.load.image('attack_horn', '/assets/attack_horn.png');
+        this.load.image('attack_lightning', '/assets/attack_lightning.png');
         
         // Load monster attack assets
         this.load.image('monster_attack_firebolt', '/assets/monster_attack_firebolt.png');
@@ -251,6 +255,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('rogue_icon', '/assets/attack_knife.png');
         this.load.image('mage_icon', '/assets/attack_wand.png');
         this.load.image('paladin_icon', '/assets/attack_shield.png');
+        this.load.image('valkyrie_icon', '/assets/attack_horn.png');
         
         // Load upgrade assets
         this.load.image('card_blank', '/assets/card_blank.png');
@@ -329,6 +334,9 @@ export default class GameScene extends Phaser.Scene {
         this.load.audio('agna_ritual_fail', '/assets/sounds/agna_ritual_fail.mp3');
         this.load.audio('agna_laugh', '/assets/sounds/agna_laugh.mp3');
         
+        // Load thunder sound for Thunder Horn attack
+        this.load.audio('thunder', '/assets/sounds/thunder.mp3');
+        
         // Add error handling for file loading errors
         this.load.on('loaderror', (fileObj: any) => {
             console.error(`Error loading asset: ${fileObj.key} (${fileObj.url})`, fileObj);
@@ -342,6 +350,7 @@ export default class GameScene extends Phaser.Scene {
             console.log("player_rogue:", this.textures.exists('player_rogue'));
             console.log("player_mage:", this.textures.exists('player_mage'));
             console.log("player_paladin:", this.textures.exists('player_paladin'));
+            console.log("player_valkyrie:", this.textures.exists('player_valkyrie'));
             console.log("monster_rat:", this.textures.exists('monster_rat'));
             console.log("monster_slime:", this.textures.exists('monster_slime'));
             console.log("monster_orc:", this.textures.exists('monster_orc'));
@@ -1465,7 +1474,7 @@ export default class GameScene extends Phaser.Scene {
         // Handle case when playerClass is a number (enum value)
         if (typeof playerClass === 'number') {
             // Map numeric enum values to class names
-            const classNames = ["Fighter", "Rogue", "Mage", "Paladin"];
+            const classNames = ["Fighter", "Rogue", "Mage", "Paladin", "Valkyrie"];
             const className = classNames[playerClass] || "Fighter";
             const spriteKey = CLASS_ASSET_KEYS[className] || 'player_fighter';
             return spriteKey;

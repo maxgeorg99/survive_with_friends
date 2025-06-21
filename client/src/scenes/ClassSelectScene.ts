@@ -11,14 +11,16 @@ const CLASS_ID_MAP = {
     "Fighter": 0,
     "Rogue": 1,
     "Mage": 2,
-    "Paladin": 3
+    "Paladin": 3,
+    "Valkyrie": 4
 };
 
 const CLASS_ICON_MAP : Record<string, string> = {
     "fighter_icon": "attack_sword",
     "rogue_icon": "attack_knife",
     "mage_icon": "attack_wand",
-    "paladin_icon": "attack_shield"
+    "paladin_icon": "attack_shield",
+    "valkyrie_icon": "attack_horn"
 };
 
 // Constants for responsive design
@@ -48,6 +50,7 @@ export default class ClassSelectScene extends Phaser.Scene {
     private rogueButton!: HTMLButtonElement;
     private mageButton!: HTMLButtonElement;
     private paladinButton!: HTMLButtonElement;
+    private valkyrieButton!: HTMLButtonElement;
     private confirmButton!: HTMLButtonElement;
     private errorText!: Phaser.GameObjects.Text;
     private optionsUI!: OptionsUI;
@@ -74,7 +77,18 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.load.image('rogue_icon', '/assets/attack_knife.png');
         this.load.image('mage_icon', '/assets/attack_wand.png');
         this.load.image('paladin_icon', '/assets/attack_shield.png');
+        this.load.image('valkyrie_icon', '/assets/attack_horn.png');
         this.load.image('title_bg', '/assets/title_bg.png');
+        
+        // Load new Valkyrie class sprite
+        this.load.image('player_valkyrie', '/assets/class_valkyrie_1.png');
+        
+        // Load new Thunder Horn attack assets
+        this.load.image('attack_horn', '/assets/attack_horn.png');
+        this.load.image('attack_lightning', '/assets/attack_lightning.png');
+        
+        // Load thunder sound effect
+        this.load.audio('thunder', '/assets/sounds/thunder.mp3');
         
         // Load assets for options menu
         this.load.image('icon_music', '/assets/icon_music.png');
@@ -225,14 +239,15 @@ export default class ClassSelectScene extends Phaser.Scene {
         const existingContainer = document.getElementById('class-select-container');
         if (existingContainer) existingContainer.remove();
         
-        // Create class selection container
+        // Create class selection container with grid layout
         this.classButtonsContainer = document.createElement('div');
         this.classButtonsContainer.id = 'class-select-container';
         this.classButtonsContainer.style.position = 'absolute';
-        this.classButtonsContainer.style.display = 'flex';
-        this.classButtonsContainer.style.flexDirection = 'column';
+        this.classButtonsContainer.style.display = 'grid';
+        this.classButtonsContainer.style.gridTemplateColumns = '1fr 1fr'; // 2 columns
+        this.classButtonsContainer.style.gridGap = '20px';
+        this.classButtonsContainer.style.justifyItems = 'center';
         this.classButtonsContainer.style.alignItems = 'center';
-        this.classButtonsContainer.style.gap = '20px';
         document.body.appendChild(this.classButtonsContainer);
         
         const createClassButton = (name: string, classType: PlayerClass, iconName: string) => {
@@ -349,17 +364,28 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.rogueButton = createClassButton('Rogue', PlayerClass.Rogue as PlayerClass, 'rogue_icon');
         this.mageButton = createClassButton('Mage', PlayerClass.Mage as PlayerClass, 'mage_icon');
         this.paladinButton = createClassButton('Paladin', PlayerClass.Paladin as PlayerClass, 'paladin_icon');
+        this.valkyrieButton = createClassButton('Valkyrie', PlayerClass.Valkyrie as PlayerClass, 'valkyrie_icon');
         
-        // Add all buttons to container
+        // Add buttons to container in grid layout (2x3 grid with last row having 1 button centered)
         this.classButtonsContainer.appendChild(this.fighterButton);
         this.classButtonsContainer.appendChild(this.rogueButton);
         this.classButtonsContainer.appendChild(this.mageButton);
         this.classButtonsContainer.appendChild(this.paladinButton);
         
+        // For the 5th button (Valkyrie), we'll span it across both columns to center it
+        this.valkyrieButton.style.gridColumn = '1 / -1'; // Span across all columns
+        this.classButtonsContainer.appendChild(this.valkyrieButton);
+        
+        // Create a separate container for the confirm button to keep it below the grid
+        const confirmContainer = document.createElement('div');
+        confirmContainer.style.gridColumn = '1 / -1'; // Span across all columns
+        confirmContainer.style.display = 'flex';
+        confirmContainer.style.justifyContent = 'center';
+        confirmContainer.style.marginTop = '20px';
+        
         // Add confirm button
         this.confirmButton = document.createElement('button');
         this.confirmButton.textContent = 'Confirm Selection';
-        this.confirmButton.style.marginTop = '20px';
         this.confirmButton.style.padding = '12px 24px';
         this.confirmButton.style.backgroundColor = '#27ae60';
         this.confirmButton.style.color = 'white';
@@ -387,9 +413,10 @@ export default class ClassSelectScene extends Phaser.Scene {
             }
         });
         
-        this.classButtonsContainer.appendChild(this.confirmButton);
+        confirmContainer.appendChild(this.confirmButton);
+        this.classButtonsContainer.appendChild(confirmContainer);
         
-        console.log('ClassSelectScene: Class buttons created successfully');
+        console.log('ClassSelectScene: Class buttons created successfully with 2-column layout');
     }
     
     private positionHTMLElements() {
@@ -401,9 +428,9 @@ export default class ClassSelectScene extends Phaser.Scene {
         
         const { width, height } = this.scale;
         
-        // Position class select container
-        this.classButtonsContainer.style.left = `${width / 2 - 125}px`; // Centered
-        this.classButtonsContainer.style.top = `${height / 2 - 100}px`;
+        // Position class select container - adjust for grid layout
+        this.classButtonsContainer.style.left = `${width / 2 - 275}px`; // Adjusted for 2-column width
+        this.classButtonsContainer.style.top = `${height / 2 - 120}px`; // Adjusted for more compact layout
     }
     
     private handleResize() {
@@ -492,7 +519,7 @@ export default class ClassSelectScene extends Phaser.Scene {
     
     private selectClass(classType: PlayerClass, button: HTMLButtonElement) {
         // Reset all button styles
-        [this.fighterButton, this.rogueButton, this.mageButton, this.paladinButton].forEach(btn => {
+        [this.fighterButton, this.rogueButton, this.mageButton, this.paladinButton, this.valkyrieButton].forEach(btn => {
             if (btn) {
                 btn.style.backgroundColor = '#2c3e50';
                 btn.style.borderColor = '#34495e';
@@ -551,7 +578,7 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.confirmButton.disabled = true;
         this.confirmButton.textContent = 'Creating...';
         
-        [this.fighterButton, this.rogueButton, this.mageButton, this.paladinButton].forEach(btn => {
+        [this.fighterButton, this.rogueButton, this.mageButton, this.paladinButton, this.valkyrieButton].forEach(btn => {
             if (btn) btn.disabled = true;
         });
         
@@ -616,7 +643,7 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.confirmButton.disabled = false;
         this.confirmButton.textContent = 'Confirm Selection';
         
-        [this.fighterButton, this.rogueButton, this.mageButton, this.paladinButton].forEach(btn => {
+        [this.fighterButton, this.rogueButton, this.mageButton, this.paladinButton, this.valkyrieButton].forEach(btn => {
             if (btn) btn.disabled = false;
         });
     }
@@ -649,6 +676,7 @@ export default class ClassSelectScene extends Phaser.Scene {
                     (el as HTMLElement).textContent?.includes('Rogue') ||
                     (el as HTMLElement).textContent?.includes('Mage') ||
                     (el as HTMLElement).textContent?.includes('Paladin') ||
+                    (el as HTMLElement).textContent?.includes('Valkyrie') ||
                     (el as HTMLElement).textContent?.includes('Confirm Selection')) {
                     if (el && el.parentNode) {
                         console.log("Removing class button:", (el as HTMLElement).textContent);

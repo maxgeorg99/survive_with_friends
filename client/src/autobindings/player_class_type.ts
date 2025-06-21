@@ -39,6 +39,7 @@ export namespace PlayerClass {
   export type Rogue = { tag: "Rogue" };
   export type Mage = { tag: "Mage" };
   export type Paladin = { tag: "Paladin" };
+  export type Valkyrie = { tag: "Valkyrie" };
 
   // Helper functions for constructing each variant of the tagged union.
   // ```
@@ -50,6 +51,7 @@ export namespace PlayerClass {
   export const Rogue = { tag: "Rogue" };
   export const Mage = { tag: "Mage" };
   export const Paladin = { tag: "Paladin" };
+  export const Valkyrie = { tag: "Valkyrie" };
 
   export function getTypeScriptAlgebraicType(): AlgebraicType {
     return AlgebraicType.createSumType([
@@ -57,6 +59,7 @@ export namespace PlayerClass {
       new SumTypeVariant("Rogue", AlgebraicType.createProductType([])),
       new SumTypeVariant("Mage", AlgebraicType.createProductType([])),
       new SumTypeVariant("Paladin", AlgebraicType.createProductType([])),
+      new SumTypeVariant("Valkyrie", AlgebraicType.createProductType([])),
     ]);
   }
 
@@ -71,7 +74,7 @@ export namespace PlayerClass {
 }
 
 // The tagged union or sum type for the algebraic type `PlayerClass`.
-export type PlayerClass = PlayerClass.Fighter | PlayerClass.Rogue | PlayerClass.Mage | PlayerClass.Paladin;
+export type PlayerClass = PlayerClass.Fighter | PlayerClass.Rogue | PlayerClass.Mage | PlayerClass.Paladin | PlayerClass.Valkyrie;
 
 export default PlayerClass;
 

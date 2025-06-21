@@ -51,6 +51,7 @@ export default class VictoryScene extends Phaser.Scene {
         this.load.image('rogue_icon', '/assets/attack_knife.png');
         this.load.image('mage_icon', '/assets/attack_wand.png');
         this.load.image('paladin_icon', '/assets/attack_shield.png');
+        this.load.image('valkyrie_icon', '/assets/attack_horn.png');
         
         console.log('VictoryScene: Preloading class icons for ClassSelectScene');
     }
