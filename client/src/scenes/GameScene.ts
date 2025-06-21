@@ -21,14 +21,16 @@ import MusicManager from '../managers/MusicManager';
 import { DebugManager } from '../managers/DebugManager'; // Added import for DebugManager
 import GameplayOptionsUI from '../ui/GameplayOptionsUI';
 import { getSoundVolume } from '../managers/VolumeSettings';
+import { getPlayerShadowConfig, getPlayerClassName } from '../constants/PlayerCharacterConfig';
 
 // Constants
 const PLAYER_SPEED = 200;
 const PLAYER_ASSET_KEY = 'player_fighter_1';
 const GRASS_ASSET_KEY = 'grass_background';
 const SHADOW_ASSET_KEY = 'shadow';
-const SHADOW_OFFSET_Y = 14; // Vertical offset for the shadow (Increased)
-const SHADOW_ALPHA = 0.4; // Transparency for the shadow
+// Legacy shadow constants - now using PlayerCharacterConfig for class-specific values
+const SHADOW_OFFSET_Y = 14; // Vertical offset for the shadow (Increased) - used as fallback
+const SHADOW_ALPHA = 0.4; // Transparency for the shadow - used as fallback
 const INTERPOLATION_SPEED = 0.2; // Speed of interpolation (0-1, higher is faster)
 const DIRECTION_UPDATE_RATE = 100; // Send direction updates every 100ms
 const PLAYER_NAME_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
@@ -67,14 +69,7 @@ const UI_DEPTH = 100000; // Extremely high depth to ensure UI stays on top of al
 // Movement and position constants
 const POSITION_CORRECTION_THRESHOLD = 49; // Distance squared threshold for position correction (7 pixels)
 
-// Asset keys for different player classes
-const CLASS_ASSET_KEYS: Record<string, string> = {
-    "Fighter": 'player_fighter',
-    "Rogue": 'player_rogue',
-    "Mage": 'player_mage',
-    "Paladin": 'player_paladin',
-    "Valkyrie": 'player_valkyrie'
-};
+// Note: Player class asset keys and shadow configurations are now in PlayerCharacterConfig.ts
 
 export default class GameScene extends Phaser.Scene {
     private spacetimeDBClient: SpacetimeDBClient;
@@ -969,9 +964,17 @@ export default class GameScene extends Phaser.Scene {
             // Store the entity ID for later reference
             this.localPlayerSprite.setData('playerId', player.playerId);
             
-            // Add shadow
-            this.localPlayerShadow = this.add.image(player.position.x, player.position.y, SHADOW_ASSET_KEY);
-            this.localPlayerShadow.setAlpha(SHADOW_ALPHA);
+            // Get shadow configuration for this player class
+            const shadowConfig = getPlayerShadowConfig(player.playerClass);
+            
+            // Add shadow with class-specific configuration
+            this.localPlayerShadow = this.add.image(
+                player.position.x + shadowConfig.offsetX, 
+                player.position.y + shadowConfig.offsetY, 
+                SHADOW_ASSET_KEY
+            );
+            this.localPlayerShadow.setAlpha(shadowConfig.alpha);
+            this.localPlayerShadow.setScale(shadowConfig.scale);
             this.localPlayerShadow.setDepth(BASE_DEPTH + player.position.y + SHADOW_DEPTH_OFFSET);
             
             // Add player name text - Using consistent position calculation with NAME_OFFSET_Y
@@ -1457,32 +1460,10 @@ export default class GameScene extends Phaser.Scene {
 
     // Get class-specific sprite key
     getClassSpriteKey(playerClass: any): string {
-        
-        // Handle case when playerClass is a simple object with a tag property
-        if (playerClass && typeof playerClass === 'object' && 'tag' in playerClass) {
-            const className = playerClass.tag;
-            const spriteKey = CLASS_ASSET_KEYS[className] || 'player_fighter';
-            return spriteKey;
-        } 
-        
-        // Handle case when playerClass is just a string
-        if (typeof playerClass === 'string') {
-            const spriteKey = CLASS_ASSET_KEYS[playerClass] || 'player_fighter';
-            return spriteKey;
-        }
-        
-        // Handle case when playerClass is a number (enum value)
-        if (typeof playerClass === 'number') {
-            // Map numeric enum values to class names
-            const classNames = ["Fighter", "Rogue", "Mage", "Paladin", "Valkyrie"];
-            const className = classNames[playerClass] || "Fighter";
-            const spriteKey = CLASS_ASSET_KEYS[className] || 'player_fighter';
-            return spriteKey;
-        }
-        
-        // Default fallback
-        console.log("Using default fighter class");
-        return 'player_fighter';
+        // Use the PlayerCharacterConfig helper function
+        const shadowConfig = getPlayerShadowConfig(playerClass);
+        console.log(`Using sprite key: ${shadowConfig.assetKey} for class: ${getPlayerClassName(playerClass)}`);
+        return shadowConfig.assetKey;
     }
     
     // Update the function to properly use the player's playerId
@@ -1500,9 +1481,13 @@ export default class GameScene extends Phaser.Scene {
         // Calculate depth based on Y position
         const initialDepth = BASE_DEPTH + startY;
         
+        // Get shadow configuration for this player class
+        const shadowConfig = getPlayerShadowConfig(playerData.playerClass);
+        
         // Create new player container with shadow, sprite and name
-        const shadow = this.add.image(0, SHADOW_OFFSET_Y, SHADOW_ASSET_KEY)
-            .setAlpha(SHADOW_ALPHA)
+        const shadow = this.add.image(shadowConfig.offsetX, shadowConfig.offsetY, SHADOW_ASSET_KEY)
+            .setAlpha(shadowConfig.alpha)
+            .setScale(shadowConfig.scale)
             .setDepth(SHADOW_DEPTH_OFFSET); // Relative depth within container
         
         // Get class-specific sprite
@@ -2717,9 +2702,21 @@ export default class GameScene extends Phaser.Scene {
         }
 
         // Update shadow
-        if (this.localPlayerShadow) {
-            this.localPlayerShadow.x = this.localPlayerSprite.x;
-            this.localPlayerShadow.y = this.localPlayerSprite.y + SHADOW_OFFSET_Y;
+        if (this.localPlayerShadow && this.spacetimeDBClient?.sdkConnection?.db) {
+            // Get the current player data to determine class
+            const playerData = this.spacetimeDBClient.sdkConnection.db.player.playerId.find(
+                this.localPlayerSprite.getData('playerId')
+            );
+            
+            if (playerData) {
+                const shadowConfig = getPlayerShadowConfig(playerData.playerClass);
+                this.localPlayerShadow.x = this.localPlayerSprite.x + shadowConfig.offsetX;
+                this.localPlayerShadow.y = this.localPlayerSprite.y + shadowConfig.offsetY;
+            } else {
+                // Fallback to default values if player data not available
+                this.localPlayerShadow.x = this.localPlayerSprite.x;
+                this.localPlayerShadow.y = this.localPlayerSprite.y + 14; // Default SHADOW_OFFSET_Y
+            }
             this.localPlayerShadow.setDepth(BASE_DEPTH + this.localPlayerSprite.y + SHADOW_DEPTH_OFFSET);
         }
 
