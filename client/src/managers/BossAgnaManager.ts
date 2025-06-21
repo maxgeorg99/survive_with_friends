@@ -4,6 +4,8 @@ import SpacetimeDBClient from '../SpacetimeDBClient';
 
 const MAGIC_CIRCLE_ASSET_KEY = 'agna_magic_circle';
 const BIG_MAGIC_CIRCLE_DEPTH = 1;
+const AGNA_WICK_CIRCLE_SCALE = 0.80;
+const AGNA_WICK_CIRCLE_Y_OFFSET = 28; // Offset circle slightly up from Agna's center
 const CANDLE_SPAWN_ASSET_KEY = 'agna_candle_off';
 const FADE_IN_DURATION = 500;
 const FADE_OUT_DURATION = 300;
@@ -49,6 +51,13 @@ export default class BossAgnaManager {
     // Magic circle phase visualization
     private playerGroundCircles: Map<number, Phaser.GameObjects.Image> = new Map();
     private isMagicCirclePhaseActive: boolean = false;
+    
+    // Wick phase visualization
+    private wickPhaseGroundCircle: Phaser.GameObjects.Image | null = null;
+    private wickPhasePlayerCircles: Map<number, Phaser.GameObjects.Image> = new Map();
+    private isWickPhaseActive: boolean = false;
+    private wickPhaseStartTime: number = 0;
+    private wickPhaseDuration: number = 13000; // 13 seconds as per server constants
 
     constructor(scene: Phaser.Scene, client: SpacetimeDBClient) {
         this.scene = scene;
@@ -122,6 +131,10 @@ export default class BossAgnaManager {
                 if (this.isMagicCircleState(monster.aiState)) {
                     console.log(`Found existing Agna boss ${monster.monsterId} in magic circle state during initialization`);
                     this.startMagicCirclePhaseVisualization();
+                }
+                if (this.isRitualWickState(monster.aiState)) {
+                    console.log(`Found existing Agna boss ${monster.monsterId} in wick state during initialization`);
+                    this.startWickPhaseVisualization(monster);
                 }
                 // Note: Ritual sounds are one-shot, so we don't need to replay them during initialization
                 // They are triggered by state transitions, not sustained like flamethrower
@@ -267,13 +280,22 @@ export default class BossAgnaManager {
             this.stopMagicCirclePhaseVisualization();
         }
 
+        // Handle wick phase visualization
+        if (!wasInRitualWick && isInRitualWick) {
+            console.log(`Agna boss ${newMonster.monsterId} entered wick phase`);
+            this.startWickPhaseVisualization(newMonster);
+        } else if (wasInRitualWick && !isInRitualWick) {
+            console.log(`Agna boss ${newMonster.monsterId} left wick phase`);
+            this.stopWickPhaseVisualization();
+        }
+
         // Play ritual sounds when entering states
         if (!wasInRitualMatch && isInRitualMatch) {
             console.log(`Agna boss ${newMonster.monsterId} entered ritual match phase`);
             this.playRitualSound('agna_match', 0.8);
         } else if (!wasInRitualWick && isInRitualWick) {
             console.log(`Agna boss ${newMonster.monsterId} entered ritual wick phase`);
-            this.playRitualSound('agna_wick', 0.8);
+            this.playRitualSound('agna_wick', 1.0);
         } else if (!wasInRitualComplete && isInRitualComplete) {
             console.log(`Agna boss ${newMonster.monsterId} entered ritual complete phase`);
             this.playRitualSound('agna_extinguished', 0.9);
@@ -281,12 +303,23 @@ export default class BossAgnaManager {
         } else if (!wasInRitualFailed && isInRitualFailed) {
             console.log(`Agna boss ${newMonster.monsterId} entered ritual failed phase`);
             this.playRitualSound('agna_ritual_fail', 0.8);
+            // Stop wick phase visualization immediately when ritual fails
+            this.stopWickPhaseVisualizationFast();
         }
         
         // Check if we need to stop ritual complete visualization
         if (wasInRitualComplete && !isInRitualComplete) {
             console.log(`Agna boss ${newMonster.monsterId} left ritual complete phase`);
             this.stopRitualCompleteVisualization();
+        }
+        
+        // Handle ritual complete enhancement of wick phase ground circle
+        if (!wasInRitualComplete && isInRitualComplete) {
+            console.log("Enhancing wick phase ground circle for ritual complete");
+            this.enhanceWickPhaseGroundCircleForRitualComplete();
+        } else if (wasInRitualComplete && !isInRitualComplete) {
+            console.log("Restoring wick phase ground circle from ritual complete enhancement");
+            this.restoreWickPhaseGroundCircleFromRitualComplete();
         }
 
         // Check for target changes in Phase 2 Agna (play laugh sound)
@@ -343,6 +376,18 @@ export default class BossAgnaManager {
                     this.createPlayerGroundCircle(newPlayer.playerId, newPlayer.position.x, newPlayer.position.y);
                 }
             }
+            
+            // Update wick phase player circle position if wick phase is active
+            if (this.isWickPhaseActive) {
+                const wickCircle = this.wickPhasePlayerCircles.get(newPlayer.playerId);
+                if (wickCircle) {
+                    wickCircle.setPosition(newPlayer.position.x, newPlayer.position.y);
+                    wickCircle.setDepth(MONSTER_DEPTH_BASE + newPlayer.position.y + 10);
+                } else {
+                    // Create wick circle for this player if wick phase is active and circle doesn't exist
+                    this.createWickPhasePlayerCircle(newPlayer.playerId, newPlayer.position.x, newPlayer.position.y);
+                }
+            }
         }
     }
 
@@ -380,6 +425,9 @@ export default class BossAgnaManager {
         
         // Remove ground circle for this player if it exists
         this.removePlayerGroundCircle(player.playerId);
+        
+        // Remove wick phase circle for this player if it exists
+        this.removeWickPhasePlayerCircle(player.playerId);
     }
 
     // Handle when a summoning circle spawner is inserted
@@ -687,6 +735,334 @@ export default class BossAgnaManager {
         }
         this.playerGroundCircles.clear();
         console.log("Removed all player ground circles");
+    }
+
+    // Wick phase visualization management
+    private startWickPhaseVisualization(agnaBoss: Monsters) {
+        if (this.isWickPhaseActive) {
+            return; // Already active
+        }
+        
+        console.log("Starting wick phase visualization - ground circle on Agna and magic circles on players");
+        this.isWickPhaseActive = true;
+        this.wickPhaseStartTime = this.scene.time.now;
+        
+        // Create ground circle on Agna's position
+        this.createWickPhaseGroundCircle(agnaBoss);
+        
+        // Create magic circles over all active players
+        this.createWickPhasePlayerCircles();
+    }
+
+    private stopWickPhaseVisualization() {
+        if (!this.isWickPhaseActive) {
+            return; // Not active
+        }
+        
+        console.log("Stopping wick phase visualization");
+        this.isWickPhaseActive = false;
+        
+        // Remove ground circle on Agna
+        this.removeWickPhaseGroundCircle();
+        
+        // Remove all player magic circles
+        this.removeAllWickPhasePlayerCircles();
+    }
+
+    private stopWickPhaseVisualizationFast() {
+        if (!this.isWickPhaseActive) {
+            return; // Not active
+        }
+        
+        console.log("Stopping wick phase visualization quickly (ritual failed)");
+        this.isWickPhaseActive = false;
+        
+        // Remove ground circle on Agna with fast fade
+        this.removeWickPhaseGroundCircleFast();
+        
+        // Remove all player magic circles with fast fade
+        this.removeAllWickPhasePlayerCirclesFast();
+    }
+
+    private createWickPhaseGroundCircle(agnaBoss: Monsters) {
+        if (this.wickPhaseGroundCircle) {
+            return; // Already exists
+        }
+        
+        // Get Agna's current position from the boid data
+        const db = this.spacetimeDBClient.sdkConnection?.db;
+        if (!db) {
+            console.warn("Cannot create wick phase ground circle - database not available");
+            return;
+        }
+        
+        const agnaBoid = db.monstersBoid.monsterId.find(agnaBoss.monsterId);
+        if (!agnaBoid) {
+            console.warn(`Cannot find boid for Agna boss ${agnaBoss.monsterId}`);
+            return;
+        }
+        
+        const agnaPosition = agnaBoid.position;
+        
+        // Create big circle sprite on Agna with Y offset
+        const circle = this.scene.add.image(agnaPosition.x, agnaPosition.y + AGNA_WICK_CIRCLE_Y_OFFSET, 'agna_big_circle');
+        circle.setScale(AGNA_WICK_CIRCLE_SCALE);
+        circle.setAlpha(0); // Start invisible
+        
+        // Set depth to be at ground level but visible
+        circle.setDepth(BIG_MAGIC_CIRCLE_DEPTH);
+        
+        // Store the circle
+        this.wickPhaseGroundCircle = circle;
+        
+        // Animate alpha from 0 to 1 over the wick phase duration using x-squared easing
+        this.scene.tweens.add({
+            targets: circle,
+            alpha: 1.0,
+            duration: this.wickPhaseDuration,
+            ease: 'Linear', // x-squared easing
+            onComplete: () => {
+                console.log("Wick phase ground circle reached full alpha");
+            }
+        });
+        
+        console.log(`Created wick phase ground circle on Agna at (${agnaPosition.x}, ${agnaPosition.y})`);
+    }
+
+    private removeWickPhaseGroundCircle() {
+        if (this.wickPhaseGroundCircle) {
+            // Stop any active tweens
+            this.scene.tweens.killTweensOf(this.wickPhaseGroundCircle);
+            this.wickPhaseGroundCircle.destroy();
+            this.wickPhaseGroundCircle = null;
+            console.log("Removed wick phase ground circle");
+        }
+    }
+
+    private removeWickPhaseGroundCircleFast() {
+        if (this.wickPhaseGroundCircle) {
+            // Stop any active tweens
+            this.scene.tweens.killTweensOf(this.wickPhaseGroundCircle);
+            
+            // Quick fade to 0 alpha then destroy
+            this.scene.tweens.add({
+                targets: this.wickPhaseGroundCircle,
+                alpha: 0,
+                duration: 200, // Fast fade (200ms)
+                ease: 'Power2',
+                onComplete: () => {
+                    if (this.wickPhaseGroundCircle) {
+                        this.wickPhaseGroundCircle.destroy();
+                        this.wickPhaseGroundCircle = null;
+                        console.log("Fast removed wick phase ground circle (ritual failed)");
+                    }
+                }
+            });
+        }
+    }
+
+    private createWickPhasePlayerCircles() {
+        // Get all active players from the database
+        const db = this.spacetimeDBClient.sdkConnection?.db;
+        if (!db) {
+            console.warn("Cannot create wick phase player circles - database not available");
+            return;
+        }
+        
+        for (const player of db.player.iter()) {
+            this.createWickPhasePlayerCircle(player.playerId, player.position.x, player.position.y);
+        }
+    }
+
+    private createWickPhasePlayerCircle(playerId: number, x: number, y: number) {
+        // Don't create if already exists
+        if (this.wickPhasePlayerCircles.has(playerId)) {
+            return;
+        }
+        
+        // Create magic circle sprite over the player
+        const circle = this.scene.add.image(x, y, MAGIC_CIRCLE_ASSET_KEY);
+        circle.setScale(0); // Start at 0 scale
+        circle.setAlpha(0); // Start invisible
+        
+        // Set depth to be above the player
+        circle.setDepth(MONSTER_DEPTH_BASE + y + 10);
+        
+        // Store the circle
+        this.wickPhasePlayerCircles.set(playerId, circle);
+        
+        // Animate both alpha and scale from 0 to 1 over the wick phase duration using x-squared easing
+        this.scene.tweens.add({
+            targets: circle,
+            alpha: 0.8,
+            scaleX: 1.0,
+            scaleY: 1.0,
+            duration: this.wickPhaseDuration,
+            ease: 'Quad.easeIn', // x-squared easing
+            onComplete: () => {
+                console.log(`Wick phase player circle for player ${playerId} reached full scale and alpha`);
+            }
+        });
+        
+        console.log(`Created wick phase magic circle for player ${playerId} at (${x}, ${y})`);
+    }
+
+    private removeWickPhasePlayerCircle(playerId: number) {
+        const circle = this.wickPhasePlayerCircles.get(playerId);
+        if (circle) {
+            // Stop any active tweens
+            this.scene.tweens.killTweensOf(circle);
+            circle.destroy();
+            this.wickPhasePlayerCircles.delete(playerId);
+            console.log(`Removed wick phase magic circle for player ${playerId}`);
+        }
+    }
+
+    private removeAllWickPhasePlayerCircles() {
+        for (const [playerId, circle] of this.wickPhasePlayerCircles) {
+            // Stop any active tweens
+            this.scene.tweens.killTweensOf(circle);
+            circle.destroy();
+        }
+        this.wickPhasePlayerCircles.clear();
+        console.log("Removed all wick phase player magic circles");
+    }
+
+    private removeAllWickPhasePlayerCirclesFast() {
+        const circlesToRemove = new Map(this.wickPhasePlayerCircles);
+        this.wickPhasePlayerCircles.clear(); // Clear immediately to prevent new updates
+        
+        for (const [playerId, circle] of circlesToRemove) {
+            // Stop any active tweens
+            this.scene.tweens.killTweensOf(circle);
+            
+            // Quick fade to 0 alpha then destroy
+            this.scene.tweens.add({
+                targets: circle,
+                alpha: 0,
+                duration: 200, // Fast fade (200ms)
+                ease: 'Power2',
+                onComplete: () => {
+                    circle.destroy();
+                }
+            });
+        }
+        
+        console.log(`Fast removed ${circlesToRemove.size} wick phase player magic circles (ritual failed)`);
+    }
+
+    // Methods to enhance wick phase ground circle during ritual complete
+    private enhanceWickPhaseGroundCircleForRitualComplete() {
+        // If no wick phase ground circle exists, create one for ritual complete
+        if (!this.wickPhaseGroundCircle) {
+            this.createRitualCompleteGroundCircle();
+            return;
+        }
+        
+        // Stop any existing tweens on the ground circle
+        this.scene.tweens.killTweensOf(this.wickPhaseGroundCircle);
+        
+        // Set to full opacity with red highlight
+        this.wickPhaseGroundCircle.setAlpha(1.0);
+        this.wickPhaseGroundCircle.setTint(0xff4444); // Red highlight
+        
+        console.log("Enhanced wick phase ground circle for ritual complete (full opacity + red tint)");
+    }
+
+    private createRitualCompleteGroundCircle() {
+        // Get Agna's current position from the database
+        const db = this.spacetimeDBClient.sdkConnection?.db;
+        if (!db) {
+            console.warn("Cannot create ritual complete ground circle - database not available");
+            return;
+        }
+
+        // Find the Agna boss
+        let agnaBoss: any = null;
+        for (const monster of db.monsters.iter()) {
+            if (monster.bestiaryId?.tag === 'BossAgnaPhase1' || monster.bestiaryId?.tag === 'BossAgnaPhase2') {
+                agnaBoss = monster;
+                break;
+            }
+        }
+
+        if (!agnaBoss) {
+            console.warn("Cannot find Agna boss for ritual complete ground circle");
+            return;
+        }
+
+        const agnaBoid = db.monstersBoid.monsterId.find(agnaBoss.monsterId);
+        if (!agnaBoid) {
+            console.warn(`Cannot find boid for Agna boss ${agnaBoss.monsterId}`);
+            return;
+        }
+
+        const agnaPosition = agnaBoid.position;
+        
+        // Create big circle sprite on Agna for ritual complete with Y offset
+        const circle = this.scene.add.image(agnaPosition.x, agnaPosition.y + AGNA_WICK_CIRCLE_Y_OFFSET, 'agna_big_circle');
+        circle.setScale(AGNA_WICK_CIRCLE_SCALE);
+        circle.setAlpha(1.0); // Full opacity immediately
+        circle.setTint(0xff4444); // Red highlight immediately
+        
+        // Set depth to be at ground level but visible
+        circle.setDepth(BIG_MAGIC_CIRCLE_DEPTH);
+        
+        // Store the circle
+        this.wickPhaseGroundCircle = circle;
+        
+        console.log(`Created ritual complete ground circle on Agna at (${agnaPosition.x}, ${agnaPosition.y})`);
+    }
+
+    private restoreWickPhaseGroundCircleFromRitualComplete() {
+        if (!this.wickPhaseGroundCircle) {
+            return; // No ground circle to restore
+        }
+        
+        // If wick phase is still active, restore to wick phase appearance
+        if (this.isWickPhaseActive) {
+            // Remove red tint
+            this.wickPhaseGroundCircle.clearTint();
+            
+            // Calculate how much time is left in the wick phase to determine proper alpha
+            const timeElapsed = this.scene.time.now - this.wickPhaseStartTime;
+            const timeRemaining = Math.max(0, this.wickPhaseDuration - timeElapsed);
+            
+            if (timeRemaining > 0) {
+                // Continue the original alpha tween for the remaining time
+                const currentProgress = timeElapsed / this.wickPhaseDuration;
+                const targetAlpha = Math.min(1.0, currentProgress); // Clamp to 1.0
+                
+                this.scene.tweens.add({
+                    targets: this.wickPhaseGroundCircle,
+                    alpha: targetAlpha,
+                    duration: 100, // Quick transition back
+                    ease: 'Power2',
+                    onComplete: () => {
+                        // Resume the original tween if there's still time left
+                        if (timeRemaining > 100) {
+                            this.scene.tweens.add({
+                                targets: this.wickPhaseGroundCircle,
+                                alpha: 1.0,
+                                duration: timeRemaining - 100,
+                                ease: 'Linear'
+                            });
+                        }
+                    }
+                });
+            } else {
+                // Wick phase should be complete, keep at full alpha
+                this.wickPhaseGroundCircle.setAlpha(1.0);
+            }
+            
+            console.log("Restored wick phase ground circle from ritual complete enhancement");
+        } else {
+            // No wick phase active, remove the ground circle entirely
+            this.scene.tweens.killTweensOf(this.wickPhaseGroundCircle);
+            this.wickPhaseGroundCircle.destroy();
+            this.wickPhaseGroundCircle = null;
+            console.log("Removed ritual complete ground circle (no wick phase active)");
+        }
     }
 
 
@@ -1026,7 +1402,10 @@ export default class BossAgnaManager {
         // Stop magic circle phase visualization if active
         this.stopMagicCirclePhaseVisualization();
         
-        // Stop all active tweens for magic circles, candle spawns, and summoning circles
+        // Stop wick phase visualization if active
+        this.stopWickPhaseVisualization();
+        
+        // Stop all active tweens for magic circles, candle spawns, summoning circles, and wick phase elements
         this.magicCircles.forEach(circleSprite => {
             this.scene.tweens.killTweensOf(circleSprite);
         });
@@ -1035,6 +1414,12 @@ export default class BossAgnaManager {
         });
         this.summoningCircles.forEach(summoningSprite => {
             this.scene.tweens.killTweensOf(summoningSprite);
+        });
+        if (this.wickPhaseGroundCircle) {
+            this.scene.tweens.killTweensOf(this.wickPhaseGroundCircle);
+        }
+        this.wickPhasePlayerCircles.forEach(wickCircle => {
+            this.scene.tweens.killTweensOf(wickCircle);
         });
         
         // Destroy all magic circle sprites, candle spawn sprites, and summoning circle sprites
