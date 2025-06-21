@@ -163,7 +163,7 @@ pub fn init_bestiary(ctx: &ReducerContext) {
         bestiary_id: MonsterType::AgnaCandle as u32,
         monster_type: MonsterType::AgnaCandle,
         tier: 3,
-        max_hp: 40,        // Medium HP (destructible but not too easy)
+        max_hp: 30,        // Medium HP (destructible but not too easy)
         speed: 0.0,        // Stationary (no movement)
         atk: 0.0,          // No melee attack (only ranged bolts)
         radius: 32.0,      // Medium radius for collision

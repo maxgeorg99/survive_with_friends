@@ -287,10 +287,10 @@ fn create_upgrade_option_data(ctx: &ReducerContext, upgrade_type: UpgradeType, p
         UpgradeType::AttackThunderHorn => {
             // Generate thunder horn-specific stat upgrade
             let possible_stats = vec![
-                (AttackStat::Damage, 10),            // High damage increase
-                (AttackStat::CooldownReduction, 30), // Significant cooldown reduction
+                (AttackStat::Damage, 15),            // High damage increase
+                (AttackStat::CooldownReduction, 33), // Significant cooldown reduction
                 (AttackStat::Projectiles, 1),        // Count upgrade (more strikes)
-                (AttackStat::Radius, 12),            // Size upgrade (larger area)
+                (AttackStat::Radius, 24),            // Size upgrade (larger area)
             ];
             generate_attack_upgrade(ctx, player_id, 5, possible_stats, upgrade_type)
         }
@@ -678,7 +678,9 @@ fn apply_player_upgrade(ctx: &ReducerContext, upgrade: &ChosenUpgradeData) {
             
             // Update the cooldown in the modified attack
             modified_attack.cooldown = new_cooldown;
-            update_scheduled_attack = true;
+
+            //we're scheduling a new attack, so we don't need to update the scheduled attack
+            update_scheduled_attack = false;
             
             // Update the attack scheduling interval
             ctx.db.player_scheduled_attacks().scheduled_id().delete(&scheduled_attack_id);

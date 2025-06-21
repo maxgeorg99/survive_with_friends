@@ -31,7 +31,7 @@ const AGNA_MAGIC_CIRCLES_PER_PLAYER: u32 = 4;          // 4 circles per player
 
 
 // Configuration constants for AgnaFireOrb projectiles  
-const AGNA_FIRE_ORB_DAMAGE: u32 = 20;                  // Damage per fire orb
+const AGNA_FIRE_ORB_DAMAGE: u32 = 40;                  // Damage per fire orb
 const AGNA_FIRE_ORB_SPEED: f32 = 300.0;                // Movement speed (slower than flamethrower)
 const AGNA_FIRE_ORB_RADIUS: f32 = 24.0;                // Collision radius
 const AGNA_FIRE_ORB_DURATION_MS: u64 = 2500;           // 4 seconds lifespan

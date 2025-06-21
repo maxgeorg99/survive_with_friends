@@ -189,7 +189,7 @@ pub fn init_attack_data(ctx: &ReducerContext) {
         speed: 0.0,              // 0 speed - instant strike at target location
         piercing: true,         // Does not pierce
         radius: 48.0,            // Moderate radius
-        damage: 10,               // Big damage
+        damage: 15,               // Big damage
         armor_piercing: 15,      // Good armor penetration
     });
 
