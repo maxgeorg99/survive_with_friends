@@ -90,6 +90,7 @@ pub struct PlayerScheduledAttack {
     pub attack_count: u32,     // Number of times this attack has triggered (for consistent rotation)
     
     // Combat stats copied from AttackData but can be modified by upgrades
+    pub cooldown: u32,         // Time between attacks in milliseconds (can be modified by upgrades)
     pub duration: u32,         // Duration in milliseconds that attack lasts
     pub projectiles: u32,      // Number of projectiles in a single burst
     pub fire_delay: u32,       // Delay in milliseconds between shots in a burst
@@ -393,6 +394,7 @@ pub fn schedule_new_player_attack(ctx: &ReducerContext, player_id: u32, attack_t
         parameter_u: 0,
         parameter_i: 0,
         attack_count: 0,
+        cooldown: attack_data.cooldown,
         duration: attack_data.duration,
         projectiles: attack_data.projectiles,
         fire_delay: attack_data.fire_delay,

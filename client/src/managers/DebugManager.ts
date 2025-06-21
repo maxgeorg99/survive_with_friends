@@ -25,13 +25,13 @@ export class DebugManager {
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.T).on('down', this.triggerBossSpawnerTest, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.G).on('down', this.spawnDebugSpecialGem, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.V).on('down', this.spawnDebugVoidChest, this);
-            this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.L).on('down', this.spawnDebugLootCapsule, this);
+            this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C).on('down', this.spawnDebugLootCapsule, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P).on('down', this.enableBotPvp, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR).on('down', this.setBossTypeEnder, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FIVE).on('down', this.setBossTypeAgna, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.H).on('down', this.setSuperHealth, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S).on('down', this.saveBuild, this);
-            this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.O).on('down', this.loadBuild, this);
+            this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.L).on('down', this.loadBuild, this);
             console.log("DebugManager: Debug keys initialized.");
         } else {
             console.warn("DebugManager: Keyboard input not available on scene. Debug keys not initialized.");
@@ -45,13 +45,13 @@ export class DebugManager {
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.T);
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.G);
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.V);
-            this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.L);
+            this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.C);
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.P);
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.FOUR);
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.FIVE);
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.H);
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.S);
-            this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.O);
+            this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.L);
         }
     }
 

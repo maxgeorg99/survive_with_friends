@@ -28,6 +28,7 @@ pub struct SavedAttack {
     pub attack_count: u32,
     
     // Combat stats
+    pub cooldown: u32,
     pub duration: u32,
     pub projectiles: u32,
     pub fire_delay: u32,
@@ -103,6 +104,7 @@ pub fn save_build(ctx: &ReducerContext) {
             parameter_u: scheduled_attack.parameter_u,
             parameter_i: scheduled_attack.parameter_i,
             attack_count: scheduled_attack.attack_count,
+            cooldown: scheduled_attack.cooldown,
             duration: scheduled_attack.duration,
             projectiles: scheduled_attack.projectiles,
             fire_delay: scheduled_attack.fire_delay,
@@ -114,8 +116,8 @@ pub fn save_build(ctx: &ReducerContext) {
         });
         saved_count += 1;
         
-        log::info!("SaveBuild: Saved attack {:?} - Damage: {}, Projectiles: {}, Speed: {}", 
-                   scheduled_attack.attack_type, scheduled_attack.damage, scheduled_attack.projectiles, scheduled_attack.speed);
+        log::info!("SaveBuild: Saved attack {:?} - Damage: {}, Projectiles: {}, Speed: {}, Cooldown: {}ms", 
+                   scheduled_attack.attack_type, scheduled_attack.damage, scheduled_attack.projectiles, scheduled_attack.speed, scheduled_attack.cooldown);
     }
 
     log::info!("SaveBuild: Successfully saved build with {} attacks for player {} ({})", 
@@ -186,17 +188,10 @@ pub fn load_build(ctx: &ReducerContext) {
     let mut loaded_count = 0;
 
     for saved_attack in saved_attacks {
-        // Get base attack data to determine cooldown
-        let attack_data = crate::attacks_def::find_attack_data_by_type(ctx, &saved_attack.attack_type);
-        let cooldown = match attack_data {
-            Some(data) => data.cooldown,
-            None => {
-                log::error!("LoadBuild: Attack data not found for type {:?}", saved_attack.attack_type);
-                continue;
-            }
-        };
+        // Use the saved cooldown (which includes any upgrades) instead of base attack data
+        let cooldown = saved_attack.cooldown;
 
-        // Create new scheduled attack using saved data
+        // Create new scheduled attack using saved data (including upgraded cooldown)
         ctx.db.player_scheduled_attacks().insert(crate::PlayerScheduledAttack {
             scheduled_id: 0,
             player_id,
@@ -205,6 +200,7 @@ pub fn load_build(ctx: &ReducerContext) {
             parameter_u: saved_attack.parameter_u,
             parameter_i: saved_attack.parameter_i,
             attack_count: saved_attack.attack_count,
+            cooldown: saved_attack.cooldown,
             duration: saved_attack.duration,
             projectiles: saved_attack.projectiles,
             fire_delay: saved_attack.fire_delay,
@@ -217,8 +213,8 @@ pub fn load_build(ctx: &ReducerContext) {
         });
         loaded_count += 1;
 
-        log::info!("LoadBuild: Loaded attack {:?} - Damage: {}, Projectiles: {}, Speed: {}", 
-                   saved_attack.attack_type, saved_attack.damage, saved_attack.projectiles, saved_attack.speed);
+        log::info!("LoadBuild: Loaded attack {:?} - Damage: {}, Projectiles: {}, Speed: {}, Cooldown: {}ms", 
+                   saved_attack.attack_type, saved_attack.damage, saved_attack.projectiles, saved_attack.speed, saved_attack.cooldown);
     }
 
     log::info!("LoadBuild: Successfully loaded build with {} attacks onto player {} ({})", 

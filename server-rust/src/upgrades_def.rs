@@ -624,40 +624,42 @@ fn apply_player_upgrade(ctx: &ReducerContext, upgrade: &ChosenUpgradeData) {
         
         // Handle cooldown reduction by updating the schedule interval
         if update_schedule_interval && cooldown_reduction > 0 {
-            // Get base attack data to get original cooldown
-            if let Some(attack_data) = find_attack_data_by_type(ctx, &attack_type) {
-                // Calculate new cooldown (apply percentage reduction)
-                let base_cooldown = attack_data.cooldown;
-                let reduction = base_cooldown * cooldown_reduction / 100;
-                let new_cooldown = base_cooldown - reduction;
-                
-                // Update the attack scheduling interval
-                ctx.db.player_scheduled_attacks().scheduled_id().delete(&scheduled_attack_id);
-                
-                // Create a new scheduled attack with the updated interval
-                let new_scheduled_attack = crate::PlayerScheduledAttack {
-                    scheduled_id: 0,
-                    player_id,
-                    attack_type: attack_type.clone(),
-                    skill_level: modified_attack.skill_level,
-                    parameter_u: modified_attack.parameter_u,
-                    parameter_i: modified_attack.parameter_i,
-                    attack_count: modified_attack.attack_count, // Preserve attack count
-                    duration: modified_attack.duration,
-                    projectiles: modified_attack.projectiles,
-                    fire_delay: modified_attack.fire_delay,
-                    speed: modified_attack.speed,
-                    piercing: modified_attack.piercing,
-                    radius: modified_attack.radius,
-                    damage: modified_attack.damage,
-                    armor_piercing: modified_attack.armor_piercing,
-                    scheduled_at: ScheduleAt::Interval(Duration::from_millis(new_cooldown as u64).into()),
-                };
-                
-                ctx.db.player_scheduled_attacks().insert(new_scheduled_attack);
-                
-                log::info!("Updated attack cooldown: reduced from {}ms to {}ms", base_cooldown, new_cooldown);
-            }
+            // Calculate new cooldown using the current cooldown (not base cooldown) for proper stacking
+            let current_cooldown = modified_attack.cooldown;
+            let reduction = current_cooldown * cooldown_reduction / 100;
+            let new_cooldown = current_cooldown - reduction;
+            
+            // Update the cooldown in the modified attack
+            modified_attack.cooldown = new_cooldown;
+            update_scheduled_attack = true;
+            
+            // Update the attack scheduling interval
+            ctx.db.player_scheduled_attacks().scheduled_id().delete(&scheduled_attack_id);
+            
+            // Create a new scheduled attack with the updated interval
+            let new_scheduled_attack = crate::PlayerScheduledAttack {
+                scheduled_id: 0,
+                player_id,
+                attack_type: attack_type.clone(),
+                skill_level: modified_attack.skill_level,
+                parameter_u: modified_attack.parameter_u,
+                parameter_i: modified_attack.parameter_i,
+                attack_count: modified_attack.attack_count, // Preserve attack count
+                cooldown: new_cooldown,
+                duration: modified_attack.duration,
+                projectiles: modified_attack.projectiles,
+                fire_delay: modified_attack.fire_delay,
+                speed: modified_attack.speed,
+                piercing: modified_attack.piercing,
+                radius: modified_attack.radius,
+                damage: modified_attack.damage,
+                armor_piercing: modified_attack.armor_piercing,
+                scheduled_at: ScheduleAt::Interval(Duration::from_millis(new_cooldown as u64).into()),
+            };
+            
+            ctx.db.player_scheduled_attacks().insert(new_scheduled_attack);
+            
+            log::info!("Updated attack cooldown: reduced from {}ms to {}ms (stacking upgrade)", current_cooldown, new_cooldown);
         }
 
         // Update the scheduled attack record if any stats were changed
