@@ -64,6 +64,9 @@ pub fn damage_monster(ctx: &ReducerContext, monster_id: u32, damage_amount: u32)
             log::info!("Shiny monster {} destroyed! Triggering death pinata at ({:.1}, {:.1})", 
                       monster.monster_id, position.x, position.y);
             monsters_def::trigger_shiny_monster_death_pinata(ctx, &monster);
+        } else if crate::structure_defs::is_structure_type(&monster.bestiary_id) {
+            // Structure death loot - spawn loot capsules based on structure type
+            crate::structure_defs::trigger_structure_death_loot(ctx, &monster);
         }
         
         // Clean up any monster damage records for this monster

@@ -113,6 +113,11 @@ export default class TitleScene extends Phaser.Scene {
         // Load special monster assets
         this.load.image('treasure_chest', '/assets/treasure_chest.png');
         
+        // Load structure assets
+        this.load.image('structure_crate', '/assets/structure_crate.png');
+        this.load.image('structure_tree', '/assets/structure_tree.png');
+        this.load.image('structure_statue', '/assets/structure_statue.png');
+        
         // Load monster attack assets for seamless gameplay
         this.load.image('monster_attack_firebolt', '/assets/monster_attack_firebolt.png');
         this.load.image('void_scythe', '/assets/void_scythe.png');

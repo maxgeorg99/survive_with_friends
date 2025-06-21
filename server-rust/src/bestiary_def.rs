@@ -169,5 +169,38 @@ pub fn init_bestiary(ctx: &ReducerContext) {
         radius: 32.0,      // Medium radius for collision
     });
 
+    // Insert Crate stats - common breakable structure
+    ctx.db.bestiary().insert(Bestiary {
+        bestiary_id: MonsterType::Crate as u32,
+        monster_type: MonsterType::Crate,
+        tier: 0,
+        max_hp: 30,        // Moderate HP - easier to break than other structures
+        speed: 0.0,        // Stationary (no movement)
+        atk: 0.0,          // No attack
+        radius: 48.0,      // Medium radius for collision
+    });
+
+    // Insert Tree stats - sturdy natural structure
+    ctx.db.bestiary().insert(Bestiary {
+        bestiary_id: MonsterType::Tree as u32,
+        monster_type: MonsterType::Tree,
+        tier: 0,
+        max_hp: 150,       // High HP - requires effort to destroy
+        speed: 0.0,        // Stationary (no movement)
+        atk: 0.0,          // No attack
+        radius: 50.0,     // Large radius for collision (trees are big)
+    });
+
+    // Insert Statue stats - durable ancient structure
+    ctx.db.bestiary().insert(Bestiary {
+        bestiary_id: MonsterType::Statue as u32,
+        monster_type: MonsterType::Statue,
+        tier: 0,
+        max_hp: 500,       // Very high HP - hardest structure to destroy
+        speed: 0.0,        // Stationary (no movement)
+        atk: 0.0,          // No attack
+        radius: 58.0,      // Largest radius for collision
+    });
+
     log::info!("Bestiary initialization complete");
 } 

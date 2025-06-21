@@ -149,13 +149,20 @@ export default class MonsterSpawnerManager {
         switch(bestiaryId) {
             case 0: return "Rat";
             case 1: return "Slime";
-            case 2: return "Orc";
-                    case 3: return "BossEnderPhase1";
-        case 4: return "BossEnderPhase2";
-            case 5: return "VoidChest";
-            case 6: return "Imp";
-            case 7: return "Zombie";
-            case 8: return "EnderClaw";
+            case 2: return "Bat";
+            case 3: return "Orc";
+            case 4: return "Imp";
+            case 5: return "Zombie";
+            case 6: return "VoidChest";
+            case 7: return "EnderClaw";
+            case 8: return "BossEnderPhase1";
+            case 9: return "BossEnderPhase2";
+            case 10: return "BossAgnaPhase1";
+            case 11: return "BossAgnaPhase2";
+            case 12: return "AgnaCandle";
+            case 13: return "Crate";
+            case 14: return "Tree";
+            case 15: return "Statue";
             default: 
                 console.warn(`Unknown monster type: ${bestiaryId}`);
                 return "Unknown";

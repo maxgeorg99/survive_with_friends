@@ -227,6 +227,11 @@ export default class GameScene extends Phaser.Scene {
         // Load special monster assets
         this.load.image('treasure_chest', '/assets/treasure_chest.png');
         
+        // Load structure assets
+        this.load.image('structure_crate', '/assets/structure_crate.png');
+        this.load.image('structure_tree', '/assets/structure_tree.png');
+        this.load.image('structure_statue', '/assets/structure_statue.png');
+        
         // Load attack assets
         this.load.image('attack_sword', '/assets/attack_sword.png');
         this.load.image('attack_wand', '/assets/attack_wand.png');
@@ -294,6 +299,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.audio('void_capsule_spawned', '/assets/sounds/void_capsule_spawned.mp3');
         this.load.audio('void_capsule_lands', '/assets/sounds/void_capsule_lands.mp3');
         this.load.audio('void_chest_destroyed', '/assets/sounds/void_chest_destroyed.mp3');
+        this.load.audio('structure_broken', '/assets/sounds/structure_broken.mp3');
         this.load.audio('upgrade_bar_fill', '/assets/sounds/upgrade_bar_fill.mp3');
         
         // Load boss audio files
@@ -343,6 +349,9 @@ export default class GameScene extends Phaser.Scene {
             console.log("monster_zombie:", this.textures.exists('monster_zombie'));
             console.log("monster_bat:", this.textures.exists('monster_bat'));
             console.log("monster_void_claw:", this.textures.exists('monster_void_claw'));
+            console.log("structure_crate:", this.textures.exists('structure_crate'));
+            console.log("structure_tree:", this.textures.exists('structure_tree'));
+            console.log("structure_statue:", this.textures.exists('structure_statue'));
             console.log("void_ball:", this.textures.exists('void_ball'));
             console.log("attack_sword:", this.textures.exists('attack_sword'));
             console.log("attack_wand:", this.textures.exists('attack_wand'));
@@ -365,6 +374,7 @@ export default class GameScene extends Phaser.Scene {
             console.log("void_capsule_spawned:", this.cache.audio.exists('void_capsule_spawned'));
             console.log("void_capsule_lands:", this.cache.audio.exists('void_capsule_lands'));
             console.log("void_chest_destroyed:", this.cache.audio.exists('void_chest_destroyed'));
+            console.log("structure_broken:", this.cache.audio.exists('structure_broken'));
             console.log("upgrade_bar_fill:", this.cache.audio.exists('upgrade_bar_fill'));
             console.log("boss_chase_cue:", this.cache.audio.exists('boss_chase_cue'));
             console.log("voice_boss:", this.cache.audio.exists('voice_boss'));

@@ -1431,7 +1431,7 @@ pub fn handle_ender_boss_chase_movement(
     let real_monster = ctx.db.monsters().monster_id().find(&monster_id);
     
     if let Some(monster) = real_monster {
-        let monster_type_name = get_monster_type_name(&monster.bestiary_id);
+        let monster_type_name = crate::monster_types_def::get_monster_type_name(&monster.bestiary_id);
         if monster_type_name == "BossEnderPhase1" || monster_type_name == "BossEnderPhase2" {
             // Check distance to target for boss monsters
             let monster_position = DbVector2::new(
@@ -1490,21 +1490,3 @@ pub fn handle_ender_boss_chase_movement(
     true // Continue with movement
 }
 
-// Helper function to get monster type name (moved from monsters_def for use here)
-fn get_monster_type_name(bestiary_id: &MonsterType) -> &'static str {
-    match bestiary_id {
-        MonsterType::Rat => "Rat",
-        MonsterType::Slime => "Slime",
-        MonsterType::Bat => "Bat",
-        MonsterType::Orc => "Orc",
-        MonsterType::Imp => "Imp",
-        MonsterType::Zombie => "Zombie",
-        MonsterType::VoidChest => "VoidChest",
-        MonsterType::EnderClaw => "EnderClaw",
-        MonsterType::BossEnderPhase1 => "BossEnderPhase1",
-        MonsterType::BossEnderPhase2 => "BossEnderPhase2",
-        MonsterType::BossAgnaPhase1 => "BossAgnaPhase1",
-        MonsterType::BossAgnaPhase2 => "BossAgnaPhase2",
-        MonsterType::AgnaCandle => "AgnaCandle",
-    }
-}

@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { Monsters, EventContext, MonsterType, MonsterBoid, AiState, MonsterVariant} from "../autobindings";
 import SpacetimeDBClient from '../SpacetimeDBClient';
-import { MONSTER_ASSET_KEYS, MONSTER_SHADOW_OFFSETS_X, MONSTER_SHADOW_OFFSETS_Y, MONSTER_SHADOW_SCALE} from '../constants/MonsterConfig';
+import { MONSTER_ASSET_KEYS, MONSTER_SHADOW_OFFSETS_X, MONSTER_SHADOW_OFFSETS_Y, MONSTER_SHADOW_SCALE, MONSTER_DEPTH_OFFSETS, MONSTER_SPRITE_OFFSETS_X, MONSTER_SPRITE_OFFSETS_Y} from '../constants/MonsterConfig';
 import { GameEvents } from '../constants/GameEvents';
 import { createMonsterDamageEffect } from '../utils/DamageEffects';
 
@@ -17,6 +17,8 @@ const BASE_DEPTH = 1000; // Base depth to ensure all sprites are above backgroun
 const SHADOW_DEPTH_OFFSET = -1; // Always behind the sprite
 const HEALTH_BG_DEPTH_OFFSET = 1; // Just behind health bar
 const HEALTH_BAR_DEPTH_OFFSET = 1.1;
+
+
 
 // Constants for shiny monster effects
 const SHINY_PARTICLE_COUNT = 8;
@@ -40,7 +42,10 @@ const MONSTER_BASE_SIZES: { [key: string]: number } = {
     "Imp": 34.0,
     "Zombie": 42.0,
     "EnderClaw": 44.0,
-    "Bat": 28.0
+    "Bat": 28.0,
+    "Crate": 48.0,
+    "Tree": 64.0,
+    "Statue": 72.0
 };
 
 export default class MonsterManager {
@@ -123,6 +128,17 @@ export default class MonsterManager {
         return (this.scene as any).gameOver === true;
     }
 
+    // Helper method to calculate depth with configurable type-specific priority bonuses
+    private calculateMonsterDepth(yPosition: number, monsterType: string): number {
+        let depth = BASE_DEPTH + yPosition;
+        
+        // Add configurable depth offset based on monster type
+        const depthOffset = MONSTER_DEPTH_OFFSETS[monsterType] || 0;
+        depth += depthOffset;
+        
+        return depth;
+    }
+
     // Initialize monster handlers
     initializeMonsters(ctx: EventContext) {
         if (!this.spacetimeDBClient?.sdkConnection?.db) {
@@ -200,7 +216,7 @@ export default class MonsterManager {
             }
             
             container.setPosition(newBoid.position.x, newBoid.position.y);
-            container.setDepth(BASE_DEPTH + newBoid.position.y);
+            container.setDepth(this.calculateMonsterDepth(newBoid.position.y, monsterType));
         }
     }
     
@@ -227,20 +243,25 @@ export default class MonsterManager {
             
             // Create new container if it doesn't exist
             container = this.scene.add.container(initialPosition.x, initialPosition.y);
-            container.setDepth(BASE_DEPTH + initialPosition.y);
+            container.setDepth(this.calculateMonsterDepth(initialPosition.y, monsterTypeName));
             this.monsters.set(monsterData.monsterId, container);
             
+            // Get sprite offset for visual perspective
+            const spriteOffsetX = MONSTER_SPRITE_OFFSETS_X[monsterTypeName] || 0;
+            const spriteOffsetY = MONSTER_SPRITE_OFFSETS_Y[monsterTypeName] || 0;
+            
             // Create shadow first (so it appears behind the sprite)
-            const shadowX = MONSTER_SHADOW_OFFSETS_X[monsterTypeName] || 0;
-            const shadowY = MONSTER_SHADOW_OFFSETS_Y[monsterTypeName] || 0;
+            // Shadow position accounts for both shadow offset and sprite offset
+            const shadowX = (MONSTER_SHADOW_OFFSETS_X[monsterTypeName] || 0) + spriteOffsetX;
+            const shadowY = (MONSTER_SHADOW_OFFSETS_Y[monsterTypeName] || 0) + spriteOffsetY;
             const shadow = this.scene.add.image(shadowX, shadowY, SHADOW_ASSET_KEY);
             shadow.setAlpha(SHADOW_ALPHA);
             shadow.setScale(MONSTER_SHADOW_SCALE[monsterTypeName] || 1.0);
             shadow.setDepth(SHADOW_DEPTH_OFFSET);
             container.add(shadow);
 
-            // Create the sprite
-            const sprite = this.scene.add.sprite(0, 0, assetKey);
+            // Create the sprite with perspective offset
+            const sprite = this.scene.add.sprite(spriteOffsetX, spriteOffsetY, assetKey);
             sprite.setDepth(0);
             container.add(sprite);
             
@@ -308,9 +329,9 @@ export default class MonsterManager {
                     sprite.setScale(scaleRatio);
                     shadow.setScale((MONSTER_SHADOW_SCALE[monsterTypeName] || 1.0) * scaleRatio);
                     
-                    // Adjust shadow position to account for scaling
-                    const scaledShadowX = (MONSTER_SHADOW_OFFSETS_X[monsterTypeName] || 0) * scaleRatio;
-                    const scaledShadowY = (MONSTER_SHADOW_OFFSETS_Y[monsterTypeName] || 0) * scaleRatio;
+                    // Adjust shadow position to account for scaling and sprite offset
+                    const scaledShadowX = ((MONSTER_SHADOW_OFFSETS_X[monsterTypeName] || 0) + spriteOffsetX) * scaleRatio;
+                    const scaledShadowY = ((MONSTER_SHADOW_OFFSETS_Y[monsterTypeName] || 0) + spriteOffsetY) * scaleRatio;
                     shadow.setPosition(scaledShadowX, scaledShadowY);
                     
                     // Update glow sprite scale to match
@@ -445,6 +466,11 @@ export default class MonsterManager {
         // Play void chest destroyed sound if this is a VoidChest (distance-based)
         if (monsterType === 'VoidChest') {
             this.playVoidChestDestroyedSound(monsterContainer);
+        }
+        
+        // Play structure broken sound if this is a structure (distance-based)
+        if (monsterType === 'Crate' || monsterType === 'Tree' || monsterType === 'Statue') {
+            this.playStructureBrokenSound(monsterContainer);
         }
         
         // Special handling for boss phase 1 (pre-transform effect)
@@ -826,14 +852,20 @@ export default class MonsterManager {
         switch(bestiaryId) {
             case 0: return "Rat";
             case 1: return "Slime";
-            case 2: return "Orc";
-            case 3: return "BossEnderPhase1";
-            case 4: return "BossEnderPhase2";
-            case 5: return "VoidChest";
-            case 6: return "Imp";
-            case 7: return "Zombie";
-            case 8: return "EnderClaw";
-            case 9: return "Bat";
+            case 2: return "Bat";
+            case 3: return "Orc";
+            case 4: return "Imp";
+            case 5: return "Zombie";
+            case 6: return "VoidChest";
+            case 7: return "EnderClaw";
+            case 8: return "BossEnderPhase1";
+            case 9: return "BossEnderPhase2";
+            case 10: return "BossAgnaPhase1";
+            case 11: return "BossAgnaPhase2";
+            case 12: return "AgnaCandle";
+            case 13: return "Crate";
+            case 14: return "Tree";
+            case 15: return "Statue";
             default: 
                 console.warn(`Unknown monster type: ${bestiaryId}`);
                 return "Unknown";
@@ -1232,6 +1264,30 @@ export default class MonsterManager {
         soundManager.playDistanceBasedSound('void_chest_destroyed', localPlayerPosition, voidChestPosition, maxDistance, 0.9);
         
         console.log(`Playing void chest destroyed sound at position (${container.x}, ${container.y}), distance from player: ${Math.sqrt(Math.pow(voidChestPosition.x - localPlayerPosition.x, 2) + Math.pow(voidChestPosition.y - localPlayerPosition.y, 2)).toFixed(1)}`);
+    }
+
+    // Add a method to play distance-based structure broken sound
+    private playStructureBrokenSound(container: Phaser.GameObjects.Container) {
+        // Get local player position from the scene
+        const gameScene = this.scene as any;
+        const localPlayerPosition = gameScene.getLocalPlayerPosition?.();
+        
+        if (!localPlayerPosition) {
+            return; // No local player or position available
+        }
+        
+        // Get sound manager
+        const soundManager = (window as any).soundManager;
+        if (!soundManager) {
+            return;
+        }
+        
+        // Play distance-based structure broken sound
+        const structurePosition = { x: container.x, y: container.y };
+        const maxDistance = 600; // Structure broken sounds travel moderately far
+        soundManager.playDistanceBasedSound('structure_broken', localPlayerPosition, structurePosition, maxDistance, 0.7);
+        
+        console.log(`Playing structure broken sound at position (${container.x}, ${container.y}), distance from player: ${Math.sqrt(Math.pow(structurePosition.x - localPlayerPosition.x, 2) + Math.pow(structurePosition.y - localPlayerPosition.y, 2)).toFixed(1)}`);
     }
 
     // Update boss after image effects during chase mode

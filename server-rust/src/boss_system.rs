@@ -129,6 +129,11 @@ pub fn schedule_boss_spawn(ctx: &ReducerContext) {
     });
     
     log::info!("Boss spawn timer scheduled - {} boss will spawn in 5 minutes", boss_name);
+    
+    // Spawn world structures at the start of a new game session
+    log::info!("Initializing world structures for new game session...");
+    crate::structure_defs::spawn_world_structures(ctx);
+    log::info!("World structure initialization complete");
 }
 
 // Called when the boss spawn timer fires

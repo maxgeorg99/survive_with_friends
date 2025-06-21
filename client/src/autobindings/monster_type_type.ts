@@ -48,6 +48,9 @@ export namespace MonsterType {
   export type BossAgnaPhase1 = { tag: "BossAgnaPhase1" };
   export type BossAgnaPhase2 = { tag: "BossAgnaPhase2" };
   export type AgnaCandle = { tag: "AgnaCandle" };
+  export type Crate = { tag: "Crate" };
+  export type Tree = { tag: "Tree" };
+  export type Statue = { tag: "Statue" };
 
   // Helper functions for constructing each variant of the tagged union.
   // ```
@@ -68,6 +71,9 @@ export namespace MonsterType {
   export const BossAgnaPhase1 = { tag: "BossAgnaPhase1" };
   export const BossAgnaPhase2 = { tag: "BossAgnaPhase2" };
   export const AgnaCandle = { tag: "AgnaCandle" };
+  export const Crate = { tag: "Crate" };
+  export const Tree = { tag: "Tree" };
+  export const Statue = { tag: "Statue" };
 
   export function getTypeScriptAlgebraicType(): AlgebraicType {
     return AlgebraicType.createSumType([
@@ -84,6 +90,9 @@ export namespace MonsterType {
       new SumTypeVariant("BossAgnaPhase1", AlgebraicType.createProductType([])),
       new SumTypeVariant("BossAgnaPhase2", AlgebraicType.createProductType([])),
       new SumTypeVariant("AgnaCandle", AlgebraicType.createProductType([])),
+      new SumTypeVariant("Crate", AlgebraicType.createProductType([])),
+      new SumTypeVariant("Tree", AlgebraicType.createProductType([])),
+      new SumTypeVariant("Statue", AlgebraicType.createProductType([])),
     ]);
   }
 
@@ -98,7 +107,7 @@ export namespace MonsterType {
 }
 
 // The tagged union or sum type for the algebraic type `MonsterType`.
-export type MonsterType = MonsterType.Rat | MonsterType.Slime | MonsterType.Bat | MonsterType.Orc | MonsterType.Imp | MonsterType.Zombie | MonsterType.VoidChest | MonsterType.EnderClaw | MonsterType.BossEnderPhase1 | MonsterType.BossEnderPhase2 | MonsterType.BossAgnaPhase1 | MonsterType.BossAgnaPhase2 | MonsterType.AgnaCandle;
+export type MonsterType = MonsterType.Rat | MonsterType.Slime | MonsterType.Bat | MonsterType.Orc | MonsterType.Imp | MonsterType.Zombie | MonsterType.VoidChest | MonsterType.EnderClaw | MonsterType.BossEnderPhase1 | MonsterType.BossEnderPhase2 | MonsterType.BossAgnaPhase1 | MonsterType.BossAgnaPhase2 | MonsterType.AgnaCandle | MonsterType.Crate | MonsterType.Tree | MonsterType.Statue;
 
 export default MonsterType;
 

@@ -935,33 +935,17 @@ pub fn spawn_debug_void_chest(ctx: &ReducerContext) {
     );
 }
 
-// Helper function to get monster type name from bestiary ID
-fn get_monster_type_name(bestiary_id: &MonsterType) -> &'static str {
-    match bestiary_id {
-        MonsterType::Rat => "Rat",
-        MonsterType::Slime => "Slime", 
-        MonsterType::Orc => "Orc",
-        MonsterType::BossEnderPhase1 => "BossEnderPhase1",
-        MonsterType::BossEnderPhase2 => "BossEnderPhase2",
-        MonsterType::BossAgnaPhase1 => "BossAgnaPhase1",
-        MonsterType::BossAgnaPhase2 => "BossAgnaPhase2",
-        MonsterType::VoidChest => "VoidChest",
-        MonsterType::Imp => "Imp",
-        MonsterType::Zombie => "Zombie",
-        MonsterType::EnderClaw => "EnderClaw",
-        MonsterType::AgnaCandle => "AgnaCandle",
-        MonsterType::Bat => "Bat",
-    }
-}
 
-// Function to determine if a monster should spawn as shiny (excludes bosses, VoidChests, and EnderClaws)
+
+// Function to determine if a monster should spawn as shiny (excludes bosses, VoidChests, EnderClaws, and structures)
 fn should_spawn_as_shiny(ctx: &ReducerContext, monster_type: &MonsterType) -> bool {
-    // Never spawn bosses, VoidChests, or EnderClaws as shiny
+    // Never spawn bosses, VoidChests, EnderClaws, or structures as shiny
     match monster_type {
         MonsterType::BossEnderPhase1 | MonsterType::BossEnderPhase2 | 
         MonsterType::BossAgnaPhase1 | MonsterType::BossAgnaPhase2 |
-        MonsterType::VoidChest | MonsterType::EnderClaw => {
-            log::debug!("{} excluded from shiny spawning", get_monster_type_name(monster_type));
+        MonsterType::VoidChest | MonsterType::EnderClaw |
+        MonsterType::Crate | MonsterType::Tree | MonsterType::Statue => {
+            log::debug!("{} excluded from shiny spawning", crate::monster_types_def::get_monster_type_name(monster_type));
             false
         },
         _ => {
@@ -1013,7 +997,7 @@ pub fn trigger_shiny_monster_death_pinata(ctx: &ReducerContext, monster: &Monste
     let capsule_count = (monster_tier + 1) * 3;
     
     log::info!("Shiny {} (Tier {}) death pinata! Spawning {} void capsules at current position ({:.1}, {:.1})", 
-              get_monster_type_name(&monster.bestiary_id), monster_tier, capsule_count, monster_position.x, monster_position.y);
+              crate::monster_types_def::get_monster_type_name(&monster.bestiary_id), monster_tier, capsule_count, monster_position.x, monster_position.y);
     
     // Spawn the calculated number of void capsules
     for i in 0..capsule_count {
