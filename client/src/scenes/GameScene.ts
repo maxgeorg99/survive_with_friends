@@ -66,7 +66,9 @@ const CLASS_ASSET_KEYS: Record<string, string> = {
     "Football": 'class_football',
     "Gambler": 'class_gambler',
     "Athlete": 'class_athlete',
-    "Gourmand": 'class_chef'
+    "Gourmand": 'class_chef',
+    "Valkyrie": 'class_valkyrie',
+    "Volleyball": 'class_volleyball'
 };
 
 export default class GameScene extends Phaser.Scene {
@@ -161,6 +163,8 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('class_gambler', 'assets/class_gambler_1.png');
         this.load.image('class_athlete', 'assets/class_athlete_1.png');
         this.load.image('class_chef', 'assets/class_chef_1.png');
+        this.load.image('class_valkyrie', 'assets/class_valkyrie.png');
+        this.load.image('class_volleyball', 'assets/class_volleyball.png');
         this.load.image(GRASS_ASSET_KEY, 'assets/grass.png');
         this.load.image(SHADOW_ASSET_KEY, 'assets/shadow.png');
         
@@ -1324,7 +1328,9 @@ export default class GameScene extends Phaser.Scene {
             'Football': 'class_football',
             'Gambler': 'class_gambler',
             'Athlete': 'class_athlete',
-            'Gourmand': 'class_chef'
+            'Gourmand': 'class_chef',
+            'Valkyrie': 'class_valkyrie',
+            'Volleyball': 'class_volleyball'
         };
         return iconMap[className] || 'class_fighter';
     } 
@@ -1339,7 +1345,9 @@ export default class GameScene extends Phaser.Scene {
             'Football': 'class_football',
             'Gambler': 'class_gambler',
             'Athlete': 'class_athlete',
-            'Gourmand': 'class_chef'
+            'Gourmand': 'class_chef',
+            'Valkyrie': 'class_valkyrie',
+            'Volleyball': 'class_volleyball'
         };
         return iconMap[playerClass] || 'class_fighter';
     }

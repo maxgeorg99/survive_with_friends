@@ -116,7 +116,8 @@ export default class ClassSelectScene extends Phaser.Scene {
         'Til': false,
         'Marc': false,
         'Max': false,
-        'Chris': false
+        'Chris': false,
+        'Gwen': false  // Added Gwen to the alt versions record
     };
     private isBurgerMenuOpen: boolean = false; // Track burger menu state
 
@@ -1476,6 +1477,11 @@ export default class ClassSelectScene extends Phaser.Scene {
     }
 
     private isCharacterQuestCompleted(characterName: string): boolean {
+        // For testing: Always return true for Gwen
+        if (characterName === 'Gwen') {
+            return true;
+        }
+
         if (!this.spacetimeDBClient || !this.spacetimeDBClient.isConnected) {
             return false;
         }
