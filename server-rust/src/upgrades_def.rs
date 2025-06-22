@@ -285,12 +285,12 @@ fn create_upgrade_option_data(ctx: &ReducerContext, upgrade_type: UpgradeType, p
             generate_attack_upgrade(ctx, player_id, 4, possible_stats, upgrade_type)
         }
         UpgradeType::AttackThunderHorn => {
-            // Generate thunder horn-specific stat upgrade
+            // Generate thunder horn-specific stat upgrade (rebalanced for fairness)
             let possible_stats = vec![
-                (AttackStat::Damage, 15),            // High damage increase
-                (AttackStat::CooldownReduction, 33), // Significant cooldown reduction
+                (AttackStat::Damage, 8),             // More moderate damage increase
+                (AttackStat::CooldownReduction, 20), // Reduced cooldown reduction
                 (AttackStat::Projectiles, 1),        // Count upgrade (more strikes)
-                (AttackStat::Radius, 24),            // Size upgrade (larger area)
+                (AttackStat::Radius, 24),            // Smaller radius increase
             ];
             generate_attack_upgrade(ctx, player_id, 5, possible_stats, upgrade_type)
         }

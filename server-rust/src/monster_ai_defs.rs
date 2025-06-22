@@ -381,3 +381,25 @@ pub fn can_monster_deal_damage(state: &AIState) -> bool {
     }
 }
 
+// Helper function to check if a monster can receive damage based on its AI state
+pub fn can_monster_receive_damage(state: &AIState) -> bool {
+    match state {
+        AIState::Default => true,
+        AIState::BossEnderIdle => true,
+        AIState::BossEnderChase => true,
+        AIState::BossEnderDance => true,
+        AIState::BossEnderVanish => false, // Immune while vanishing
+        AIState::BossEnderLurk => false,   // Immune while lurking (hidden)
+        AIState::BossEnderTeleport => true,
+        AIState::BossEnderTransform => true,
+        AIState::BossAgnaIdle => true,
+        AIState::BossAgnaFlamethrower => true,
+        AIState::BossAgnaMagicCircle => true,
+        AIState::BossAgnaRitualMatch => false, // Immune during ritual match
+        AIState::BossAgnaRitualWick => false,  // Immune during ritual wick
+        AIState::BossAgnaRitualFailed => true, // Vulnerable when ritual failed
+        AIState::BossAgnaRitualComplete => false, // Immune during completion
+        AIState::Stationary => true,
+    }
+}
+

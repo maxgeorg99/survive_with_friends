@@ -37,6 +37,15 @@ pub fn damage_monster(ctx: &ReducerContext, monster_id: u32, damage_amount: u32)
         None => return false,
     };
     
+    // Check if this monster can receive damage based on its AI state
+    if !crate::monster_ai_defs::can_monster_receive_damage(&monster.ai_state) {
+        /*
+        log::info!("Monster {} (type: {:?}) is immune to damage during {:?} state", 
+                  monster_id, monster.bestiary_id, monster.ai_state);
+        */
+        return false; // No damage dealt, monster doesn't die
+    }
+    
     // Get the monster's position from boid (we'll need this for pinata logic)
     let boid_opt = ctx.db.monsters_boid().monster_id().find(&monster_id);
     let position = match boid_opt {
