@@ -6,6 +6,7 @@ import { GameEvents } from '../constants/GameEvents';
 const UI_DEPTH = 100000; // Extremely high depth to ensure UI stays on top of all game elements
 const BOSS_SPAWN_DELAY_MS = 5 * 60 * 1000; // 5 minutes in milliseconds, same as server
 const WARNING_THRESHOLD = 60 * 1000; // Start warning animation at 1 minute remaining
+const OMINOUS_SILENCE_THRESHOLD = 1; // Stop music at 10 seconds remaining for ominous effect
 
 export default class BossTimerUI {
     private scene: Phaser.Scene;
@@ -15,10 +16,21 @@ export default class BossTimerUI {
     private timerBackground: Phaser.GameObjects.Rectangle;
     private gameEvents: Phaser.Events.EventEmitter;
     
+    // Boss nameplate elements
+    private bossNameContainer!: Phaser.GameObjects.Container;
+    private bossNameText!: Phaser.GameObjects.Text;
+    private bossNameBackground!: Phaser.GameObjects.Rectangle;
+    private bossNameAnimation: Phaser.Tweens.Tween | null = null;
+    
     // Timer tracking
     private bossSpawnTime: number | null = null;
     private isTimerActive: boolean = false;
     private flashAnimation: Phaser.Tweens.Tween | null = null;
+    private hasSilencedMusic: boolean = false; // Track if we've already stopped music for ominous effect
+    
+    // Boss state tracking
+    private bossActive: boolean = false;
+    private currentBossType: string | null = null;
 
     constructor(scene: Phaser.Scene, spacetimeClient: SpacetimeDBClient) {
         this.scene = scene;
@@ -28,13 +40,6 @@ export default class BossTimerUI {
         // Create container for UI elements
         this.container = this.scene.add.container(0, 0);
         this.container.setDepth(UI_DEPTH);
-        
-        // Set initial position at top center of camera view
-        const camera = this.scene.cameras.main;
-        if (camera) {
-            this.container.x = camera.scrollX + camera.width / 2;
-            this.container.y = camera.scrollY + 40; // Position at the top
-        }
         
         // Create background for timer - wider to fit longer text
         this.timerBackground = this.scene.add.rectangle(0, 0, 300, 40, 0x000000, 0.7);
@@ -52,17 +57,138 @@ export default class BossTimerUI {
         });
         this.timerText.setOrigin(0.5, 0.5);
         
-        // Add elements to container (removed icon)
+        // Add elements to container
         this.container.add([this.timerBackground, this.timerText]);
         
-        // Hide initially until we know a boss is coming
-        this.container.setVisible(false);
+        // Create boss nameplate container (initially hidden)
+        this.createBossNameplate();
+        
+        // Set initial position at top center of camera view
+        const camera = this.scene.cameras.main;
+        if (camera) {
+            this.container.setPosition(
+                camera.scrollX + camera.width / 2,
+                camera.scrollY + 40
+            );
+        }
+        
+        // Add update callback to scene
+        this.scene.events.on('update', this.update, this);
         
         // Register event listeners
         this.registerEventListeners();
         
-        // Check for existing boss spawn timer in the database
+        // Check for existing boss timer in the database
         this.checkForExistingBossTimer();
+        
+        // Check for existing boss monsters (for reconnection cases)
+        // Add a small delay to ensure database connection is fully established
+        this.scene.time.delayedCall(100, () => {
+            this.checkForExistingBoss();
+        });
+        
+        console.log('BossTimerUI initialized');
+    }
+
+    private createBossNameplate(): void {
+        // Create boss nameplate container
+        this.bossNameContainer = this.scene.add.container(0, 0);
+        this.bossNameContainer.setDepth(UI_DEPTH + 1); // Higher than timer
+        this.bossNameContainer.setVisible(false);
+        
+        // Create dark background for dramatic effect - smaller size
+        this.bossNameBackground = this.scene.add.rectangle(0, 0, 650, 100, 0x000000, 0.8);
+        this.bossNameBackground.setStrokeStyle(3, 0xaa6c39, 0.9); // Dark gold border
+        this.bossNameBackground.setOrigin(0.5, 0.5);
+        
+        // Create boss name text with Dark Souls style
+        this.bossNameText = this.scene.add.text(0, 0, "", {
+            fontSize: '48px',
+            fontFamily: 'serif',
+            color: '#f4e4bc', // Parchment/gold color
+            stroke: '#2c1810', // Dark brown stroke
+            strokeThickness: 6,
+            align: 'center',
+            fontStyle: 'bold'
+        });
+        this.bossNameText.setOrigin(0.5, 0.5);
+        
+        // Add elements to nameplate container
+        this.bossNameContainer.add([this.bossNameBackground, this.bossNameText]);
+    }
+
+    private showBossNameplate(bossName: string): void {
+        // Set the boss name text
+        this.bossNameText.setText(bossName);
+        
+        // Track boss state
+        this.bossActive = true;
+        this.currentBossType = bossName.includes("Scion") ? "phase1" : "phase2";
+        
+        // Position closer to top of screen
+        const camera = this.scene.cameras.main;
+        if (camera) {
+            this.bossNameContainer.setPosition(
+                camera.scrollX + camera.width / 2,
+                camera.scrollY + 60 // Much closer to top
+            );
+        }
+        
+        // Stop any existing animation
+        if (this.bossNameAnimation) {
+            this.bossNameAnimation.stop();
+        }
+        
+        // Set initial state for animation
+        this.bossNameContainer.setVisible(true);
+        this.bossNameContainer.setAlpha(0);
+        this.bossNameContainer.setScale(0.5);
+        this.bossNameContainer.y -= 30; // Start slightly higher
+        
+        // Create dramatic entrance animation - full opacity
+        this.bossNameAnimation = this.scene.tweens.add({
+            targets: this.bossNameContainer,
+            alpha: { from: 0, to: 1 }, // Full opacity during entrance
+            scaleX: { from: 0.5, to: 1 },
+            scaleY: { from: 0.5, to: 1 },
+            y: this.bossNameContainer.y + 30, // Move to final position
+            duration: 2000,
+            ease: 'Power3.easeOut'
+            // Nameplate stays at full opacity (no fade to semi-transparent)
+        });
+        
+        // Add subtle pulsing glow effect
+        this.scene.tweens.add({
+            targets: this.bossNameBackground,
+            alpha: { from: 0.8, to: 0.6 },
+            duration: 1500,
+            ease: 'Sine.easeInOut',
+            yoyo: true,
+            repeat: 2
+        });
+        
+        console.log(`Boss nameplate shown: ${bossName}`);
+    }
+
+    private hideBossNameplate(): void {
+        if (this.bossNameAnimation) {
+            this.bossNameAnimation.stop();
+        }
+        
+        // Reset boss state
+        this.bossActive = false;
+        this.currentBossType = null;
+        
+        // Fade out animation
+        this.bossNameAnimation = this.scene.tweens.add({
+            targets: this.bossNameContainer,
+            alpha: { from: this.bossNameContainer.alpha, to: 0 },
+            duration: 1500,
+            ease: 'Power2.easeIn',
+            onComplete: () => {
+                this.bossNameContainer.setVisible(false);
+            }
+        });
     }
 
     private registerEventListeners(): void {
@@ -77,15 +203,25 @@ export default class BossTimerUI {
     }
 
     private handleGameStateUpdated(ctx: any, oldState: any, newState: any): void {
-        // If boss becomes active, hide the timer
+        // If boss becomes active, hide the timer and stop music immediately
         if (!oldState.bossActive && newState.bossActive) {
             this.stopTimer();
             this.container.setVisible(false);
+            
+            // Stop music immediately when boss becomes active for ominous silence
+            console.log("Boss active state detected! Stopping background music for ominous silence before boss spawn");
+            const gameScene = this.scene.scene.get('GameScene') as any;
+            if (gameScene && gameScene.musicManager) {
+                gameScene.musicManager.stopCurrentTrack();
+            }
         }
         
-        // If boss becomes inactive and was previously active, prepare for new timer
+        // If boss becomes inactive and was previously active, hide nameplate and prepare for new timer
         if (oldState.bossActive && !newState.bossActive) {
-            // Boss fight ended, we'll wait for new timer to be created
+            // Boss fight ended, hide nameplate
+            if (this.bossActive) {
+                this.hideBossNameplate();
+            }
             this.bossSpawnTime = null;
         }
     }
@@ -96,8 +232,9 @@ export default class BossTimerUI {
         if (timestamp) {
             this.bossSpawnTime = timestamp;
             this.startTimer();
-        } else {            
-            // Fallback 1: Try direct access to value if it exists
+            console.log("Boss timer started");
+        } else {
+            // Fallback: Try direct access to value if it exists
             if (timer?.scheduledAt?.value) {
                 const directValue = timer.scheduledAt.value;
                 if (typeof directValue === 'bigint' || !isNaN(Number(directValue))) {
@@ -111,16 +248,29 @@ export default class BossTimerUI {
             // Hide timer if no valid timestamp was found
             this.stopTimer();
             this.container.setVisible(false);
+            console.warn("Could not extract valid timestamp from created timer");
         }
     }
 
     private handleMonsterCreated(ctx: any, monster: any): void {
-        // If a boss monster is created, hide the timer
+        // If a boss monster is created, hide the timer and show nameplate
         if (monster.bestiaryId && monster.bestiaryId.tag) {
             const monsterType = monster.bestiaryId.tag;
-            if (monsterType === 'FinalBossPhase1' || monsterType === 'FinalBossPhase2') {
-                this.stopTimer();
-                this.container.setVisible(false);
+            if (this.isBoss(monsterType)) {
+                const bossName = this.getBossName(monsterType);
+                
+                if (this.isBossPhase1(monsterType)) {
+                    this.stopTimer();
+                    this.container.setVisible(false);
+                    this.showBossNameplate(bossName);
+                } else if (this.isBossPhase2(monsterType)) {
+                    // Hide any existing nameplate first
+                    this.hideBossNameplate();
+                    // Small delay before showing new nameplate for dramatic effect
+                    this.scene.time.delayedCall(1000, () => {
+                        this.showBossNameplate(bossName);
+                    });
+                }
             } else {
                 // For regular monsters, recheck the boss timer to keep it in sync
                 this.checkForExistingBossTimer();
@@ -130,27 +280,28 @@ export default class BossTimerUI {
 
     public startTimer(): void {
         if (!this.bossSpawnTime) {
+            console.log("Cannot start timer - no valid boss spawn time");
             this.container.setVisible(false);
             return;
         }
         
         this.isTimerActive = true;
+        this.hasSilencedMusic = false; // Reset silence flag for new timer
         this.container.setVisible(true);
         
         // Ensure UI is properly visible
         if (!this.container.visible) {
+            console.warn("Boss timer container not visible after setVisible(true), forcing visibility");
             this.container.visible = true;
             this.container.alpha = 1;
         }
         
         // Check if the spawn time is in the past
         if (this.bossSpawnTime <= Date.now()) {
+            console.log("Boss spawn time is in the past, showing IMMINENT message");
             this.timerText.setText("End of the world: IMMINENT!");
             this.startWarningFlash(true);
-        }
-        
-        console.log(`Boss timer started. Boss will spawn at: ${new Date(this.bossSpawnTime).toLocaleTimeString()}`);
-        console.log(`Timer container properties: visible=${this.container.visible}, alpha=${this.container.alpha}, x=${this.container.x}, y=${this.container.y}`);
+        }  
     }
 
     public stopTimer(): void {
@@ -166,36 +317,83 @@ export default class BossTimerUI {
     }
 
     public update(time: number, delta: number): void {
-        // Update position based on camera view
+        // Update position to follow camera
         const camera = this.scene.cameras.main;
         if (camera) {
-            this.container.x = camera.scrollX + camera.width / 2;
-            this.container.y = camera.scrollY + 40; // Position at the top
+            this.container.setPosition(
+                camera.scrollX + camera.width / 2,
+                camera.scrollY + 40 // Fixed distance from top of screen
+            );
+            
+            // Update boss nameplate position as well - closer to top
+            if (this.bossNameContainer.visible) {
+                this.bossNameContainer.setPosition(
+                    camera.scrollX + camera.width / 2,
+                    camera.scrollY + 60 // Much closer to top
+                );
+            }
         }
         
-        // Update timer if active
-        if (this.isTimerActive && this.bossSpawnTime) {
-            const now = Date.now();
-            const timeRemaining = Math.max(0, this.bossSpawnTime - now);
-            
-            if (timeRemaining <= 0) {
-                // Timer expired but boss hasn't spawned yet
-                this.timerText.setText("End of the world: IMMINENT!");
-                
-                // Start flashing if not already
-                if (!this.flashAnimation) {
-                    this.startWarningFlash(true);
-                }
-            } else {
-                // Format remaining time as MM:SS
-                const minutes = Math.floor(timeRemaining / 60000);
-                const seconds = Math.floor((timeRemaining % 60000) / 1000);
-                const timeString = `End of the world in: ${minutes}:${seconds.toString().padStart(2, '0')}`;
-                this.timerText.setText(timeString);
-                
-                // Start warning animation when approaching boss time
-                if (timeRemaining <= WARNING_THRESHOLD && !this.flashAnimation) {
-                    this.startWarningFlash(false);
+        // Update timer text if game state exists
+        if (this.spacetimeClient.sdkConnection?.db) {
+            const gameState = this.spacetimeClient.sdkConnection.db.gameState.id.find(0);
+            if (gameState) {
+                // Show timer if we have a boss spawn timer
+                const bossTimers = Array.from(this.spacetimeClient.sdkConnection.db.bossSpawnTimer.iter());
+                if (bossTimers.length > 0 && !gameState.bossActive) {
+                    // Force visibility and check container properties
+                    this.container.setVisible(true);
+                    this.container.setAlpha(1);
+                    
+                    // Get current time and calculate remaining time
+                    const now = Date.now();
+                    const timestamp = this.extractTimestampFromTimer(bossTimers[0]);
+                    if (timestamp) {
+                        const timeRemaining = Math.max(0, (timestamp - now) / 1000); // Convert to seconds
+                        const minutes = Math.floor(timeRemaining / 60);
+                        const seconds = Math.floor(timeRemaining % 60);
+                        
+                        if (timeRemaining > 0) {
+                            this.timerText.setText(`End of the world in: ${minutes}:${seconds.toString().padStart(2, '0')}`);
+                            
+                            // Stop background music at 10 seconds for ominous silence before boss spawn
+                            if (timeRemaining <= OMINOUS_SILENCE_THRESHOLD && !this.hasSilencedMusic) {
+                                console.log("Boss timer: Stopping background music for ominous silence before boss spawn");
+                                const gameScene = this.scene.scene.get('GameScene') as any;
+                                if (gameScene && gameScene.musicManager) {
+                                    gameScene.musicManager.stopCurrentTrack();
+                                }
+                                this.hasSilencedMusic = true;
+                            }
+                            
+                            // Start warning flash if time is running low
+                            if (timeRemaining <= 60 && !this.flashAnimation) {
+                                this.startWarningFlash(timeRemaining <= 10);
+                            }
+                        } else {
+                            this.timerText.setText("End of the world: IMMINENT!");
+                            
+                            // Ensure music is stopped when timer reaches 0
+                            if (!this.hasSilencedMusic) {
+                                console.log("Boss timer: Timer reached 0, ensuring music is stopped");
+                                const gameScene = this.scene.scene.get('GameScene') as any;
+                                if (gameScene && gameScene.musicManager) {
+                                    gameScene.musicManager.stopCurrentTrack();
+                                }
+                                this.hasSilencedMusic = true;
+                            }
+                            
+                            if (!this.flashAnimation) {
+                                this.startWarningFlash(true);
+                            }
+                        }
+                    }
+                } else {
+                    this.container.setVisible(false);
+                    if (this.flashAnimation) {
+                        this.flashAnimation.stop();
+                        this.flashAnimation = null;
+                    }
                 }
             }
         }
@@ -224,6 +422,9 @@ export default class BossTimerUI {
     }
 
     public destroy(): void {
+        // Remove update callback
+        this.scene.events.off('update', this.update, this);
+        
         // Clean up event listeners
         this.gameEvents.off(GameEvents.GAME_STATE_UPDATED, this.handleGameStateUpdated, this);
         this.gameEvents.off(GameEvents.BOSS_SPAWN_TIMER_CREATED, this.handleBossTimerCreated, this);
@@ -233,56 +434,38 @@ export default class BossTimerUI {
         if (this.flashAnimation) {
             this.flashAnimation.stop();
         }
+        if (this.bossNameAnimation) {
+            this.bossNameAnimation.stop();
+        }
         
-        // Destroy container and all children
+        // Destroy containers and all children
         this.container.destroy();
+        this.bossNameContainer.destroy();
     }
 
     private checkForExistingBossTimer(): void {
         // Only if we have a connection
         if (this.spacetimeClient?.sdkConnection?.db) {
-            
             try {
                 // Try to find a boss timer in the database
                 const bossTimers = Array.from(this.spacetimeClient.sdkConnection.db.bossSpawnTimer.iter());
                 
-                console.log("Raw timer data:", 
-                    JSON.stringify(bossTimers, (key, value) => 
-                        typeof value === 'bigint' ? value.toString() + 'n' : value
-                    )
-                );
-                
                 if (bossTimers.length > 0) {
                     // Timer exists, get the first one
                     const timer = bossTimers[0];
-                    console.log("Found existing boss timer:", timer);
-                    console.log("Timer properties:", Object.keys(timer));
                     
-                    if (timer?.scheduledAt?.value) {
-                        console.log("Direct value:", timer.scheduledAt.value);
-                        console.log("Value type:", typeof timer.scheduledAt.value);
-                    }
-                    
-                    // Extract spawn time - we need to safely extract it from the timer object
+                    // Extract spawn time
                     if (timer) {
-                        // Extract the timestamp using a more general approach
                         const timestamp = this.extractTimestampFromTimer(timer);
                         if (timestamp) {
-                            console.log("Successfully extracted timestamp:", timestamp);
-                            console.log("Human readable date:", new Date(timestamp).toLocaleString());
                             this.bossSpawnTime = timestamp;
                             this.startTimer();
-                            console.log("Started boss timer from existing database entry");
                         } else {
-                            console.log("Failed to extract timestamp using standard method, trying fallbacks...");
-                            
-                            // Fallback 1: Try direct access to value if it exists
+                            // Fallback: Try direct access to value if it exists
                             if (timer?.scheduledAt?.value) {
                                 const directValue = timer.scheduledAt.value;
                                 if (typeof directValue === 'bigint' || !isNaN(Number(directValue))) {
                                     const directTimestamp = Number(directValue) / 1000;
-                                    console.log("Fallback 1: Direct value conversion:", directTimestamp);
-                                    console.log("Human readable date:", new Date(directTimestamp).toLocaleString());
                                     this.bossSpawnTime = directTimestamp;
                                     this.startTimer();
                                     return;
@@ -292,11 +475,9 @@ export default class BossTimerUI {
                             // Hide timer if timestamp can't be extracted
                             this.stopTimer();
                             this.container.setVisible(false);
-                            console.log("Could not extract valid timestamp from timer, hiding boss timer UI");
                         }
                     }
                 } else {
-                    console.log("No existing boss spawn timer found, hiding timer UI");
                     // Ensure timer is hidden when no timer exists
                     this.stopTimer();
                     this.container.setVisible(false);
@@ -313,25 +494,8 @@ export default class BossTimerUI {
     // Helper method to extract timestamp from timer object
     private extractTimestampFromTimer(timer: any): number | null {
         try {
-            // Log the raw timer before JSON stringification
-            console.log("Raw timer before stringification:", timer);
-            console.log("Raw scheduledAt:", timer?.scheduledAt);
-            console.log("Raw value:", timer?.scheduledAt?.value);
-            
-            // Check the actual type of the value
-            if (timer?.scheduledAt?.value) {
-                console.log("Value type:", typeof timer.scheduledAt.value);
-                console.log("Is BigInt:", typeof timer.scheduledAt.value === 'bigint');
-            }
-            
-            // Log stringified version for reference
-            console.log("Extracting timestamp from timer:", JSON.stringify(timer, (key, value) => 
-                typeof value === 'bigint' ? value.toString() : value
-            ));
-            
             // First check if we have a scheduledAt property
             if (!timer || !timer.scheduledAt) {
-                console.log("Timer or scheduledAt property is missing");
                 return null;
             }
             
@@ -341,10 +505,8 @@ export default class BossTimerUI {
             // If scheduled_at has a microsSinceUnixEpoch property (common timestamp format)
             if (scheduledAt.microsSinceUnixEpoch !== undefined) {
                 // Convert microseconds to milliseconds for JS Date
-                // Handle both number and bigint cases
                 const microsValue = scheduledAt.microsSinceUnixEpoch;
                 if (typeof microsValue === 'bigint') {
-                    // Convert bigint to number safely
                     return Number(microsValue) / 1000;
                 } else if (typeof microsValue === 'number') {
                     return microsValue / 1000;
@@ -362,27 +524,22 @@ export default class BossTimerUI {
             if (typeof scheduledAt === 'object' && scheduledAt.tag && scheduledAt.value) {
                 if (scheduledAt.tag === 'Time') {
                     const timeValue = scheduledAt.value;
-                    console.log("Processing Time tag with value:", timeValue, "type:", typeof timeValue);
                     
                     // Direct BigInt handling
                     if (typeof timeValue === 'bigint') {
-                        console.log("Converting BigInt value to timestamp");
                         return Number(timeValue) / 1000;
                     }
                     
                     // Handle case where value is a string (could be with or without 'n')
                     if (typeof timeValue === 'string') {
-                        console.log("Found string timestamp:", timeValue);
                         // Check if it's a BigInt string (ends with 'n')
                         if (timeValue.endsWith('n')) {
                             // Remove the 'n' suffix and convert to number
                             const valueWithoutN = timeValue.slice(0, -1);
-                            console.log("Removed 'n' suffix, processing:", valueWithoutN);
                             // This is microseconds since epoch, convert to ms
                             return Number(valueWithoutN) / 1000;
                         } else {
                             // It's a regular string number, convert directly
-                            console.log("Processing as regular string number");
                             return Number(timeValue) / 1000;
                         }
                     }
@@ -404,25 +561,104 @@ export default class BossTimerUI {
                             : timeValue.timeMs;
                     }
 
-                    // Try direct conversion as a fallback - this is likely the case we're handling
+                    // Try direct conversion as a fallback
                     if (timeValue) {
-                        console.log("Attempting direct conversion of value");
                         const timestamp = Number(timeValue);
                         if (!isNaN(timestamp) && timestamp > 0) {
-                            console.log("Direct conversion succeeded:", timestamp);
                             return timestamp / 1000; // Convert microseconds to milliseconds
                         }
                     }
                 }
             }
             
-            // Log the structure for debugging
-            console.log("Could not extract timestamp - unknown timer structure");
-            
             return null;
         } catch (error) {
             console.error("Error extracting timestamp:", error);
             return null;
+        }
+    }
+
+    private checkForExistingBoss(): void {
+        // Check if there are any existing boss monsters when connecting
+        if (!this.spacetimeClient?.sdkConnection?.db) {
+            console.log("Database not ready yet, retrying boss check in 500ms...");
+            // Retry after a longer delay if database isn't ready
+            this.scene.time.delayedCall(500, () => {
+                this.checkForExistingBoss();
+            });
+            return;
+        }
+        
+        console.log("Checking for existing boss monsters on reconnect...");
+        
+        // Look for any existing boss monsters
+        for (const monster of this.spacetimeClient.sdkConnection.db.monsters.iter()) {
+            if (monster.bestiaryId && monster.bestiaryId.tag) {
+                const monsterType = monster.bestiaryId.tag;
+                if (this.isBoss(monsterType)) {
+                    const bossName = this.getBossName(monsterType);
+                    const phaseText = this.isBossPhase1(monsterType) ? "phase 1" : "phase 2";
+                    console.log(`Found existing boss ${phaseText} on reconnect - showing nameplate, starting boss music and haze`);
+                    this.stopTimer();
+                    this.container.setVisible(false);
+                    this.showBossNameplate(bossName);
+                    
+                    // Trigger boss music and haze for reconnection
+                    this.triggerBossEffectsOnReconnect();
+                    return; // Only show one boss nameplate
+                }
+            }
+        }
+        
+        console.log("No existing boss monsters found on reconnect");
+    }
+    
+    // Helper method to trigger boss music and haze effects when reconnecting
+    private triggerBossEffectsOnReconnect(): void {
+        console.log("Triggering boss music and haze effects on reconnect");
+        
+        // Get reference to GameScene to trigger boss effects
+        const gameScene = this.scene as any;
+        
+        // Start boss music only if not already playing boss music
+        if (gameScene.musicManager) {
+            const currentTrack = gameScene.musicManager.getCurrentTrack();
+            if (currentTrack.key !== 'boss') {
+                console.log("Starting boss music on reconnect (current track: " + currentTrack.key + ")");
+                gameScene.musicManager.playTrack('boss');
+            } else {
+                console.log("Boss music already playing, skipping music change");
+            }
+        }
+        
+        // Show boss haze (this is safe to call multiple times)
+        if (gameScene.showBossHaze) {
+            console.log("Showing boss haze on reconnect");
+            gameScene.showBossHaze();
+        }
+    }
+
+    // Helper functions for boss type checking
+    private isBoss(monsterType: string): boolean {
+        return monsterType === 'BossEnderPhase1' || monsterType === 'BossEnderPhase2' ||
+               monsterType === 'BossAgnaPhase1' || monsterType === 'BossAgnaPhase2';
+    }
+
+    private isBossPhase1(monsterType: string): boolean {
+        return monsterType === 'BossEnderPhase1' || monsterType === 'BossAgnaPhase1';
+    }
+
+    private isBossPhase2(monsterType: string): boolean {
+        return monsterType === 'BossEnderPhase2' || monsterType === 'BossAgnaPhase2';
+    }
+
+    private getBossName(monsterType: string): string {
+        switch (monsterType) {
+            case 'BossEnderPhase1': return "Ender, Scion of Ruin";
+            case 'BossEnderPhase2': return "Ender, Host of Oblivion";
+            case 'BossAgnaPhase1': return "Agna, the Seething Calamity";
+            case 'BossAgnaPhase2': return "Agna, Purified by Flame";
+            default: return "Unknown Boss";
         }
     }
 } 

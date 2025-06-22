@@ -10,12 +10,11 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "baseUrl": ".",
-    "resolveJsonModule": true,
     "paths": {
       "@spacetimedb/sdk/*": ["./node_modules/@spacetimedb/sdk/*"],
       "@autobindings/*": ["./src/autobindings/*"]
     }
   },
-  "include": ["src/**/*", "public/loca/*.json"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 } 

@@ -2,32 +2,28 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Vibe Survivors</title>
+    
+    <!-- Preload class icons for faster loading in ClassSelectScene -->
+    <link rel="preload" href="/assets/attack_sword.png" as="image">
+    <link rel="preload" href="/assets/attack_knife.png" as="image">
+    <link rel="preload" href="/assets/attack_wand.png" as="image">
+    <link rel="preload" href="/assets/attack_shield.png" as="image">
+    <link rel="preload" href="/assets/attack_horn.png" as="image">
+    
+    <!-- Preload new Valkyrie class sprite -->
+    <link rel="preload" href="/assets/class_valkyrie_1.png" as="image">
+    
+    <!-- Preload Thunder Horn attack assets -->
+    <link rel="preload" href="/assets/attack_lightning.png" as="image">
+    
     <style>
-        body { 
-            margin: 0; 
-            overflow: hidden; 
-            background-color: #333; 
-            height: 100%; 
-            position: fixed;
-            width: 100%;
-        }
-        
-        /* Fix for input fields on mobile */
-        input, button {
-            font-size: 16px; /* Prevent zoom on iOS */
-        }
-        
-        /* Style to keep input visible during keyboard display */
-        .keyboard-open .login-input-container {
-            position: fixed !important;
-            top: 20px !important;
-        }
+        body { margin: 0; overflow: hidden; background-color: #333; }
     </style>
 </head>
 <body>
     <div id="gameContainer"></div>
     <script type="module" src="/src/main.ts"></script>
 </body>
-</html>
+</html> 
