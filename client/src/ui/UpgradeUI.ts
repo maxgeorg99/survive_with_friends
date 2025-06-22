@@ -1,28 +1,51 @@
 import Phaser from 'phaser';
-import { UpgradeOptionData, UpgradeType, AttackType, ChosenUpgradeData } from '../autobindings';
+import { UpgradeOptionData, UpgradeType } from '../autobindings';
 import SpacetimeDBClient from '../SpacetimeDBClient';
-import { GameEvents } from '../constants/GameEvents';
+import { ChooseUpgrade } from '../autobindings';
+import { getSoundVolume } from '../managers/VolumeSettings';
+
+// Define a type for our attack graphic data with prediction capabilities
+interface AttackGraphicData {
+    graphic: Phaser.GameObjects.Graphics;
+    sprite: Phaser.GameObjects.Sprite | null;
+    radius: number;
+    baseRadius: number; // Store the base radius from attack data for scaling calculation
+    alpha: number;
+    // Add prediction-related properties
+    lastUpdateTime: number;
+    predictedPosition: Phaser.Math.Vector2;
+    serverPosition: Phaser.Math.Vector2;
+    direction: Phaser.Math.Vector2;
+    speed: number;
+    isShield: boolean;
+    playerId: number | null;
+    parameterU: number;
+    ticksElapsed: number;
+    attackType: string;
+}
+
+// Card hold state interface
+interface CardHoldState {
+    isHolding: boolean;
+    holdStartTime: number;
+    holdTimer: Phaser.Time.TimerEvent | null;
+    progressBar: Phaser.GameObjects.Rectangle | null;
+    progressBarBackground: Phaser.GameObjects.Rectangle | null;
+}
 
 // Constants
-const CARD_WIDTH = 180; 
-const CARD_HEIGHT = 250;
-const CARD_SPACING = 10;
-const CARD_SCALE_DESKTOP = 0.8;
-const CARD_SCALE_MOBILE = 0.65;
-const UI_DEPTH = 100000; // Much higher depth to ensure UI stays above all game elements including monsters
-const MOBILE_BOTTOM_MARGIN = 5;
-const DESKTOP_BOTTOM_MARGIN = 20;
+const CARD_WIDTH = 200;
+const CARD_HEIGHT = 260;
+const CARD_SPACING = 20;
+const CARD_SCALE = 0.8;
+const UI_DEPTH = 100000; // Extremely high depth to ensure UI stays on top of all game elements
 
-// Animation constants for weapon fusion
-const FUSION_ANIMATION = {
-    WEAPON_SCALE: 1.0,
-    FUSION_DURATION: 2500,
-    WEAPON_MOVE_DURATION: 800,
-    MERGE_PAUSE_DURATION: 400,
-    RESULT_REVEAL_DURATION: 600,
-    PARTICLE_BURST_COUNT: 50,
-    ENERGY_STREAM_COUNT: 12
-};
+// Hold mechanic constants
+const HOLD_DURATION_MS = 400; // Time required to hold for selection (800ms)
+const PROGRESS_BAR_WIDTH = CARD_WIDTH * CARD_SCALE * 0.8;
+const PROGRESS_BAR_HEIGHT = 8;
+const PROGRESS_BAR_Y_OFFSET = (CARD_HEIGHT * CARD_SCALE) / 2 - 35; // Moved down slightly more
+const NUMBER_TEXT_Y_OFFSET = (CARD_HEIGHT * CARD_SCALE) / 2 + 5; // Moved up closer to cards (was +15, now +5)
 
 // Define upgrade icon mapping
 const UPGRADE_ICON_MAP: { [key: string]: string } = {
@@ -34,89 +57,39 @@ const UPGRADE_ICON_MAP: { [key: string]: string } = {
     'AttackWand': 'attack_wand',
     'AttackKnives': 'attack_knife',
     'AttackShield': 'attack_shield',
-    'AttackFootball': 'attack_football',
-    'AttackCards': 'attack_cards',
-    'AttackDumbbell': 'attack_dumbbell',
-    'AttackGarlic': 'attack_garlic'
-};
-
-// Weapon asset mapping for combinations - Fix TypeScript errors by using string keys
-const WEAPON_ASSET_MAP: Record<string, string> = {
-    'Sword': 'attack_sword',
-    'Wand': 'attack_wand',
-    'Knives': 'attack_knife',
-    'Shield': 'attack_shield',
-    'Football': 'attack_football',
-    'Cards': 'attack_cards',
-    'Dumbbell': 'attack_dumbbell',
-    'Garlic': 'attack_garlic',
-    'Shuriken': 'attack_shuriken',
-    'FireSword': 'attack_fire_sword',
-    'HolyHammer': 'attack_holy_hammer',
-    'MagicDagger': 'attack_magic_dagger',
-    'ThrowingShield': 'attack_throwing_shield',
-    'EnergyOrb': 'attack_energy_orb'
-};
-
-// Weapon name mapping for combinations - Fix TypeScript errors by using string keys
-const WEAPON_NAME_MAP: Record<string, string> = {
-    'Sword': "Sword",
-    'Wand': "Wand",
-    'Knives': "Knives",
-    'Shield': "Shield",
-    'Football': "Football",
-    'Cards': "Cards",
-    'Dumbbell': "Dumbbell",
-    'Garlic': "Garlic",
-    'Shuriken': "Shuriken",
-    'FireSword': "Fire Sword",
-    'HolyHammer': "Holy Hammer",
-    'MagicDagger': "Magic Dagger",
-    'ThrowingShield': "Throwing Shield",
-    'EnergyOrb': "Energy Orb"
+    'AttackThunderHorn': 'attack_horn'
 };
 
 export default class UpgradeUI {
     private scene: Phaser.Scene;
     private spacetimeClient: SpacetimeDBClient;
-    private upgradeContainer: Phaser.GameObjects.Container;
-    private combinationContainer: Phaser.GameObjects.Container;
+    private container: Phaser.GameObjects.Container;
     private cards: Phaser.GameObjects.Container[] = [];
     private localPlayerId: number = 0;
     private upgradeOptions: UpgradeOptionData[] = [];
     private isVisible: boolean = false;
     private keyListeners: Phaser.Input.Keyboard.Key[] = [];
     private rerollText: Phaser.GameObjects.Text | null = null;
-    private isMobile: boolean = false;
-    private gameEvents: Phaser.Events.EventEmitter;
-
-    // Helper to detect mobile devices
-    private detectMobile(): boolean {
-        const userAgent = navigator.userAgent.toLowerCase();
-        return /android|webos|iphone|ipad|ipod|blackberry|windows phone/i.test(userAgent) 
-            || (window.innerWidth <= 800);
-    }
+    private chooseUpgradeText: Phaser.GameObjects.Text | null = null;
+    
+    // Hold state tracking for each card
+    private cardHoldStates: CardHoldState[] = [];
+    
+    // Track which pointers are being handled by UI to prevent movement
+    private handledPointers: Set<number> = new Set();
+    
+    // Track the upgrade bar fill sound instance
+    private upgradeBarFillSound: Phaser.Sound.BaseSound | null = null;
 
     constructor(scene: Phaser.Scene, spacetimeClient: SpacetimeDBClient, localPlayerId: number) {
         this.scene = scene;
         this.spacetimeClient = spacetimeClient;
         this.localPlayerId = localPlayerId;
-        this.gameEvents = (window as any).gameEvents;
         
-        // Detect if we're on a mobile device
-        this.isMobile = this.detectMobile();
-        console.log(`UpgradeUI initialized on ${this.isMobile ? 'mobile' : 'desktop'} device`);
+        // Create container for all upgrade UI elements
+        this.container = this.scene.add.container(0, 0);
+        this.container.setDepth(UI_DEPTH);
         
-        // Create container for upgrade UI elements
-        this.upgradeContainer = this.scene.add.container(0, 0);
-        this.upgradeContainer.setDepth(UI_DEPTH);
-        this.upgradeContainer.setVisible(false);
-        
-        // Create container for weapon combination UI elements
-        this.combinationContainer = this.scene.add.container(0, 0);
-        this.combinationContainer.setDepth(UI_DEPTH);
-        this.combinationContainer.setVisible(false);
-
         // Create keyboard input for number keys 1-3
         this.keyListeners = [
             this.scene.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.ONE),
@@ -124,26 +97,78 @@ export default class UpgradeUI {
             this.scene.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.THREE)
         ].filter((key): key is Phaser.Input.Keyboard.Key => key !== undefined);
 
-        // Register for weapon combination events
-        this.registerCombinationEventListeners();
+        // Create "Choose an upgrade" text - moved back down for proper distance from character
+        this.chooseUpgradeText = this.scene.add.text(0, -CARD_HEIGHT / 2 - 30, "Choose an upgrade", {
+            fontSize: '24px',
+            fontFamily: 'Arial',
+            color: '#ffff00', // Yellow color to make it stand out
+            stroke: '#000000',
+            strokeThickness: 4,
+        });
+        this.chooseUpgradeText.setOrigin(0.5);
+        this.container.add(this.chooseUpgradeText);
 
-        console.log('UpgradeUI initialized');
+        // Create reroll text with instruction - also moved down to maintain spacing
+        this.rerollText = this.scene.add.text(0, -CARD_HEIGHT / 2, "Press R to reroll (Available: 0)", {
+            fontSize: '18px',
+            fontFamily: 'Arial',
+            color: '#ffffff',
+            stroke: '#000000',
+            strokeThickness: 3,
+        });
+        this.rerollText.setOrigin(0.5);
+        this.container.add(this.rerollText);
+
+        console.log('UpgradeUI initialized with hold mechanics');
     }
 
     public update(time: number, delta: number): void {
         if (!this.isVisible) return;
 
-        // Position the container at the bottom of the camera
+        // Position the container at the bottom of the camera - moved up to be closer to text
         const camera = this.scene.cameras.main;
         if (camera) {
-            this.upgradeContainer.x = camera.scrollX + camera.width / 2;
-            
-            // Use different vertical positioning based on device type
-            const bottomMargin = this.isMobile ? MOBILE_BOTTOM_MARGIN : DESKTOP_BOTTOM_MARGIN;
-            this.upgradeContainer.y = camera.scrollY + camera.height - (CARD_HEIGHT / 2) - bottomMargin;
+            this.container.setPosition(
+                camera.scrollX + camera.width / 2,
+                camera.scrollY + camera.height - CARD_HEIGHT / 2 - 60 // Moved up from -20 to -60
+            );
         }
 
-        // Check for number key presses
+        // Update reroll text if player data is available
+        if (this.rerollText && this.spacetimeClient.sdkConnection?.db) {
+            const player = this.spacetimeClient.sdkConnection.db.player.playerId.find(this.localPlayerId);
+            if (player && player.rerolls !== undefined) {
+                this.rerollText.setText(`Press R to reroll (Available: ${player.rerolls})`);
+                this.rerollText.setVisible(this.isVisible);
+            }
+        }
+
+        // Update progress bars for cards being held
+        this.cardHoldStates.forEach((holdState, index) => {
+            if (holdState.isHolding && holdState.progressBar && holdState.holdStartTime > 0) {
+                const elapsed = time - holdState.holdStartTime;
+                const progress = Math.min(elapsed / HOLD_DURATION_MS, 1);
+                
+                // Update progress bar width
+                holdState.progressBar.width = PROGRESS_BAR_WIDTH * progress;
+                
+                // Change color as it progresses
+                if (progress < 0.3) {
+                    holdState.progressBar.fillColor = 0xff4444; // Red
+                } else if (progress < 0.7) {
+                    holdState.progressBar.fillColor = 0xffaa00; // Orange
+                } else {
+                    holdState.progressBar.fillColor = 0x44ff44; // Green
+                }
+                
+                // Complete selection if progress is full
+                if (progress >= 1) {
+                    this.completeHoldSelection(index);
+                }
+            }
+        });
+
+        // Check for number key presses (immediate selection)
         for (let i = 0; i < this.keyListeners.length; i++) {
             if (Phaser.Input.Keyboard.JustDown(this.keyListeners[i])) {
                 this.chooseUpgrade(i);
@@ -158,59 +183,135 @@ export default class UpgradeUI {
         
         if (options.length > 0) {
             this.createUpgradeCards();
-            this.showUpgradeUI();
+            this.show();
+            console.log("UpgradeUI shown with options");
         } else {
-            this.hideUpgradeUI();
+            this.hide();
+            console.log("UpgradeUI hidden - no options");
         }
     }
 
     private createUpgradeCards(): void {
-        // Clear any existing cards
+        // Clear any existing cards and hold states
         this.cards.forEach(card => card.destroy());
         this.cards = [];
-
-        // Use different spacing for mobile
-        const effectiveCardWidth = this.isMobile ? CARD_WIDTH * CARD_SCALE_MOBILE : CARD_WIDTH * CARD_SCALE_DESKTOP;
-        const effectiveCardSpacing = this.isMobile ? CARD_SPACING / 2 : CARD_SPACING; // Even tighter spacing on mobile
+        this.cardHoldStates = [];
 
         // Calculate total width of all cards with spacing
-        const totalWidth = (this.upgradeOptions.length * effectiveCardWidth) + 
-                          ((this.upgradeOptions.length - 1) * effectiveCardSpacing);
-        const startX = -totalWidth / 2 + effectiveCardWidth / 2;
+        const totalWidth = (this.upgradeOptions.length * CARD_WIDTH) + ((this.upgradeOptions.length - 1) * CARD_SPACING);
+        const startX = -totalWidth / 2 + CARD_WIDTH / 2;
 
-        // Create a card for each option
+        // Create a card for each option - moved up closer to text
         this.upgradeOptions.forEach((option, index) => {
-            const x = startX + (index * (effectiveCardWidth + effectiveCardSpacing));
-            const card = this.createCard(x, 0, option, index);
+            const x = startX + (index * (CARD_WIDTH + CARD_SPACING));
+            const card = this.createCard(x, -20, option, index); // Moved up from y=0 to y=-30
             this.cards.push(card);
-            this.upgradeContainer.add(card);
+            this.container.add(card);
+            
+            // Initialize hold state for this card
+            this.cardHoldStates.push({
+                isHolding: false,
+                holdStartTime: 0,
+                holdTimer: null,
+                progressBar: null,
+                progressBarBackground: null
+            });
         });
     }
 
     private createCard(x: number, y: number, option: UpgradeOptionData, index: number): Phaser.GameObjects.Container {
         const card = this.scene.add.container(x, y);
         
-        // Use different scale based on device type
-        const cardScale = this.isMobile ? CARD_SCALE_MOBILE : CARD_SCALE_DESKTOP;
-        
         // Card background
         const background = this.scene.add.image(0, 0, 'card_blank');
-        background.setScale(cardScale);
+        background.setScale(CARD_SCALE);
         card.add(background);
         
-        // Make card interactive
-        background.setInteractive({ useHandCursor: true });
-        background.on('pointerdown', () => this.chooseUpgrade(index));
-        background.on('pointerover', () => background.setTint(0xdddddd));
-        background.on('pointerout', () => background.clearTint());
+        // Create progress bar background (initially hidden)
+        const progressBarBackground = this.scene.add.rectangle(
+            0, 
+            PROGRESS_BAR_Y_OFFSET, 
+            PROGRESS_BAR_WIDTH, 
+            PROGRESS_BAR_HEIGHT, 
+            0x333333, 
+            0.8
+        );
+        progressBarBackground.setVisible(false);
+        card.add(progressBarBackground);
         
-        // Add number text (1, 2, or 3)
-        const numberText = this.scene.add.text(0, background.height * cardScale, `${index + 1}`, {
-            fontSize: this.isMobile ? '36px' : '48px', // Smaller font on mobile
+        // Create progress bar (initially hidden)
+        const progressBar = this.scene.add.rectangle(
+            -PROGRESS_BAR_WIDTH / 2, 
+            PROGRESS_BAR_Y_OFFSET, 
+            0, 
+            PROGRESS_BAR_HEIGHT, 
+            0xff4444, 
+            1
+        );
+        progressBar.setOrigin(0, 0.5);
+        progressBar.setVisible(false);
+        card.add(progressBar);
+        
+        // Store progress bar references
+        this.cardHoldStates[index] = {
+            isHolding: false,
+            holdStartTime: 0,
+            holdTimer: null,
+            progressBar: progressBar,
+            progressBarBackground: progressBarBackground
+        };
+        
+        // Make card interactive with proper input consumption
+        background.setInteractive({ useHandCursor: true });
+        
+        // Hover effects
+        background.on('pointerover', () => {
+            background.setTint(0xdddddd);
+            console.log(`Hovering over upgrade card ${index + 1}`);
+        });
+        
+        background.on('pointerout', () => {
+            background.clearTint();
+            // Cancel hold if pointer leaves the card
+            this.cancelHold(index);
+        });
+        
+        // CRITICAL: Use input manager to consume pointer events properly
+        background.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+            console.log(`Pointer down on upgrade card ${index + 1}, pointerId: ${pointer.id}`);
+            
+            // Mark this pointer as handled by UI
+            this.handledPointers.add(pointer.id);
+            
+            // Stop this pointer from being processed by other input handlers
+            this.scene.input.stopPropagation();
+            
+            this.startHold(index);
+            console.log(`Started holding upgrade card ${index + 1}`);
+        });
+        
+        background.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+            console.log(`Pointer up on upgrade card ${index + 1}, pointerId: ${pointer.id}`);
+            
+            // Remove this pointer from handled set
+            this.handledPointers.delete(pointer.id);
+            
+            this.cancelHold(index);
+            console.log(`Released upgrade card ${index + 1}`);
+        });
+        
+        // Also handle pointer leave to clean up handled pointers
+        background.on('pointerout', (pointer: Phaser.Input.Pointer) => {
+            this.handledPointers.delete(pointer.id);
+        });
+        
+        // Add number text (1, 2, or 3) - made smaller
+        const numberText = this.scene.add.text(0, NUMBER_TEXT_Y_OFFSET, `${index + 1}`, {
+            fontSize: '36px', // Reduced from 48px to 36px
             fontFamily: 'Arial',
             color: '#ffffff',
             stroke: '#000000',
-            strokeThickness: this.isMobile ? 3 : 4 // Reduced stroke thickness on mobile
+            strokeThickness: 3 // Reduced stroke thickness too
         });
         numberText.setOrigin(0.5);
         card.add(numberText);
@@ -219,37 +320,142 @@ export default class UpgradeUI {
         const upgradeType = option.upgradeType.tag;
         const iconKey = UPGRADE_ICON_MAP[upgradeType] || 'white_pixel';
         
-        // Add upgrade icon - position higher on mobile
-        const iconY = this.isMobile ? -10 : -20;
-        const icon = this.scene.add.image(0, iconY, iconKey);
-        icon.setScale(this.isMobile ? 0.65 : 0.8); // Smaller icon on mobile
+        // Add upgrade icon
+        const icon = this.scene.add.image(0, -20, iconKey);
+        icon.setScale(0.8);
         card.add(icon);
         
-        // Create upgrade text - position higher on mobile
+        // Create upgrade text
         let upgradeText = this.getUpgradeDescription(option);
-        
-        // Show special indication if this is a weapon combination
-        // Check for both possible property naming conventions (snake_case from C# and camelCase in TypeScript)
-        if (option.isCombinationTrigger || (option as any).is_combination_trigger) {
-            upgradeText = "⚔COMBO⚔";
-            
-            // Debug log to help diagnose property naming
-            console.log("Found combination trigger option:", option);
-        }
-        
-        const descText = this.scene.add.text(0, background.height * cardScale * 0.28, upgradeText, {
-            fontSize: this.isMobile ? '16px' : '18px', // Smaller font on mobile
+        const descText = this.scene.add.text(0, background.height * CARD_SCALE * 0.28, upgradeText, {
+            fontSize: '18px',
             fontFamily: 'Arial',
-            color: (option.isCombinationTrigger || (option as any).is_combination_trigger) ? '#FFD700' : '#ffffff', // Gold color for combinations
+            color: '#ffffff',
             stroke: '#000000',
-            strokeThickness: this.isMobile ? 2 : 3, // Reduced stroke thickness on mobile
+            strokeThickness: 3,
             align: 'center',
-            wordWrap: { width: background.width * cardScale * 0.85 } // Slightly wider text area
+            wordWrap: { width: background.width * CARD_SCALE * 0.8 }
         });
         descText.setOrigin(0.5);
         card.add(descText);
         
         return card;
+    }
+    
+    private startHold(index: number): void {
+        if (index >= this.cardHoldStates.length) return;
+        
+        const holdState = this.cardHoldStates[index];
+        holdState.isHolding = true;
+        holdState.holdStartTime = this.scene.time.now;
+        
+        // Show progress bars
+        if (holdState.progressBar && holdState.progressBarBackground) {
+            holdState.progressBarBackground.setVisible(true);
+            holdState.progressBar.setVisible(true);
+            holdState.progressBar.width = 0; // Reset width
+        }
+        
+        // Play upgrade bar fill sound using global sound volume
+        if (!this.upgradeBarFillSound) {
+            try {
+                const globalSoundVolume = getSoundVolume();
+                const adjustedVolume = 0.7 * globalSoundVolume;
+                
+                // Use tiny volume instead of 0 to prevent Phaser default volume fallback
+                const safeVolume = adjustedVolume > 0 ? adjustedVolume : 0.001;
+                
+                this.upgradeBarFillSound = this.scene.sound.add('upgrade_bar_fill', { 
+                    volume: safeVolume,
+                    loop: true
+                });
+                this.upgradeBarFillSound.play();
+            } catch (error) {
+                console.warn("Failed to play upgrade bar fill sound:", error);
+            }
+        }
+        
+        // Add visual feedback to the card
+        const card = this.cards[index];
+        if (card) {
+            // Add a subtle glow effect while holding
+            this.scene.tweens.add({
+                targets: card,
+                scaleX: 1.05,
+                scaleY: 1.05,
+                duration: 100,
+                ease: 'Power2'
+            });
+        }
+    }
+    
+    private cancelHold(index: number): void {
+        if (index >= this.cardHoldStates.length) return;
+        
+        const holdState = this.cardHoldStates[index];
+        holdState.isHolding = false;
+        holdState.holdStartTime = 0;
+        
+        // Clear any existing timer
+        if (holdState.holdTimer) {
+            holdState.holdTimer.destroy();
+            holdState.holdTimer = null;
+        }
+        
+        // Stop upgrade bar fill sound
+        if (this.upgradeBarFillSound) {
+            try {
+                this.upgradeBarFillSound.stop();
+                this.upgradeBarFillSound.destroy();
+                this.upgradeBarFillSound = null;
+            } catch (error) {
+                console.warn("Failed to stop upgrade bar fill sound:", error);
+            }
+        }
+        
+        // Hide progress bars
+        if (holdState.progressBar && holdState.progressBarBackground) {
+            holdState.progressBarBackground.setVisible(false);
+            holdState.progressBar.setVisible(false);
+        }
+        
+        // Reset card scale
+        const card = this.cards[index];
+        if (card) {
+            this.scene.tweens.add({
+                targets: card,
+                scaleX: 1,
+                scaleY: 1,
+                duration: 100,
+                ease: 'Power2'
+            });
+        }
+    }
+    
+    private completeHoldSelection(index: number): void {
+        // Cancel the hold state first
+        this.cancelHold(index);
+        
+        // Flash the card to indicate selection
+        const card = this.cards[index];
+        if (card) {
+            this.scene.tweens.add({
+                targets: card,
+                alpha: 0.5,
+                duration: 100,
+                yoyo: true,
+                repeat: 1,
+                onComplete: () => {
+                    // Select the upgrade after the flash
+                    this.chooseUpgrade(index);
+                }
+            });
+        } else {
+            // Fallback if card doesn't exist
+            this.chooseUpgrade(index);
+        }
+        
+        console.log(`Completed hold selection for upgrade card ${index + 1}`);
     }
     
     private getUpgradeDescription(option: UpgradeOptionData): string {
@@ -269,7 +475,7 @@ export default class UpgradeUI {
         
         // Handle attack upgrades
         if (option.isNewAttack) {
-            return "New";
+            return "New"
         }
         
         // Handle attack stat upgrades
@@ -293,6 +499,12 @@ export default class UpgradeUI {
         
         console.log(`Choosing upgrade at index ${index}`);
         
+        // Play choose sound effect when upgrade is selected
+        const soundManager = (window as any).soundManager;
+        if (soundManager) {
+            soundManager.playSound('choose', 0.8);
+        }
+        
         // Get the upgrade option and index
         const option = this.upgradeOptions[index];
         if (!option) return;
@@ -310,7 +522,7 @@ export default class UpgradeUI {
             this.createUpgradeAppliedEffect(player);
             
             // Hide the UI
-            this.hideUpgradeUI();
+            this.hide();
         } else {
             console.error("Cannot choose upgrade: SpacetimeDB connection not available");
         }
@@ -378,598 +590,64 @@ export default class UpgradeUI {
         });
     }
 
-    // ------ Weapon Combination UI Methods ------
-    
-    private registerCombinationEventListeners(): void {
-        // Listen for chosen upgrade events that might be combinations
-        if (this.spacetimeClient.sdkConnection) {
-            this.spacetimeClient.sdkConnection.db.chosenUpgrades.onInsert((ctx, chosenUpgrade: ChosenUpgradeData) => {
-                console.log("ChosenUpgrade insert detected:", chosenUpgrade);
-                
-                // Check both camelCase and snake_case property names for combination trigger
-                const isCombination = chosenUpgrade.isCombinationTrigger || (chosenUpgrade as any).is_combination_trigger;
-                
-                if (isCombination && chosenUpgrade.playerId === this.localPlayerId) {
-                    // Log the raw object to help with debugging
-                    console.log("Weapon combination detected with properties:", 
-                        "isCombinationTrigger:", chosenUpgrade.isCombinationTrigger,
-                        "is_combination_trigger:", (chosenUpgrade as any).is_combination_trigger);
-                    
-                    // Get the weapon types, checking both naming conventions
-                    const firstWeapon = chosenUpgrade.firstWeaponToCombine || (chosenUpgrade as any).first_weapon_to_combine;
-                    const secondWeapon = chosenUpgrade.secondWeaponToCombine || (chosenUpgrade as any).second_weapon_to_combine;
-                    const combinedWeapon = chosenUpgrade.combinedWeaponResult || (chosenUpgrade as any).combined_weapon_result;
-                    
-                    this.handleWeaponCombination(
-                        firstWeapon as AttackType,
-                        secondWeapon as AttackType,
-                        combinedWeapon as AttackType
-                    );
-                }
-            });
-        }
-    }
-
-    private handleWeaponCombination(firstWeapon: AttackType, secondWeapon: AttackType, combinedWeapon: AttackType): void {
-        console.log("Local player received weapon combination trigger:", 
-            this.getWeaponDisplayName(firstWeapon), "+", this.getWeaponDisplayName(secondWeapon), "->", this.getWeaponDisplayName(combinedWeapon));
-        this.showWeaponCombinationNotification(firstWeapon, secondWeapon, combinedWeapon);
-    }
-    
-    private showWeaponCombinationNotification(firstWeapon: AttackType, secondWeapon: AttackType, combinedWeapon: AttackType): void {
-        console.log("Starting weapon combination animation...");
-        this.combinationContainer.removeAll(true);
-        
-        // Get camera position for proper positioning
-        const camera = this.scene.cameras.main;
-        const { width, height } = this.scene.scale;
-        
-        // Position relative to camera viewport, not world coordinates
-        this.combinationContainer.x = camera.scrollX + width / 2;
-        this.combinationContainer.y = camera.scrollY + height / 2 - 100;
-        
-        console.log(`Combination container positioned at: ${this.combinationContainer.x}, ${this.combinationContainer.y}`);
-        
-        // Create animated background with growing effect
-        const background = this.scene.add.rectangle(0, 0, 600, 250, 0x000000, 0.9);
-        background.setStrokeStyle(6, 0xFFD700);
-        background.setScale(0.1);
-        
-        // Animate background entrance
-        this.scene.tweens.add({
-            targets: background,
-            scaleX: 1,
-            scaleY: 1,
-            duration: 400,
-            ease: 'Back.easeOut'
-        });
-        
-        const titleText = this.scene.add.text(0, -100, "WEAPON FUSION!", { 
-            fontFamily: 'Arial Black', 
-            fontSize: '32px', 
-            color: '#FFD700', 
-            stroke: '#000000', 
-            strokeThickness: 6,
-            fontStyle: 'bold'
-        }).setOrigin(0.5);
-        
-        // Animate title with glow effect
-        titleText.setScale(0);
-        this.scene.tweens.add({
-            targets: titleText,
-            scaleX: 1,
-            scaleY: 1,
-            duration: 500,
-            delay: 200,
-            ease: 'Elastic.easeOut'
-        });
-        
-        // Create weapon sprites for fusion animation
-        const firstWeaponKey = this.getWeaponAssetKey(firstWeapon);
-        const secondWeaponKey = this.getWeaponAssetKey(secondWeapon);
-        const combinedWeaponKey = this.getWeaponAssetKey(combinedWeapon);
-        
-        console.log(`Weapon assets: ${firstWeaponKey}, ${secondWeaponKey} -> ${combinedWeaponKey}`);
-        
-        // Position weapons far apart initially
-        const leftWeapon = this.scene.add.image(-200, 0, firstWeaponKey)
-            .setScale(FUSION_ANIMATION.WEAPON_SCALE)
-            .setAlpha(0);
-        const rightWeapon = this.scene.add.image(200, 0, secondWeaponKey)
-            .setScale(FUSION_ANIMATION.WEAPON_SCALE)
-            .setAlpha(0);
-        
-        // Create combined weapon (hidden initially)
-        const resultWeapon = this.scene.add.image(0, 0, combinedWeaponKey)
-            .setScale(0)
-            .setAlpha(0);
-        
-        // Add glow effects to weapons
-        const leftGlow = this.scene.add.circle(-200, 0, 40, 0x00FFFF, 0.3);
-        const rightGlow = this.scene.add.circle(200, 0, 40, 0xFF6B6B, 0.3);
-        const resultGlow = this.scene.add.circle(0, 0, 60, 0xFFD700, 0.5).setScale(0);
-        
-        this.combinationContainer.add([
-            background, titleText, leftGlow, rightGlow, resultGlow,
-            leftWeapon, rightWeapon, resultWeapon
-        ]);
-        
-        // Ensure the container is visible and has proper depth
-        this.combinationContainer.setVisible(true);
-        this.combinationContainer.setDepth(UI_DEPTH + 10); // Extra high depth
-        this.combinationContainer.setAlpha(1); // Start visible instead of 0
-        
-        console.log("Combination container setup complete, starting animation...");
-        
-        // Start the fusion animation sequence
-        this.startFusionAnimation(leftWeapon, rightWeapon, resultWeapon, leftGlow, rightGlow, resultGlow, firstWeapon, secondWeapon, combinedWeapon);
-    }
-    
-    private startFusionAnimation(
-        leftWeapon: Phaser.GameObjects.Image, 
-        rightWeapon: Phaser.GameObjects.Image, 
-        resultWeapon: Phaser.GameObjects.Image,
-        leftGlow: Phaser.GameObjects.Arc,
-        rightGlow: Phaser.GameObjects.Arc,
-        resultGlow: Phaser.GameObjects.Arc,
-        firstWeapon: AttackType, 
-        secondWeapon: AttackType, 
-        combinedWeapon: AttackType
-    ): void {
-        console.log("Starting fusion animation phases...");
-        
-        // Get camera position for proper relative positioning
-        const camera = this.scene.cameras.main;
-        const { height } = this.scene.scale;
-        
-        // Phase 1: Container and weapons appear
-        console.log("Phase 1: Container appears");
-        this.scene.tweens.add({
-            targets: this.combinationContainer,
-            alpha: 1,
-            y: camera.scrollY + height / 2 - 50, // Position relative to camera
-            duration: 400,
-            ease: 'Power2.easeOut',
-            onComplete: () => {
-                console.log("Phase 2: Weapons fade in");
-                // Phase 2: Weapons fade in with rotation
-                this.scene.tweens.add({
-                    targets: [leftWeapon, rightWeapon],
-                    alpha: 1,
-                    rotation: Math.PI * 2,
-                    duration: 600,
-                    ease: 'Power2.easeOut'
-                });
-                
-                // Glow pulse animation
-                this.scene.tweens.add({
-                    targets: [leftGlow, rightGlow],
-                    scale: { from: 1, to: 1.5 },
-                    alpha: { from: 0.3, to: 0.6 },
-                    duration: 500,
-                    yoyo: true,
-                    repeat: -1,
-                    ease: 'Sine.easeInOut'
-                });
-                
-                // Phase 3: Move weapons towards center with energy streams
-                this.scene.time.delayedCall(800, () => {
-                    console.log("Phase 3: Weapons moving to center");
-                    this.createEnergyStreams(leftWeapon.x, leftWeapon.y, rightWeapon.x, rightWeapon.y);
-                    
-                    this.scene.tweens.add({
-                        targets: [leftWeapon, leftGlow],
-                        x: -50,
-                        rotation: leftWeapon.rotation + Math.PI,
-                        duration: FUSION_ANIMATION.WEAPON_MOVE_DURATION,
-                        ease: 'Power2.easeInOut'
-                    });
-                    
-                    this.scene.tweens.add({
-                        targets: [rightWeapon, rightGlow],
-                        x: 50,
-                        rotation: rightWeapon.rotation - Math.PI,
-                        duration: FUSION_ANIMATION.WEAPON_MOVE_DURATION,
-                        ease: 'Power2.easeInOut',
-                        onComplete: () => {
-                            console.log("Phase 4: Starting merge effect");
-                            // Phase 4: Merge effect
-                            this.createMergeEffect(leftWeapon, rightWeapon, resultWeapon, leftGlow, rightGlow, resultGlow, firstWeapon, secondWeapon, combinedWeapon);
-                        }
-                    });
-                });
-            }
-        });
-    }
-    
-    private createEnergyStreams(x1: number, y1: number, x2: number, y2: number): void {
-        for (let i = 0; i < FUSION_ANIMATION.ENERGY_STREAM_COUNT; i++) {
-            const delay = i * 50;
-            
-            this.scene.time.delayedCall(delay, () => {
-                // Create energy particle that travels between weapons
-                const energy = this.scene.add.circle(x1, y1, 3, 0x00FFFF, 0.8);
-                energy.setBlendMode(Phaser.BlendModes.ADD);
-                this.combinationContainer.add(energy);
-                
-                this.scene.tweens.add({
-                    targets: energy,
-                    x: x2,
-                    y: y2,
-                    scale: { from: 1, to: 0.1 },
-                    alpha: { from: 0.8, to: 0 },
-                    duration: 400,
-                    ease: 'Power2.easeOut',
-                    onComplete: () => {
-                        energy.destroy();
-                    }
-                });
-                
-                // Reverse energy stream
-                const reverseEnergy = this.scene.add.circle(x2, y2, 3, 0xFF6B6B, 0.8);
-                reverseEnergy.setBlendMode(Phaser.BlendModes.ADD);
-                this.combinationContainer.add(reverseEnergy);
-                
-                this.scene.tweens.add({
-                    targets: reverseEnergy,
-                    x: x1,
-                    y: y1,
-                    scale: { from: 1, to: 0.1 },
-                    alpha: { from: 0.8, to: 0 },
-                    duration: 400,
-                    delay: 100,
-                    ease: 'Power2.easeOut',
-                    onComplete: () => {
-                        reverseEnergy.destroy();
-                    }
-                });
-            });
-        }
-    }
-    
-    private createMergeEffect(
-        leftWeapon: Phaser.GameObjects.Image, 
-        rightWeapon: Phaser.GameObjects.Image, 
-        resultWeapon: Phaser.GameObjects.Image,
-        leftGlow: Phaser.GameObjects.Arc,
-        rightGlow: Phaser.GameObjects.Arc,
-        resultGlow: Phaser.GameObjects.Arc,
-        firstWeapon: AttackType, 
-        secondWeapon: AttackType, 
-        combinedWeapon: AttackType
-    ): void {
-        // Create brilliant flash effect
-        const flash = this.scene.add.circle(0, 0, 100, 0xFFFFFF, 0.8);
-        flash.setBlendMode(Phaser.BlendModes.ADD);
-        this.combinationContainer.add(flash);
-        
-        // Flash animation
-        this.scene.tweens.add({
-            targets: flash,
-            scale: { from: 0.1, to: 3 },
-            alpha: { from: 0.8, to: 0 },
-            duration: 500,
-            ease: 'Power3.easeOut',
-            onComplete: () => {
-                flash.destroy();
-            }
-        });
-        
-        // Create massive particle burst at merge point
-        this.createFusionParticles(0, 0);
-        
-        // Weapons merge and disappear
-        this.scene.tweens.add({
-            targets: [leftWeapon, rightWeapon],
-            x: 0,
-            y: 0,
-            scale: 0.1,
-            alpha: 0,
-            rotation: `+=${Math.PI * 3}`,
-            duration: FUSION_ANIMATION.MERGE_PAUSE_DURATION,
-            ease: 'Power3.easeIn',
-            onComplete: () => {
-                leftWeapon.setVisible(false);
-                rightWeapon.setVisible(false);
-                
-                // Hide old glows
-                leftGlow.setVisible(false);
-                rightGlow.setVisible(false);
-                
-                // Reveal the result weapon with dramatic effect
-                this.revealResultWeapon(resultWeapon, resultGlow, firstWeapon, secondWeapon, combinedWeapon);
-            }
-        });
-    }
-    
-    private createFusionParticles(x: number, y: number): void {
-        const worldX = this.combinationContainer.x + x;
-        const worldY = this.combinationContainer.y + y;
-        
-        // Main fusion burst
-        const fusionBurst = this.scene.add.particles(worldX, worldY, 'white_pixel', {
-            speed: { min: 100, max: 300 },
-            scale: { start: 1, end: 0 },
-            blendMode: 'ADD',
-            tint: [0xFFD700, 0x00FFFF, 0xFF6B6B, 0xFFFFFF],
-            lifespan: 1500,
-            quantity: 3,
-            frequency: 20,
-            emitting: true
-        });
-        fusionBurst.setDepth(UI_DEPTH + 2);
-        
-        // Swirling energy particles
-        const energySwirl = this.scene.add.particles(worldX, worldY, 'white_pixel', {
-            speed: { min: 50, max: 150 },
-            scale: { start: 0.5, end: 0 },
-            blendMode: 'ADD',
-            tint: [0x00FFFF, 0xFFD700],
-            lifespan: 2000,
-            quantity: 2,
-            frequency: 30,
-            emitting: true,
-            gravityY: -50,
-            rotate: { min: 0, max: 360 }
-        });
-        energySwirl.setDepth(UI_DEPTH + 1);
-        
-        // Stop particles after animation
-        this.scene.time.delayedCall(1000, () => {
-            fusionBurst.stop();
-            energySwirl.stop();
-        });
-        
-        this.scene.time.delayedCall(3000, () => {
-            fusionBurst.destroy();
-            energySwirl.destroy();
-        });
-    }
-    
-    private revealResultWeapon(
-        resultWeapon: Phaser.GameObjects.Image,
-        resultGlow: Phaser.GameObjects.Arc,
-        firstWeapon: AttackType, 
-        secondWeapon: AttackType, 
-        combinedWeapon: AttackType
-    ): void {
-        const firstWeaponName = this.getWeaponDisplayName(firstWeapon);
-        const secondWeaponName = this.getWeaponDisplayName(secondWeapon);
-        const combinedWeaponName = this.getWeaponDisplayName(combinedWeapon);
-        
-        // Create result text
-        const resultText = this.scene.add.text(0, 80, `${firstWeaponName} + ${secondWeaponName}`, {
-            fontFamily: 'Arial', 
-            fontSize: '18px', 
-            color: '#CCCCCC', 
-            align: 'center'
-        }).setOrigin(0.5).setAlpha(0);
-        
-        const transformText = this.scene.add.text(0, 100, "▼ TRANSFORMS INTO ▼", {
-            fontFamily: 'Arial', 
-            fontSize: '14px', 
-            color: '#FFD700', 
-            align: 'center'
-        }).setOrigin(0.5).setAlpha(0);
-        
-        const newWeaponText = this.scene.add.text(0, 130, combinedWeaponName, {
-            fontFamily: 'Arial Black', 
-            fontSize: '28px', 
-            color: '#00FFFF', 
-            stroke: '#000000', 
-            strokeThickness: 4,
-            fontStyle: 'bold'
-        }).setOrigin(0.5).setAlpha(0);
-        
-        this.combinationContainer.add([resultText, transformText, newWeaponText]);
-        
-        // Dramatic weapon reveal
-        resultWeapon.setAlpha(1);
-        resultGlow.setAlpha(1);
-        
-        this.scene.tweens.add({
-            targets: [resultWeapon, resultGlow],
-            scale: { from: 0, to: 1.5 },
-            duration: FUSION_ANIMATION.RESULT_REVEAL_DURATION,
-            ease: 'Elastic.easeOut',
-            onComplete: () => {
-                // Scale back to normal size
-                this.scene.tweens.add({
-                    targets: resultWeapon,
-                    scale: 1.2,
-                    duration: 300,
-                    ease: 'Power2.easeOut'
-                });
-                
-                // Pulsing glow effect
-                this.scene.tweens.add({
-                    targets: resultGlow,
-                    scale: { from: 1.5, to: 2 },
-                    alpha: { from: 0.5, to: 0.2 },
-                    duration: 1000,
-                    yoyo: true,
-                    repeat: -1,
-                    ease: 'Sine.easeInOut'
-                });
-            }
-        });
-        
-        // Fade in text elements sequentially
-        this.scene.tweens.add({
-            targets: resultText,
-            alpha: 1,
-            y: 70,
-            duration: 400,
-            delay: 200,
-            ease: 'Power2.easeOut'
-        });
-        
-        this.scene.tweens.add({
-            targets: transformText,
-            alpha: 1,
-            duration: 400,
-            delay: 600,
-            ease: 'Power2.easeOut'
-        });
-        
-        this.scene.tweens.add({
-            targets: newWeaponText,
-            alpha: 1,
-            scale: { from: 0.5, to: 1 },
-            duration: 500,
-            delay: 1000,
-            ease: 'Back.easeOut'
-        });
-        
-        // Final celebration particles around result weapon
-        this.scene.time.delayedCall(1200, () => {
-            this.createCelebrationParticles(resultWeapon.x, resultWeapon.y);
-        });
-        
-        // Auto-hide after extended duration
-        this.scene.time.delayedCall(6000, () => {
-            this.scene.tweens.add({
-                targets: this.combinationContainer,
-                alpha: 0,
-                y: this.combinationContainer.y - 100,
-                duration: 800,
-                ease: 'Power2.easeIn',
-                onComplete: () => {
-                    this.combinationContainer.setVisible(false);
-                }
-            });
-        });
-    }
-    
-    private createCelebrationParticles(x: number, y: number): void {
-        const worldX = this.combinationContainer.x + x;
-        const worldY = this.combinationContainer.y + y;
-        
-        // Golden sparkles around the new weapon
-        const celebration = this.scene.add.particles(worldX, worldY, 'white_pixel', {
-            speed: { min: 30, max: 80 },
-            scale: { start: 0.8, end: 0 },
-            blendMode: 'ADD',
-            tint: [0xFFD700, 0xFFA500, 0xFFFF00],
-            lifespan: 2000,
-            quantity: 1,
-            frequency: 100,
-            emitting: true,
-            gravityY: -20,
-            alpha: { start: 0.8, end: 0 }
-        });
-        celebration.setDepth(UI_DEPTH + 3);
-        
-        // Stop and cleanup
-        this.scene.time.delayedCall(3000, () => {
-            celebration.stop();
-        });
-        
-        this.scene.time.delayedCall(5000, () => {
-            celebration.destroy();
-        });
-    }
-    
-    // Update the simple particle method to be more spectacular
-    private createCombinationParticles(x: number, y: number): void {
-        // This method is kept for backward compatibility but enhanced
-        this.createCelebrationParticles(x, y);
-    }
-
-    // ------ Helper Methods for Weapon Information ------
-    
-    private getWeaponAssetKey(weaponType: AttackType): string {
-        // Handle AttackType objects by accessing their tag property
-        const weaponTag = typeof weaponType === 'object' && weaponType.tag ? weaponType.tag : weaponType;
-        return WEAPON_ASSET_MAP[weaponTag] || 'white_pixel';
-    }
-    
-    private getWeaponDisplayName(weaponType: AttackType): string {
-        // Handle AttackType objects by accessing their tag property
-        const weaponTag = typeof weaponType === 'object' && weaponType.tag ? weaponType.tag : weaponType;
-        return WEAPON_NAME_MAP[weaponTag] || 'Unknown Weapon';
-    }
-
-    // ------ Debug and Safety Methods ----__
-    
-    /**
-     * Force the combination container to be visible for debugging
-     */
-    public forceCombinationVisible(): void {
-        console.log("Forcing combination container visibility...");
-        
-        const camera = this.scene.cameras.main;
-        const { width, height } = this.scene.scale;
-        
-        // Position in the center of the screen
-        this.combinationContainer.x = camera.scrollX + width / 2;
-        this.combinationContainer.y = camera.scrollY + height / 2;
-        
-        // Force visibility and high depth
-        this.combinationContainer.setVisible(true);
-        this.combinationContainer.setAlpha(1);
-        this.combinationContainer.setDepth(UI_DEPTH + 20);
-        
-        console.log(`Combination container forced to position: ${this.combinationContainer.x}, ${this.combinationContainer.y}`);
-        console.log(`Combination container properties: visible=${this.combinationContainer.visible}, alpha=${this.combinationContainer.alpha}, depth=${this.combinationContainer.depth}`);
-    }
-    
-    /**
-     * Check if the combination container is properly set up
-     */
-    public debugCombinationContainer(): void {
-        console.log("=== Combination Container Debug Info ===");
-        console.log(`Container exists: ${!!this.combinationContainer}`);
-        console.log(`Container visible: ${this.combinationContainer?.visible}`);
-        console.log(`Container alpha: ${this.combinationContainer?.alpha}`);
-        console.log(`Container depth: ${this.combinationContainer?.depth}`);
-        console.log(`Container position: x=${this.combinationContainer?.x}, y=${this.combinationContainer?.y}`);
-        console.log(`Container children count: ${this.combinationContainer?.list?.length || 0}`);
-        
-        const camera = this.scene.cameras.main;
-        if (camera) {
-            console.log(`Camera position: scrollX=${camera.scrollX}, scrollY=${camera.scrollY}`);
-            console.log(`Camera size: width=${camera.width}, height=${camera.height}`);
-        }
-        
-        // Check if container is within camera bounds
-        if (this.combinationContainer && camera) {
-            const containerInView = (
-                this.combinationContainer.x >= camera.scrollX - 100 &&
-                this.combinationContainer.x <= camera.scrollX + camera.width + 100 &&
-                this.combinationContainer.y >= camera.scrollY - 100 &&
-                this.combinationContainer.y <= camera.scrollY + camera.height + 100
-            );
-            console.log(`Container in camera view: ${containerInView}`);
-        }
-        console.log("=== End Debug Info ===");
-    }
-
-    // ------ UI Visibility Methods ------
-    
-    public showUpgradeUI(): void {
-        this.isVisible = true;
-        this.upgradeContainer.setVisible(true);
-    }
-
-    public hideUpgradeUI(): void {
-        this.isVisible = false;
-        this.upgradeContainer.setVisible(false);
-    }
-    
-    // Alias methods for backward compatibility
     public show(): void {
-        this.showUpgradeUI();
+        console.log("Showing UpgradeUI");
+        this.isVisible = true;
+        this.container.setVisible(true);
     }
 
     public hide(): void {
-        this.hideUpgradeUI();
+        console.log("Hiding UpgradeUI");
+        this.isVisible = false;
+        this.container.setVisible(false);
+        
+        // Cancel any active holds when hiding
+        this.cardHoldStates.forEach((_, index) => {
+            this.cancelHold(index);
+        });
+        
+        // Stop upgrade bar fill sound if playing
+        if (this.upgradeBarFillSound) {
+            try {
+                this.upgradeBarFillSound.stop();
+                this.upgradeBarFillSound.destroy();
+                this.upgradeBarFillSound = null;
+            } catch (error) {
+                console.warn("Failed to stop upgrade bar fill sound in hide:", error);
+            }
+        }
+        
+        // Clear all handled pointers when hiding
+        this.handledPointers.clear();
     }
 
     public destroy(): void {
+        // Cancel all holds and clean up timers
+        this.cardHoldStates.forEach((_, index) => {
+            this.cancelHold(index);
+        });
+        
+        // Stop upgrade bar fill sound if playing
+        if (this.upgradeBarFillSound) {
+            try {
+                this.upgradeBarFillSound.stop();
+                this.upgradeBarFillSound.destroy();
+                this.upgradeBarFillSound = null;
+            } catch (error) {
+                console.warn("Failed to stop upgrade bar fill sound in destroy:", error);
+            }
+        }
+        
+        // Clear handled pointers
+        this.handledPointers.clear();
+        
         this.keyListeners.forEach(key => key.destroy());
         this.cards.forEach(card => card.destroy());
-        this.upgradeContainer.destroy();
-        this.combinationContainer.destroy();
+        this.container.destroy();
+    }
+
+    // Add method to check if a pointer is handled by UI
+    public isPointerHandledByUI(pointerId: number): boolean {
+        return this.handledPointers.has(pointerId);
     }
 }

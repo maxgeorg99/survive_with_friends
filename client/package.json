@@ -1,15 +1,13 @@
 {
   "name": "vibe_survivors_client",
-  "homepage": "https://www.survive-with-friends.com/",
   "version": "1.0.0",
   "description": "Phaser client for Vibe Survivors",
   "main": "src/main.ts",
   "scripts": {
-    "start": "vite --host",
+    "start": "vite",
     "build": "vite build",
     "serve": "vite preview",
-    "predeploy": "npm run build && echo survive-with-friends.com > dist/CNAME",
-    "deploy": "gh-pages -d dist",
+    "start:prod": "vite preview --host 0.0.0.0 --port $PORT",
     "generate-bindings": "spacetimedb generate --lang typescript --out-dir ./src/autobindings"
   },
   "author": "",
@@ -22,4 +20,4 @@
     "typescript": "^5.3.3",
     "vite": "^5.0.11"
   }
-}
+} 
