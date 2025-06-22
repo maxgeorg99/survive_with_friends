@@ -4,7 +4,7 @@ import { Account } from '../autobindings';
 import PlayerClass from '../autobindings/player_class_type';
 import { GameEvents } from '../constants/GameEvents';
 import { localization } from '../utils/localization';
-import { isMobileDevice, getResponsiveFontSize, applyResponsiveStyles, getResponsiveCenteredPosition } from '../utils/responsive';
+import { isMobileDevice, getResponsiveFontSize, applyResponsiveStyles } from '../utils/responsive';
 import { QuestType } from '../autobindings';
 
 // Map player class to numeric class ID
@@ -16,7 +16,9 @@ const CLASS_ID_MAP = {
     "Football": 4,
     "Gambler": 5,
     "Athlete": 6,
-    "Gourmand": 7
+    "Gourmand": 7,
+    "Valkyrie": 8,
+    "Volleyball": 9
 };
 
 const CLASS_NAME_MAP = {
@@ -27,7 +29,9 @@ const CLASS_NAME_MAP = {
     'Football': "Dominik",
     'Gambler': "Robin",
     'Athlete': "David",
-    'Gourmand': "Benni"
+    'Gourmand': "Benni",
+    'Valkyrie': "Gwen",
+    'Volleyball': "Volleyball Gwen"
 } as const;
 
 const CLASS_INFO = {
@@ -62,6 +66,14 @@ const CLASS_INFO = {
         weaknesses: "class.chris.weaknesses",
         altName: "Chef Chris",
         altClass: "Gourmand"
+    },
+    "Gwen": {
+        description: "class.gwen.description",
+        weapon: "class.gwen.weapon",
+        strengths: "class.gwen.strengths",
+        weaknesses: "class.gwen.weaknesses",
+        altName: "Volleyball Gwen",
+        altClass: "Volleyball"
     }
 } as const;
 
@@ -80,6 +92,7 @@ export default class ClassSelectScene extends Phaser.Scene {
     private rogueButton!: HTMLButtonElement;
     private mageButton!: HTMLButtonElement;
     private paladinButton!: HTMLButtonElement;
+    private gwenButton!: HTMLButtonElement;  // Add Gwen button property
     private confirmButton!: HTMLButtonElement;
     private errorText!: Phaser.GameObjects.Text;
     private questButton!: HTMLButtonElement;
@@ -120,22 +133,24 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.load.image('rogue_icon', 'assets/class_rogue_1.png');
         this.load.image('mage_icon', 'assets/class_mage_1.png');
         this.load.image('paladin_icon', 'assets/class_paladin_1.png');
-        // Temporarily use fighter sprite as placeholder for new classes
         this.load.image('football_icon', 'assets/class_football_1.png');
         this.load.image('gambler_icon', 'assets/class_gambler_1.png');
         this.load.image('athlete_icon', 'assets/class_athlete_1.png');
         this.load.image('gourmand_icon', 'assets/class_chef_1.png');
+        this.load.image('valkyrie_icon', 'assets/class_valkyrie.png');
+        this.load.image('volleyball_icon', 'assets/class_volleyball.png');
         
         // Load weapon icons
         this.load.image('attack_sword', 'assets/attack_sword.png');
         this.load.image('attack_knife', 'assets/attack_knife.png');
         this.load.image('attack_wand', 'assets/attack_wand.png');
         this.load.image('attack_shield', 'assets/attack_shield.png');
-        // Temporarily use sword sprite as placeholder for new weapons
         this.load.image('attack_football', 'assets/attack_football.png');
         this.load.image('attack_cards', 'assets/attack_cards.png');
         this.load.image('attack_dumbbell', 'assets/attack_dumbbell.png');
         this.load.image('attack_garlic', 'assets/attack_garlic.png');
+        this.load.image('attack_throwing_shield', 'assets/attack_throwing_shield.png');
+        this.load.image('attack_energy_orb', 'assets/attack_energy_orb.png');
         
         // Add quest button image if you have one
         this.load.image('quest_icon', 'assets/white_pixel.png');
@@ -513,7 +528,9 @@ export default class ClassSelectScene extends Phaser.Scene {
     private createConfirmButton() {
         this.confirmButton = document.createElement('button');
         this.confirmButton.textContent = localization.getText('ui.confirm_selection');
-        this.confirmButton.style.position = 'absolute';
+        
+        // Update button styles to fix positioning
+        this.confirmButton.style.position = 'relative';  // Changed from absolute to relative
         this.confirmButton.style.padding = '12px 24px';
         this.confirmButton.style.backgroundColor = '#27ae60';
         this.confirmButton.style.color = 'white';
@@ -523,26 +540,22 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.confirmButton.style.cursor = 'pointer';
         this.confirmButton.style.transition = 'background-color 0.2s';
         this.confirmButton.style.display = 'none';
-        
-        // Remove the fixed left position, let it be centered by the container
-        this.confirmButton.style.bottom = '0';
-        this.confirmButton.style.width = '100%'; // Use full width of the container
-        this.confirmButton.style.transform = 'translateX(0)'; // Reset any transforms
-        this.confirmButton.style.margin = '15px 0 0 0'; // Add some margin at the top
+        this.confirmButton.style.width = '100%';
+        this.confirmButton.style.marginTop = '20px';  // Added margin top
+        this.confirmButton.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';  // Added shadow for better visibility
         
         this.confirmButton.addEventListener('mouseover', () => {
-            this.confirmButton.style.backgroundColor = '#219a52';  // Darker shade for hover
+            this.confirmButton.style.backgroundColor = '#219a52';
         });
         
         this.confirmButton.addEventListener('mouseout', () => {
-            this.confirmButton.style.backgroundColor = '#27ae60';  // Return to original color
+            this.confirmButton.style.backgroundColor = '#27ae60';
         });
         
         this.confirmButton.addEventListener('click', () => {
             this.spawnPlayer();
         });
 
-        // Append to the class buttons container
         this.classButtonsContainer.appendChild(this.confirmButton);
     }
 
@@ -649,18 +662,20 @@ export default class ClassSelectScene extends Phaser.Scene {
             return button;
         };
         
-        // Create only the original 4 class buttons
+        // Create class buttons
         this.fighterButton = createClassButton('Til', PlayerClass.Fighter as PlayerClass, 'fighter_icon', 'class_fighter_1.png');
         this.rogueButton = createClassButton('Marc', PlayerClass.Rogue as PlayerClass, 'rogue_icon', 'class_rogue_1.png');
         this.mageButton = createClassButton('Max', PlayerClass.Mage as PlayerClass, 'mage_icon', 'class_mage_1.png');
         this.paladinButton = createClassButton('Chris', PlayerClass.Paladin as PlayerClass, 'paladin_icon', 'class_paladin_1.png');
+        this.gwenButton = createClassButton('Gwen', PlayerClass.Valkyrie as PlayerClass, 'valkyrie_icon', 'class_valkyrie.png');
         
         // Add all buttons to container
         this.classButtonsContainer.appendChild(this.fighterButton);
         this.classButtonsContainer.appendChild(this.rogueButton);
         this.classButtonsContainer.appendChild(this.mageButton);
         this.classButtonsContainer.appendChild(this.paladinButton);
-
+        this.classButtonsContainer.appendChild(this.gwenButton);
+        
         // Check quest completion status after buttons are created
         this.updateQuestLockStatus();
     }
@@ -806,22 +821,20 @@ export default class ClassSelectScene extends Phaser.Scene {
         const originalCharName = this.getOriginalCharacterName(characterName);
         const isAltVersion = this.selectedAltVersions[originalCharName] || false;
         
-        // Check if the quest for this character is completed
         const isQuestCompleted = this.isCharacterQuestCompleted(originalCharName);
         
-        // Determine actual class to use based on the alt toggle state
         const currentClass = isAltVersion ? info.altClass : classType.tag;
         const currentName = isAltVersion ? info.altName : originalCharName;
         
-        // Get the PlayerClass object corresponding to the selected class
         let actualClassType = classType;
         if (isAltVersion && info.altClass) {
             // Find the alt class PlayerClass object
-            for (const key in PlayerClass) {
-                if (typeof PlayerClass[key] === 'object' && (PlayerClass[key] as any).tag === info.altClass) {
-                    actualClassType = PlayerClass[key] as PlayerClass;
-                    break;
-                }
+            const classKey = Object.keys(PlayerClass).find(key => 
+                typeof PlayerClass[key as keyof typeof PlayerClass] === 'object' && 
+                (PlayerClass[key as keyof typeof PlayerClass] as PlayerClass).tag === info.altClass
+            );
+            if (classKey) {
+                actualClassType = PlayerClass[classKey as keyof typeof PlayerClass] as PlayerClass;
             }
         }
 
@@ -906,19 +919,21 @@ export default class ClassSelectScene extends Phaser.Scene {
                 // Update the selected class to the appropriate one
                 if (this.selectedAltVersions[originalCharName] && info.altClass) {
                     // Find the alt class PlayerClass object
-                    for (const key in PlayerClass) {
-                        if (typeof PlayerClass[key] === 'object' && (PlayerClass[key] as any).tag === info.altClass) {
-                            this.selectedClass = PlayerClass[key] as PlayerClass;
-                            break;
-                        }
+                    const classKey = Object.keys(PlayerClass).find(key => 
+                        typeof PlayerClass[key as keyof typeof PlayerClass] === 'object' && 
+                        (PlayerClass[key as keyof typeof PlayerClass] as PlayerClass).tag === info.altClass
+                    );
+                    if (classKey) {
+                        this.selectedClass = PlayerClass[classKey as keyof typeof PlayerClass] as PlayerClass;
                     }
                 } else {
                     // Switch back to original class
-                    for (const key in PlayerClass) {
-                        if (typeof PlayerClass[key] === 'object' && (PlayerClass[key] as any).tag === classType.tag) {
-                            this.selectedClass = PlayerClass[key] as PlayerClass;
-                            break;
-                        }
+                    const classKey = Object.keys(PlayerClass).find(key => 
+                        typeof PlayerClass[key as keyof typeof PlayerClass] === 'object' && 
+                        (PlayerClass[key as keyof typeof PlayerClass] as PlayerClass).tag === classType.tag
+                    );
+                    if (classKey) {
+                        this.selectedClass = PlayerClass[classKey as keyof typeof PlayerClass] as PlayerClass;
                     }
                 }
                 
@@ -945,7 +960,9 @@ export default class ClassSelectScene extends Phaser.Scene {
             'Football': 'attack_football.png',
             'Gambler': 'attack_cards.png',
             'Athlete': 'attack_dumbbell.png',
-            'Gourmand': 'attack_garlic.png'
+            'Gourmand': 'attack_garlic.png',
+            'Valkyrie': 'attack_throwing_shield.png',
+            'Volleyball': 'attack_energy_orb.png'
         };
         return weaponMap[classTag] || 'attack_sword.png';
     }
@@ -1108,7 +1125,13 @@ export default class ClassSelectScene extends Phaser.Scene {
     
     private selectClass(classType: PlayerClass, button: HTMLButtonElement) {
         // Reset all button styles
-        const allButtons = [this.fighterButton, this.rogueButton, this.mageButton, this.paladinButton];
+        const allButtons = [
+            this.fighterButton, 
+            this.rogueButton, 
+            this.mageButton, 
+            this.paladinButton,
+            this.gwenButton
+        ];
         allButtons.forEach(btn => {
             if (btn) {
                 btn.style.backgroundColor = '#2c3e50';
@@ -1132,30 +1155,14 @@ export default class ClassSelectScene extends Phaser.Scene {
         // Get class info based on the original character name
         const baseClassName = CLASS_NAME_MAP[classType.tag as keyof typeof CLASS_NAME_MAP];
         const info = CLASS_INFO[baseClassName as ClassNames];
-
-        // Update button content before updating panel
-        const originalCharName = this.getOriginalCharacterName(baseClassName);
-        const isAltVersion = this.selectedAltVersions[originalCharName] || false;
-        
-        const iconElement = document.getElementById(`${originalCharName.toLowerCase()}-icon`) as HTMLImageElement;
-        const textElement = document.getElementById(`${originalCharName.toLowerCase()}-text`);
-        
-        if (iconElement) {
-            const iconFile = isAltVersion ? this.getAltClassIcon(info.altClass) : this.getClassIcon(classType.tag);
-            iconElement.src = `assets/${iconFile}`;
-        }
-        
-        if (textElement) {
-            textElement.textContent = isAltVersion ? info.altName : originalCharName;
-        }
         
         // On desktop, update and show the info panel
         if (!isMobileDevice() && this.classInfoPanel) {
             this.classInfoPanel.style.display = 'block';
-            this.positionHTMLElements(); // Ensure proper positioning
+            this.positionHTMLElements();
         }
         
-        // Update the info panel content
+        // Update the info panel content - this will also handle icon updates correctly
         this.updateClassInfoPanel(baseClassName, classType, info);
     }
 
@@ -1164,7 +1171,8 @@ export default class ClassSelectScene extends Phaser.Scene {
             'Fighter': this.fighterButton,
             'Rogue': this.rogueButton,
             'Mage': this.mageButton,
-            'Paladin': this.paladinButton
+            'Paladin': this.paladinButton,
+            'Valkyrie': this.gwenButton
         };
         return buttonMap[classType.tag] || null;
     }
@@ -1376,7 +1384,9 @@ export default class ClassSelectScene extends Phaser.Scene {
             'Football': 'class_football_1.png',
             'Gambler': 'class_gambler_1.png',
             'Athlete': 'class_athlete_1.png',
-            'Gourmand': 'class_chef_1.png'
+            'Gourmand': 'class_chef_1.png',
+            'Valkyrie': 'class_valkyrie.png',
+            'Volleyball': 'class_volleyball.png'
         };
         return iconMap[classType] || 'class_fighter_1.png';
     }
@@ -1400,9 +1410,11 @@ export default class ClassSelectScene extends Phaser.Scene {
             'Football': 'class_football_1.png',
             'Gambler': 'class_gambler_1.png',
             'Athlete': 'class_athlete_1.png',
-            'Gourmand': 'class_chef_1.png'
+            'Gourmand': 'class_chef_1.png',
+            'Valkyrie': 'class_valkyrie.png',
+            'Volleyball': 'class_volleyball.png'
         };
-        return altIconMap[classType] || 'class_fighter_1.png';
+        return altIconMap[classType] || this.getClassIcon(classType);
     }
 
     shutdown() {

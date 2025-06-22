@@ -13,7 +13,9 @@ public static partial class Module
         Football,
         Gambler,
         Athlete,
-        Gourmand
+        Gourmand,
+        Valkyrie,
+        Volleyball
     }
 
     [SpacetimeDB.Type]

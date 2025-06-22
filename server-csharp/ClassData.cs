@@ -133,6 +133,28 @@ public static partial class Module
             StartingAttackType = AttackType.Garlic
         });
         
+        // Gwen (Valkyrie class)
+        ctx.Db.class_data.Insert(new ClassData 
+        {
+            ClassId = (uint)PlayerClass.Valkyrie,
+            PlayerClass = PlayerClass.Valkyrie,
+            MaxHp = 110,
+            Armor = 1,
+            Speed = 210.0f,
+            StartingAttackType = AttackType.ThrowingShield
+        });
+
+        // Volleyball Gwen (Volleyball class)
+        ctx.Db.class_data.Insert(new ClassData 
+        {
+            ClassId = (uint)PlayerClass.Volleyball,
+            PlayerClass = PlayerClass.Volleyball,
+            MaxHp = 100,
+            Armor = 0,
+            Speed = 230.0f,
+            StartingAttackType = AttackType.EnergyOrb
+        });
+        
         Log.Info("Class data initialization complete.");
     }
     
