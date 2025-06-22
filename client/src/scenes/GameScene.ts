@@ -1327,6 +1327,11 @@ export default class GameScene extends Phaser.Scene {
                             repeat: -1,
                             duration: 500,
                             onUpdate: () => {
+                                // Check if sprite still exists before accessing it
+                                if (!this.localPlayerSprite || !this.localPlayerSprite.active) {
+                                    return;
+                                }
+                                
                                 // Create cycling colors for more visible effect
                                 const t = Math.sin(this.time.now / 200) * 0.5 + 0.5;
                                 const color1 = new Phaser.Display.Color(255, 255, 255);
@@ -1337,7 +1342,7 @@ export default class GameScene extends Phaser.Scene {
                                     100,
                                     Math.floor(t * 100)
                                 );
-                                this.localPlayerSprite?.setTint(Phaser.Display.Color.GetColor(color.r, color.g, color.b));
+                                this.localPlayerSprite.setTint(Phaser.Display.Color.GetColor(color.r, color.g, color.b));
                             }
                         });
                         this.localPlayerSprite.setData('graceTween', graceTween);
@@ -1598,19 +1603,24 @@ export default class GameScene extends Phaser.Scene {
                 yoyo: true,
                 repeat: -1,
                 duration: 500,
-                onUpdate: () => {
-                    // Create cycling colors for visible effect
-                    const t = Math.sin(this.time.now / 200) * 0.5 + 0.5;
-                    const color1 = new Phaser.Display.Color(255, 255, 255);
-                    const color2 = new Phaser.Display.Color(200, 200, 200);
-                    const color = Phaser.Display.Color.Interpolate.ColorWithColor(
-                        color1,
-                        color2,
-                        100,
-                        Math.floor(t * 100)
-                    );
-                    sprite.setTint(Phaser.Display.Color.GetColor(color.r, color.g, color.b));
-                }
+                                                        onUpdate: () => {
+                                            // Check if sprite still exists before accessing it
+                                            if (!sprite || !sprite.active) {
+                                                return;
+                                            }
+                                            
+                                            // Create cycling colors for visible effect
+                                            const t = Math.sin(this.time.now / 200) * 0.5 + 0.5;
+                                            const color1 = new Phaser.Display.Color(255, 255, 255);
+                                            const color2 = new Phaser.Display.Color(200, 200, 200);
+                                            const color = Phaser.Display.Color.Interpolate.ColorWithColor(
+                                                color1,
+                                                color2,
+                                                100,
+                                                Math.floor(t * 100)
+                                            );
+                                            sprite.setTint(Phaser.Display.Color.GetColor(color.r, color.g, color.b));
+                                        }
             });
             container.setData('graceTween', graceTween);
             console.log(`Player ${playerData.name} has grace period: ${playerData.spawnGracePeriodRemaining}`);
@@ -1745,6 +1755,11 @@ export default class GameScene extends Phaser.Scene {
                                         repeat: -1,
                                         duration: 500,
                                         onUpdate: () => {
+                                            // Check if sprite still exists before accessing it
+                                            if (!sprite || !sprite.active) {
+                                                return;
+                                            }
+                                            
                                             // Create cycling colors for visible effect
                                             const t = Math.sin(this.time.now / 200) * 0.5 + 0.5;
                                             const color1 = new Phaser.Display.Color(255, 255, 255);
@@ -1828,6 +1843,11 @@ export default class GameScene extends Phaser.Scene {
                 duration: 100, // Short duration for smooth sync
                 ease: 'Linear',
                 onUpdate: () => {
+                    // Check if container still exists before accessing it
+                    if (!container || !container.active) {
+                        return;
+                    }
+                    
                     // Update depth during the tween
                     container.setDepth(BASE_DEPTH + container.y);
                 }

@@ -290,6 +290,13 @@ export default class LootCapsuleManager {
             duration: animationDuration,
             ease: 'Sine.InOut',
             onUpdate: (tween: Phaser.Tweens.Tween) => {
+                // Check if container still exists and hasn't been destroyed
+                if (!container || !container.list || container.list.length === 0) {
+                    console.warn(`Container for capsule ${capsuleIdKey} no longer exists, stopping animation`);
+                    tween.stop();
+                    return;
+                }
+                
                 const progress = animationTarget.progress;
                 
                 // Quadratic bezier curve: B(t) = (1-t)²P₀ + 2(1-t)tP₁ + t²P₂
