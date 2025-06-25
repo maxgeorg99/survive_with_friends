@@ -519,6 +519,18 @@ pub fn game_tick(ctx: &ReducerContext, _timer: GameTickTimer) {
         scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(tick_rate as u64)),
     });
 
+    // Early return if no players are online - skip all expensive game logic
+    let player_count = ctx.db.player().count();
+    if player_count == 0 {
+        // Log occasionally to show the server is still running but idle
+        if let Some(world) = ctx.db.world().world_id().find(&0) {
+            if world.tick_count % 1200 == 0 { // Every minute (1200 ticks at 20Hz)
+                log::info!("Server idle - no players online (tick {})", world.tick_count);
+            }
+        }
+        return;
+    }
+
     clear_collision_cache_for_frame();
 
     process_player_movement(ctx, tick_rate);
@@ -527,10 +539,14 @@ pub fn game_tick(ctx: &ReducerContext, _timer: GameTickTimer) {
 
     process_attack_movements(ctx);
 
-    // Update Agna magic circles
-    let collision_cache = crate::monsters_def::get_collision_cache();
-    crate::boss_agna_defs::update_agna_magic_circles(ctx, collision_cache);
-    crate::boss_agna_defs::process_agna_ritual_complete_damage(ctx);
+    // Update Agna magic circles - only if Agna boss is active
+    if let Some(game_state) = ctx.db.game_state().id().find(&0) {
+        if game_state.boss_active && game_state.boss_type == crate::BossType::Agna {
+            let collision_cache = crate::monsters_def::get_collision_cache();
+            crate::boss_agna_defs::update_agna_magic_circles(ctx, collision_cache);
+            crate::boss_agna_defs::process_agna_ritual_complete_damage(ctx);
+        }
+    }
 
     process_monster_attack_movements(ctx);
 
