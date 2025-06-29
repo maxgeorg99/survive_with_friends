@@ -525,7 +525,7 @@ export default class ClassSelectScene extends Phaser.Scene {
     
     private selectClass(classType: PlayerClass, button: HTMLButtonElement) {
         // Reset all button styles
-        [this.fighterButton, this.rogueButton, this.mageButton, this.paladinButton, this.valkyrieButton].forEach(btn => {
+        [this.fighterButton, this.rogueButton, this.mageButton, this.paladinButton, this.valkyrieButton, this.priestessButton].forEach(btn => {
             if (btn) {
                 btn.style.backgroundColor = '#2c3e50';
                 btn.style.borderColor = '#34495e';
@@ -584,7 +584,7 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.confirmButton.disabled = true;
         this.confirmButton.textContent = 'Creating...';
         
-        [this.fighterButton, this.rogueButton, this.mageButton, this.paladinButton, this.valkyrieButton].forEach(btn => {
+        [this.fighterButton, this.rogueButton, this.mageButton, this.paladinButton, this.valkyrieButton, this.priestessButton].forEach(btn => {
             if (btn) btn.disabled = true;
         });
         
