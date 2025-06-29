@@ -368,30 +368,33 @@ export class AttackManager {
         const holyGold = 0xFFD700; // Gold color
         const holyWhite = 0xFFFFFF; // Pure white
         
-        // Draw the main pulse circle with golden color (relative to graphics position)
-        vfxGraphics.fillStyle(holyGold, 0.6);
+        // Draw the main pulse circle with golden color (much more transparent)
+        vfxGraphics.fillStyle(holyGold, 0.15);
         vfxGraphics.fillCircle(0, 0, radius * 0.8);
         
-        // Add a bright white inner glow (smaller for better contrast)
-        vfxGraphics.fillStyle(holyWhite, 0.4);
+        // Add a subtle white inner glow (much more transparent)
+        vfxGraphics.fillStyle(holyWhite, 0.1);
         vfxGraphics.fillCircle(0, 0, radius * 0.7);
         
-        // Add a bright golden border
-        vfxGraphics.lineStyle(4, holyGold, 0.9);
+        // Add a subtle golden border
+        vfxGraphics.lineStyle(3, holyGold, 0.3);
         vfxGraphics.strokeCircle(0, 0, radius* 0.8);
         
-        // Add inner white border for extra glow (smaller for better contrast)
-        vfxGraphics.lineStyle(2, holyWhite, 1.0);
+        // Add subtle inner white border
+        vfxGraphics.lineStyle(2, holyWhite, 0.25);
         vfxGraphics.strokeCircle(0, 0, radius * 0.7);
         
-        // Create pulsing animation - expand and fade (null-safe)
+        // Create gentle pulsing animation - slower and more comfortable (null-safe)
         if (this.scene.tweens) {
+            // Start at lower alpha to make the flash even gentler
+            vfxGraphics.setAlpha(0.7);
+            
             this.scene.tweens.add({
                 targets: vfxGraphics,
-                scaleX: 1.25,
-                scaleY: 1.25,
+                scaleX: 1.15, // Less dramatic scaling
+                scaleY: 1.15,
                 alpha: 0,
-                duration: 300, // Slightly longer than Thunder Horn for holy effect
+                duration: 450, // Longer, slower animation
                 ease: 'Power2.easeOut',
                 onComplete: () => {
                     if (vfxGraphics && vfxGraphics.scene) {
@@ -401,33 +404,34 @@ export class AttackManager {
             });
         } else {
             // Fallback: destroy immediately if tweens not available
-            this.scene.time.delayedCall(300, () => {
+            this.scene.time.delayedCall(450, () => {
                 if (vfxGraphics && vfxGraphics.scene) {
                     vfxGraphics.destroy();
                 }
             });
         }
         
-        // Add some sparkle particles for extra holy effect (null-safe)
+        // Add some subtle sparkle particles (much more gentle)
         if (this.scene.add && this.scene.add.particles) {
             const particles = this.scene.add.particles(x, y, 'white_pixel', {
-                speed: { min: 30, max: 80 },
-                scale: { start: 0.8, end: 0 },
+                speed: { min: 20, max: 50 },
+                scale: { start: 0.4, end: 0 },
+                alpha: { start: 0.3, end: 0 }, // Much more transparent particles
                 blendMode: 'ADD',
-                lifespan: 400,
-                gravityY: -30, // Float upward like holy energy
+                lifespan: 300,
+                gravityY: -20, // Gentler upward float
                 tint: [holyGold, holyWhite], // Mix of gold and white particles
                 emitting: false
             });
             
-            // Emit particles in a burst
+            // Emit fewer particles in a burst
             if (particles && particles.explode) {
-                particles.explode(15, 0, 0); // Relative to particle system position
+                particles.explode(8, 0, 0); // Reduced from 15 to 8 particles
             }
             
             // Clean up particles (null-safe)
             if (this.scene.time) {
-                this.scene.time.delayedCall(500, () => {
+                this.scene.time.delayedCall(600, () => {
                     if (particles && particles.scene) {
                         particles.destroy();
                     }
@@ -435,7 +439,7 @@ export class AttackManager {
             }
         }
         
-        console.log(`Angel Staff holy pulse VFX created at player position (${x}, ${y}) with radius ${radius}`);
+        //console.log(`Angel Staff holy pulse VFX created at player position (${x}, ${y}) with radius ${radius}`);
     }
 
     private updateAttackGraphic(attackGraphicData: AttackGraphicData) {

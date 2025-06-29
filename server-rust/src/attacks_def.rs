@@ -198,7 +198,7 @@ pub fn init_attack_data(ctx: &ReducerContext) {
         attack_id: 6,
         attack_type: AttackType::AngelStaff,
         name: "Angel Staff".to_string(),
-        cooldown: 500,           // Fast cooldown (0.8 seconds)
+        cooldown: 300,           // Fast cooldown (0.8 seconds)
         duration: 100,           // Very short duration (0.1 seconds) - just for VFX
         projectiles: 1,          // Single cast
         fire_delay: 0,           // Instant
@@ -267,7 +267,7 @@ fn trigger_attack_projectile(ctx: &ReducerContext, player_id: u32, attack_type: 
         // Get the collision cache to access cached monster data
         let cache = crate::monsters_def::get_collision_cache();
         
-        // Check all cached monsters within radius and add damage to accumulator
+        // Check all cached monsters within radius and apply damage directly
         for mid in 0..cache.monster.cached_count_monsters as usize {
             let monster_x = cache.monster.pos_x_monster[mid];
             let monster_y = cache.monster.pos_y_monster[mid];
@@ -276,8 +276,9 @@ fn trigger_attack_projectile(ctx: &ReducerContext, player_id: u32, attack_type: 
             let distance_squared = dx * dx + dy * dy;
             
             if distance_squared <= damage_radius_squared {
-                // Add damage to the damage accumulator - it will be committed at end of frame
-                cache.monster.damage_to_monster[mid] += scheduled_attack.damage as f32;
+                let monster_id = cache.monster.keys_monster[mid];
+                // Apply damage directly since we're outside the main update loop
+                crate::core_game::damage_monster(ctx, monster_id, scheduled_attack.damage);
                 enemies_hit += 1;
             }
         }
@@ -306,8 +307,8 @@ fn trigger_attack_projectile(ctx: &ReducerContext, player_id: u32, attack_type: 
                 let distance_squared = dx * dx + dy * dy;
                 
                 if distance_squared <= damage_radius_squared {
-                    // Add damage to the player damage accumulator - it will be committed at end of frame
-                    cache.player.damage_to_player[pid] += scheduled_attack.damage as f32;
+                    // Apply damage directly since we're outside the main update loop
+                    crate::core_game::damage_player(ctx, target_player_id, scheduled_attack.damage as f32);
                     enemies_hit += 1;
                 }
             }
@@ -332,7 +333,7 @@ fn trigger_attack_projectile(ctx: &ReducerContext, player_id: u32, attack_type: 
             id_within_burst,
             parameter_u,
             ticks_elapsed: 0,
-            damage: scheduled_attack.damage,
+            damage: 0,
             radius: scheduled_attack.radius,
             piercing: scheduled_attack.piercing,
         });
