@@ -34,6 +34,10 @@ pub fn get_parameter_u(ctx: &ReducerContext, attack: &PlayerScheduledAttack) -> 
             // We'll pack the position coordinates into these parameters
             0 // Position will be determined in determine_attack_direction
         }
+        AttackType::AngelStaff => {
+            // Angel Staff doesn't need special parameters since it's a simple area effect
+            0
+        }
         _ => 0,
     }
 }
@@ -103,6 +107,10 @@ pub fn determine_attack_direction(
                 // If no target found, default direction
                 DbVector2::new(1.0, 0.0)
             }
+        }
+        AttackType::AngelStaff => {
+            // Angel Staff is an area effect at player position - direction doesn't matter
+            DbVector2::new(0.0, 0.0)
         }
     }
 }

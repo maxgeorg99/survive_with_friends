@@ -90,5 +90,15 @@ pub fn initialize_class_data(ctx: &ReducerContext) {
         starting_attack_type: AttackType::ThunderHorn,
     });
     
+    // Insert Priest class data
+    ctx.db.class_data().insert(ClassData {
+        class_id: PlayerClass::Priest as u32,
+        player_class: PlayerClass::Priest,
+        max_hp: 100,
+        armor: 0,
+        speed: 200.0,
+        starting_attack_type: AttackType::AngelStaff,
+    });
+    
     log::info!("Class data initialization complete.");
 }

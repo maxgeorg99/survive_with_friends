@@ -52,6 +52,7 @@ export default class LoadingScene extends Phaser.Scene {
         this.load.image('mage_icon', '/assets/attack_wand.png');
         this.load.image('paladin_icon', '/assets/attack_shield.png');
         this.load.image('valkyrie_icon', '/assets/attack_horn.png');
+        this.load.image('priestess_icon', '/assets/attack_staff.png');
         
         console.log('LoadingScene: Preloading class icons for ClassSelectScene');
     }

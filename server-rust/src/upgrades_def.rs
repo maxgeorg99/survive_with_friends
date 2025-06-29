@@ -17,6 +17,7 @@ pub enum UpgradeType {
     AttackKnives,
     AttackShield,
     AttackThunderHorn,
+    AttackAngelStaff,
 }
 
 // Attack stat enum for upgrades
@@ -99,6 +100,7 @@ pub fn draw_upgrade_options(ctx: &ReducerContext, player_id: u32) {
         UpgradeType::AttackKnives,
         UpgradeType::AttackShield,
         UpgradeType::AttackThunderHorn,
+        UpgradeType::AttackAngelStaff,
     ];
     
     // Shuffle the list randomly using Fisher-Yates algorithm
@@ -132,7 +134,7 @@ fn create_upgrade_option_data(ctx: &ReducerContext, upgrade_type: UpgradeType, p
     let is_attack_upgrade = match upgrade_type {
         UpgradeType::AttackSword | UpgradeType::AttackWand | 
         UpgradeType::AttackKnives | UpgradeType::AttackShield |
-        UpgradeType::AttackThunderHorn => true,
+        UpgradeType::AttackThunderHorn | UpgradeType::AttackAngelStaff => true,
         _ => false,
     };
 
@@ -294,6 +296,15 @@ fn create_upgrade_option_data(ctx: &ReducerContext, upgrade_type: UpgradeType, p
             ];
             generate_attack_upgrade(ctx, player_id, 5, possible_stats, upgrade_type)
         }
+        UpgradeType::AttackAngelStaff => {
+            // Generate angel staff-specific stat upgrade
+            let possible_stats = vec![
+                (AttackStat::Damage, 1),             // Moderate damage increase
+                (AttackStat::CooldownReduction, 15), // Cooldown reduction for faster casting
+                (AttackStat::Radius, 48),            // Good radius increase since it can exceed limits
+            ];
+            generate_attack_upgrade(ctx, player_id, 6, possible_stats, upgrade_type)
+        }
     }
 }
 
@@ -306,6 +317,7 @@ fn generate_attack_upgrade(ctx: &ReducerContext, player_id: u32, attack_type: u3
         3 => AttackType::Knives,
         4 => AttackType::Shield,
         5 => AttackType::ThunderHorn,
+        6 => AttackType::AngelStaff,
         _ => panic!("Invalid attack type: {}", attack_type),
     };
     
@@ -653,10 +665,10 @@ fn apply_player_upgrade(ctx: &ReducerContext, upgrade: &ChosenUpgradeData) {
         }
         
         if upgrade.radius > 0 {
-            // Attack radius upgrade - check against maximum limit
+            // Attack radius upgrade - check against maximum limit (except for Angel Staff)
             let new_radius = modified_attack.radius + upgrade.radius as f32;
-            if new_radius > MAX_RADIUS_LIMIT {
-                // Cap the radius at the maximum limit
+            if attack_type != AttackType::AngelStaff && new_radius > MAX_RADIUS_LIMIT {
+                // Cap the radius at the maximum limit for non-Angel Staff attacks
                 let capped_radius = MAX_RADIUS_LIMIT;
                 let actual_increase = capped_radius - modified_attack.radius;
                 modified_attack.radius = capped_radius;
@@ -664,7 +676,11 @@ fn apply_player_upgrade(ctx: &ReducerContext, upgrade: &ChosenUpgradeData) {
                     attack_type, upgrade.radius, actual_increase, modified_attack.radius, MAX_RADIUS_LIMIT);
             } else {
                 modified_attack.radius = new_radius;
-                log::info!("Increased attack {:?} radius by {} to {}", attack_type, upgrade.radius, modified_attack.radius);
+                if attack_type == AttackType::AngelStaff {
+                    log::info!("Increased Angel Staff radius by {} to {} (no limit)", upgrade.radius, modified_attack.radius);
+                } else {
+                    log::info!("Increased attack {:?} radius by {} to {}", attack_type, upgrade.radius, modified_attack.radius);
+                }
             }
             update_scheduled_attack = true;
         }
@@ -727,6 +743,7 @@ fn get_attack_type_from_upgrade(upgrade_type: &UpgradeType) -> AttackType {
         UpgradeType::AttackKnives => AttackType::Knives,
         UpgradeType::AttackShield => AttackType::Shield,
         UpgradeType::AttackThunderHorn => AttackType::ThunderHorn,
+        UpgradeType::AttackAngelStaff => AttackType::AngelStaff,
         _ => panic!("Cannot convert upgrade type {:?} to attack type", upgrade_type),
     }
 }
@@ -818,8 +835,9 @@ fn is_attack_radius_at_limit(ctx: &ReducerContext, player_id: u32, attack_type: 
 
 // Helper function to filter radius upgrades from possible stats if at limit
 fn filter_stats_by_radius_limit(ctx: &ReducerContext, player_id: u32, attack_type: AttackType, mut possible_stats: Vec<(AttackStat, u32)>) -> Vec<(AttackStat, u32)> {
-    if is_attack_radius_at_limit(ctx, player_id, attack_type.clone()) {
-        // Remove radius upgrades from possible stats
+    // Angel Staff is exempt from radius limits
+    if attack_type != AttackType::AngelStaff && is_attack_radius_at_limit(ctx, player_id, attack_type.clone()) {
+        // Remove radius upgrades from possible stats for non-Angel Staff attacks
         possible_stats.retain(|(stat, _)| !matches!(stat, AttackStat::Radius));
         log::info!("Player {} attack {:?} radius at limit, filtered out radius upgrades", player_id, attack_type);
     }

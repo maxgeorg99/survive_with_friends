@@ -193,6 +193,22 @@ pub fn init_attack_data(ctx: &ReducerContext) {
         armor_piercing: 15,      // Good armor penetration
     });
 
+    // Angel Staff - instant area damage
+    ctx.db.attack_data().insert(AttackData {
+        attack_id: 6,
+        attack_type: AttackType::AngelStaff,
+        name: "Angel Staff".to_string(),
+        cooldown: 500,           // Fast cooldown (0.8 seconds)
+        duration: 100,           // Very short duration (0.1 seconds) - just for VFX
+        projectiles: 1,          // Single cast
+        fire_delay: 0,           // Instant
+        speed: 0.0,              // 0 speed - instant area effect
+        piercing: true,          // Hits all enemies in radius
+        radius: 196.0,           // Large radius
+        damage: 1,               // Low damage
+        armor_piercing: 5,       // Some armor penetration
+    });
+
     log::info!("Attack data initialized successfully.");
 }
 
@@ -237,6 +253,99 @@ fn trigger_attack_projectile(ctx: &ReducerContext, player_id: u32, attack_type: 
     
     let player_x = cache.player.pos_x_player[player_cache_idx];
     let player_y = cache.player.pos_y_player[player_cache_idx];
+    
+    // Special handling for Angel Staff - instant area damage without projectiles
+    if attack_type == AttackType::AngelStaff {
+        
+        // Apply instant damage to all enemies within radius
+        let player_position = DbVector2::new(player_x, player_y);
+        let damage_radius_squared = scheduled_attack.radius * scheduled_attack.radius;
+        
+        // Count enemies hit for logging
+        let mut enemies_hit = 0;
+        
+        // Get the collision cache to access cached monster data
+        let cache = crate::monsters_def::get_collision_cache();
+        
+        // Check all cached monsters within radius and add damage to accumulator
+        for mid in 0..cache.monster.cached_count_monsters as usize {
+            let monster_x = cache.monster.pos_x_monster[mid];
+            let monster_y = cache.monster.pos_y_monster[mid];
+            let dx = monster_x - player_position.x;
+            let dy = monster_y - player_position.y;
+            let distance_squared = dx * dx + dy * dy;
+            
+            if distance_squared <= damage_radius_squared {
+                // Add damage to the damage accumulator - it will be committed at end of frame
+                cache.monster.damage_to_monster[mid] += scheduled_attack.damage as f32;
+                enemies_hit += 1;
+            }
+        }
+        
+        // Get the attacking player's PvP status from cache
+        let attacker_pvp_enabled = if let Some(&cache_idx) = cache.player.player_id_to_cache_index.get(&player_id) {
+            cache.player.pvp_player[cache_idx as usize]
+        } else {
+            false
+        };
+        
+        // Check all other players within radius if PvP is enabled
+        if attacker_pvp_enabled {
+            for pid in 0..cache.player.cached_count_players as usize {
+                let target_player_id = cache.player.keys_player[pid];
+                
+                // Skip the attacking player
+                if target_player_id == player_id {
+                    continue;
+                }
+                
+                let target_x = cache.player.pos_x_player[pid];
+                let target_y = cache.player.pos_y_player[pid];
+                let dx = target_x - player_position.x;
+                let dy = target_y - player_position.y;
+                let distance_squared = dx * dx + dy * dy;
+                
+                if distance_squared <= damage_radius_squared {
+                    // Add damage to the player damage accumulator - it will be committed at end of frame
+                    cache.player.damage_to_player[pid] += scheduled_attack.damage as f32;
+                    enemies_hit += 1;
+                }
+            }
+        }
+        
+        // Create a temporary visual effect entity for the client to display
+        let visual_entity = ctx.db.entity().insert(Entity {
+            entity_id: 0,
+            position: player_position,
+            direction: DbVector2::new(0.0, 0.0), // No direction needed for area effect
+            radius: scheduled_attack.radius,
+            waypoint: DbVector2::new(0.0, 0.0),
+            has_waypoint: false,
+        });
+
+        // Create a temporary active attack for visual effects only
+        let active_attack = ctx.db.active_attacks().insert(ActiveAttack {
+            active_attack_id: 0,
+            entity_id: visual_entity.entity_id,
+            player_id,
+            attack_type: attack_type.clone(),
+            id_within_burst,
+            parameter_u,
+            ticks_elapsed: 0,
+            damage: scheduled_attack.damage,
+            radius: scheduled_attack.radius,
+            piercing: scheduled_attack.piercing,
+        });
+
+        // Schedule cleanup of the visual effect
+        ctx.db.active_attack_cleanup().insert(ActiveAttackCleanup {
+            scheduled_id: 0,
+            active_attack_id: active_attack.active_attack_id,
+            scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(scheduled_attack.duration as u64)),
+        });
+        
+        return; // Early return - don't create normal projectile
+    }
     
     // Get attack direction using AttackUtils, passing the upgraded projectiles count
     let direction = crate::attack_utils::determine_attack_direction(ctx, player_id, &attack_type, id_within_burst, parameter_u, parameter_i, scheduled_attack.projectiles);

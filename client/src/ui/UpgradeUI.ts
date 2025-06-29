@@ -57,7 +57,8 @@ const UPGRADE_ICON_MAP: { [key: string]: string } = {
     'AttackWand': 'attack_wand',
     'AttackKnives': 'attack_knife',
     'AttackShield': 'attack_shield',
-    'AttackThunderHorn': 'attack_horn'
+    'AttackThunderHorn': 'attack_horn',
+    'AttackAngelStaff': 'attack_staff'
 };
 
 export default class UpgradeUI {

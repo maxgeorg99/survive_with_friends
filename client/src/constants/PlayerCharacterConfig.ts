@@ -6,7 +6,8 @@ export const PLAYER_CLASS_ASSET_KEYS: Record<string, string> = {
     "Rogue": 'player_rogue',
     "Mage": 'player_mage',
     "Paladin": 'player_paladin',
-    "Valkyrie": 'player_valkyrie'
+    "Valkyrie": 'player_valkyrie',
+    "Priest": 'player_priest'
 };
 
 // Shadow offset configurations for each player class (horizontal offset in pixels)
@@ -15,7 +16,8 @@ export const PLAYER_SHADOW_OFFSETS_X: Record<string, number> = {
     "Rogue": -3,     // Default - no horizontal offset
     "Mage": -2,      // Default - no horizontal offset
     "Paladin": 0,   // Default - no horizontal offset
-    "Valkyrie": -7   // Default - no horizontal offset
+    "Valkyrie": -7,   // Default - no horizontal offset
+    "Priest": 1     // Similar to Mage
 };
 
 // Shadow offset configurations for each player class (vertical offset in pixels)
@@ -24,7 +26,8 @@ export const PLAYER_SHADOW_OFFSETS_Y: Record<string, number> = {
     "Rogue": 13,     // Default current value
     "Mage": 7,      // Default current value
     "Paladin": 14,   // Default current value
-    "Valkyrie": 13   // Default current value
+    "Valkyrie": 13,   // Default current value
+    "Priest": 5      // Similar to Mage
 };
 
 // Shadow scale configurations for each player class
@@ -33,7 +36,8 @@ export const PLAYER_SHADOW_SCALE: Record<string, number> = {
     "Rogue": 1.0,     // Default scale
     "Mage": 1.0,      // Default scale
     "Paladin": 1.0,   // Default scale
-    "Valkyrie": 1.0   // Default scale
+    "Valkyrie": 1.0,   // Default scale
+    "Priest": 1.0     // Default scale
 };
 
 // Shadow alpha (transparency) configurations for each player class
@@ -42,7 +46,8 @@ export const PLAYER_SHADOW_ALPHA: Record<string, number> = {
     "Rogue": 0.4,     // Default current value
     "Mage": 0.4,      // Default current value
     "Paladin": 0.4,   // Default current value
-    "Valkyrie": 0.4   // Default current value
+    "Valkyrie": 0.4,   // Default current value
+    "Priest": 0.4     // Default current value
 };
 
 // Helper function to get player class name from various formats
@@ -60,7 +65,7 @@ export function getPlayerClassName(playerClass: any): string {
     // Handle case when playerClass is a number (enum value)
     if (typeof playerClass === 'number') {
         // Map numeric enum values to class names
-        const classNames = ["Fighter", "Rogue", "Mage", "Paladin", "Valkyrie"];
+        const classNames = ["Fighter", "Rogue", "Mage", "Paladin", "Valkyrie", "Priest"];
         return classNames[playerClass] || "Fighter";
     }
     

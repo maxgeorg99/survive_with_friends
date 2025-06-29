@@ -12,7 +12,8 @@ const CLASS_ID_MAP = {
     "Rogue": 1,
     "Mage": 2,
     "Paladin": 3,
-    "Valkyrie": 4
+    "Valkyrie": 4,
+    "Priest": 5
 };
 
 const CLASS_ICON_MAP : Record<string, string> = {
@@ -20,7 +21,8 @@ const CLASS_ICON_MAP : Record<string, string> = {
     "rogue_icon": "attack_knife",
     "mage_icon": "attack_wand",
     "paladin_icon": "attack_shield",
-    "valkyrie_icon": "attack_horn"
+    "valkyrie_icon": "attack_horn",
+    "priestess_icon": "attack_staff"
 };
 
 // Constants for responsive design
@@ -51,6 +53,7 @@ export default class ClassSelectScene extends Phaser.Scene {
     private mageButton!: HTMLButtonElement;
     private paladinButton!: HTMLButtonElement;
     private valkyrieButton!: HTMLButtonElement;
+    private priestessButton!: HTMLButtonElement;
     private confirmButton!: HTMLButtonElement;
     private errorText!: Phaser.GameObjects.Text;
     private optionsUI!: OptionsUI;
@@ -78,10 +81,14 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.load.image('mage_icon', '/assets/attack_wand.png');
         this.load.image('paladin_icon', '/assets/attack_shield.png');
         this.load.image('valkyrie_icon', '/assets/attack_horn.png');
+        this.load.image('priestess_icon', '/assets/attack_staff.png');
         this.load.image('title_bg', '/assets/title_bg.png');
         
         // Load new Valkyrie class sprite
         this.load.image('player_valkyrie', '/assets/class_valkyrie_1.png');
+        
+        // Load Priest class sprite
+        this.load.image('player_priest', '/assets/class_priest_1.png');
         
         // Load new Thunder Horn attack assets
         this.load.image('attack_horn', '/assets/attack_horn.png');
@@ -365,16 +372,15 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.mageButton = createClassButton('Mage', PlayerClass.Mage as PlayerClass, 'mage_icon');
         this.paladinButton = createClassButton('Paladin', PlayerClass.Paladin as PlayerClass, 'paladin_icon');
         this.valkyrieButton = createClassButton('Valkyrie', PlayerClass.Valkyrie as PlayerClass, 'valkyrie_icon');
+        this.priestessButton = createClassButton('Priestess', PlayerClass.Priest as PlayerClass, 'priestess_icon');
         
-        // Add buttons to container in grid layout (2x3 grid with last row having 1 button centered)
+        // Add buttons to container in grid layout (2x3 grid)
         this.classButtonsContainer.appendChild(this.fighterButton);
         this.classButtonsContainer.appendChild(this.rogueButton);
         this.classButtonsContainer.appendChild(this.mageButton);
         this.classButtonsContainer.appendChild(this.paladinButton);
-        
-        // For the 5th button (Valkyrie), we'll span it across both columns to center it
-        this.valkyrieButton.style.gridColumn = '1 / -1'; // Span across all columns
         this.classButtonsContainer.appendChild(this.valkyrieButton);
+        this.classButtonsContainer.appendChild(this.priestessButton);
         
         // Create a separate container for the confirm button to keep it below the grid
         const confirmContainer = document.createElement('div');
@@ -643,7 +649,7 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.confirmButton.disabled = false;
         this.confirmButton.textContent = 'Confirm Selection';
         
-        [this.fighterButton, this.rogueButton, this.mageButton, this.paladinButton, this.valkyrieButton].forEach(btn => {
+        [this.fighterButton, this.rogueButton, this.mageButton, this.paladinButton, this.valkyrieButton, this.priestessButton].forEach(btn => {
             if (btn) btn.disabled = false;
         });
     }
@@ -677,6 +683,7 @@ export default class ClassSelectScene extends Phaser.Scene {
                     (el as HTMLElement).textContent?.includes('Mage') ||
                     (el as HTMLElement).textContent?.includes('Paladin') ||
                     (el as HTMLElement).textContent?.includes('Valkyrie') ||
+                    (el as HTMLElement).textContent?.includes('Priestess') ||
                     (el as HTMLElement).textContent?.includes('Confirm Selection')) {
                     if (el && el.parentNode) {
                         console.log("Removing class button:", (el as HTMLElement).textContent);

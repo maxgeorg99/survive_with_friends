@@ -67,6 +67,7 @@ export default class TitleScene extends Phaser.Scene {
         this.load.image('mage_icon', '/assets/attack_wand.png');
         this.load.image('paladin_icon', '/assets/attack_shield.png');
         this.load.image('valkyrie_icon', '/assets/attack_horn.png');
+        this.load.image('priestess_icon', '/assets/attack_staff.png');
         
         // Preload upgrade UI assets to eliminate delays when leveling up
         this.load.image('card_blank', '/assets/card_blank.png');
@@ -133,6 +134,7 @@ export default class TitleScene extends Phaser.Scene {
         this.load.image('attack_knife', '/assets/attack_knife.png');
         this.load.image('attack_shield', '/assets/attack_shield.png');
         this.load.image('attack_horn', '/assets/attack_horn.png');
+        this.load.image('attack_staff', '/assets/attack_staff.png');
         this.load.image('attack_lightning', '/assets/attack_lightning.png');
         
         console.log("TitleScene: Preloading ALL game assets for completely seamless gameplay experience");

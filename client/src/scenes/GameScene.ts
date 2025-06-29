@@ -197,6 +197,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('player_mage', '/assets/class_mage_1.png');
         this.load.image('player_paladin', '/assets/class_paladin_1.png');
         this.load.image('player_valkyrie', '/assets/class_valkyrie_1.png');
+        this.load.image('player_priest', '/assets/class_priest_1.png');
         this.load.image(GRASS_ASSET_KEY, '/assets/grass.png');
         this.load.image(SHADOW_ASSET_KEY, '/assets/shadow.png');
         
@@ -237,6 +238,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('attack_knife', '/assets/attack_knife.png');
         this.load.image('attack_shield', '/assets/attack_shield.png');
         this.load.image('attack_horn', '/assets/attack_horn.png');
+        this.load.image('attack_staff', '/assets/attack_staff.png');
         this.load.image('attack_lightning', '/assets/attack_lightning.png');
         
         // Load monster attack assets
@@ -253,6 +255,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('mage_icon', '/assets/attack_wand.png');
         this.load.image('paladin_icon', '/assets/attack_shield.png');
         this.load.image('valkyrie_icon', '/assets/attack_horn.png');
+        this.load.image('priestess_icon', '/assets/attack_staff.png');
         
         // Load upgrade assets
         this.load.image('card_blank', '/assets/card_blank.png');
@@ -354,6 +357,7 @@ export default class GameScene extends Phaser.Scene {
             console.log("player_mage:", this.textures.exists('player_mage'));
             console.log("player_paladin:", this.textures.exists('player_paladin'));
             console.log("player_valkyrie:", this.textures.exists('player_valkyrie'));
+            console.log("player_priest:", this.textures.exists('player_priest'));
             console.log("monster_rat:", this.textures.exists('monster_rat'));
             console.log("monster_slime:", this.textures.exists('monster_slime'));
             console.log("monster_orc:", this.textures.exists('monster_orc'));
@@ -369,6 +373,7 @@ export default class GameScene extends Phaser.Scene {
             console.log("attack_wand:", this.textures.exists('attack_wand'));
             console.log("attack_knife:", this.textures.exists('attack_knife'));
             console.log("attack_shield:", this.textures.exists('attack_shield'));
+            console.log("attack_staff:", this.textures.exists('attack_staff'));
             console.log("void_arrow:", this.textures.exists('void_arrow'));
             console.log("soul_arrow:", this.textures.exists('soul_arrow'));
             console.log(GRASS_ASSET_KEY + ":", this.textures.exists(GRASS_ASSET_KEY));

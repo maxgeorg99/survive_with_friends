@@ -171,8 +171,19 @@ export class AttackManager {
             // Set depth to be behind sprites
             graphic.setDepth(1.4);
             
+            // For Angel Staff, use player position instead of entity position
+            let initialX = entity.position.x;
+            let initialY = entity.position.y;
+            if (attackType === 'AngelStaff') {
+                const playerPosition = this.getPlayerPosition(attack.playerId);
+                if (playerPosition) {
+                    initialX = playerPosition.x;
+                    initialY = playerPosition.y;
+                }
+            }
+            
             // Create sprite based on attack type
-            const sprite = this.createAttackSprite(attackType, entity.position.x, entity.position.y, attack.radius);
+            const sprite = this.createAttackSprite(attackType, initialX, initialY, attack.radius);
             
             // Setup direction vector based on entity direction
             const direction = new Phaser.Math.Vector2(entity.direction.x, entity.direction.y);
@@ -185,8 +196,8 @@ export class AttackManager {
                 baseRadius: attackData.radius, // Store base radius from attack data for scaling
                 alpha,
                 lastUpdateTime: this.gameTime,
-                predictedPosition: new Phaser.Math.Vector2(entity.position.x, entity.position.y),
-                serverPosition: new Phaser.Math.Vector2(entity.position.x, entity.position.y),
+                predictedPosition: new Phaser.Math.Vector2(initialX, initialY),
+                serverPosition: new Phaser.Math.Vector2(initialX, initialY),
                 direction: direction,
                 speed: attackData.speed,
                 isShield,
@@ -205,16 +216,27 @@ export class AttackManager {
             attackGraphicData.attackType = attackType;
             attackGraphicData.radius = attack.radius; // Update radius value
             
-            // Check if predicted position is too far from server position
-            const dx = attackGraphicData.predictedPosition.x - entity.position.x;
-            const dy = attackGraphicData.predictedPosition.y - entity.position.y;
-            const distSquared = dx * dx + dy * dy;
-
-            var threshold = (DELTA_TIME * attackGraphicData.speed) * (DELTA_TIME * attackGraphicData.speed);
+            // For Angel Staff, the attack should follow the player position
+            if (attackType === 'AngelStaff' && attackGraphicData.playerId) {
+                const playerPosition = this.getPlayerPosition(attackGraphicData.playerId);
+                if (playerPosition) {
+                    attackGraphicData.serverPosition.set(playerPosition.x, playerPosition.y);
+                    attackGraphicData.predictedPosition.set(playerPosition.x, playerPosition.y);
+                }
+            }
             
-            if (distSquared > threshold) {
-                // Correction needed - reset prediction to match server
-                attackGraphicData.predictedPosition.set(entity.position.x, entity.position.y);
+            // Check if predicted position is too far from server position (but skip for Angel Staff which should follow player)
+            if (attackType !== 'AngelStaff') {
+                const dx = attackGraphicData.predictedPosition.x - entity.position.x;
+                const dy = attackGraphicData.predictedPosition.y - entity.position.y;
+                const distSquared = dx * dx + dy * dy;
+
+                var threshold = (DELTA_TIME * attackGraphicData.speed) * (DELTA_TIME * attackGraphicData.speed);
+                
+                if (distSquared > threshold) {
+                    // Correction needed - reset prediction to match server
+                    attackGraphicData.predictedPosition.set(entity.position.x, entity.position.y);
+                }
             }
         }
 
@@ -242,6 +264,9 @@ export class AttackManager {
             case 'ThunderHorn':
                 spriteKey = 'attack_horn';
                 break;
+            case 'AngelStaff':
+                spriteKey = 'attack_staff';
+                break;
             default:
                 console.error(`Unknown attack type: ${attackType}`);
                 return null;
@@ -255,6 +280,12 @@ export class AttackManager {
         if (attackType === 'ThunderHorn') {
             sprite.setAlpha(0); // Hidden for debugging as requested
             this.createThunderHornVFX(x, y, radius);
+        }
+        
+        // For Angel Staff, set alpha to 0 and create holy pulse VFX
+        if (attackType === 'AngelStaff') {
+            sprite.setAlpha(0); // Hidden for debugging as requested
+            this.createAngelStaffVFX(x, y, radius);
         }
         
         // The scale will be set in updateAttackGraphic based on radius comparison
@@ -281,30 +312,130 @@ export class AttackManager {
         vfxGraphics.lineStyle(3, 0x87CEEB, 0.9); // Sky blue border
         vfxGraphics.strokeCircle(x, y, radius); // Use actual attack radius
         
-        // Fade out lightning sprite very quickly
-        this.scene.tweens.add({
-            targets: lightningSprite,
-            alpha: 0,
-            scale: 2.0, // Grow while fading
-            duration: 150, // Very fast fade
-            ease: 'Power2.easeOut',
-            onComplete: () => {
-                lightningSprite.destroy();
+        // Fade out lightning sprite very quickly (null-safe)
+        if (this.scene.tweens) {
+            this.scene.tweens.add({
+                targets: lightningSprite,
+                alpha: 0,
+                scale: 2.0, // Grow while fading
+                duration: 150, // Very fast fade
+                ease: 'Power2.easeOut',
+                onComplete: () => {
+                    if (lightningSprite && lightningSprite.scene) {
+                        lightningSprite.destroy();
+                    }
+                }
+            });
+            
+            // Fade out circle very quickly
+            this.scene.tweens.add({
+                targets: vfxGraphics,
+                alpha: 0,
+                duration: 200, // Slightly longer than lightning
+                ease: 'Power2.easeOut',
+                onComplete: () => {
+                    if (vfxGraphics && vfxGraphics.scene) {
+                        vfxGraphics.destroy();
+                    }
+                }
+            });
+        } else {
+            // Fallback: destroy after timeout if tweens not available
+            if (this.scene.time) {
+                this.scene.time.delayedCall(150, () => {
+                    if (lightningSprite && lightningSprite.scene) {
+                        lightningSprite.destroy();
+                    }
+                });
+                this.scene.time.delayedCall(200, () => {
+                    if (vfxGraphics && vfxGraphics.scene) {
+                        vfxGraphics.destroy();
+                    }
+                });
             }
-        });
-        
-        // Fade out circle very quickly
-        this.scene.tweens.add({
-            targets: vfxGraphics,
-            alpha: 0,
-            duration: 200, // Slightly longer than lightning
-            ease: 'Power2.easeOut',
-            onComplete: () => {
-                vfxGraphics.destroy();
-            }
-        });
+        }
         
         console.log(`Thunder Horn VFX created at (${x}, ${y}) with radius ${radius}`);
+    }
+
+    private createAngelStaffVFX(x: number, y: number, radius: number): void {
+        // Create holy pulse circle VFX with golden/white colors
+        const vfxGraphics = this.scene.add.graphics();
+        vfxGraphics.setPosition(x, y); // Position the graphics object at the target location
+        vfxGraphics.setDepth(1.9); // Just below sprites
+        
+        // Create a holy golden-white circle
+        const holyGold = 0xFFD700; // Gold color
+        const holyWhite = 0xFFFFFF; // Pure white
+        
+        // Draw the main pulse circle with golden color (relative to graphics position)
+        vfxGraphics.fillStyle(holyGold, 0.6);
+        vfxGraphics.fillCircle(0, 0, radius * 0.8);
+        
+        // Add a bright white inner glow (smaller for better contrast)
+        vfxGraphics.fillStyle(holyWhite, 0.4);
+        vfxGraphics.fillCircle(0, 0, radius * 0.7);
+        
+        // Add a bright golden border
+        vfxGraphics.lineStyle(4, holyGold, 0.9);
+        vfxGraphics.strokeCircle(0, 0, radius* 0.8);
+        
+        // Add inner white border for extra glow (smaller for better contrast)
+        vfxGraphics.lineStyle(2, holyWhite, 1.0);
+        vfxGraphics.strokeCircle(0, 0, radius * 0.7);
+        
+        // Create pulsing animation - expand and fade (null-safe)
+        if (this.scene.tweens) {
+            this.scene.tweens.add({
+                targets: vfxGraphics,
+                scaleX: 1.25,
+                scaleY: 1.25,
+                alpha: 0,
+                duration: 300, // Slightly longer than Thunder Horn for holy effect
+                ease: 'Power2.easeOut',
+                onComplete: () => {
+                    if (vfxGraphics && vfxGraphics.scene) {
+                        vfxGraphics.destroy();
+                    }
+                }
+            });
+        } else {
+            // Fallback: destroy immediately if tweens not available
+            this.scene.time.delayedCall(300, () => {
+                if (vfxGraphics && vfxGraphics.scene) {
+                    vfxGraphics.destroy();
+                }
+            });
+        }
+        
+        // Add some sparkle particles for extra holy effect (null-safe)
+        if (this.scene.add && this.scene.add.particles) {
+            const particles = this.scene.add.particles(x, y, 'white_pixel', {
+                speed: { min: 30, max: 80 },
+                scale: { start: 0.8, end: 0 },
+                blendMode: 'ADD',
+                lifespan: 400,
+                gravityY: -30, // Float upward like holy energy
+                tint: [holyGold, holyWhite], // Mix of gold and white particles
+                emitting: false
+            });
+            
+            // Emit particles in a burst
+            if (particles && particles.explode) {
+                particles.explode(15, 0, 0); // Relative to particle system position
+            }
+            
+            // Clean up particles (null-safe)
+            if (this.scene.time) {
+                this.scene.time.delayedCall(500, () => {
+                    if (particles && particles.scene) {
+                        particles.destroy();
+                    }
+                });
+            }
+        }
+        
+        console.log(`Angel Staff holy pulse VFX created at player position (${x}, ${y}) with radius ${radius}`);
     }
 
     private updateAttackGraphic(attackGraphicData: AttackGraphicData) {
@@ -338,8 +469,8 @@ export class AttackManager {
             sprite.x = attackGraphicData.predictedPosition.x;
             sprite.y = attackGraphicData.predictedPosition.y;
             
-            // Apply alpha transparency based on PvP status (except Thunder Horn which stays at 0)
-            if (attackGraphicData.attackType !== 'ThunderHorn') {
+            // Apply alpha transparency based on PvP status (except Thunder Horn and Angel Staff which stay at 0)
+            if (attackGraphicData.attackType !== 'ThunderHorn' && attackGraphicData.attackType !== 'AngelStaff') {
                 sprite.setAlpha(attackGraphicData.alpha);
             }
             
@@ -379,6 +510,12 @@ export class AttackManager {
                     
                 case 'ThunderHorn':
                     // Thunder Horn stays at position, no rotation needed
+                    sprite.setRotation(0);
+                    sprite.setFlipX(false);
+                    break;
+                    
+                case 'AngelStaff':
+                    // Angel Staff stays at position, no rotation needed
                     sprite.setRotation(0);
                     sprite.setFlipX(false);
                     break;
@@ -464,6 +601,16 @@ export class AttackManager {
                 // Thunder Horn stays stationary - no movement needed
                 // Just update the graphic in case other properties changed
                 this.updateAttackGraphic(attackGraphicData);
+            } else if (attackGraphicData.attackType === 'AngelStaff') {
+                // Angel Staff follows the player position exactly
+                const playerPos = this.getPlayerPosition(attackGraphicData.playerId || 0);
+                if (playerPos) {
+                    // Update predicted position to match player position
+                    attackGraphicData.predictedPosition.set(playerPos.x, playerPos.y);
+                    
+                    // Draw at player position
+                    this.updateAttackGraphic(attackGraphicData);
+                }
             } else {
                 // Normal projectile with directional movement
                 if (attackGraphicData.direction.length() > 0) {

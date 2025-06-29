@@ -40,6 +40,7 @@ export namespace AttackType {
   export type Knives = { tag: "Knives" };
   export type Shield = { tag: "Shield" };
   export type ThunderHorn = { tag: "ThunderHorn" };
+  export type AngelStaff = { tag: "AngelStaff" };
 
   // Helper functions for constructing each variant of the tagged union.
   // ```
@@ -52,6 +53,7 @@ export namespace AttackType {
   export const Knives = { tag: "Knives" };
   export const Shield = { tag: "Shield" };
   export const ThunderHorn = { tag: "ThunderHorn" };
+  export const AngelStaff = { tag: "AngelStaff" };
 
   export function getTypeScriptAlgebraicType(): AlgebraicType {
     return AlgebraicType.createSumType([
@@ -60,6 +62,7 @@ export namespace AttackType {
       new SumTypeVariant("Knives", AlgebraicType.createProductType([])),
       new SumTypeVariant("Shield", AlgebraicType.createProductType([])),
       new SumTypeVariant("ThunderHorn", AlgebraicType.createProductType([])),
+      new SumTypeVariant("AngelStaff", AlgebraicType.createProductType([])),
     ]);
   }
 
@@ -74,7 +77,7 @@ export namespace AttackType {
 }
 
 // The tagged union or sum type for the algebraic type `AttackType`.
-export type AttackType = AttackType.Sword | AttackType.Wand | AttackType.Knives | AttackType.Shield | AttackType.ThunderHorn;
+export type AttackType = AttackType.Sword | AttackType.Wand | AttackType.Knives | AttackType.Shield | AttackType.ThunderHorn | AttackType.AngelStaff;
 
 export default AttackType;
 

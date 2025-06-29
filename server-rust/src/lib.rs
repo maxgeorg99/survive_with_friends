@@ -63,6 +63,7 @@ pub enum PlayerClass {
     Mage,
     Paladin,
     Valkyrie,
+    Priest,
 }
 
 // Account state enum for player progression
@@ -83,6 +84,7 @@ pub enum AttackType {
     Knives,
     Shield,
     ThunderHorn,
+    AngelStaff,
 }
 
 // Monster attack type enum
@@ -482,7 +484,8 @@ pub fn spawn_player(ctx: &ReducerContext, class_id: u32) {
         2 => PlayerClass::Mage,
         3 => PlayerClass::Paladin,
         4 => PlayerClass::Valkyrie,
-        _ => panic!("SpawnPlayer: Invalid class ID provided by {}: {}. Valid class IDs are 0-4 (Fighter, Rogue, Mage, Paladin, Valkyrie).", identity, class_id),
+        5 => PlayerClass::Priest,
+        _ => panic!("SpawnPlayer: Invalid class ID provided by {}: {}. Valid class IDs are 0-5 (Fighter, Rogue, Mage, Paladin, Valkyrie, Priest).", identity, class_id),
     };
     
     // Create the player and entity
