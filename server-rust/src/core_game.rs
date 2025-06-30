@@ -108,7 +108,7 @@ pub fn damage_monster(ctx: &ReducerContext, monster_id: u32, damage_amount: u32)
                         crate::monster_attacks_def::cleanup_imp_attack_schedule(ctx, monster_id);
                     }
                     // Clean up EnderScythe attack schedules for bosses
-                    crate::boss_ender_defs::cleanup_ender_scythe_schedules(ctx, monster_id);
+                    crate::boss_bjorn_defs::cleanup_ender_scythe_schedules(ctx, monster_id);
                     // Clean up all scheduled AI state changes for Phase 1 boss
                     crate::monster_ai_defs::cleanup_monster_ai_schedules(ctx, monster_id);
                     
@@ -145,9 +145,9 @@ pub fn damage_monster(ctx: &ReducerContext, monster_id: u32, damage_amount: u32)
                         crate::monster_attacks_def::cleanup_imp_attack_schedule(ctx, monster_id);
                     }
                     // Clean up EnderScythe attack schedules for bosses
-                    crate::boss_ender_defs::cleanup_ender_scythe_schedules(ctx, monster_id);
+                    crate::boss_bjorn_defs::cleanup_ender_scythe_schedules(ctx, monster_id);
                     // Clean up EnderClaw spawning for Phase 2 boss
-                    crate::boss_ender_defs::cleanup_ender_claw_spawning(ctx, monster_id);
+                    crate::boss_bjorn_defs::cleanup_ender_claw_spawning(ctx, monster_id);
                     
                     // Delete the monster and entity
                     ctx.db.monsters().monster_id().delete(&monster_id);
@@ -527,10 +527,10 @@ pub fn game_tick(ctx: &ReducerContext, _timer: GameTickTimer) {
 
     process_attack_movements(ctx);
 
-    // Update Agna magic circles
+    // Update Claudia magic circles
     let collision_cache = crate::monsters_def::get_collision_cache();
-    crate::boss_agna_defs::update_agna_magic_circles(ctx, collision_cache);
-    crate::boss_agna_defs::process_agna_ritual_complete_damage(ctx);
+    crate::boss_claudia_defs::update_agna_magic_circles(ctx, collision_cache);
+    crate::boss_claudia_defs::process_agna_ritual_complete_damage(ctx);
 
     process_monster_attack_movements(ctx);
 

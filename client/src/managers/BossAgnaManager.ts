@@ -5,7 +5,7 @@ import SpacetimeDBClient from '../SpacetimeDBClient';
 const MAGIC_CIRCLE_ASSET_KEY = 'agna_magic_circle';
 const BIG_MAGIC_CIRCLE_DEPTH = 1;
 const AGNA_WICK_CIRCLE_SCALE = 0.80;
-const AGNA_WICK_CIRCLE_Y_OFFSET = 28; // Offset circle slightly up from Agna's center
+const AGNA_WICK_CIRCLE_Y_OFFSET = 28; // Offset circle slightly up from Claudia's center
 const CANDLE_SPAWN_ASSET_KEY = 'agna_candle_off';
 const FADE_IN_DURATION = 500;
 const FADE_OUT_DURATION = 300;
@@ -117,23 +117,23 @@ export default class BossAgnaManager {
             this.createCandleSpawn(candleSpawn);
         }
         
-        // Also check for any existing Agna bosses in flamethrower mode or ritual states
+        // Also check for any existing Claudia bosses in flamethrower mode or ritual states
         for (const monster of ctx.db?.monsters?.iter() || []) {
             if (this.isAgnaBoss(monster)) {
                 if (this.isFlamethrowerState(monster.aiState)) {
-                    console.log(`Found existing Agna boss ${monster.monsterId} in flamethrower mode during initialization`);
+                    console.log(`Found existing Claudia boss ${monster.monsterId} in flamethrower mode during initialization`);
                     this.startFlamethrowerSound(monster.monsterId);
                 }
                 if (this.isRitualCompleteState(monster.aiState)) {
-                    console.log(`Found existing Agna boss ${monster.monsterId} in ritual complete state during initialization`);
+                    console.log(`Found existing Claudia boss ${monster.monsterId} in ritual complete state during initialization`);
                     this.startRitualCompleteVisualization();
                 }
                 if (this.isMagicCircleState(monster.aiState)) {
-                    console.log(`Found existing Agna boss ${monster.monsterId} in magic circle state during initialization`);
+                    console.log(`Found existing Claudia boss ${monster.monsterId} in magic circle state during initialization`);
                     this.startMagicCirclePhaseVisualization();
                 }
                 if (this.isRitualWickState(monster.aiState)) {
-                    console.log(`Found existing Agna boss ${monster.monsterId} in wick state during initialization`);
+                    console.log(`Found existing Claudia boss ${monster.monsterId} in wick state during initialization`);
                     this.startWickPhaseVisualization(monster);
                 }
                 // Note: Ritual sounds are one-shot, so we don't need to replay them during initialization
@@ -228,7 +228,7 @@ export default class BossAgnaManager {
             return;
         }
         
-        // Only process Agna bosses
+        // Only process Claudia bosses
         if (!this.isAgnaBoss(newMonster)) {
             return;
         }
@@ -238,10 +238,10 @@ export default class BossAgnaManager {
         
         // Check for flamethrower state transitions (Phase 1)
         if (!wasInFlamethrower && isInFlamethrower) {
-            console.log(`Agna boss ${newMonster.monsterId} entered flamethrower mode`);
+            console.log(`Claudia boss ${newMonster.monsterId} entered flamethrower mode`);
             this.startFlamethrowerSound(newMonster.monsterId);
         } else if (wasInFlamethrower && !isInFlamethrower) {
-            console.log(`Agna boss ${newMonster.monsterId} left flamethrower mode`);
+            console.log(`Claudia boss ${newMonster.monsterId} left flamethrower mode`);
             this.stopFlamethrowerSound(newMonster.monsterId);
         }
 
@@ -250,10 +250,10 @@ export default class BossAgnaManager {
         const isPhase2 = newMonster.bestiaryId?.tag === 'BossAgnaPhase2';
         
         if (!wasPhase2 && isPhase2) {
-            console.log(`Agna boss ${newMonster.monsterId} entered Phase 2 - starting continuous flamethrower sound`);
+            console.log(`Claudia boss ${newMonster.monsterId} entered Phase 2 - starting continuous flamethrower sound`);
             this.startFlamethrowerSound(newMonster.monsterId);
         } else if (wasPhase2 && !isPhase2) {
-            console.log(`Agna boss ${newMonster.monsterId} left Phase 2 - stopping continuous flamethrower sound`);
+            console.log(`Claudia boss ${newMonster.monsterId} left Phase 2 - stopping continuous flamethrower sound`);
             this.stopFlamethrowerSound(newMonster.monsterId);
         }
 
@@ -273,35 +273,35 @@ export default class BossAgnaManager {
 
         // Handle magic circle phase visualization
         if (!wasInMagicCircle && isInMagicCircle) {
-            console.log(`Agna boss ${newMonster.monsterId} entered magic circle phase`);
+            console.log(`Claudia boss ${newMonster.monsterId} entered magic circle phase`);
             this.startMagicCirclePhaseVisualization();
         } else if (wasInMagicCircle && !isInMagicCircle) {
-            console.log(`Agna boss ${newMonster.monsterId} left magic circle phase`);
+            console.log(`Claudia boss ${newMonster.monsterId} left magic circle phase`);
             this.stopMagicCirclePhaseVisualization();
         }
 
         // Handle wick phase visualization
         if (!wasInRitualWick && isInRitualWick) {
-            console.log(`Agna boss ${newMonster.monsterId} entered wick phase`);
+            console.log(`Claudia boss ${newMonster.monsterId} entered wick phase`);
             this.startWickPhaseVisualization(newMonster);
         } else if (wasInRitualWick && !isInRitualWick) {
-            console.log(`Agna boss ${newMonster.monsterId} left wick phase`);
+            console.log(`Claudia boss ${newMonster.monsterId} left wick phase`);
             this.stopWickPhaseVisualization();
         }
 
         // Play ritual sounds when entering states
         if (!wasInRitualMatch && isInRitualMatch) {
-            console.log(`Agna boss ${newMonster.monsterId} entered ritual match phase`);
+            console.log(`Claudia boss ${newMonster.monsterId} entered ritual match phase`);
             this.playRitualSound('agna_match', 0.8);
         } else if (!wasInRitualWick && isInRitualWick) {
-            console.log(`Agna boss ${newMonster.monsterId} entered ritual wick phase`);
+            console.log(`Claudia boss ${newMonster.monsterId} entered ritual wick phase`);
             this.playRitualSound('agna_wick', 1.0);
         } else if (!wasInRitualComplete && isInRitualComplete) {
-            console.log(`Agna boss ${newMonster.monsterId} entered ritual complete phase`);
+            console.log(`Claudia boss ${newMonster.monsterId} entered ritual complete phase`);
             this.playRitualSound('agna_extinguished', 0.9);
             this.startRitualCompleteVisualization();
         } else if (!wasInRitualFailed && isInRitualFailed) {
-            console.log(`Agna boss ${newMonster.monsterId} entered ritual failed phase`);
+            console.log(`Claudia boss ${newMonster.monsterId} entered ritual failed phase`);
             this.playRitualSound('agna_ritual_fail', 0.8);
             // Stop wick phase visualization immediately when ritual fails
             this.stopWickPhaseVisualizationFast();
@@ -309,7 +309,7 @@ export default class BossAgnaManager {
         
         // Check if we need to stop ritual complete visualization
         if (wasInRitualComplete && !isInRitualComplete) {
-            console.log(`Agna boss ${newMonster.monsterId} left ritual complete phase`);
+            console.log(`Claudia boss ${newMonster.monsterId} left ritual complete phase`);
             this.stopRitualCompleteVisualization();
         }
         
@@ -322,26 +322,26 @@ export default class BossAgnaManager {
             this.restoreWickPhaseGroundCircleFromRitualComplete();
         }
 
-        // Check for target changes in Phase 2 Agna (play laugh sound)
+        // Check for target changes in Phase 2 Claudia (play laugh sound)
         if (newMonster.bestiaryId?.tag === 'BossAgnaPhase2' && 
             oldMonster.targetPlayerId !== newMonster.targetPlayerId) {
-            console.log(`Agna Phase 2 boss ${newMonster.monsterId} changed target from ${oldMonster.targetPlayerId} to ${newMonster.targetPlayerId}`);
+            console.log(`Claudia Phase 2 boss ${newMonster.monsterId} changed target from ${oldMonster.targetPlayerId} to ${newMonster.targetPlayerId}`);
             this.playRitualSound('agna_laugh', 0.7);
         }
     }
 
-    // Handle when a monster is deleted (for cleanup when Agna bosses are destroyed)
+    // Handle when a monster is deleted (for cleanup when Claudia bosses are destroyed)
     private handleMonsterDelete(ctx: EventContext, monster: Monsters) {
         if (this.isDestroyed) {
             return;
         }
         
-        // Only process Agna bosses
+        // Only process Claudia bosses
         if (!this.isAgnaBoss(monster)) {
             return;
         }
         
-        console.log(`Agna boss ${monster.monsterId} was destroyed`);
+        console.log(`Claudia boss ${monster.monsterId} was destroyed`);
         this.stopFlamethrowerSound(monster.monsterId);
     }
 
@@ -493,7 +493,7 @@ export default class BossAgnaManager {
         if (!this.flamethrowerSound || !this.flamethrowerSound.isPlaying) {
             const soundManager = (window as any).soundManager;
             if (soundManager) {
-                console.log("Starting Agna flamethrower sound");
+                console.log("Starting Claudia flamethrower sound");
                 
                 // Stop any existing flamethrower sound first
                 this.stopFlamethrowerSoundImmediate();
@@ -506,21 +506,21 @@ export default class BossAgnaManager {
                     });
                     this.flamethrowerSound.play();
                 } else {
-                    console.warn("Agna flamethrower sound not found in cache");
+                    console.warn("Claudia flamethrower sound not found in cache");
                 }
             }
         }
     }
 
     private stopFlamethrowerSound(monsterId: number) {
-        // Since there's only ever one Agna boss, just clear the set and stop the sound
+        // Since there's only ever one Claudia boss, just clear the set and stop the sound
         this.agnaBossesInFlamethrowerMode.clear();
         this.stopFlamethrowerSoundImmediate();
     }
 
     private stopFlamethrowerSoundImmediate() {
         if (this.flamethrowerSound) {
-            console.log("Stopping Agna flamethrower sound");
+            console.log("Stopping Claudia flamethrower sound");
             this.flamethrowerSound.stop();
             this.flamethrowerSound.destroy();
             this.flamethrowerSound = null;
@@ -531,7 +531,7 @@ export default class BossAgnaManager {
     private playRitualSound(soundKey: string, volume: number = 0.8) {
         const soundManager = (window as any).soundManager;
         if (soundManager) {
-            console.log(`Playing Agna ritual sound: ${soundKey}`);
+            console.log(`Playing Claudia ritual sound: ${soundKey}`);
             soundManager.playSound(soundKey, volume);
         } else {
             console.warn("Sound manager not available for ritual sound playback");
@@ -743,11 +743,11 @@ export default class BossAgnaManager {
             return; // Already active
         }
         
-        console.log("Starting wick phase visualization - ground circle on Agna and magic circles on players");
+        console.log("Starting wick phase visualization - ground circle on Claudia and magic circles on players");
         this.isWickPhaseActive = true;
         this.wickPhaseStartTime = this.scene.time.now;
         
-        // Create ground circle on Agna's position
+        // Create ground circle on Claudia's position
         this.createWickPhaseGroundCircle(agnaBoss);
         
         // Create magic circles over all active players
@@ -762,7 +762,7 @@ export default class BossAgnaManager {
         console.log("Stopping wick phase visualization");
         this.isWickPhaseActive = false;
         
-        // Remove ground circle on Agna
+        // Remove ground circle on Claudia
         this.removeWickPhaseGroundCircle();
         
         // Remove all player magic circles
@@ -777,7 +777,7 @@ export default class BossAgnaManager {
         console.log("Stopping wick phase visualization quickly (ritual failed)");
         this.isWickPhaseActive = false;
         
-        // Remove ground circle on Agna with fast fade
+        // Remove ground circle on Claudia with fast fade
         this.removeWickPhaseGroundCircleFast();
         
         // Remove all player magic circles with fast fade
@@ -789,7 +789,7 @@ export default class BossAgnaManager {
             return; // Already exists
         }
         
-        // Get Agna's current position from the boid data
+        // Get Claudia's current position from the boid data
         const db = this.spacetimeDBClient.sdkConnection?.db;
         if (!db) {
             console.warn("Cannot create wick phase ground circle - database not available");
@@ -798,13 +798,13 @@ export default class BossAgnaManager {
         
         const agnaBoid = db.monstersBoid.monsterId.find(agnaBoss.monsterId);
         if (!agnaBoid) {
-            console.warn(`Cannot find boid for Agna boss ${agnaBoss.monsterId}`);
+            console.warn(`Cannot find boid for Claudia boss ${agnaBoss.monsterId}`);
             return;
         }
         
         const agnaPosition = agnaBoid.position;
         
-        // Create big circle sprite on Agna with Y offset
+        // Create big circle sprite on Claudia with Y offset
         const circle = this.scene.add.image(agnaPosition.x, agnaPosition.y + AGNA_WICK_CIRCLE_Y_OFFSET, 'agna_big_circle');
         circle.setScale(AGNA_WICK_CIRCLE_SCALE);
         circle.setAlpha(0); // Start invisible
@@ -826,7 +826,7 @@ export default class BossAgnaManager {
             }
         });
         
-        console.log(`Created wick phase ground circle on Agna at (${agnaPosition.x}, ${agnaPosition.y})`);
+        console.log(`Created wick phase ground circle on Claudia at (${agnaPosition.x}, ${agnaPosition.y})`);
     }
 
     private removeWickPhaseGroundCircle() {
@@ -970,14 +970,14 @@ export default class BossAgnaManager {
     }
 
     private createRitualCompleteGroundCircle() {
-        // Get Agna's current position from the database
+        // Get Claudia's current position from the database
         const db = this.spacetimeDBClient.sdkConnection?.db;
         if (!db) {
             console.warn("Cannot create ritual complete ground circle - database not available");
             return;
         }
 
-        // Find the Agna boss
+        // Find the Claudia boss
         let agnaBoss: any = null;
         for (const monster of db.monsters.iter()) {
             if (monster.bestiaryId?.tag === 'BossAgnaPhase1' || monster.bestiaryId?.tag === 'BossAgnaPhase2') {
@@ -987,19 +987,19 @@ export default class BossAgnaManager {
         }
 
         if (!agnaBoss) {
-            console.warn("Cannot find Agna boss for ritual complete ground circle");
+            console.warn("Cannot find Claudia boss for ritual complete ground circle");
             return;
         }
 
         const agnaBoid = db.monstersBoid.monsterId.find(agnaBoss.monsterId);
         if (!agnaBoid) {
-            console.warn(`Cannot find boid for Agna boss ${agnaBoss.monsterId}`);
+            console.warn(`Cannot find boid for Claudia boss ${agnaBoss.monsterId}`);
             return;
         }
 
         const agnaPosition = agnaBoid.position;
         
-        // Create big circle sprite on Agna for ritual complete with Y offset
+        // Create big circle sprite on Claudia for ritual complete with Y offset
         const circle = this.scene.add.image(agnaPosition.x, agnaPosition.y + AGNA_WICK_CIRCLE_Y_OFFSET, 'agna_big_circle');
         circle.setScale(AGNA_WICK_CIRCLE_SCALE);
         circle.setAlpha(1.0); // Full opacity immediately
@@ -1011,7 +1011,7 @@ export default class BossAgnaManager {
         // Store the circle
         this.wickPhaseGroundCircle = circle;
         
-        console.log(`Created ritual complete ground circle on Agna at (${agnaPosition.x}, ${agnaPosition.y})`);
+        console.log(`Created ritual complete ground circle on Claudia at (${agnaPosition.x}, ${agnaPosition.y})`);
     }
 
     private restoreWickPhaseGroundCircleFromRitualComplete() {

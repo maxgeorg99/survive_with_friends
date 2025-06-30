@@ -1,10 +1,10 @@
 import { Identity, ErrorContextInterface } from '@clockworklabs/spacetimedb-sdk';
 // Import generated classes, including the generated DbConnection
-import { RemoteReducers, SetReducerFlags, RemoteTables, DbConnection, ErrorContext, SubscriptionEventContext } from "./autobindings"; // Removed Reducer, EventContext import as they seem unused here
+import { RemoteReducers, SetReducerFlags, RemoteTables, DbConnection, ErrorContext, SubscriptionEventContext } from "./autobindings";
 import { GameEvents } from './constants/GameEvents';
 
 // Define your SpacetimeDB connection details
-const SPACETIME_DB_LIVE : string = "vibesurvivors";
+const SPACETIME_DB_LIVE : string = "survive-with-friends";
 const SPACETIME_DB_PTR : string = "vibesurvivorsptr";
 const SPACETIMEDB_DB_NAME : string = SPACETIME_DB_LIVE;
 
@@ -12,7 +12,7 @@ const LOCAL_SPACETIMEDB_URI : string = "ws://localhost:3000"; // Use wss for clo
 const REMOTE_SPACETIMEDB_URI : string = "wss://maincloud.spacetimedb.com";
 const PROXY_SPACETIMEDB_URI : string = "ws://localhost:3001";
 
-const URI_TO_USE = REMOTE_SPACETIMEDB_URI;
+const URI_TO_USE = LOCAL_SPACETIMEDB_URI;
 
 const TOKEN_TO_USE = (URI_TO_USE === REMOTE_SPACETIMEDB_URI) ? "space_token" : 'local_token';
 
@@ -104,7 +104,9 @@ class SpacetimeDBClient {
                 "SELECT * FROM loot_capsules",
                 "SELECT * FROM agna_magic_circles",
                 "SELECT * FROM agna_candle_spawns",
-                "SELECT * FROM found_lore_scrolls"
+                "SELECT * FROM found_lore_scrolls",
+                "SELECT * FROM achievements",
+                "SELECT * FROM game_quests"
             ]);
 
         // Register table event callbacks
@@ -316,4 +318,4 @@ class SpacetimeDBClient {
     }
 }
 
-export default SpacetimeDBClient; 
+export default SpacetimeDBClient;

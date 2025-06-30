@@ -9,7 +9,7 @@ use std::time::Duration;
 // General constants
 const AGNA_IDLE_DURATION_MS: u64 = 3000;               // 3 seconds idle time between patterns
 
-// Configuration constants for Agna Flamethrower pattern
+// Configuration constants for Claudia Flamethrower pattern
 const AGNA_FLAMETHROWER_DURATION_MS: u64 = 10000;     // 10 seconds flamethrower phase
 const AGNA_FLAMETHROWER_SPEED_MULTIPLIER: f32 = 1.3;  // Speed boost while chasing
 const AGNA_FLAMETHROWER_JET_INTERVAL_MS: u64 = 100;   // Fire rapidly every 100ms
@@ -22,7 +22,7 @@ const AGNA_FLAMETHROWER_JET_INITIAL_RADIUS: f32 = 16.0; // Starting radius
 const AGNA_FLAMETHROWER_JET_FINAL_RADIUS: f32 = 64.0;   // Final radius
 const AGNA_FLAMETHROWER_JET_DURATION_MS: u64 = 3000;    // 3 seconds lifespan
 
-// Configuration constants for Agna Magic Circle pattern
+// Configuration constants for Claudia Magic Circle pattern
 const AGNA_MAGIC_CIRCLE_DURATION_MS: u64 = 15000;      // 15 seconds magic circle phase
 const AGNA_MAGIC_CIRCLE_ORBIT_RADIUS: f32 = 256.0;      // Distance circles orbit around player
 const AGNA_MAGIC_CIRCLE_ORBIT_SPEED: f32 = 80.0;       // Degrees per second orbit speed
@@ -41,7 +41,7 @@ const AGNA_FIRE_ORB_SPAWN_INTERVAL_MS: u64 = 1000;     // Spawn orb every 1 seco
 const AGNA_ORB_SPAWN_TELEGRAPH_MS: u64 = 150;          // Telegraph appears
 const AGNA_ORB_SPAWN_DURATION_MS: u64 = 50;           // Telegraph lasts
 
-// Configuration constants for Agna Ritual pattern
+// Configuration constants for Claudia Ritual pattern
 const AGNA_RITUAL_MATCH_DURATION_MS: u64 = 4000;       // 4 seconds to create candles
 const AGNA_RITUAL_WICK_DURATION_MS: u64 = 13000;       // 13 seconds for candle phase
 const AGNA_RITUAL_FAILED_DURATION_MS: u64 = 3000;      // 3 seconds vulnerable if failed
@@ -57,7 +57,7 @@ const AGNA_CANDLE_BOLT_INITIAL_DELAY_MS: u64 = 2000;   // Initial delay before c
 const AGNA_RITUAL_COMPLETE_DURATION_MS: u64 = 4000;    // 4 second duration for ritual complete
 const AGNA_RITUAL_CANDLE_SPAWN_INTERVAL_MS: u64 = AGNA_RITUAL_MATCH_DURATION_MS / (AGNA_RITUAL_CANDLE_COUNT as u64); // ~307ms between candle spawns
 
-// Configuration constants for Agna Phase 2
+// Configuration constants for Claudia Phase 2
 const AGNA_PHASE2_SUMMONING_RITUAL_SPAWN_RADIUS_MIN: f32 = 400.0; // Radius of summoning ritual
 const AGNA_PHASE2_SUMMONING_RITUAL_SPAWN_RADIUS_RANGE: f32 = 400.0; // Radius of summoning ritual
 const AGNA_PHASE2_SUMMONING_INITIAL_INTERVAL_MS: u64 = 4000;   // Start spawning every 8 seconds
@@ -80,7 +80,7 @@ const AGNA_GROUND_FLAME_DAMAGE: u32 = 35;              // High damage ground eff
 const AGNA_GROUND_FLAME_RADIUS: f32 = 60.0;            // Large area effect
 const AGNA_GROUND_FLAME_DURATION_MS: u64 = 300000;     // 5 minutes duration (very long)
 
-// Table to track the last chosen pattern for each Agna boss to avoid repetition
+// Table to track the last chosen pattern for each Claudia boss to avoid repetition
 #[table(name = boss_agna_last_patterns, public)]
 pub struct BossAgnaLastPattern {
     #[primary_key]
@@ -109,7 +109,7 @@ pub struct AgnaMagicCircle {
     #[auto_inc]
     pub circle_id: u64,
     
-    pub boss_monster_id: u32,     // The Agna boss that spawned this circle
+    pub boss_monster_id: u32,     // The Claudia boss that spawned this circle
     pub target_player_id: u32,    // The player this circle orbits around
     pub circle_index: u32,        // Which of the 4 circles this is (0-3)
     pub initial_rotation: f32,    // Starting rotation angle in radians
@@ -126,7 +126,7 @@ pub struct AgnaFireOrbScheduler {
     
     pub scheduled_at: ScheduleAt,
     
-    pub boss_monster_id: u32,     // The Agna boss that owns this pattern
+    pub boss_monster_id: u32,     // The Claudia boss that owns this pattern
     pub target_player_id: u32,    // The player being targeted
 }
 
@@ -139,7 +139,7 @@ pub struct AgnaDelayedOrbScheduler {
     
     pub scheduled_at: ScheduleAt,
     
-    pub boss_monster_id: u32,     // The Agna boss that owns this pattern
+    pub boss_monster_id: u32,     // The Claudia boss that owns this pattern
     pub target_player_id: u32,    // The player being targeted
     pub circle_position: DbVector2, // Position where the orb should spawn
     pub circle_index: u32,        // Which circle fired this orb (0-3)
@@ -153,7 +153,7 @@ pub struct AgnaCandleSpawn {
     #[auto_inc]
     pub spawn_id: u64,
     
-    pub boss_monster_id: u32,     // The Agna boss that created this spawn
+    pub boss_monster_id: u32,     // The Claudia boss that created this spawn
     pub position: DbVector2,      // Position where the candle should spawn
     pub candle_index: u32,        // Which candle this is (0-12)
     pub candle_monster_id: u32,   // The monster ID of the spawned candle (0 if not yet spawned)
@@ -168,7 +168,7 @@ pub struct AgnaCandleScheduler {
     
     pub scheduled_at: ScheduleAt,
     
-    pub boss_monster_id: u32,     // The Agna boss that owns this ritual
+    pub boss_monster_id: u32,     // The Claudia boss that owns this ritual
     pub spawn_id: u64,            // The AgnaCandleSpawn this scheduler will spawn
 }
 
@@ -194,10 +194,10 @@ pub struct AgnaRitualCompletionCheck {
     
     pub scheduled_at: ScheduleAt,
     
-    pub boss_monster_id: u32,     // The Agna boss to check
+    pub boss_monster_id: u32,     // The Claudia boss to check
 }
 
-// Scheduled table for Agna Phase 2 summoning circles
+// Scheduled table for Claudia Phase 2 summoning circles
 #[table(name = agna_summoning_circle_spawner, scheduled(spawn_agna_summoning_circle), public)]
 pub struct AgnaSummoningCircleSpawner {
     #[primary_key]
@@ -205,12 +205,12 @@ pub struct AgnaSummoningCircleSpawner {
     pub scheduled_id: u64,
     
     #[index(btree)]
-    pub boss_monster_id: u32,     // The Phase 2 Agna boss ID
+    pub boss_monster_id: u32,     // The Phase 2 Claudia boss ID
     pub spawn_interval_ms: u64,   // Current spawn interval (decreases over time)
     pub scheduled_at: ScheduleAt, // When to spawn the next summoning circle
 }
 
-// Scheduled table for Agna Phase 2 target switching
+// Scheduled table for Claudia Phase 2 target switching
 #[table(name = agna_target_switch_scheduler, scheduled(trigger_agna_target_switch), public)]
 pub struct AgnaTargetSwitchScheduler {
     #[primary_key]
@@ -220,10 +220,10 @@ pub struct AgnaTargetSwitchScheduler {
     pub scheduled_at: ScheduleAt, // When the boss should switch targets
     
     #[index(btree)]
-    pub boss_monster_id: u32,     // The Phase 2 Agna boss that will switch targets
+    pub boss_monster_id: u32,     // The Phase 2 Claudia boss that will switch targets
 }
 
-// Scheduled table for Agna Phase 2 continuous flamethrower attacks
+// Scheduled table for Claudia Phase 2 continuous flamethrower attacks
 #[table(name = agna_phase2_flamethrower_scheduler, scheduled(trigger_agna_phase2_flamethrower_attack), public)]
 pub struct AgnaPhase2FlamethrowerScheduler {
     #[primary_key]
@@ -233,12 +233,12 @@ pub struct AgnaPhase2FlamethrowerScheduler {
     pub scheduled_at: ScheduleAt, // When the next flamethrower jet should fire
     
     #[index(btree)]
-    pub boss_monster_id: u32,     // The Phase 2 Agna boss that will fire the jet
+    pub boss_monster_id: u32,     // The Phase 2 Claudia boss that will fire the jet
 }
 
 
 
-// Handle movement for Agna's special attacks
+// Handle movement for Claudia's special attacks
 pub fn handle_agna_attack_movement(ctx: &ReducerContext, attack: &mut crate::ActiveMonsterAttack) {
     match attack.monster_attack_type {
         MonsterAttackType::AgnaFlamethrowerJet => {
@@ -300,25 +300,25 @@ pub fn trigger_agna_flamethrower_attack(ctx: &ReducerContext, scheduler: AgnaFla
         panic!("trigger_agna_flamethrower_attack may not be invoked by clients, only via scheduling.");
     }
 
-    // Check if the Agna boss still exists
+    // Check if the Claudia boss still exists
     let boss_opt = ctx.db.monsters().monster_id().find(&scheduler.boss_monster_id);
     let boss = match boss_opt {
         Some(monster) => monster,
         None => {
-            log::info!("Agna boss {} no longer exists, stopping flamethrower attacks", scheduler.boss_monster_id);
+            log::info!("Claudia boss {} no longer exists, stopping flamethrower attacks", scheduler.boss_monster_id);
             return;
         }
     };
 
-    // Verify this is actually an Agna boss
+    // Verify this is actually an Claudia boss
     if boss.bestiary_id != MonsterType::BossAgnaPhase1 && boss.bestiary_id != MonsterType::BossAgnaPhase2 {
-        log::info!("Boss {} is not Agna, stopping flamethrower attacks", scheduler.boss_monster_id);
+        log::info!("Boss {} is not Claudia, stopping flamethrower attacks", scheduler.boss_monster_id);
         return;
     }
 
     // Check if boss is still in flamethrower state
     if boss.ai_state != crate::monster_ai_defs::AIState::BossAgnaFlamethrower {
-        log::info!("Agna boss {} no longer in flamethrower state, stopping attacks", scheduler.boss_monster_id);
+        log::info!("Claudia boss {} no longer in flamethrower state, stopping attacks", scheduler.boss_monster_id);
         return;
     }
 
@@ -327,7 +327,7 @@ pub fn trigger_agna_flamethrower_attack(ctx: &ReducerContext, scheduler: AgnaFla
     let scheduled_target = scheduler.target_player_id;
     
     let final_target_player_id = if current_target != scheduled_target {
-        log::info!("Agna boss {} target changed from {} to {}, updating flamethrower target", 
+        log::info!("Claudia boss {} target changed from {} to {}, updating flamethrower target", 
                   scheduler.boss_monster_id, scheduled_target, current_target);
         current_target
     } else {
@@ -404,7 +404,7 @@ pub fn trigger_agna_flamethrower_attack(ctx: &ReducerContext, scheduler: AgnaFla
 
     ctx.db.active_monster_attacks().insert(jet_attack);
 
-    log::info!("Agna boss {} fired flamethrower jet towards ({}, {})", 
+    log::info!("Claudia boss {} fired flamethrower jet towards ({}, {})", 
               scheduler.boss_monster_id, target_position.x, target_position.y);
 
     // Schedule the next flamethrower attack using the corrected target
@@ -421,9 +421,9 @@ fn schedule_next_agna_flamethrower_attack(ctx: &ReducerContext, boss_monster_id:
     });
 }
 
-// Start flamethrower attacks for an Agna boss
+// Start flamethrower attacks for an Claudia boss
 pub fn start_agna_flamethrower_attacks(ctx: &ReducerContext, boss_monster_id: u32, target_player_id: u32) {
-    log::info!("Starting flamethrower attacks for Agna boss {} targeting player {}", boss_monster_id, target_player_id);
+    log::info!("Starting flamethrower attacks for Claudia boss {} targeting player {}", boss_monster_id, target_player_id);
     
     // Schedule the first flamethrower attack immediately
     ctx.db.agna_flamethrower_scheduler().insert(AgnaFlamethrowerScheduler {
@@ -436,7 +436,7 @@ pub fn start_agna_flamethrower_attacks(ctx: &ReducerContext, boss_monster_id: u3
 
 // Cleanup flamethrower schedules for a boss
 pub fn cleanup_agna_flamethrower_schedules(ctx: &ReducerContext, boss_monster_id: u32) {
-    log::info!("Cleaning up flamethrower schedules for Agna boss {}", boss_monster_id);
+    log::info!("Cleaning up flamethrower schedules for Claudia boss {}", boss_monster_id);
     
     // Find and delete all flamethrower schedulers for this boss
     let schedulers_to_delete: Vec<_> = ctx.db.agna_flamethrower_scheduler().iter()
@@ -464,13 +464,13 @@ fn find_random_player(ctx: &ReducerContext) -> Option<u32> {
 
 // Apply speed boost when entering BossAgnaFlamethrower state (called once on state entry)
 pub fn apply_agna_flamethrower_speed_boost(ctx: &ReducerContext, monster: &crate::Monsters) {
-    log::info!("Applying flamethrower speed boost to Agna boss {}", monster.monster_id);
+    log::info!("Applying flamethrower speed boost to Claudia boss {}", monster.monster_id);
     increase_monster_speed(ctx, monster, AGNA_FLAMETHROWER_SPEED_MULTIPLIER);
 }
 
 // Execute behavior when entering BossAgnaFlamethrower state
 pub fn execute_boss_agna_flamethrower_behavior(ctx: &ReducerContext, monster: &crate::Monsters) {
-    log::info!("Agna boss {} entering flamethrower state", monster.monster_id);
+    log::info!("Claudia boss {} entering flamethrower state", monster.monster_id);
 
     // Apply speed boost first (called once on state entry)
     apply_agna_flamethrower_speed_boost(ctx, monster);
@@ -490,7 +490,7 @@ pub fn execute_boss_agna_flamethrower_behavior(ctx: &ReducerContext, monster: &c
     updated_monster.target_player_id = target_player_id;
     ctx.db.monsters().monster_id().update(updated_monster);
     
-    log::info!("Agna boss {} selected new random target player {} for flamethrower attack and chase", monster.monster_id, target_player_id);
+    log::info!("Claudia boss {} selected new random target player {} for flamethrower attack and chase", monster.monster_id, target_player_id);
     start_agna_flamethrower_attacks(ctx, monster.monster_id, target_player_id);
     
     // Schedule return to idle after flamethrower duration
@@ -499,7 +499,7 @@ pub fn execute_boss_agna_flamethrower_behavior(ctx: &ReducerContext, monster: &c
 
 // Execute behavior when entering BossAgnaIdle state
 pub fn execute_boss_agna_idle_behavior(ctx: &ReducerContext, monster: &crate::Monsters) {
-    log::info!("Agna boss {} entering idle state", monster.monster_id);
+    log::info!("Claudia boss {} entering idle state", monster.monster_id);
 
     // Reset speed to base value when entering idle (ensures clean state between patterns)
     reset_monster_speed_to_bestiary(ctx, monster);
@@ -516,9 +516,9 @@ pub fn execute_boss_agna_idle_behavior(ctx: &ReducerContext, monster: &crate::Mo
     schedule_random_boss_agna_pattern(ctx, monster.monster_id, AGNA_IDLE_DURATION_MS);
 }
 
-// Schedule a random Agna boss pattern
+// Schedule a random Claudia boss pattern
 pub fn schedule_random_boss_agna_pattern(ctx: &ReducerContext, monster_id: u32, delay_ms: u64) {
-    log::info!("Scheduling random Agna pattern for monster {} in {}ms", monster_id, delay_ms);
+    log::info!("Scheduling random Claudia pattern for monster {} in {}ms", monster_id, delay_ms);
     
     // Choose between available patterns
     let available_patterns = vec![
@@ -561,20 +561,20 @@ pub fn schedule_random_boss_agna_pattern(ctx: &ReducerContext, monster_id: u32, 
     schedule_state_change(ctx, monster_id, chosen_pattern, delay_ms);
 }
 
-// Initialize Agna boss AI
+// Initialize Claudia boss AI
 pub fn initialize_boss_agna_ai(ctx: &ReducerContext, monster_id: u32) {
-    log::info!("Initializing Agna boss AI for monster {}", monster_id);
+    log::info!("Initializing Claudia boss AI for monster {}", monster_id);
     
     // Start with idle behavior
     let idle_delay_ms = 3000; // 3 seconds before first pattern
     schedule_random_boss_agna_pattern(ctx, monster_id, idle_delay_ms);
 }
 
-// Initialize Phase 2 Agna boss AI
+// Initialize Phase 2 Claudia boss AI
 pub fn initialize_phase2_boss_agna_ai(ctx: &ReducerContext, monster_id: u32) {
-    log::info!("Initializing Phase 2 Agna boss AI for monster {}", monster_id);
+    log::info!("Initializing Phase 2 Claudia boss AI for monster {}", monster_id);
     
-    // Phase 2 Agna has different behavior than Phase 1
+    // Phase 2 Claudia has different behavior than Phase 1
     // Start summoning circles that spawn Imps and ground flames
     start_agna_phase2_summoning_circles(ctx, monster_id);
     
@@ -584,7 +584,7 @@ pub fn initialize_phase2_boss_agna_ai(ctx: &ReducerContext, monster_id: u32) {
     // Start continuous flamethrower attacks
     start_agna_phase2_flamethrower_attacks(ctx, monster_id);
     
-    log::info!("Phase 2 Agna boss {} initialized with summoning circles, target switching, and continuous flamethrower", monster_id);
+    log::info!("Phase 2 Claudia boss {} initialized with summoning circles, target switching, and continuous flamethrower", monster_id);
 }
 
 // Helper function to reset monster speed to bestiary entry
@@ -596,7 +596,7 @@ fn reset_monster_speed_to_bestiary(ctx: &ReducerContext, monster: &crate::Monste
     updated_monster.speed = bestiary_entry.speed;
     ctx.db.monsters().monster_id().update(updated_monster);
     
-    log::info!("Agna monster {} speed reset to {}", monster.monster_id, bestiary_entry.speed);
+    log::info!("Claudia monster {} speed reset to {}", monster.monster_id, bestiary_entry.speed);
 }
 
 // Helper function to increase monster speed (called only once during state entry)
@@ -611,7 +611,7 @@ fn increase_monster_speed(ctx: &ReducerContext, monster: &crate::Monsters, multi
     updated_monster.speed = target_speed;
     ctx.db.monsters().monster_id().update(updated_monster);
     
-    log::info!("Agna monster {} speed increased from {} to {} (base: {}, multiplier: {})", 
+    log::info!("Claudia monster {} speed increased from {} to {} (base: {}, multiplier: {})", 
               monster.monster_id, monster.speed, target_speed, base_speed, multiplier);
 }
 
@@ -624,12 +624,12 @@ fn schedule_state_change(ctx: &ReducerContext, monster_id: u32, target_state: cr
         scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(delay_ms)),
     });
     
-    log::info!("Scheduled state change for Agna monster {} to {:?} in {}ms", monster_id, target_state, delay_ms);
+    log::info!("Scheduled state change for Claudia monster {} to {:?} in {}ms", monster_id, target_state, delay_ms);
 }
 
-// Cleanup all AI schedules for an Agna boss (used during boss transitions)
+// Cleanup all AI schedules for an Claudia boss (used during boss transitions)
 pub fn cleanup_agna_ai_schedules(ctx: &ReducerContext, monster_id: u32) {
-    log::info!("Cleaning up all Agna AI schedules for monster {}", monster_id);
+    log::info!("Cleaning up all Claudia AI schedules for monster {}", monster_id);
     
     // Cleanup Phase 1 schedules
     cleanup_agna_flamethrower_schedules(ctx, monster_id);
@@ -644,7 +644,7 @@ pub fn cleanup_agna_ai_schedules(ctx: &ReducerContext, monster_id: u32) {
     // Remove last pattern tracking
     if ctx.db.boss_agna_last_patterns().monster_id().find(&monster_id).is_some() {
         ctx.db.boss_agna_last_patterns().monster_id().delete(&monster_id);
-        log::info!("Removed last pattern tracking for Agna boss {}", monster_id);
+        log::info!("Removed last pattern tracking for Claudia boss {}", monster_id);
     }
 }
 
@@ -655,19 +655,19 @@ pub fn trigger_agna_fire_orb_attack(ctx: &ReducerContext, scheduler: AgnaFireOrb
         panic!("trigger_agna_fire_orb_attack may not be invoked by clients, only via scheduling.");
     }
 
-    // Check if the Agna boss still exists
+    // Check if the Claudia boss still exists
     let boss_opt = ctx.db.monsters().monster_id().find(&scheduler.boss_monster_id);
     let boss = match boss_opt {
         Some(monster) => monster,
         None => {
-            log::info!("Agna boss {} no longer exists, stopping fire orb attacks", scheduler.boss_monster_id);
+            log::info!("Claudia boss {} no longer exists, stopping fire orb attacks", scheduler.boss_monster_id);
             return;
         }
     };
 
     // Check if boss is still in magic circle state
     if boss.ai_state != crate::monster_ai_defs::AIState::BossAgnaMagicCircle {
-        log::info!("Agna boss {} no longer in magic circle state, stopping fire orb attacks", scheduler.boss_monster_id);
+        log::info!("Claudia boss {} no longer in magic circle state, stopping fire orb attacks", scheduler.boss_monster_id);
         return;
     }
 
@@ -728,7 +728,7 @@ pub fn trigger_agna_fire_orb_attack(ctx: &ReducerContext, scheduler: AgnaFireOrb
         circle_index: chosen_circle.circle_index,
     });
 
-    log::info!("Agna boss {} spawned orb spawn telegraph from circle {} targeting player {}", 
+    log::info!("Claudia boss {} spawned orb spawn telegraph from circle {} targeting player {}", 
               scheduler.boss_monster_id, chosen_circle.circle_index, scheduler.target_player_id);
 
     // Schedule the next fire orb attack for this player
@@ -742,18 +742,18 @@ pub fn spawn_delayed_agna_fire_orb(ctx: &ReducerContext, scheduler: AgnaDelayedO
         panic!("spawn_delayed_agna_fire_orb may not be invoked by clients, only via scheduling.");
     }
 
-    // Check if the Agna boss still exists
+    // Check if the Claudia boss still exists
     let boss_opt = ctx.db.monsters().monster_id().find(&scheduler.boss_monster_id);
     let boss = match boss_opt {
         Some(monster) => monster,
         None => {
-            log::info!("Agna boss {} no longer exists, cancelling delayed fire orb", scheduler.boss_monster_id);
+            log::info!("Claudia boss {} no longer exists, cancelling delayed fire orb", scheduler.boss_monster_id);
             return;
         }
     };
 
     if boss.ai_state != crate::monster_ai_defs::AIState::BossAgnaMagicCircle {
-        log::info!("Agna boss {} no longer in magic circle state, cancelling delayed fire orb", scheduler.boss_monster_id);
+        log::info!("Claudia boss {} no longer in magic circle state, cancelling delayed fire orb", scheduler.boss_monster_id);
         return;
     }
 
@@ -792,7 +792,7 @@ pub fn spawn_delayed_agna_fire_orb(ctx: &ReducerContext, scheduler: AgnaDelayedO
 
     ctx.db.active_monster_attacks().insert(fire_orb_attack);
 
-    log::info!("Agna boss {} spawned delayed fire orb from circle {} targeting player {}", 
+    log::info!("Claudia boss {} spawned delayed fire orb from circle {} targeting player {}", 
               scheduler.boss_monster_id, scheduler.circle_index, scheduler.target_player_id);
 }
 
@@ -820,9 +820,9 @@ fn schedule_next_agna_fire_orb_attack(ctx: &ReducerContext, boss_monster_id: u32
     });
 }
 
-// Spawn magic circles around all players for an Agna boss
+// Spawn magic circles around all players for an Claudia boss
 pub fn spawn_agna_magic_circles(ctx: &ReducerContext, boss_monster_id: u32) {
-    log::info!("Spawning magic circles for Agna boss {}", boss_monster_id);
+    log::info!("Spawning magic circles for Claudia boss {}", boss_monster_id);
     
     // Count players first
     let players: Vec<_> = ctx.db.player().iter().collect();
@@ -882,7 +882,7 @@ fn spawn_magic_circles_for_player(ctx: &ReducerContext, boss_monster_id: u32, pl
 
 // Start fire orb attacks for a specific player
 pub fn start_agna_fire_orb_attacks(ctx: &ReducerContext, boss_monster_id: u32, target_player_id: u32) {
-    log::info!("Starting fire orb attacks for Agna boss {} targeting player {}", boss_monster_id, target_player_id);
+    log::info!("Starting fire orb attacks for Claudia boss {} targeting player {}", boss_monster_id, target_player_id);
     
     // Schedule the first fire orb attack with initial delay
     ctx.db.agna_fire_orb_scheduler().insert(AgnaFireOrbScheduler {
@@ -922,7 +922,7 @@ pub fn update_agna_magic_circles(ctx: &ReducerContext, cache: &crate::collision:
 
 // Cleanup magic circles and fire orb schedules for a boss
 pub fn cleanup_agna_magic_circle_schedules(ctx: &ReducerContext, boss_monster_id: u32) {
-    log::info!("Cleaning up magic circle schedules for Agna boss {}", boss_monster_id);
+    log::info!("Cleaning up magic circle schedules for Claudia boss {}", boss_monster_id);
     
     // Delete all magic circles for this boss
     let circles_to_delete: Vec<_> = ctx.db.agna_magic_circles().iter()
@@ -954,13 +954,13 @@ pub fn cleanup_agna_magic_circle_schedules(ctx: &ReducerContext, boss_monster_id
         ctx.db.agna_delayed_orb_scheduler().scheduled_id().delete(&scheduler.scheduled_id);
     }
     
-    log::info!("Cleaned up {} magic circles, {} fire orb schedulers, and {} delayed orb schedulers for Agna boss {}", 
+    log::info!("Cleaned up {} magic circles, {} fire orb schedulers, and {} delayed orb schedulers for Claudia boss {}", 
               circles_count, schedulers_count, delayed_schedulers_count, boss_monster_id);
 }
 
 // Execute behavior when entering BossAgnaMagicCircle state
 pub fn execute_boss_agna_magic_circle_behavior(ctx: &ReducerContext, monster: &crate::Monsters) {
-    log::info!("Agna boss {} entering magic circle state", monster.monster_id);
+    log::info!("Claudia boss {} entering magic circle state", monster.monster_id);
 
     // Reset speed to normal (no speed boost for magic circle)
     reset_monster_speed_to_bestiary(ctx, monster);
@@ -968,9 +968,9 @@ pub fn execute_boss_agna_magic_circle_behavior(ctx: &ReducerContext, monster: &c
 
     
     // Spawn magic circles around all players and start fire orb attacks
-    log::info!("About to spawn magic circles for Agna boss {}", monster.monster_id);
+    log::info!("About to spawn magic circles for Claudia boss {}", monster.monster_id);
     spawn_agna_magic_circles(ctx, monster.monster_id);
-    log::info!("Finished spawning magic circles for Agna boss {}", monster.monster_id);
+    log::info!("Finished spawning magic circles for Claudia boss {}", monster.monster_id);
     
     // Schedule return to idle after magic circle duration
     schedule_state_change(ctx, monster.monster_id, crate::monster_ai_defs::AIState::BossAgnaIdle, AGNA_MAGIC_CIRCLE_DURATION_MS);
@@ -978,15 +978,15 @@ pub fn execute_boss_agna_magic_circle_behavior(ctx: &ReducerContext, monster: &c
 
 // Execute behavior when entering BossAgnaRitualMatch state
 pub fn execute_boss_agna_ritual_match_behavior(ctx: &ReducerContext, monster: &crate::Monsters) {
-    log::info!("Starting Agna ritual match phase for boss {}", monster.monster_id);
+    log::info!("Starting Claudia ritual match phase for boss {}", monster.monster_id);
     
-    // Make Agna stationary and invulnerable
+    // Make Claudia stationary and invulnerable
     reset_monster_speed_to_bestiary(ctx, monster);
     
     // Clear any existing candle spawns for this boss
     cleanup_agna_candle_spawns(ctx, monster.monster_id);
     
-    // Get Agna's position from monsters_boid table
+    // Get Claudia's position from monsters_boid table
     let boid_opt = ctx.db.monsters_boid().monster_id().find(&monster.monster_id);
     let boid = match boid_opt {
         Some(boid) => boid,
@@ -996,7 +996,7 @@ pub fn execute_boss_agna_ritual_match_behavior(ctx: &ReducerContext, monster: &c
         }
     };
     
-    // Create candle spawn positions in a circle around Agna
+    // Create candle spawn positions in a circle around Claudia
     create_ritual_candle_spawns(ctx, monster.monster_id, &boid.position);
     
     // Schedule progressive candle spawning during match phase
@@ -1008,7 +1008,7 @@ pub fn execute_boss_agna_ritual_match_behavior(ctx: &ReducerContext, monster: &c
 
 // Execute behavior when entering BossAgnaRitualWick state
 pub fn execute_boss_agna_ritual_wick_behavior(ctx: &ReducerContext, monster: &crate::Monsters) {
-    log::info!("Starting Agna ritual wick phase for boss {} - candles already spawned during match phase", monster.monster_id);
+    log::info!("Starting Claudia ritual wick phase for boss {} - candles already spawned during match phase", monster.monster_id);
     
     // Candles were already spawned progressively during the match phase
     // Clean up the spawn indicators now that the match phase is complete
@@ -1024,7 +1024,7 @@ pub fn execute_boss_agna_ritual_wick_behavior(ctx: &ReducerContext, monster: &cr
 
 // Execute behavior when entering BossAgnaRitualFailed state (vulnerable)
 pub fn execute_boss_agna_ritual_failed_behavior(ctx: &ReducerContext, monster: &crate::Monsters) {
-    log::info!("Agna ritual failed for boss {} - now vulnerable", monster.monster_id);
+    log::info!("Claudia ritual failed for boss {} - now vulnerable", monster.monster_id);
     
     // Clean up any remaining candles and schedules
     cleanup_agna_candle_spawns(ctx, monster.monster_id);
@@ -1036,7 +1036,7 @@ pub fn execute_boss_agna_ritual_failed_behavior(ctx: &ReducerContext, monster: &
 
 // Execute behavior when entering BossAgnaRitualComplete state (damage all players)
 pub fn execute_boss_agna_ritual_complete_behavior(ctx: &ReducerContext, monster: &crate::Monsters) {
-    log::info!("Agna ritual completed for boss {} - dealing damage to all players", monster.monster_id);
+    log::info!("Claudia ritual completed for boss {} - dealing damage to all players", monster.monster_id);
     
     // Damage all living players every tick while in this state
     // This will be handled in the core game tick by checking the AI state
@@ -1146,7 +1146,7 @@ fn spawn_all_ritual_candles(ctx: &ReducerContext, boss_monster_id: u32) {
         
         let candle_monster_id = candle_monster.monster_id;
 
-        log::info!("Spawned Agna candle {} at position ({}, {})", 
+        log::info!("Spawned Claudia candle {} at position ({}, {})", 
                   candle_monster_id, spawn.position.x, spawn.position.y);
 
         // Update the spawn record with the candle monster ID
@@ -1338,7 +1338,7 @@ pub fn spawn_agna_candle(ctx: &ReducerContext, scheduler: AgnaCandleScheduler) {
     // Check if the boss still exists
     let boss_opt = ctx.db.monsters().monster_id().find(&scheduler.boss_monster_id);
     if boss_opt.is_none() {
-        log::info!("Agna boss {} no longer exists, cancelling candle spawn", scheduler.boss_monster_id);
+        log::info!("Claudia boss {} no longer exists, cancelling candle spawn", scheduler.boss_monster_id);
         return;
     }
 
@@ -1367,7 +1367,7 @@ pub fn spawn_agna_candle(ctx: &ReducerContext, scheduler: AgnaCandleScheduler) {
         position: spawn.position,
     });
 
-    log::info!("Spawned Agna candle {} at position ({}, {}) during match phase", 
+    log::info!("Spawned Claudia candle {} at position ({}, {}) during match phase", 
               candle_monster.monster_id, spawn.position.x, spawn.position.y);
 
     // Update the spawn record with the candle monster ID
@@ -1503,7 +1503,7 @@ pub fn process_agna_ritual_complete_damage(ctx: &ReducerContext) {
         return; // Not in a boss phase, skip processing
     }
     
-    // Find all Agna bosses in ritual complete state
+    // Find all Claudia bosses in ritual complete state
     let ritual_complete_bosses: Vec<_> = ctx.db.monsters()
         .iter()
         .filter(|monster| {
@@ -1540,14 +1540,14 @@ pub fn process_agna_ritual_complete_damage(ctx: &ReducerContext) {
             
             // Check if player died
             if new_hp <= 0.0 {
-                log::info!("Player {} killed by Agna ritual completion", player_id);
+                log::info!("Player {} killed by Claudia ritual completion", player_id);
                 crate::transition_player_to_dead_state(ctx, player_id);
             }
         }
     }
     
     if !ritual_complete_bosses.is_empty() {
-        log::info!("Agna ritual complete damage: {} damage dealt to all living players by {} boss(es)", 
+        log::info!("Claudia ritual complete damage: {} damage dealt to all living players by {} boss(es)", 
                   total_damage, ritual_complete_bosses.len());
     }
 }
@@ -1563,19 +1563,19 @@ pub fn spawn_agna_summoning_circle(ctx: &ReducerContext, spawner: AgnaSummoningC
         panic!("spawn_agna_summoning_circle may not be invoked by clients, only via scheduling.");
     }
 
-    // Check if the Phase 2 Agna boss still exists
+    // Check if the Phase 2 Claudia boss still exists
     let boss_opt = ctx.db.monsters().monster_id().find(&spawner.boss_monster_id);
     let boss = match boss_opt {
         Some(monster) => monster,
         None => {
-            log::info!("Phase 2 Agna boss {} no longer exists, stopping summoning circle spawning", spawner.boss_monster_id);
+            log::info!("Phase 2 Claudia boss {} no longer exists, stopping summoning circle spawning", spawner.boss_monster_id);
             return;
         }
     };
 
-    // Verify this is actually a Phase 2 Agna boss
+    // Verify this is actually a Phase 2 Claudia boss
     if boss.bestiary_id != MonsterType::BossAgnaPhase2 {
-        log::info!("Boss {} is not Agna Phase 2, stopping summoning circle spawning", spawner.boss_monster_id);
+        log::info!("Boss {} is not Claudia Phase 2, stopping summoning circle spawning", spawner.boss_monster_id);
         return;
     }
 
@@ -1611,7 +1611,7 @@ pub fn spawn_agna_summoning_circle(ctx: &ReducerContext, spawner: AgnaSummoningC
     spawn_position.x = spawn_position.x.clamp(100.0, config.world_size as f32 - 100.0);
     spawn_position.y = spawn_position.y.clamp(100.0, config.world_size as f32 - 100.0);
 
-    log::info!("Spawning Agna summoning circle at position ({:.1}, {:.1}) near player {}", 
+    log::info!("Spawning Claudia summoning circle at position ({:.1}, {:.1}) near player {}", 
               spawn_position.x, spawn_position.y, target_player.name);
 
     // Spawn an Imp monster at the summoning circle location
@@ -1683,30 +1683,30 @@ fn schedule_next_agna_summoning_circle(ctx: &ReducerContext, boss_monster_id: u3
         scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(next_interval_ms)),
     });
 
-    log::info!("Scheduled next Agna summoning circle for boss {} in {}ms (reduced from {}ms)", 
+    log::info!("Scheduled next Claudia summoning circle for boss {} in {}ms (reduced from {}ms)", 
               boss_monster_id, next_interval_ms, current_interval_ms);
 }
 
-// Reducer called when Agna Phase 2 boss should switch targets
+// Reducer called when Claudia Phase 2 boss should switch targets
 #[reducer]
 pub fn trigger_agna_target_switch(ctx: &ReducerContext, scheduler: AgnaTargetSwitchScheduler) {
     if ctx.sender != ctx.identity() {
         panic!("trigger_agna_target_switch may not be invoked by clients, only via scheduling.");
     }
 
-    // Check if the boss monster still exists and is a Phase 2 Agna boss
+    // Check if the boss monster still exists and is a Phase 2 Claudia boss
     let boss_opt = ctx.db.monsters().monster_id().find(&scheduler.boss_monster_id);
     let boss = match boss_opt {
         Some(monster) => monster,
         None => {
-            log::info!("Boss {} no longer exists, stopping Agna target switching", scheduler.boss_monster_id);
+            log::info!("Boss {} no longer exists, stopping Claudia target switching", scheduler.boss_monster_id);
             return;
         }
     };
 
-    // Verify this is a Phase 2 Agna boss
+    // Verify this is a Phase 2 Claudia boss
     if boss.bestiary_id != crate::MonsterType::BossAgnaPhase2 {
-        log::info!("Boss {} is not Agna Phase 2, stopping target switching", scheduler.boss_monster_id);
+        log::info!("Boss {} is not Claudia Phase 2, stopping target switching", scheduler.boss_monster_id);
         return;
     }
 
@@ -1715,7 +1715,7 @@ pub fn trigger_agna_target_switch(ctx: &ReducerContext, scheduler: AgnaTargetSwi
     let player_count = players.len();
     
     if player_count == 0 {
-        log::info!("No players online for Agna boss {} target switch, stopping", scheduler.boss_monster_id);
+        log::info!("No players online for Claudia boss {} target switch, stopping", scheduler.boss_monster_id);
         return;
     }
     
@@ -1746,14 +1746,14 @@ pub fn trigger_agna_target_switch(ctx: &ReducerContext, scheduler: AgnaTargetSwi
     updated_boss.target_player_id = new_target.player_id;
     ctx.db.monsters().monster_id().update(updated_boss);
     
-    log::info!("Agna boss {} switched target from player {} to player {} ({})", 
+    log::info!("Claudia boss {} switched target from player {} to player {} ({})", 
               scheduler.boss_monster_id, current_target_id, new_target.player_id, new_target.name);
 
     // Schedule the next target switch
     schedule_next_agna_target_switch(ctx, scheduler.boss_monster_id);
 }
 
-// Helper function to schedule the next Agna target switch with random variation
+// Helper function to schedule the next Claudia target switch with random variation
 fn schedule_next_agna_target_switch(ctx: &ReducerContext, boss_monster_id: u32) {
     // Add random variation to the base interval
     let mut rng = ctx.rng();
@@ -1769,7 +1769,7 @@ fn schedule_next_agna_target_switch(ctx: &ReducerContext, boss_monster_id: u32) 
         scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(next_interval_ms)),
     });
     
-    log::info!("Scheduled next Agna target switch for boss {} in {}ms", 
+    log::info!("Scheduled next Claudia target switch for boss {} in {}ms", 
               boss_monster_id, next_interval_ms);
 }
 
@@ -1780,19 +1780,19 @@ pub fn trigger_agna_phase2_flamethrower_attack(ctx: &ReducerContext, scheduler: 
         panic!("trigger_agna_phase2_flamethrower_attack may not be invoked by clients, only via scheduling.");
     }
 
-    // Check if the Agna Phase 2 boss still exists
+    // Check if the Claudia Phase 2 boss still exists
     let boss_opt = ctx.db.monsters().monster_id().find(&scheduler.boss_monster_id);
     let boss = match boss_opt {
         Some(monster) => monster,
         None => {
-            log::info!("Agna Phase 2 boss {} no longer exists, stopping flamethrower attacks", scheduler.boss_monster_id);
+            log::info!("Claudia Phase 2 boss {} no longer exists, stopping flamethrower attacks", scheduler.boss_monster_id);
             return;
         }
     };
 
-    // Verify this is actually an Agna Phase 2 boss
+    // Verify this is actually an Claudia Phase 2 boss
     if boss.bestiary_id != MonsterType::BossAgnaPhase2 {
-        log::info!("Boss {} is not Agna Phase 2, stopping flamethrower attacks", scheduler.boss_monster_id);
+        log::info!("Boss {} is not Claudia Phase 2, stopping flamethrower attacks", scheduler.boss_monster_id);
         return;
     }
 
@@ -1853,7 +1853,7 @@ pub fn trigger_agna_phase2_flamethrower_attack(ctx: &ReducerContext, scheduler: 
 
     ctx.db.active_monster_attacks().insert(jet_attack);
 
-    log::info!("Agna Phase 2 boss {} fired flame jet at player {} ({})", 
+    log::info!("Claudia Phase 2 boss {} fired flame jet at player {} ({})", 
               scheduler.boss_monster_id, target_player_id, target_player.name);
 
     // Schedule the next flamethrower attack
@@ -1869,9 +1869,9 @@ fn schedule_next_agna_phase2_flamethrower_attack(ctx: &ReducerContext, boss_mons
     });
 }
 
-// Function to start Agna Phase 2 summoning circle spawning
+// Function to start Claudia Phase 2 summoning circle spawning
 pub fn start_agna_phase2_summoning_circles(ctx: &ReducerContext, boss_monster_id: u32) {
-    log::info!("Starting Agna Phase 2 summoning circles for boss {}", boss_monster_id);
+    log::info!("Starting Claudia Phase 2 summoning circles for boss {}", boss_monster_id);
 
     // Schedule the first summoning circle
     ctx.db.agna_summoning_circle_spawner().insert(AgnaSummoningCircleSpawner {
@@ -1881,11 +1881,11 @@ pub fn start_agna_phase2_summoning_circles(ctx: &ReducerContext, boss_monster_id
         scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(AGNA_PHASE2_SUMMONING_INITIAL_INTERVAL_MS)),
     });
 
-    log::info!("Agna Phase 2 summoning circles scheduled for boss {} (first circle in {}ms)", 
+    log::info!("Claudia Phase 2 summoning circles scheduled for boss {} (first circle in {}ms)", 
               boss_monster_id, AGNA_PHASE2_SUMMONING_INITIAL_INTERVAL_MS);
 }
 
-// Function to start Agna Phase 2 target switching
+// Function to start Claudia Phase 2 target switching
 pub fn start_agna_phase2_target_switching(ctx: &ReducerContext, boss_monster_id: u32) {
     ctx.db.agna_target_switch_scheduler().insert(AgnaTargetSwitchScheduler {
         scheduled_id: 0,
@@ -1893,11 +1893,11 @@ pub fn start_agna_phase2_target_switching(ctx: &ReducerContext, boss_monster_id:
         scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(AGNA_PHASE2_TARGET_SWITCH_INITIAL_DELAY_MS)),
     });
 
-    log::info!("Started Agna Phase 2 target switching for boss {} (first switch in {}ms)", 
+    log::info!("Started Claudia Phase 2 target switching for boss {} (first switch in {}ms)", 
               boss_monster_id, AGNA_PHASE2_TARGET_SWITCH_INITIAL_DELAY_MS);
 }
 
-// Function to start Agna Phase 2 continuous flamethrower attacks
+// Function to start Claudia Phase 2 continuous flamethrower attacks
 pub fn start_agna_phase2_flamethrower_attacks(ctx: &ReducerContext, boss_monster_id: u32) {
     ctx.db.agna_phase2_flamethrower_scheduler().insert(AgnaPhase2FlamethrowerScheduler {
         scheduled_id: 0,
@@ -1905,13 +1905,13 @@ pub fn start_agna_phase2_flamethrower_attacks(ctx: &ReducerContext, boss_monster
         scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(AGNA_PHASE2_FLAME_JET_INTERVAL_MS)),
     });
 
-    log::info!("Started Agna Phase 2 flamethrower attacks for boss {} (first attack in {}ms)", 
+    log::info!("Started Claudia Phase 2 flamethrower attacks for boss {} (first attack in {}ms)", 
               boss_monster_id, AGNA_PHASE2_FLAME_JET_INTERVAL_MS);
 }
 
-// Function to cleanup all Agna Phase 2 schedules when boss dies
+// Function to cleanup all Claudia Phase 2 schedules when boss dies
 pub fn cleanup_agna_phase2_schedules(ctx: &ReducerContext, boss_monster_id: u32) {
-    log::info!("Cleaning up all Agna Phase 2 schedules for boss {}", boss_monster_id);
+    log::info!("Cleaning up all Claudia Phase 2 schedules for boss {}", boss_monster_id);
     
     // Cleanup summoning circle spawners
     let summoning_schedulers_to_delete: Vec<u64> = ctx.db.agna_summoning_circle_spawner()
@@ -1965,7 +1965,7 @@ pub fn cleanup_agna_phase2_schedules(ctx: &ReducerContext, boss_monster_id: u32)
     }
 
     if summoning_count > 0 || target_count > 0 || flamethrower_count > 0 || active_count > 0 {
-        log::info!("Cleaned up {} summoning schedulers, {} target schedulers, {} flamethrower schedulers, and {} active attacks for Agna Phase 2 boss {}", 
+        log::info!("Cleaned up {} summoning schedulers, {} target schedulers, {} flamethrower schedulers, and {} active attacks for Claudia Phase 2 boss {}", 
                   summoning_count, target_count, flamethrower_count, active_count, boss_monster_id);
     }
 }

@@ -21,6 +21,11 @@ pub enum AIState {
     BossAgnaRitualWick = 13,
     BossAgnaRitualFailed = 14,
     BossAgnaRitualComplete = 15,
+    BossSimonIdle = 16,
+    BossSimonChemicalBoltPattern = 17,
+    BossSimonToxicZonePattern = 18,
+    BossSimonPhase2Transform = 19,
+    BossJorgeIdle = 20,
 }
 
 // Scheduled table for changing monster AI states
@@ -35,7 +40,7 @@ pub struct MonsterStateChange {
     pub scheduled_at: ScheduleAt,
 }
 
-// Note: Boss-specific constants and tables have been moved to boss_ender_defs.rs 
+// Note: Boss-specific constants and tables have been moved to boss_bjorn_defs
 
 // Chase acceleration per frame
 pub const CHASE_ACCELERATION_MULTIPLIER: f32 = 1.02; // 2% increase per frame
@@ -75,99 +80,99 @@ fn execute_state_entry_behavior(ctx: &ReducerContext, monster: &crate::Monsters,
         AIState::BossEnderIdle => {
             log::info!("Monster {} entering BossEnderIdle state", monster.monster_id);
             
-            // Delegate to boss_ender_defs for Ender boss specific behavior
-            crate::boss_ender_defs::execute_boss_ender_idle_behavior(ctx, monster);
+            // Delegate to boss_ender_defs for Björn boss specific behavior
+            crate::boss_bjorn_defs::execute_boss_ender_idle_behavior(ctx, monster);
         },
         
         AIState::BossEnderChase => {
             log::info!("Monster {} entering BossEnderChase state", monster.monster_id);
             
-            // Delegate to boss_ender_defs for Ender boss specific behavior
-            crate::boss_ender_defs::execute_boss_ender_chase_behavior(ctx, monster);
+            // Delegate to boss_ender_defs for Björn boss specific behavior
+            crate::boss_bjorn_defs::execute_boss_ender_chase_behavior(ctx, monster);
         },
         
         AIState::BossEnderDance => {
             log::info!("Monster {} entering BossEnderDance state", monster.monster_id);
             
-            // Delegate to boss_ender_defs for Ender boss specific behavior
-            crate::boss_ender_defs::execute_boss_ender_dance_behavior(ctx, monster);
+            // Delegate to boss_ender_defs for Björn boss specific behavior
+            crate::boss_bjorn_defs::execute_boss_ender_dance_behavior(ctx, monster);
         },
         
         AIState::BossEnderVanish => {
             log::info!("Monster {} entering BossEnderVanish state", monster.monster_id);
             
-            // Delegate to boss_ender_defs for Ender boss specific behavior
-            crate::boss_ender_defs::execute_boss_ender_vanish_behavior(ctx, monster);
+            // Delegate to boss_ender_defs for Björn boss specific behavior
+            crate::boss_bjorn_defs::execute_boss_ender_vanish_behavior(ctx, monster);
         },
         
         AIState::BossEnderLurk => {
             log::info!("Monster {} entering BossEnderLurk state", monster.monster_id);
             
-            // Delegate to boss_ender_defs for Ender boss specific behavior
-            crate::boss_ender_defs::execute_boss_ender_lurk_behavior(ctx, monster);
+            // Delegate to boss_ender_defs for Björn boss specific behavior
+            crate::boss_bjorn_defs::execute_boss_ender_lurk_behavior(ctx, monster);
         },
         
         AIState::BossEnderTeleport => {
             log::info!("Monster {} entering BossEnderTeleport state", monster.monster_id);
             
-            // Delegate to boss_ender_defs for Ender boss specific behavior
-            crate::boss_ender_defs::execute_boss_ender_teleport_behavior(ctx, monster);
+            // Delegate to boss_ender_defs for Björn boss specific behavior
+            crate::boss_bjorn_defs::execute_boss_ender_teleport_behavior(ctx, monster);
         },
         
         AIState::BossEnderTransform => {
             log::info!("Monster {} entering BossEnderTransform state", monster.monster_id);
             
-            // Delegate to boss_ender_defs for Ender boss specific behavior
-            crate::boss_ender_defs::execute_boss_ender_transform_behavior(ctx, monster);
+            // Delegate to boss_ender_defs for Björn boss specific behavior
+            crate::boss_bjorn_defs::execute_boss_ender_transform_behavior(ctx, monster);
         },
         
         AIState::BossAgnaIdle => {
             log::info!("Monster {} entering BossAgnaIdle state", monster.monster_id);
             
-            // Delegate to boss_agna_defs for Agna boss specific behavior
-            crate::boss_agna_defs::execute_boss_agna_idle_behavior(ctx, monster);
+            // Delegate to boss_agna_defs for Claudia boss specific behavior
+            crate::boss_claudia_defs::execute_boss_agna_idle_behavior(ctx, monster);
         },
         
         AIState::BossAgnaFlamethrower => {
             log::info!("Monster {} entering BossAgnaFlamethrower state", monster.monster_id);
             
             // Then execute the behavior
-            crate::boss_agna_defs::execute_boss_agna_flamethrower_behavior(ctx, monster);
+            crate::boss_claudia_defs::execute_boss_agna_flamethrower_behavior(ctx, monster);
         },
         
         AIState::BossAgnaMagicCircle => {
             log::info!("Monster {} entering BossAgnaMagicCircle state", monster.monster_id);
             
-            // Delegate to boss_agna_defs for Agna boss specific behavior
-            crate::boss_agna_defs::execute_boss_agna_magic_circle_behavior(ctx, monster);
+            // Delegate to boss_agna_defs for Claudia boss specific behavior
+            crate::boss_claudia_defs::execute_boss_agna_magic_circle_behavior(ctx, monster);
         },
         
         AIState::BossAgnaRitualMatch => {
             log::info!("Monster {} entering BossAgnaRitualMatch state", monster.monster_id);
             
-            // Delegate to boss_agna_defs for Agna ritual behavior
-            crate::boss_agna_defs::execute_boss_agna_ritual_match_behavior(ctx, monster);
+            // Delegate to boss_agna_defs for Claudia ritual behavior
+            crate::boss_claudia_defs::execute_boss_agna_ritual_match_behavior(ctx, monster);
         },
         
         AIState::BossAgnaRitualWick => {
             log::info!("Monster {} entering BossAgnaRitualWick state", monster.monster_id);
             
-            // Delegate to boss_agna_defs for Agna ritual behavior
-            crate::boss_agna_defs::execute_boss_agna_ritual_wick_behavior(ctx, monster);
+            // Delegate to boss_agna_defs for Claudia ritual behavior
+            crate::boss_claudia_defs::execute_boss_agna_ritual_wick_behavior(ctx, monster);
         },
         
         AIState::BossAgnaRitualFailed => {
             log::info!("Monster {} entering BossAgnaRitualFailed state", monster.monster_id);
             
-            // Delegate to boss_agna_defs for Agna ritual behavior
-            crate::boss_agna_defs::execute_boss_agna_ritual_failed_behavior(ctx, monster);
+            // Delegate to boss_agna_defs for Claudia ritual behavior
+            crate::boss_claudia_defs::execute_boss_agna_ritual_failed_behavior(ctx, monster);
         },
         
         AIState::BossAgnaRitualComplete => {
             log::info!("Monster {} entering BossAgnaRitualComplete state", monster.monster_id);
             
-            // Delegate to boss_agna_defs for Agna ritual behavior
-            crate::boss_agna_defs::execute_boss_agna_ritual_complete_behavior(ctx, monster);
+            // Delegate to boss_agna_defs for Claudia ritual behavior
+            crate::boss_claudia_defs::execute_boss_agna_ritual_complete_behavior(ctx, monster);
         },
         
         AIState::Default => {
@@ -179,6 +184,26 @@ fn execute_state_entry_behavior(ctx: &ReducerContext, monster: &crate::Monsters,
             log::info!("Monster {} entering Stationary state", monster.monster_id);
             // No special behavior for stationary state - just stands still
         },
+        AIState::BossSimonIdle => {
+            log::info!("Monster {} entering BossSimonIdle state", monster.monster_id);
+            crate::boss_simon_defs::execute_boss_simon_idle_behavior(ctx, monster);
+        }
+        AIState::BossSimonChemicalBoltPattern => {
+            log::info!("Monster {} entering BossSimonChemicalBoltPattern state", monster.monster_id);
+            crate::boss_simon_defs::execute_boss_simon_chemical_bolt_pattern(ctx, monster);
+        }
+        AIState::BossSimonToxicZonePattern => {
+            log::info!("Monster {} entering BossSimonToxicZonePattern state", monster.monster_id);
+            crate::boss_simon_defs::execute_boss_simon_toxic_zone_pattern(ctx, monster);
+        }
+        AIState::BossSimonPhase2Transform => {
+            log::info!("Monster {} entering BossSimonPhase2Transform state", monster.monster_id);
+            crate::boss_simon_defs::execute_boss_simon_phase2_transform(ctx, monster);
+        }
+        AIState::BossJorgeIdle => {
+            log::info!("Monster {} entering BossJorgeIdle state", monster.monster_id);
+            crate::boss_jorge_defs::execute_boss_jorge_idle_behavior(ctx, monster);
+        }
     }
 }
 
@@ -208,10 +233,10 @@ fn cancel_scheduled_state_changes(ctx: &ReducerContext, monster_id: u32) {
     }
     
     // Also cleanup any pending EnderScythe attacks for this boss
-    crate::boss_ender_defs::cleanup_ender_scythe_schedules(ctx, monster_id);
+    crate::boss_bjorn_defs::cleanup_ender_scythe_schedules(ctx, monster_id);
     
-    // Also cleanup any pending Agna attacks for this boss
-    crate::boss_agna_defs::cleanup_agna_ai_schedules(ctx, monster_id);
+    // Also cleanup any pending Claudia attacks for this boss
+    crate::boss_claudia_defs::cleanup_agna_ai_schedules(ctx, monster_id);
 }
 
 // Public function to cleanup all AI schedules for a monster (used during boss transitions)
@@ -221,13 +246,13 @@ pub fn cleanup_monster_ai_schedules(ctx: &ReducerContext, monster_id: u32) {
     // Cancel all scheduled state changes
     cancel_scheduled_state_changes(ctx, monster_id);
     
-    // Note: Boss ender last pattern cleanup is now handled in boss_ender_defs.rs
+    // Note: Boss ender last pattern cleanup is now handled in boss_bjorn_defs
 }
 
 // Schedule a random boss ender pattern (chase, dance, or vanish) - will be moved to boss_ender_defs
 fn schedule_random_boss_ender_pattern(ctx: &ReducerContext, monster_id: u32) {
-    // Delegate to boss_ender_defs for Ender boss specific behavior
-    crate::boss_ender_defs::schedule_random_boss_ender_pattern(ctx, monster_id);
+    // Delegate to boss_ender_defs for Björn boss specific behavior
+    crate::boss_bjorn_defs::schedule_random_boss_ender_pattern(ctx, monster_id);
 }
 
 // Initialize boss AI state when a boss is spawned
@@ -243,14 +268,14 @@ pub fn initialize_boss_ai(ctx: &ReducerContext, monster_id: u32) {
     
     match monster.bestiary_id {
         MonsterType::BossEnderPhase1 | MonsterType::BossEnderPhase2 => {
-            log::info!("Initializing Ender boss AI for monster {}", monster_id);
-            // Delegate to boss_ender_defs for Ender boss specific initialization
-            crate::boss_ender_defs::initialize_boss_ender_ai(ctx, monster_id);
+            log::info!("Initializing Björn boss AI for monster {}", monster_id);
+            // Delegate to boss_ender_defs for Björn boss specific initialization
+            crate::boss_bjorn_defs::initialize_boss_ender_ai(ctx, monster_id);
         },
         MonsterType::BossAgnaPhase1 | MonsterType::BossAgnaPhase2 => {
-            log::info!("Initializing Agna boss AI for monster {}", monster_id);
-            // Delegate to boss_agna_defs for Agna boss specific initialization
-            crate::boss_agna_defs::initialize_boss_agna_ai(ctx, monster_id);
+            log::info!("Initializing Claudia boss AI for monster {}", monster_id);
+            // Delegate to boss_agna_defs for Claudia boss specific initialization
+            crate::boss_claudia_defs::initialize_boss_agna_ai(ctx, monster_id);
         },
         _ => {
             log::warn!("initialize_boss_ai called for non-boss monster {} of type {:?}", monster_id, monster.bestiary_id);
@@ -271,14 +296,14 @@ pub fn initialize_phase2_boss_ai(ctx: &ReducerContext, monster_id: u32) {
     
     match monster.bestiary_id {
         MonsterType::BossEnderPhase2 => {
-            log::info!("Initializing Phase 2 Ender boss AI for monster {} (BossEnderIdle only, no patterns)", monster_id);
-            // Delegate to boss_ender_defs for Ender boss specific initialization
-            crate::boss_ender_defs::initialize_phase2_boss_ender_ai(ctx, monster_id);
+            log::info!("Initializing Phase 2 Björn boss AI for monster {} (BossEnderIdle only, no patterns)", monster_id);
+            // Delegate to boss_ender_defs for Björn boss specific initialization
+            crate::boss_bjorn_defs::initialize_phase2_boss_ender_ai(ctx, monster_id);
         },
         MonsterType::BossAgnaPhase2 => {
-            log::info!("Initializing Phase 2 Agna boss AI for monster {}", monster_id);
-            // Delegate to boss_agna_defs for Agna boss specific initialization
-            crate::boss_agna_defs::initialize_phase2_boss_agna_ai(ctx, monster_id);
+            log::info!("Initializing Phase 2 Claudia boss AI for monster {}", monster_id);
+            // Delegate to boss_agna_defs for Claudia boss specific initialization
+            crate::boss_claudia_defs::initialize_phase2_boss_agna_ai(ctx, monster_id);
         },
         _ => {
             log::warn!("initialize_phase2_boss_ai called for non-phase-2-boss monster {} of type {:?}", monster_id, monster.bestiary_id);
@@ -299,11 +324,16 @@ pub fn get_movement_behavior_for_state(state: &AIState) -> MovementBehavior {
         AIState::BossEnderTransform => MovementBehavior::StandStill,
         AIState::BossAgnaIdle => MovementBehavior::Normal,
         AIState::BossAgnaFlamethrower => MovementBehavior::Normal, // Use chase behavior for flamethrower
-        AIState::BossAgnaMagicCircle => MovementBehavior::StandStill, // Agna stands still during magic circle
-        AIState::BossAgnaRitualMatch => MovementBehavior::StandStill, // Agna stands still during ritual
-        AIState::BossAgnaRitualWick => MovementBehavior::StandStill, // Agna stands still during ritual
-        AIState::BossAgnaRitualFailed => MovementBehavior::StandStill, // Agna stands still when vulnerable
-        AIState::BossAgnaRitualComplete => MovementBehavior::StandStill, // Agna stands still during completion
+        AIState::BossAgnaMagicCircle => MovementBehavior::StandStill, // Claudia stands still during magic circle
+        AIState::BossAgnaRitualMatch => MovementBehavior::StandStill, // Claudia stands still during ritual
+        AIState::BossAgnaRitualWick => MovementBehavior::StandStill, // Claudia stands still during ritual
+        AIState::BossAgnaRitualFailed => MovementBehavior::StandStill, // Claudia stands still when vulnerable
+        AIState::BossAgnaRitualComplete => MovementBehavior::StandStill, // Claudia stands still during completion
+        AIState::BossSimonIdle => MovementBehavior::Normal,
+        AIState::BossSimonChemicalBoltPattern => MovementBehavior::StandStill,
+        AIState::BossSimonToxicZonePattern => MovementBehavior::StandStill,
+        AIState::BossSimonPhase2Transform => MovementBehavior::StandStill,
+        AIState::BossJorgeIdle => MovementBehavior::Normal,
         AIState::Stationary => MovementBehavior::StandStill,
     }
 }
@@ -377,7 +407,12 @@ pub fn can_monster_deal_damage(state: &AIState) -> bool {
         AIState::BossAgnaRitualWick => false, // Invulnerable during ritual wick
         AIState::BossAgnaRitualFailed => true, // Vulnerable when ritual failed
         AIState::BossAgnaRitualComplete => false, // Invulnerable during completion
+        AIState::BossSimonIdle => true,
+        AIState::BossSimonChemicalBoltPattern => true,
+        AIState::BossSimonToxicZonePattern => true,
+        AIState::BossSimonPhase2Transform => true,
         AIState::Stationary => true,
+        AIState::BossJorgeIdle => true,
     }
 }
 
@@ -399,7 +434,12 @@ pub fn can_monster_receive_damage(state: &AIState) -> bool {
         AIState::BossAgnaRitualWick => false,  // Immune during ritual wick
         AIState::BossAgnaRitualFailed => true, // Vulnerable when ritual failed
         AIState::BossAgnaRitualComplete => false, // Immune during completion
+        AIState::BossSimonIdle => true,
+        AIState::BossSimonChemicalBoltPattern => true,
+        AIState::BossSimonToxicZonePattern => true,
+        AIState::BossSimonPhase2Transform => true,
         AIState::Stationary => true,
+        AIState::BossJorgeIdle => true,
     }
 }
 

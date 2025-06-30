@@ -154,6 +154,28 @@ public static partial class Module
             Speed = 230.0f,
             StartingAttackType = AttackType.EnergyOrb
         });
+
+        // Enno Healer class
+        ctx.Db.class_data.Insert(new ClassData 
+        {
+            ClassId = (uint)PlayerClass.Healer,
+            PlayerClass = PlayerClass.Healer,
+            MaxHp = 110,
+            Armor = 1,
+            Speed = 200.0f,
+            StartingAttackType = AttackType.HealingWand
+        });
+
+        // Enno (Stoner class)
+        ctx.Db.class_data.Insert(new ClassData 
+        {
+            ClassId = (uint)PlayerClass.Stoner,
+            PlayerClass = PlayerClass.Stoner,
+            MaxHp = 120,
+            Armor = 1,
+            Speed = 190.0f,
+            StartingAttackType = AttackType.Joint
+        });
         
         Log.Info("Class data initialization complete.");
     }

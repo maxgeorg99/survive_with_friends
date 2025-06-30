@@ -121,7 +121,7 @@ pub fn init_attack_data(ctx: &ReducerContext) {
         cooldown: 600,          
         duration: 340,          
         projectiles: 1,          
-        fire_delay: 50,          
+        fire_delay: 40,          
         speed: 800.0,              
         piercing: true,         
         radius: 32.0,             
@@ -135,7 +135,7 @@ pub fn init_attack_data(ctx: &ReducerContext) {
         attack_type: AttackType::Wand,
         name: "Magic Bolt".to_string(),
         cooldown: 400,           
-        duration: 390,         
+        duration: 1000,         
         projectiles: 1,          
         fire_delay: 20,          
         speed: 800.0,                
@@ -150,14 +150,14 @@ pub fn init_attack_data(ctx: &ReducerContext) {
         attack_id: 3,
         attack_type: AttackType::Knives,
         name: "Throwing Knives".to_string(),
-        cooldown: 500,          
-        duration: 490,
-        projectiles: 5,          
-        fire_delay: 0,           
+        cooldown: 1200,          
+        duration: 800,
+        projectiles: 4,          
+        fire_delay: 1,           
         speed: 1000.0,               
-        piercing: true,       
+        piercing: false,       
         radius: 15.0,              
-        damage: 1,              
+        damage: 2,              
         armor_piercing: 0,       
     });
 
@@ -177,9 +177,73 @@ pub fn init_attack_data(ctx: &ReducerContext) {
         armor_piercing: 10,       
     });
 
-    // Thunder Horn - long range instant strike
+    // Football - bouncing projectile with knockback
     ctx.db.attack_data().insert(AttackData {
         attack_id: 5,
+        attack_type: AttackType::Football,
+        name: "Football Shot".to_string(),
+        cooldown: 800,           // Slower attack speed
+        duration: 2500,          // Stays longer
+        projectiles: 1,          // Single football
+        fire_delay: 200,         // Small delay between shots
+        speed: 600.0,            // Medium speed
+        piercing: false,         // Doesn't go through enemies
+        radius: 24.0,            // Medium size
+        damage: 4,               // Moderate damage
+        armor_piercing: 2,
+    });
+
+    // Cards - spread attack
+    ctx.db.attack_data().insert(AttackData {
+        attack_id: 6,
+        attack_type: AttackType::Cards,
+        name: "Card Throw".to_string(),
+        cooldown: 600,
+        duration: 800,
+        projectiles: 3,          // Multiple cards
+        fire_delay: 50,
+        speed: 700.0,
+        piercing: false,
+        radius: 16.0,
+        damage: 3,
+        armor_piercing: 2,
+    });
+
+    // Dumbbell - falling aerial attack
+    ctx.db.attack_data().insert(AttackData {
+        attack_id: 7,
+        attack_type: AttackType::Dumbbell,
+        name: "Dumbbell Drop".to_string(),
+        cooldown: 1200,          // Slow attack speed
+        duration: 1000,          // Long fall time
+        projectiles: 1,          // Single dumbbell
+        fire_delay: 200,         // Delay between drops
+        speed: 800.0,            // Fast falling speed
+        piercing: true,          // Goes through enemies
+        radius: 40.0,            // Large impact radius
+        damage: 8,               // High damage
+        armor_piercing: 4,
+    });
+
+    // Garlic - aura attack
+    ctx.db.attack_data().insert(AttackData {
+        attack_id: 8,
+        attack_type: AttackType::Garlic,
+        name: "Garlic Aura".to_string(),
+        cooldown: 800,           // Frequent ticks
+        duration: 800,           // Duration of each pulse
+        projectiles: 1,          // Single aura
+        fire_delay: 0,           // Continuous
+        speed: 0.0,              // Stationary
+        piercing: true,          // Hits all enemies in range
+        radius: 100.0,           // Large aura radius
+        damage: 2,               // Low damage but constant
+        armor_piercing: 1,
+    });
+
+    // Thunder Horn - long range instant strike
+    ctx.db.attack_data().insert(AttackData {
+        attack_id: 9,
         attack_type: AttackType::ThunderHorn,
         name: "Thunder Horn".to_string(),
         cooldown: 3000,          // Long cooldown (3 seconds)
@@ -187,10 +251,58 @@ pub fn init_attack_data(ctx: &ReducerContext) {
         projectiles: 1,          // Single target initially
         fire_delay: 0,           // Instant burst
         speed: 0.0,              // 0 speed - instant strike at target location
-        piercing: true,         // Does not pierce
+        piercing: true,          // Strikes through armor
         radius: 48.0,            // Moderate radius
-        damage: 15,               // Big damage
+        damage: 15,              // Big damage
         armor_piercing: 15,      // Good armor penetration
+    });
+
+    // Volleyball - bouncing projectile
+    ctx.db.attack_data().insert(AttackData {
+        attack_id: 10,
+        attack_type: AttackType::Volleyball,
+        name: "Volleyball".to_string(),
+        cooldown: 1000,
+        duration: 700,
+        projectiles: 1,
+        fire_delay: 0,
+        speed: 800.0,
+        piercing: true,
+        radius: 25.0,
+        damage: 17,
+        armor_piercing: 3,
+    });
+
+    // Healing Wand - heals players or damages monsters when hit
+    ctx.db.attack_data().insert(AttackData {
+        attack_id: 11,
+        attack_type: AttackType::HealingWand,
+        name: "Healing Wand".to_string(),
+        cooldown: 400,           
+        duration: 1000,          
+        projectiles: 1,          
+        fire_delay: 20,          
+        speed: 800.0,                
+        piercing: false,         
+        radius: 20.0,              
+        damage: 2,              
+        armor_piercing: 10,       
+    });
+
+    // Joint - combines Stoner and Healer properties
+    ctx.db.attack_data().insert(AttackData {
+        attack_id: 12,
+        attack_type: AttackType::Joint,
+        name: "Joint".to_string(),
+        cooldown: 1000,          // Moderate cooldown
+        duration: 5000,          // Long duration for healing effect
+        projectiles: 1,          // Single joint smoke
+        fire_delay: 0,           // Instant effect
+        speed: 0.0,              // Stationary
+        piercing: true,          // Affects all players in range
+        radius: 100.0,           // Large radius for healing
+        damage: 1,               // Low damage to monsters
+        armor_piercing: 0,       // No armor piercing needed
     });
 
     log::info!("Attack data initialized successfully.");

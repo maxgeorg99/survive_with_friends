@@ -227,9 +227,9 @@ export default class SoundManager {
     playBossSpawnSound(bossType?: string): void {
         // Play appropriate voice line based on boss type
         if (bossType === 'BossAgnaPhase1') {
-            this.playSound('voice_agna_1', 0.4); // Reduced volume for Agna narrator
+            this.playSound('voice_agna_1', 0.4); // Reduced volume for Claudia narrator
         } else {
-            // Default to Ender voice (original behavior)
+            // Default to Björn voice (original behavior)
             this.playSound('voice_boss', 1.0);
         }
     }
@@ -239,10 +239,10 @@ export default class SoundManager {
         if (bossType === 'BossAgnaPhase2') {
             this.playSoundsSequence([
                 { key: 'boss_transform', volume: 0.9 },
-                { key: 'voice_agna_2', delay: 1500, volume: 0.4 } // Reduced volume for Agna narrator
+                { key: 'voice_agna_2', delay: 1500, volume: 0.4 } // Reduced volume for Claudia narrator
             ]);
         } else {
-            // Default to Ender voices (original behavior)
+            // Default to Björn voices (original behavior)
             this.playSoundsSequence([
                 { key: 'boss_transform', volume: 0.9 },
                 { key: 'voice_boss_2', delay: 1500, volume: 1.0 } // 1.5 second delay
@@ -255,7 +255,7 @@ export default class SoundManager {
         if (bossType === 'BossAgnaPhase1') {
             this.playSound('agna_phase_2', 1.0);
         } else {
-            // Default to Ender pre-transform voice (original behavior)
+            // Default to Björn pre-transform voice (original behavior)
             this.playSound('voice_transform', 1.0);
         }
     }

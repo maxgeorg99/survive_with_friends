@@ -654,10 +654,10 @@ export default class BossTimerUI {
 
     private getBossName(monsterType: string): string {
         switch (monsterType) {
-            case 'BossEnderPhase1': return "Ender, Scion of Ruin";
-            case 'BossEnderPhase2': return "Ender, Host of Oblivion";
-            case 'BossAgnaPhase1': return "Agna, the Seething Calamity";
-            case 'BossAgnaPhase2': return "Agna, Purified by Flame";
+            case 'BossEnderPhase1': return "Björn, Scion of Ruin";
+            case 'BossEnderPhase2': return "Björn, Host of Oblivion";
+            case 'BossAgnaPhase1': return "Claudia, the Fiery";
+            case 'BossAgnaPhase2': return "Claudia, Purified by Flame";
             default: return "Unknown Boss";
         }
     }

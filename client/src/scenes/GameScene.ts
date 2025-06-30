@@ -103,7 +103,7 @@ export default class GameScene extends Phaser.Scene {
     // Add loot capsule manager for loot capsule visualization
     private lootCapsuleManager: LootCapsuleManager | null = null;
     
-    // Add boss Agna manager for magic circle visualization
+    // Add boss Claudia manager for magic circle visualization
     private bossAgnaManager: BossAgnaManager | null = null;
     private loreScrollManager: LoreScrollManager | null = null;
     
@@ -895,7 +895,7 @@ export default class GameScene extends Phaser.Scene {
         this.lootCapsuleManager = new LootCapsuleManager(this, this.spacetimeDBClient);
         this.lootCapsuleManager.initializeLootCapsules(ctx);
 
-        // Create and initialize the boss Agna manager
+        // Create and initialize the boss Claudia manager
         this.bossAgnaManager = new BossAgnaManager(this, this.spacetimeDBClient);
         this.loreScrollManager = new LoreScrollManager(this, this.spacetimeDBClient);
         console.log("BossAgnaManager created successfully");
@@ -2019,7 +2019,7 @@ export default class GameScene extends Phaser.Scene {
             this.soulUI.update();
         }
 
-        // Boss Agna Manager now handles updates automatically via event subscriptions
+        // Boss Claudia Manager now handles updates automatically via event subscriptions
 
         // Update minimap
         this.updateMinimap();

@@ -1,7 +1,5 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, ScheduleAt, SpacetimeType, rand::Rng};
-use crate::{DbVector2, MonsterType, MonsterAttackType, config, player, bestiary, monsters, monsters_boid, MonsterSpawners, 
-           DELTA_TIME, get_world_cell_from_position, spatial_hash_collision_checker,
-           WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT};
+use crate::{DbVector2, MonsterType, MonsterAttackType, config, player, bestiary, monsters, monsters_boid, MonsterSpawners, DELTA_TIME, get_world_cell_from_position, spatial_hash_collision_checker, WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT, Monsters};
 use crate::monster_attacks_def::active_monster_attacks;
 use crate::monster_ai_defs::monster_state_changes;
 use std::time::Duration;
@@ -53,7 +51,7 @@ const BOSS_TARGET_SWITCH_BASE_INTERVAL_MS: u64 = 10000;   // Base interval (8 se
 const BOSS_TARGET_SWITCH_VARIATION_MS: u64 = 4000;       // Random variation (±4 seconds)
 const BOSS_TARGET_SWITCH_INITIAL_DELAY_MS: u64 = 10000;   // Initial delay before first switch
 
-// Configuration constants for Ender boss AI timing
+// Configuration constants for Björn boss AI timing
 const BOSS_ENDER_IDLE_DURATION_MS: u64 = 5000;        // 5 seconds idle
 const BOSS_ENDER_CHASE_DURATION_MS: u64 = 15000;       // 15 seconds chase
 pub const BOSS_ENDER_DANCE_DURATION_MS: u64 = 15000;       // 15 seconds dance
@@ -68,7 +66,7 @@ const BOSS_ENDER_CHASE_SPEED_MULTIPLIER: f32 = 1.5;
 // Chase distance threshold (when boss gets this close, stop chasing and attack)
 const BOSS_ENDER_CHASE_STOP_DISTANCE: f32 = 128.0;
 
-// Table to track the last chosen pattern for each Ender boss to avoid repetition
+// Table to track the last chosen pattern for each Björn boss to avoid repetition
 #[table(name = boss_ender_last_patterns, public)]
 pub struct BossEnderLastPattern {
     #[primary_key]
@@ -1421,7 +1419,7 @@ fn schedule_state_change(ctx: &ReducerContext, monster_id: u32, target_state: cr
 // ENDER BOSS CHASE BEHAVIOR FUNCTIONS
 // ================================================================================================
 
-// Handle chase behavior for Ender boss monsters during movement processing
+// Handle chase behavior for Björn boss monsters during movement processing
 pub fn handle_ender_boss_chase_movement(
     ctx: &ReducerContext, 
     cache: &mut crate::collision::CollisionCache, 
@@ -1473,7 +1471,7 @@ pub fn handle_ender_boss_chase_movement(
         }
     }
     
-    // Not an Ender boss, apply default chase behavior
+    // Not an Björn boss, apply default chase behavior
     let mut speed = cache.monster.speed_monster[cache_index];
     speed *= crate::monster_ai_defs::CHASE_ACCELERATION_MULTIPLIER;
     speed = speed.min(crate::monster_ai_defs::MAX_CHASE_SPEED);

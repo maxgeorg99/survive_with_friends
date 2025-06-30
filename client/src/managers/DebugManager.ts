@@ -128,19 +128,19 @@ export class DebugManager {
 
     private setBossTypeEnder(): void {
         if (this.spacetimedb && this.spacetimedb.sdkConnection) {
-            console.log("DebugManager: Setting boss type to Ender (client key 4)...");
+            console.log("DebugManager: Setting boss type to Björn (client key 4)...");
             this.spacetimedb.sdkConnection.reducers.debugSetBossType(4);
         } else {
-            console.warn("DebugManager: SpacetimeDB connection not available for setting boss type to Ender.");
+            console.warn("DebugManager: SpacetimeDB connection not available for setting boss type to Björn.");
         }
     }
 
     private setBossTypeAgna(): void {
         if (this.spacetimedb && this.spacetimedb.sdkConnection) {
-            console.log("DebugManager: Setting boss type to Agna (client key 5)...");
+            console.log("DebugManager: Setting boss type to Claudia (client key 5)...");
             this.spacetimedb.sdkConnection.reducers.debugSetBossType(5);
         } else {
-            console.warn("DebugManager: SpacetimeDB connection not available for setting boss type to Agna.");
+            console.warn("DebugManager: SpacetimeDB connection not available for setting boss type to Claudia.");
         }
     }
 

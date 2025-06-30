@@ -60,8 +60,8 @@ pub fn process_monster_attack_movements(ctx: &ReducerContext) {
 
         // Handle different movement patterns based on attack type
         // First check if this is a boss attack that needs special handling
-        crate::boss_ender_defs::handle_boss_attack_movement(ctx, &mut updated_active_monster_attack);
-        crate::boss_agna_defs::handle_agna_attack_movement(ctx, &mut updated_active_monster_attack);
+        crate::boss_bjorn_defs::handle_boss_attack_movement(ctx, &mut updated_active_monster_attack);
+        crate::boss_claudia_defs::handle_agna_attack_movement(ctx, &mut updated_active_monster_attack);
         
         // Then handle regular projectile movement for non-boss attacks
         match updated_active_monster_attack.monster_attack_type {
@@ -400,6 +400,15 @@ pub fn cleanup_imp_attack_schedule(ctx: &ReducerContext, imp_monster_id: u32) {
     if count > 0 {
         log::info!("Cleaned up {} attack schedulers for dead Imp {}", count, imp_monster_id);
     }
+}
+
+//#[derive(SpacetimeType, Clone, Debug, PartialEq)]
+pub enum MonsterAttackType {
+    // ...existing types...
+    ChemicalBolt,      // Phase 1 single target chemical projectile
+    ToxicZone,         // Phase 1 stationary toxic damage zone
+    ToxicSpray,        // Phase 2 chemical breath weapon
+    // ...rest of enum...
 }
 
 

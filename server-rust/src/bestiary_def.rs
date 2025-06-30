@@ -136,18 +136,18 @@ pub fn init_bestiary(ctx: &ReducerContext) {
         radius: 28.0,      // Small radius (smaller than Rat)
     });
 
-    // Insert Agna Boss Phase 1 stats
+    // Insert Claudia Boss Phase 1 stats
     ctx.db.bestiary().insert(Bestiary {
         bestiary_id: MonsterType::BossAgnaPhase1 as u32,
         monster_type: MonsterType::BossAgnaPhase1,
         tier: 5,
-        max_hp: 500,       // Slightly less HP than Ender Phase 1
-        speed: 90.0,       // Slightly slower than Ender Phase 1
-        atk: 8.5,          // Slightly less attack than Ender Phase 1
-        radius: 88.0,      // Slightly smaller than Ender Phase 1
+        max_hp: 500,       // Slightly less HP than Björn Phase 1
+        speed: 90.0,       // Slightly slower than Björn Phase 1
+        atk: 8.5,          // Slightly less attack than Björn Phase 1
+        radius: 88.0,      // Slightly smaller than Björn Phase 1
     });
     
-    // Insert Agna Boss Phase 2 stats
+    // Insert Claudia Boss Phase 2 stats
     ctx.db.bestiary().insert(Bestiary {
         bestiary_id: MonsterType::BossAgnaPhase2 as u32,
         monster_type: MonsterType::BossAgnaPhase2,
@@ -158,7 +158,7 @@ pub fn init_bestiary(ctx: &ReducerContext) {
         radius: 128.0,     
     });
 
-    // Insert Agna Candle stats - stationary ritual candles
+    // Insert Claudia Candle stats - stationary ritual candles
     ctx.db.bestiary().insert(Bestiary {
         bestiary_id: MonsterType::AgnaCandle as u32,
         monster_type: MonsterType::AgnaCandle,
@@ -200,6 +200,28 @@ pub fn init_bestiary(ctx: &ReducerContext) {
         speed: 0.0,        // Stationary (no movement)
         atk: 0.0,          // No attack
         radius: 58.0,      // Largest radius for collision
+    });
+
+    // Insert Final Boss Simon Phase 1 stats
+    ctx.db.bestiary().insert(Bestiary {
+        bestiary_id: MonsterType::BossSimonPhase1 as u32,
+        monster_type: MonsterType::BossSimonPhase1,
+        tier: 5,
+        max_hp: 500,
+        speed: 100.0,
+        atk: 9.0,
+        radius: 92.0,
+    });
+    
+    // Insert Final Boss Simon Phase 2 stats
+    ctx.db.bestiary().insert(Bestiary {
+        bestiary_id: MonsterType::BossSimonPhase1 as u32,
+        monster_type: MonsterType::BossSimonPhase2,
+        tier: 5,
+        max_hp: 500,
+        speed: 120.0,
+        atk: 12.0,
+        radius: 128.0,
     });
 
     log::info!("Bestiary initialization complete");

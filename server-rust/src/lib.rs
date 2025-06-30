@@ -15,8 +15,8 @@ pub mod gems_def;
 pub mod gem_drop_defs;
 pub mod loot_capsule_defs;
 pub mod boss_system;
-pub mod boss_ender_defs;
-pub mod boss_agna_defs;
+pub mod boss_bjorn_defs;
+pub mod boss_claudia_defs;
 pub mod monsters_def;
 pub mod monster_ai_defs;
 pub mod monster_spawn_defs;
@@ -27,6 +27,10 @@ pub mod upgrades_def;
 pub mod structure_defs;
 pub mod lorescrolls_defs;
 pub mod cheats_def;
+pub mod quest_def;
+pub mod achievement_def;
+pub mod boss_simon_defs;
+pub mod boss_jorge_defs;
 
 // Re-export public items from modules
 pub use config_def::*;
@@ -42,8 +46,8 @@ pub use gems_def::*;
 pub use gem_drop_defs::*;
 pub use loot_capsule_defs::*;
 pub use boss_system::*;
-pub use boss_ender_defs::*;
-pub use boss_agna_defs::*;
+pub use boss_bjorn_defs::*;
+pub use boss_claudia_defs::*;
 pub use monsters_def::*;
 pub use monster_ai_defs::*;
 pub use monster_spawn_defs::*;
@@ -100,6 +104,9 @@ pub enum MonsterAttackType {
     AgnaCandleBolt,
     AgnaPhase2FlameJet,
     AgnaGroundFlame,
+    SimonChemicalBolt,
+    SimonToxicZone,
+    SimonToxicSpray,
 }
 
 // Monster variant enum for shiny monsters
@@ -275,7 +282,7 @@ pub fn init(ctx: &ReducerContext) {
     // TODO: Initialize game state
     init_game_state(ctx);
     
-    // Initialize boss selection (choose between Ender and Agna)
+    // Initialize boss selection (choose between Björn and Claudia)
     boss_system::init_boss_selection(ctx);
     
     // TODO: Initialize class data

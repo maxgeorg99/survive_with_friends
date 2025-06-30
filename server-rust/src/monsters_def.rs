@@ -433,7 +433,7 @@ fn move_monsters(ctx: &ReducerContext, cache: &mut crate::collision::CollisionCa
         // Handle chase behavior (delegated to boss-specific modules)
         if movement_behavior == crate::monster_ai_defs::MovementBehavior::EnderChase {
             // Delegate chase behavior to the appropriate boss module
-            let should_continue_movement = crate::boss_ender_defs::handle_ender_boss_chase_movement(ctx, cache, i);
+            let should_continue_movement = crate::boss_bjorn_defs::handle_ender_boss_chase_movement(ctx, cache, i);
             if !should_continue_movement {
                 continue; // Skip movement if chase handler says to stop
             }

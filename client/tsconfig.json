@@ -13,8 +13,9 @@
     "paths": {
       "@spacetimedb/sdk/*": ["./node_modules/@spacetimedb/sdk/*"],
       "@autobindings/*": ["./src/autobindings/*"]
-    }
+    },
+    "resolveJsonModule": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
-} 
+}

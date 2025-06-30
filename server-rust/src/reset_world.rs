@@ -203,7 +203,7 @@ pub fn reset_world(ctx: &ReducerContext) {
     log::info!("ResetWorld: Cleaned up {} void zone schedulers, {} chaos ball schedulers, and {} active monster attacks", 
               void_zone_scheduler_count, chaos_ball_scheduler_count, active_monster_attack_count);
     
-    // 16. Clean up all Agna boss attack schedules (magic circles, flamethrower, fire orbs, delayed orbs)
+    // 16. Clean up all Claudia boss attack schedules (magic circles, flamethrower, fire orbs, delayed orbs)
     let mut agna_magic_circle_count = 0;
     let agna_magic_circles_to_delete: Vec<u64> = ctx.db.agna_magic_circles().iter().map(|c| c.circle_id).collect();
     for circle_id in agna_magic_circles_to_delete {
@@ -232,7 +232,7 @@ pub fn reset_world(ctx: &ReducerContext) {
         agna_flamethrower_scheduler_count += 1;
     }
     
-    // Clean up Agna candle-related tables that were missing from cleanup
+    // Clean up Claudia candle-related tables that were missing from cleanup
     let mut agna_candle_spawn_count = 0;
     let agna_candle_spawns_to_delete: Vec<u64> = ctx.db.agna_candle_spawns().iter().map(|s| s.spawn_id).collect();
     for spawn_id in agna_candle_spawns_to_delete {
@@ -261,7 +261,7 @@ pub fn reset_world(ctx: &ReducerContext) {
         agna_ritual_completion_count += 1;
     }
     
-    // Clean up Agna Phase 2 tables
+    // Clean up Claudia Phase 2 tables
     let mut agna_summoning_spawner_count = 0;
     let agna_summoning_spawners_to_delete: Vec<u64> = ctx.db.agna_summoning_circle_spawner().iter().map(|s| s.scheduled_id).collect();
     for scheduled_id in agna_summoning_spawners_to_delete {
@@ -283,7 +283,7 @@ pub fn reset_world(ctx: &ReducerContext) {
         agna_phase2_flamethrower_count += 1;
     }
     
-    // Clean up Agna last pattern tracking
+    // Clean up Claudia last pattern tracking
     let mut agna_last_pattern_count = 0;
     let agna_last_patterns_to_delete: Vec<u32> = ctx.db.boss_agna_last_patterns().iter().map(|p| p.monster_id).collect();
     for monster_id in agna_last_patterns_to_delete {
@@ -291,7 +291,7 @@ pub fn reset_world(ctx: &ReducerContext) {
         agna_last_pattern_count += 1;
     }
     
-    log::info!("ResetWorld: Cleaned up {} Agna magic circles, {} fire orb schedulers, {} delayed orb schedulers, {} flamethrower schedulers, {} candle spawns, {} candle schedulers, {} candle bolt schedulers, {} ritual completion checks, {} summoning spawners, {} target switch schedulers, {} phase 2 flamethrower schedulers, and {} last pattern records", 
+    log::info!("ResetWorld: Cleaned up {} Claudia magic circles, {} fire orb schedulers, {} delayed orb schedulers, {} flamethrower schedulers, {} candle spawns, {} candle schedulers, {} candle bolt schedulers, {} ritual completion checks, {} summoning spawners, {} target switch schedulers, {} phase 2 flamethrower schedulers, and {} last pattern records", 
               agna_magic_circle_count, agna_fire_orb_scheduler_count, agna_delayed_orb_scheduler_count, agna_flamethrower_scheduler_count, agna_candle_spawn_count, agna_candle_scheduler_count, agna_candle_bolt_scheduler_count, agna_ritual_completion_count, agna_summoning_spawner_count, agna_target_switch_count, agna_phase2_flamethrower_count, agna_last_pattern_count);
     
     // 17. Clean up lore scroll pickup records

@@ -661,13 +661,13 @@ export default class MonsterManager {
                 this.soundManager.playBossTransformSound(transformBossType);
                 break;
             case 'BossAgnaFlamethrower':
-                // Play Agna flamethrower sound
-                console.log(`*** Agna boss ${newMonster.monsterId} entered flamethrower mode! ***`);
+                // Play Claudia flamethrower sound
+                console.log(`*** Claudia boss ${newMonster.monsterId} entered flamethrower mode! ***`);
                 this.soundManager.playSound('agna_burned', 0.4);
                 break;
             case 'BossAgnaMagicCircle':
-                // Play Agna magic circle sound
-                console.log(`*** Agna boss ${newMonster.monsterId} entered magic circle mode! ***`);
+                // Play Claudia magic circle sound
+                console.log(`*** Claudia boss ${newMonster.monsterId} entered magic circle mode! ***`);
                 this.soundManager.playSound('agna_closing_in', 0.4);
                 break;
             default:
@@ -720,7 +720,7 @@ export default class MonsterManager {
             console.log(`- Texture exists: ${this.scene.textures.exists(MONSTER_ASSET_KEYS[monsterTypeName])}`);
             console.log(`- Position: (${monster.spawnPosition.x}, ${monster.spawnPosition.y})`);
             
-            // Play boss spawn sound for first form (both Ender and Agna Phase 1)
+            // Play boss spawn sound for first form (both Björn and Claudia Phase 1)
             if (this.isBossPhase1(monsterTypeName)) {
                 const bossName = this.isEnderBoss(monsterTypeName) ? "ENDER" : "AGNA";
                 console.log(`*** ${bossName} PHASE 1 SPAWNED! Playing voice cue... ***`);

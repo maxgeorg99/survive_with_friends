@@ -11,6 +11,10 @@ import SpacetimeDBClient from './SpacetimeDBClient';
 import { DbConnection, ErrorContext, SubscriptionEventContext } from './autobindings';
 import { GameEvents } from './constants/GameEvents';
 import SoundManager from './managers/SoundManager';
+import SplashScene from './scenes/SplashScene';
+import QuestScene from './scenes/QuestScene';
+import BestaryScene from './scenes/BestaryScene';
+import AchievementScene from './scenes/AchievementScene';
 
 console.log("Main script loading...");
 
@@ -97,7 +101,7 @@ const config: Phaser.Types.Core.GameConfig = {
             // debug: true // Set to true for physics debugging
         }
     },
-    scene: [TitleScene, NameSelectScene, ClassSelectScene, GameScene, DeadScene, VictoryScene, LoadingScene],
+    scene: [SplashScene,TitleScene, NameSelectScene, ClassSelectScene, GameScene, LoadingScene, QuestScene, BestaryScene, AchievementScene],
     scale: {
         mode: Phaser.Scale.RESIZE,
         autoCenter: Phaser.Scale.CENTER_BOTH

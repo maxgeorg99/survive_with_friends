@@ -2,12 +2,16 @@ use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, Sc
 use crate::{DbVector2, MonsterType, player, config, monster_spawners, bestiary, monsters, monsters_boid, entity, gems, dead_players, monster_spawn_timer,
     active_attacks, attack_burst_cooldowns, player_scheduled_attacks};
 use std::time::Duration;
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
 
 // Boss type enum for selecting which boss to spawn
-#[derive(SpacetimeType, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(SpacetimeType, Clone, Copy, Debug, PartialEq, Eq, Hash, EnumIter)]
 pub enum BossType {
-    Ender = 0,
-    Agna = 1,
+    Björn = 0,
+    Claudia = 1,
+    Simon = 2,
+    Jorge = 3,
 }
 
 // Game state table to track boss-related information
@@ -69,7 +73,7 @@ pub fn init_game_state(ctx: &ReducerContext) {
         boss_active: false,
         boss_phase: 0,
         boss_monster_id: 0,
-        boss_type: BossType::Ender,
+        boss_type: BossType::Björn,
         normal_spawning_paused: false,
         game_start_time: ctx.timestamp, // Set game start time to current timestamp
     });
@@ -98,27 +102,20 @@ pub fn schedule_boss_spawn(ctx: &ReducerContext) {
     
     // Randomly select boss type when first scheduling the boss spawn
     let mut rng = ctx.rng();
-    let selected_boss_type = if rng.gen_bool(0.5) { BossType::Ender } else { BossType::Agna };
-    let boss_name = match selected_boss_type {
-        BossType::Ender => "Ender",
-        BossType::Agna => "Agna",
-    };
-    
-    log::info!("Randomly selected boss type: {} ({:?})", boss_name, selected_boss_type);
-    
+    let bosses: Vec<BossType> = BossType::iter().collect();
+    let selected_boss_type = bosses[rng.gen_range(0..bosses.len())];
+       
     // Update or create boss selection with the randomly chosen boss
     let boss_selection_opt = ctx.db.boss_selection().id().find(&0);
     if let Some(mut selection) = boss_selection_opt {
         selection.boss_type = selected_boss_type;
         ctx.db.boss_selection().id().update(selection);
-        log::info!("Updated boss selection to randomly chosen {} ({:?})", boss_name, selected_boss_type);
     } else {
         // Create new selection if it doesn't exist
         ctx.db.boss_selection().insert(BossSelection {
             id: 0,
             boss_type: selected_boss_type,
         });
-        log::info!("Created new boss selection with randomly chosen {} ({:?})", boss_name, selected_boss_type);
     }
     
     // Schedule the boss spawn timer
@@ -127,9 +124,7 @@ pub fn schedule_boss_spawn(ctx: &ReducerContext) {
         scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(BOSS_SPAWN_DELAY_MS)),
         session_start_time: ctx.timestamp,
     });
-    
-    log::info!("Boss spawn timer scheduled - {} boss will spawn in 5 minutes", boss_name);
-    
+
     // Spawn world structures at the start of a new game session
     log::info!("Initializing world structures for new game session...");
     crate::structure_defs::spawn_world_structures(ctx);
@@ -189,13 +184,17 @@ fn schedule_boss_spawning(ctx: &ReducerContext, position: DbVector2) {
     
     // Determine which boss type to spawn based on selection
     let boss_monster_type = match boss_selection.boss_type {
-        BossType::Ender => MonsterType::BossEnderPhase1,
-        BossType::Agna => MonsterType::BossAgnaPhase1,
+        BossType::Björn => MonsterType::BossEnderPhase1,
+        BossType::Claudia => MonsterType::BossAgnaPhase1,
+        BossType::Simon => MonsterType::BossSimonPhase1,
+        BossType::Jorge => MonsterType::BossJorgePhase1,
     };
     
     let boss_name = match boss_selection.boss_type {
-        BossType::Ender => "Ender",
-        BossType::Agna => "Agna",
+        BossType::Björn => "Björn",
+        BossType::Claudia => "Claudia",
+        BossType::Simon => "Simon",
+        BossType::Jorge => "Jorge",
     };
     
     log::info!("Spawning {} boss (type {:?}) at position ({}, {})", boss_name, boss_selection.boss_type, position.x, position.y);
@@ -227,13 +226,17 @@ pub fn spawn_boss_phase_two(ctx: &ReducerContext, position: DbVector2) {
     
     // Determine which boss phase 2 type to spawn based on selection
     let (boss_monster_type, ai_state) = match boss_selection.boss_type {
-        BossType::Ender => (MonsterType::BossEnderPhase2, crate::monster_ai_defs::AIState::BossEnderIdle),
-        BossType::Agna => (MonsterType::BossAgnaPhase2, crate::monster_ai_defs::AIState::BossAgnaIdle),
+        BossType::Björn => (MonsterType::BossEnderPhase2, crate::monster_ai_defs::AIState::BossEnderIdle),
+        BossType::Claudia => (MonsterType::BossAgnaPhase2, crate::monster_ai_defs::AIState::BossAgnaIdle),
+        BossType::Simon => (MonsterType::BossSimonPhase2, crate::monster_ai_defs::AIState::BossSimonIdle),
+        BossType::Jorge => (MonsterType::BossJorgePhase2, crate::monster_ai_defs::AIState::BossJorgeIdle),
     };
     
     let boss_name = match boss_selection.boss_type {
-        BossType::Ender => "Ender",
-        BossType::Agna => "Agna", 
+        BossType::Björn => "Björn",
+        BossType::Claudia => "Claudia", 
+        BossType::Simon => "Simon", 
+        BossType::Jorge => "Jorge", 
     };
     
     log::info!("Spawning {} Phase 2 boss at position ({}, {})", boss_name, position.x, position.y);
@@ -275,25 +278,33 @@ pub fn spawn_boss_phase_two(ctx: &ReducerContext, position: DbVector2) {
 
     // Initialize boss AI based on boss type
     match boss_selection.boss_type {
-        BossType::Ender => {
-            // Initialize Ender Phase 2 boss AI (BossEnderIdle only, no automatic patterns)
+        BossType::Björn => {
+            // Initialize Björn Phase 2 boss AI (BossEnderIdle only, no automatic patterns)
             crate::monster_ai_defs::initialize_phase2_boss_ai(ctx, monster.monster_id);
             
             // Start EnderClaw spawning for Phase 2 boss
             log::info!("Starting EnderClaw spawning for Phase 2 boss {}", monster.monster_id);
-            crate::boss_ender_defs::start_ender_claw_spawning(ctx, monster.monster_id);
+            crate::boss_bjorn_defs::start_ender_claw_spawning(ctx, monster.monster_id);
             
             // Start ChaosBall and VoidZone attacks for Phase 2 boss
             log::info!("Starting ChaosBall and VoidZone attacks for Phase 2 boss {}", monster.monster_id);
-            crate::boss_ender_defs::start_chaos_ball_attacks(ctx, monster.monster_id);
-            crate::boss_ender_defs::start_void_zone_attacks(ctx, monster.monster_id);
+            crate::boss_bjorn_defs::start_chaos_ball_attacks(ctx, monster.monster_id);
+            crate::boss_bjorn_defs::start_void_zone_attacks(ctx, monster.monster_id);
             
             // Start boss target switching for Phase 2 boss
             log::info!("Starting boss target switching for Phase 2 boss {}", monster.monster_id);
-            crate::boss_ender_defs::start_boss_target_switching(ctx, monster.monster_id);
+            crate::boss_bjorn_defs::start_boss_target_switching(ctx, monster.monster_id);
         },
-        BossType::Agna => {
-            // Initialize Agna Phase 2 boss AI with summoning circles, target switching, and flamethrower
+        BossType::Claudia => {
+            // Initialize Claudia Phase 2 boss AI with summoning circles, target switching, and flamethrower
+            crate::monster_ai_defs::initialize_phase2_boss_ai(ctx, monster.monster_id);
+        },
+        BossType::Simon => {
+            // Initialize Claudia Phase 2 boss AI with summoning circles, target switching, and flamethrower
+            crate::monster_ai_defs::initialize_phase2_boss_ai(ctx, monster.monster_id);
+        },
+        BossType::Jorge => {
+            // Initialize Claudia Phase 2 boss AI with summoning circles, target switching, and flamethrower
             crate::monster_ai_defs::initialize_phase2_boss_ai(ctx, monster.monster_id);
         },
     }
@@ -309,18 +320,18 @@ pub fn handle_boss_defeated(ctx: &ReducerContext) {
     
     // Cleanup all boss-related scheduled attacks if there was a boss
     if game_state.boss_monster_id != 0 {
-        crate::boss_ender_defs::cleanup_ender_claw_spawning(ctx, game_state.boss_monster_id);
+        crate::boss_bjorn_defs::cleanup_ender_claw_spawning(ctx, game_state.boss_monster_id);
         // Clean up EnderScythe attack schedules that might still be active
-        crate::boss_ender_defs::cleanup_ender_scythe_schedules(ctx, game_state.boss_monster_id);
+        crate::boss_bjorn_defs::cleanup_ender_scythe_schedules(ctx, game_state.boss_monster_id);
         // Clean up Imp attack schedules if the boss was an Imp
         crate::monster_attacks_def::cleanup_imp_attack_schedule(ctx, game_state.boss_monster_id);
         // Clean up ChaosBall and VoidZone attack schedules for Phase 2 boss
-        crate::boss_ender_defs::cleanup_chaos_ball_schedules(ctx, game_state.boss_monster_id);
-        crate::boss_ender_defs::cleanup_void_zone_schedules(ctx, game_state.boss_monster_id);
+        crate::boss_bjorn_defs::cleanup_chaos_ball_schedules(ctx, game_state.boss_monster_id);
+        crate::boss_bjorn_defs::cleanup_void_zone_schedules(ctx, game_state.boss_monster_id);
         // Clean up boss target switching schedules for Phase 2 boss
-        crate::boss_ender_defs::cleanup_boss_target_switching(ctx, game_state.boss_monster_id);
-        // Clean up Agna boss attack schedules (magic circles, flamethrower, fire orbs)
-        crate::boss_agna_defs::cleanup_agna_ai_schedules(ctx, game_state.boss_monster_id);
+        crate::boss_bjorn_defs::cleanup_boss_target_switching(ctx, game_state.boss_monster_id);
+        // Clean up Claudia boss attack schedules (magic circles, flamethrower, fire orbs)
+        crate::boss_claudia_defs::cleanup_agna_ai_schedules(ctx, game_state.boss_monster_id);
     }
     
     // Reset game state
@@ -413,7 +424,7 @@ pub fn update_boss_monster_id(ctx: &ReducerContext, monster_id: u32) {
     // Check if this is a boss monster (Phase 1 of any boss type)
     if monster.bestiary_id == MonsterType::BossEnderPhase1 ||
        monster.bestiary_id == MonsterType::BossAgnaPhase1 {
-        let boss_name = if monster.bestiary_id == MonsterType::BossEnderPhase1 { "Ender" } else { "Agna" };
+        let boss_name = if monster.bestiary_id == MonsterType::BossEnderPhase1 { "Björn" } else { "Claudia" };
         log::info!("BOSS {} PHASE 1 CREATED: Updating game state with boss_monster_id={}", boss_name, monster_id);
         
         // Get game state
@@ -454,7 +465,7 @@ pub fn spawn_boss_phase_two_delayed(ctx: &ReducerContext, timer: BossPhase2Timer
     spawn_boss_phase_two(ctx, timer.position);
 }
 
-// Debug reducer to set the boss type (client keys: 4 = Ender, 5 = Agna)
+// Debug reducer to set the boss type (client keys: 4 = Björn, 5 = Claudia)
 #[reducer]
 pub fn debug_set_boss_type(ctx: &ReducerContext, client_key: u32) {
     // Check admin access first
@@ -462,16 +473,18 @@ pub fn debug_set_boss_type(ctx: &ReducerContext, client_key: u32) {
     
     // Convert client key to boss type
     let boss_type = match client_key {
-        4 => BossType::Ender,
-        5 => BossType::Agna,
+        4 => BossType::Björn,
+        5 => BossType::Claudia,
         _ => {
-            panic!("debug_set_boss_type: Invalid client key {}. Use 4 for Ender or 5 for Agna.", client_key);
+            panic!("debug_set_boss_type: Invalid client key {}. Use 4 for Björn or 5 for Claudia.", client_key);
         }
     };
     
     let boss_name = match boss_type {
-        BossType::Ender => "Ender",
-        BossType::Agna => "Agna",
+        BossType::Björn => "Björn",
+        BossType::Claudia => "Claudia",
+        BossType::Simon => "Simon",
+        BossType::Jorge => "Jorge",
     };
     log::info!("Debug: Setting boss type to {} ({:?}) from client key {}", boss_name, boss_type, client_key);
     
