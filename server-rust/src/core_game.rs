@@ -28,7 +28,7 @@ fn cleanup_monster_damage_records(ctx: &ReducerContext, monster_id: u32) {
 }
 
 // Helper function to damage a monster
-// Returns true if the monster died, false otherwise
+// Returns true if the monster died was the final boss, false otherwise
 pub fn damage_monster(ctx: &ReducerContext, monster_id: u32, damage_amount: u32) -> bool {
     // Find the monster
     let monster_opt = ctx.db.monsters().monster_id().find(&monster_id);
@@ -135,7 +135,7 @@ pub fn damage_monster(ctx: &ReducerContext, monster_id: u32, damage_amount: u32)
                         log::info!("ERROR: Game state still shows phase 1 after transition!");
                     }
 
-                    return true;
+                    return false;
                 } else if game_state.boss_phase == 2 {
                     // Phase 2 boss defeated - VICTORY!
                     log::info!("BOSS PHASE 2 DEFEATED! GAME COMPLETE!");
@@ -156,6 +156,7 @@ pub fn damage_monster(ctx: &ReducerContext, monster_id: u32, damage_amount: u32)
                     // Handle boss defeated (true victory!)
                     crate::boss_system::handle_boss_defeated(ctx);
                     
+                    //Return true to signal that the boss was defeated
                     return true;
                 } else {
                     log::info!("WARNING: Boss killed but phase is unexpected: {}", game_state.boss_phase);
@@ -181,7 +182,7 @@ pub fn damage_monster(ctx: &ReducerContext, monster_id: u32, damage_amount: u32)
             ctx.db.monsters_boid().monster_id().delete(&monster_id);
         }
         
-        true
+        false
     } else {
         // Monster is still alive, update with reduced HP
         monster.hp -= damage_amount;
@@ -560,7 +561,10 @@ pub fn game_tick(ctx: &ReducerContext, _timer: GameTickTimer) {
 
     process_player_attack_collisions_spatial_hash(ctx);
 
-    crate::monsters_def::commit_monster_damage(ctx);
+    let _boss_defeated = crate::monsters_def::commit_monster_damage(ctx);
+    if _boss_defeated {
+        return;
+    }
 
     commit_player_damage(ctx);
 

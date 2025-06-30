@@ -812,16 +812,20 @@ fn record_monster_hit_by_attack(ctx: &ReducerContext, monster_id: u32, attack_en
     //Log::info(&format!("Recorded monster {} hit by attack {}, cleanup scheduled in {}ms", monster_id, attack_entity_id, cleanup_delay));
 }
 
-pub fn commit_monster_damage(ctx: &ReducerContext) {
+pub fn commit_monster_damage(ctx: &ReducerContext) -> bool {
     let cache = get_collision_cache();
     for i in 0..cache.monster.cached_count_monsters {
         let i = i as usize;
         let monster_id = cache.monster.keys_monster[i];
         let damage = cache.monster.damage_to_monster[i];
         if damage > 0.0 {
-            let _monster_killed = crate::core_game::damage_monster(ctx, monster_id, damage as u32);
+            let _boss_defeated = crate::core_game::damage_monster(ctx, monster_id, damage as u32);
+            if _boss_defeated {
+                return true;
+            }
         }
     }
+    return false;
 }
 
 // Reducer to clean up a monster hit record
