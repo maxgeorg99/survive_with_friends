@@ -23,7 +23,11 @@ public enum AttackType
     HolyHammer,     // Sword + Shield
     MagicDagger,    // Knives + Wand
     ThrowingShield, // Knives + Shield
-    EnergyOrb       // Wand + Shield
+    EnergyOrb,       // Wand + Shield
+    HealingWand,
+    Joint,
+    Volleyball,
+    ThunderHorn
 }
 
 public static partial class Module
@@ -186,15 +190,15 @@ public static partial class Module
             attack_id = 1,
             attack_type = AttackType.Sword,
             name = "Sword Slash",
-            cooldown = 600,          
-            duration = 340,          
-            projectiles = 1,          
-            fire_delay = 40,          
-            speed = 800,              
-            piercing = true,         
-            radius = 32,             
-            damage = 4,        
-            armor_piercing = 0       
+            cooldown = 600,
+            duration = 340,
+            projectiles = 1,
+            fire_delay = 40,
+            speed = 800,
+            piercing = true,
+            radius = 32,
+            damage = 4,
+            armor_piercing = 0
         });
 
         // Wand - magic projectile
@@ -203,15 +207,15 @@ public static partial class Module
             attack_id = 2,
             attack_type = AttackType.Wand,
             name = "Magic Bolt",
-            cooldown = 400,           
-            duration = 1000,          
-            projectiles = 1,          
-            fire_delay = 20,          
-            speed = 800,                
-            piercing = false,         
-            radius = 20,              
-            damage = 2,              
-            armor_piercing = 10       
+            cooldown = 400,
+            duration = 1000,
+            projectiles = 1,
+            fire_delay = 20,
+            speed = 800,
+            piercing = false,
+            radius = 20,
+            damage = 2,
+            armor_piercing = 10
         });
 
         // Knives - multiple projectiles in burst
@@ -220,15 +224,15 @@ public static partial class Module
             attack_id = 3,
             attack_type = AttackType.Knives,
             name = "Throwing Knives",
-            cooldown = 1200,          
-            duration = 800,          
-            projectiles = 4,          
-            fire_delay = 1,           
-            speed = 1000,               
-            piercing = false,         
-            radius = 15,              
-            damage = 2,              
-            armor_piercing = 0       
+            cooldown = 1200,
+            duration = 800,
+            projectiles = 4,
+            fire_delay = 1,
+            speed = 1000,
+            piercing = false,
+            radius = 15,
+            damage = 2,
+            armor_piercing = 0
         });
 
         // Shield - defensive area attack
@@ -237,17 +241,17 @@ public static partial class Module
             attack_id = 4,
             attack_type = AttackType.Shield,
             name = "Shield Bash",
-            cooldown = 5000,          
-            duration = 4250,         
-            projectiles = 2,          
-            fire_delay = 0,           
-            speed = 200,              
-            piercing = true,         
-            radius = 32,             
-            damage = 4,             
-            armor_piercing = 10       
+            cooldown = 5000,
+            duration = 4250,
+            projectiles = 2,
+            fire_delay = 0,
+            speed = 200,
+            piercing = true,
+            radius = 32,
+            damage = 4,
+            armor_piercing = 10
         });
-        
+
         // Football - bouncing projectile with knockback
         ctx.Db.attack_data.Insert(new AttackData
         {
@@ -262,7 +266,7 @@ public static partial class Module
             piercing = false,         // Goes through enemies
             radius = 24,             // Medium size
             damage = 4,              // Moderate damage
-            armor_piercing = 2       
+            armor_piercing = 2
         });
 
         // Cards - spread attack
@@ -271,15 +275,15 @@ public static partial class Module
             attack_id = 6,
             attack_type = AttackType.Cards,
             name = "Card Throw",
-            cooldown = 600,          
-            duration = 800,          
+            cooldown = 600,
+            duration = 800,
             projectiles = 3,         // Multiple cards
-            fire_delay = 50,         
-            speed = 700,             
-            piercing = false,        
-            radius = 16,             
-            damage = 3,              
-            armor_piercing = 2       
+            fire_delay = 50,
+            speed = 700,
+            piercing = false,
+            radius = 16,
+            damage = 3,
+            armor_piercing = 2
         });
 
         // Dumbbell - falling aerial attack
@@ -296,7 +300,7 @@ public static partial class Module
             piercing = true,         // Goes through enemies
             radius = 40,             // Large impact radius
             damage = 8,              // High damage
-            armor_piercing = 4       
+            armor_piercing = 4
         });
 
         // Garlic - aura attack
@@ -313,171 +317,32 @@ public static partial class Module
             piercing = true,         // Hits all enemies in range
             radius = 100,            // Large aura radius
             damage = 2,              // Low damage but constant
-            armor_piercing = 1       
+            armor_piercing = 1
         });
 
-        // Boss attack IDs use 21-30
-        // Boss Standard Bolt - for Simon's spread attack
+        // Thunder Horn - long range instant strike
         ctx.Db.attack_data.Insert(new AttackData
         {
-            attack_id = 21,
-            attack_type = AttackType.BossBolt, 
-            name = "Boss Standard Bolt",
-            cooldown = 10000,      // Example cooldown for Simon's attack sequence
-            duration = 1000,      // How long each bolt lasts
-            projectiles = 1,      // This AttackData defines a single bolt
-            fire_delay = 0,       
-            speed = 850,          // Speed of the bolt
-            piercing = false,
-            radius = 10,          // Radius of the bolt
-            damage = 0,           // Damage per bolt
-            armor_piercing = 3
+            attack_id = 17,
+            attack_type = AttackType.ThunderHorn,
+            name = "Thunder Horn",
+            cooldown = 3000,           // Long cooldown (3 seconds)
+            duration = 200,            // Very short duration (0.2 seconds)
+            projectiles = 1,           // Single target initially
+            fire_delay = 0,            // Instant burst
+            speed = 0,                 // 0 speed - instant strike at target location
+            piercing = true,           // Strikes through armor
+            radius = 48,               // Moderate radius
+            damage = 15,               // Big damage
+            armor_piercing = 15        // Good armor penetration
         });
 
-        // Boss Jorge Bolt - unique projectile for Jorge
+        //Volleyball - bouncing projectile
         ctx.Db.attack_data.Insert(new AttackData
         {
-            attack_id = 22,
-            attack_type = AttackType.BossJorgeBolt,
-            name = "Jorge Bolt",
-            cooldown = 1000,           // Faster fire rate
-            duration = 2000,           // Flies longer
-            projectiles = 1,
-            fire_delay = 0,
-            speed = 950,               // Slightly faster
-            piercing = false,
-            radius = 10,               // Smaller
-            damage = 7,                // Slightly more damage
-            armor_piercing = 5
-        });
-
-        // Boss Björn Bolt - unique homing projectile for Björn
-        ctx.Db.attack_data.Insert(new AttackData
-        {
-            attack_id = 23,
-            attack_type = AttackType.BossBjornBolt,
-            name = "Björn Homing Bolt",
-            cooldown = 1800,           // Medium fire rate
-            duration = 2500,           // Flies longer
-            projectiles = 1,
-            fire_delay = 0,
-            speed = 800,               // Homing, so a bit slower
-            piercing = false,
-            radius = 12,               // Medium size
-            damage = 8,                // More damage
-            armor_piercing = 5
-        });
-
-        // Monster attacks use IDs 31-40
-        // Worm Spit - weak projectile attack
-        ctx.Db.attack_data.Insert(new AttackData
-        {
-            attack_id = 31,
-            attack_type = AttackType.WormSpit,
-            name = "Worm Spit",
-            cooldown = 8000,           // Slow attack speed (8 seconds)
-            duration = 1500,           // How long the projectile stays active
-            projectiles = 1,           // One projectile at a time
-            fire_delay = 0,
-            speed = 500,               // Medium speed
-            piercing = false,          // Doesn't pierce through targets
-            radius = 12,               // Small size
-            damage = 2,                // Very low damage
-            armor_piercing = 0         // No armor piercing
-        });
-
-        // Scorpion Sting - short range projectile with poison effect
-        ctx.Db.attack_data.Insert(new AttackData
-        {
-            attack_id = 32,
-            attack_type = AttackType.ScorpionSting,
-            name = "Scorpion Sting",
-            cooldown = 4000,           // Slower
-            duration = 800,            // Shorter duration than worm spit
-            projectiles = 1,           // One projectile at a time
-            fire_delay = 0,
-            speed = 400,               // Slower
-            piercing = false,          // Doesn't pierce through targets
-            radius = 10,               // Smaller size
-            damage = 1,                // Lower damage (poison effect is the main threat)
-            armor_piercing = 0         // No armor piercing
-        });
-
-        // Combined weapons use IDs 11-20
-        // Shuriken - combines Sword and Knives properties
-        ctx.Db.attack_data.Insert(new AttackData
-        {
-            attack_id = 11,
-            attack_type = AttackType.Shuriken,
-            name = "Shuriken Toss",
-            cooldown = 700,          // Medium cooldown
-            duration = 600,          // Shorter duration
-            projectiles = 1,         
-            fire_delay = 100,        // Delay between shurikens
-            speed = 900,             // Fast speed
-            piercing = true,         // Pierces through enemies
-            radius = 18,             // Medium radius
-            damage = 15,              // Moderate damage
-            armor_piercing = 3       
-        });
-
-        // Fire Sword - combines Sword and Wand properties
-        ctx.Db.attack_data.Insert(new AttackData
-        {
-            attack_id = 12,
-            attack_type = AttackType.FireSword,
-            name = "Fire Sword Slash",
-            cooldown = 800,          // Medium cooldown
-            duration = 700,          // Medium duration
-            projectiles = 1,         // Single fiery slash
-            fire_delay = 0,          // No delay, instant hit
-            speed = 1000,            // Very fast
-            piercing = true,         // Pierces through enemies
-            radius = 30,             // Medium radius
-            damage = 25,              // Moderate damage
-            armor_piercing = 4       
-        });
-
-        // Holy Hammer - combines Sword and Shield properties
-        ctx.Db.attack_data.Insert(new AttackData
-        {
-            attack_id = 13,
-            attack_type = AttackType.HolyHammer,
-            name = "Holy Hammer Throw",
-            cooldown = 1200,         // Slower cooldown
-            duration = 800,          // Medium duration
-            projectiles = 1,         // Single hammer smash
-            fire_delay = 0,          // No delay, instant hit
-            speed = 700,             // Medium speed
-            piercing = true,        // Does not pierce, blunt force
-            radius = 35,             // Large radius
-            damage = 15,             // High damage
-            armor_piercing = 5       
-        });
-
-        // Magic Dagger - combines Knives and Wand properties
-        ctx.Db.attack_data.Insert(new AttackData
-        {
-            attack_id = 14,
-            attack_type = AttackType.MagicDagger,
-            name = "Magic Dagger Throw",
-            cooldown = 500,          // Fast cooldown
-            duration = 2000,          // Short duration
-            projectiles = 1,         // Burst of 2 daggers
-            fire_delay = 50,         // Quick delay between daggers
-            speed = 400,             // Fast speed
-            piercing = true,
-            radius = 12,
-            damage = 20,
-            armor_piercing = 2       
-        });
-
-        // Throwing Shield - combines Knives and Shield properties
-        ctx.Db.attack_data.Insert(new AttackData
-        {
-            attack_id = 15,
-            attack_type = AttackType.ThrowingShield,
-            name = "Throwing Shield Bash",
+            attack_id = 18,
+            attack_type = AttackType.Volleyball,
+            name = "Volleyball",
             cooldown = 1000,
             duration = 700,
             projectiles = 1,
@@ -489,21 +354,38 @@ public static partial class Module
             armor_piercing = 3       
         });
 
-        // Energy Orb - combines Wand and Shield properties
+        // Healing Wand - heals players or dmg monsters when hit
         ctx.Db.attack_data.Insert(new AttackData
         {
-            attack_id = 16,
-            attack_type = AttackType.EnergyOrb,
-            name = "Energy Orb Blast",
-            cooldown = 1500,
-            duration = 800,
-            projectiles = 4,
-            fire_delay = 0,
-            speed = 800,
-            piercing = false,
-            radius = 40,
-            damage = 8,
-            armor_piercing = 4       
+            attack_id = 19,
+            attack_type = AttackType.HealingWand,
+            name = "Healing Wand",
+            cooldown = 400,           
+            duration = 1000,          
+            projectiles = 1,          
+            fire_delay = 20,          
+            speed = 800,                
+            piercing = false,         
+            radius = 20,              
+            damage = 2,              
+            armor_piercing = 10       
+        });
+
+        // Joint - combines Stoner and Healer properties
+        ctx.Db.attack_data.Insert(new AttackData
+        {
+            attack_id = 20,
+            attack_type = AttackType.Joint,
+            name = "Joint",
+            cooldown = 1000,          // Moderate cooldown
+            duration = 5000,          // Long duration for healing effect
+            projectiles = 1,          // Single joint smoke
+            fire_delay = 0,           // Instant effect
+            speed = 0,                // Stationary
+            piercing = true,          // Affects all players in range
+            radius = 100,             // Large radius for healing
+            damage = 1,               // Low damage to monsters
+            armor_piercing = 0        // No armor piercing needed
         });
 
         Log.Info("Attack data initialized successfully.");

@@ -1,25 +1,37 @@
 import Phaser from 'phaser';
 import SpacetimeDBClient from '../SpacetimeDBClient';
-import { Player, Entity, PlayerClass, UpdatePlayerDirection, Monsters, MonsterType, Bestiary, Account, DeadPlayer, EventContext, ErrorContext, UpgradeOptionData } from "../autobindings";
-import { Identity } from '@clockworklabs/spacetimedb-sdk';
-import { MONSTER_ASSET_KEYS, MONSTER_SHADOW_OFFSETS, MONSTER_MAX_HP } from '../constants/MonsterConfig';
+import { Player, Entity, PlayerClass, Account, EventContext, ErrorContext, UpgradeOptionData } from "../autobindings";
 import MonsterManager from '../managers/MonsterManager';
 import MonsterSpawnerManager from '../managers/MonsterSpawnerManager';
 import { GameEvents } from '../constants/GameEvents';
 import { AttackManager } from '../managers/AttackManager';
+import { MonsterAttackManager } from '../managers/MonsterAttackManager';
 import GemManager from '../managers/GemManager';
-import { createPlayerDamageEffect, createMonsterDamageEffect, createScorpionPoisonEffect } from '../utils/DamageEffects';
+import LootCapsuleManager from '../managers/LootCapsuleManager';
+import BossAgnaManager from '../managers/BossAgnaManager';
+import LoreScrollManager from '../managers/LoreScrollManager';
+import { createPlayerDamageEffect, createMonsterDamageEffect } from '../utils/DamageEffects';
 import UpgradeUI from '../ui/UpgradeUI';
 import PlayerHUD from '../ui/PlayerHUD';
 import BossTimerUI from '../ui/BossTimerUI';
+import MonsterCounterUI from '../ui/MonsterCounterUI';
+import VoidChestUI from '../ui/VoidChestUI';
+import SoulUI from '../ui/SoulUI';
+import Minimap, { MinimapElements } from '../ui/Minimap';
+import MusicManager from '../managers/MusicManager';
+import { DebugManager } from '../managers/DebugManager'; // Added import for DebugManager
+import GameplayOptionsUI from '../ui/GameplayOptionsUI';
+import { getSoundVolume } from '../managers/VolumeSettings';
+import { getPlayerShadowConfig, getPlayerClassName } from '../constants/PlayerCharacterConfig';
 
 // Constants
 const PLAYER_SPEED = 200;
 const PLAYER_ASSET_KEY = 'player_fighter_1';
 const GRASS_ASSET_KEY = 'grass_background';
 const SHADOW_ASSET_KEY = 'shadow';
-const SHADOW_OFFSET_Y = 14; // Vertical offset for the shadow (Increased)
-const SHADOW_ALPHA = 0.4; // Transparency for the shadow
+// Legacy shadow constants - now using PlayerCharacterConfig for class-specific values
+const SHADOW_OFFSET_Y = 14; // Vertical offset for the shadow (Increased) - used as fallback
+const SHADOW_ALPHA = 0.4; // Transparency for the shadow - used as fallback
 const INTERPOLATION_SPEED = 0.2; // Speed of interpolation (0-1, higher is faster)
 const DIRECTION_UPDATE_RATE = 100; // Send direction updates every 100ms
 const PLAYER_NAME_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
@@ -32,7 +44,7 @@ const PLAYER_NAME_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
 // Health bar configuration
 const HEALTH_BAR_WIDTH = 50;
 const HEALTH_BAR_HEIGHT = 6;
-const HEALTH_BAR_OFFSET_Y = 18 // Position health bar above the exp bar
+const HEALTH_BAR_OFFSET_Y = 18; // Position health bar above the exp bar
 // EXP bar configuration
 const EXP_BAR_WIDTH = 50;
 const EXP_BAR_HEIGHT = 4;
@@ -53,27 +65,18 @@ const HEALTH_BG_DEPTH_OFFSET = 1; // Just behind health bar but in front of spri
 const HEALTH_BAR_DEPTH_OFFSET = 1.1; // In front of background but behind name
 const EXP_BG_DEPTH_OFFSET = 1; // Same as health background
 const EXP_BAR_DEPTH_OFFSET = 1.1; // Same as health bar
+const UI_DEPTH = 100000; // Extremely high depth to ensure UI stays on top of all game elements
 
 // Movement and position constants
 const POSITION_CORRECTION_THRESHOLD = 49; // Distance squared threshold for position correction (7 pixels)
 
-// Asset keys for different player classes
-const CLASS_ASSET_KEYS: Record<string, string> = {
-    "Fighter": 'player_fighter',
-    "Rogue": 'player_rogue',
-    "Mage": 'player_mage',
-    "Paladin": 'player_paladin',
-    "Football": 'class_football',
-    "Gambler": 'class_gambler',
-    "Athlete": 'class_athlete',
-    "Gourmand": 'class_chef',
-    "Valkyrie": 'class_valkyrie',
-    "Volleyball": 'class_volleyball'
-};
+// Note: Player class asset keys and shadow configurations are now in PlayerCharacterConfig.ts
 
 export default class GameScene extends Phaser.Scene {
     private spacetimeDBClient: SpacetimeDBClient;
     private gameEvents: Phaser.Events.EventEmitter;
+    private musicManager!: MusicManager;
+    private debugManager!: DebugManager; // Added DebugManager property
     private playerInitialized = false;
     private localPlayerSprite: Phaser.Physics.Arcade.Sprite | null = null;
     private localPlayerNameText: Phaser.GameObjects.Text | null = null;
@@ -91,8 +94,18 @@ export default class GameScene extends Phaser.Scene {
     // Add attack manager for player attack visualization
     private attackManager: AttackManager | null = null;
     
+    // Add monster attack manager for monster attack visualization
+    private monsterAttackManager: MonsterAttackManager | null = null;
+    
     // Add gem manager for gem visualization
     private gemManager: GemManager | null = null;
+    
+    // Add loot capsule manager for loot capsule visualization
+    private lootCapsuleManager: LootCapsuleManager | null = null;
+    
+    // Add boss Claudia manager for magic circle visualization
+    private bossAgnaManager: BossAgnaManager | null = null;
+    private loreScrollManager: LoreScrollManager | null = null;
     
     // Add upgrade UI manager
     private upgradeUI: UpgradeUI | null = null;
@@ -104,23 +117,13 @@ export default class GameScene extends Phaser.Scene {
     private bossTimerUI: BossTimerUI | null = null;
     
     // Add minimap
-    private minimap: {
-        container: Phaser.GameObjects.Container;
-        background: Phaser.GameObjects.Rectangle;
-        playerDot: Phaser.GameObjects.Arc;
-        otherPlayerDots: Map<number, Phaser.GameObjects.Arc>;
-        border: Phaser.GameObjects.Rectangle;
-    } | null = null;
+    private minimap: Minimap | null = null;
+    private minimapElements: MinimapElements | null = null;
     
     private localPlayerId: number = 0;
     
     private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null;
-    private wasdKeys: {
-        W: Phaser.Input.Keyboard.Key;
-        A: Phaser.Input.Keyboard.Key;
-        S: Phaser.Input.Keyboard.Key;
-        D: Phaser.Input.Keyboard.Key;
-    } | null = null;
+
     private backgroundTile: Phaser.GameObjects.TileSprite | null = null;
     private isPlayerDataReady = false;
     
@@ -128,7 +131,6 @@ export default class GameScene extends Phaser.Scene {
     private lastDirectionUpdateTime: number = 0;
     private serverPosition: Phaser.Math.Vector2 | null = null;
     private currentDirection: Phaser.Math.Vector2 = new Phaser.Math.Vector2(0, 0);
-    private isMoving: boolean = false;
 
     // Add a property to track tap target
     private tapTarget: Phaser.Math.Vector2 | null = null;
@@ -145,6 +147,27 @@ export default class GameScene extends Phaser.Scene {
 
     private gameOver: boolean = false;
 
+    // Add predicted position for client-side prediction
+    private predictedPosition: Phaser.Math.Vector2 | null = null;
+
+    // Add monster counter UI
+    private monsterCounterUI: MonsterCounterUI | null = null;
+
+    // Dark haze overlay for boss fights
+    private bossHazeOverlay: Phaser.GameObjects.Rectangle | null = null;
+
+    // Add VoidChest UI for alerts and directional arrow
+    private voidChestUI: VoidChestUI | null = null;
+
+    // Add Soul UI for guiding players to their soul
+    private soulUI: SoulUI | null = null;
+
+    // Add Options UI for settings
+    private optionsUI: GameplayOptionsUI | null = null;
+
+    // Track if player damage sound is currently playing
+    private isPlayerDamageSoundPlaying: boolean = false;
+
     constructor() {
         super('GameScene');
         this.spacetimeDBClient = (window as any).spacetimeDBClient;
@@ -152,77 +175,170 @@ export default class GameScene extends Phaser.Scene {
         console.log("GameScene constructor called.");
     }
 
+    // Helper functions for boss type checking
+    private isBoss(monsterType: string): boolean {
+        return monsterType === 'BossEnderPhase1' || monsterType === 'BossEnderPhase2' ||
+               monsterType === 'BossAgnaPhase1' || monsterType === 'BossAgnaPhase2';
+    }
+
+    private isBossPhase1(monsterType: string): boolean {
+        return monsterType === 'BossEnderPhase1' || monsterType === 'BossAgnaPhase1';
+    }
+
+    private isBossPhase2(monsterType: string): boolean {
+        return monsterType === 'BossEnderPhase2' || monsterType === 'BossAgnaPhase2';
+    }
+
     preload() {
         console.log("GameScene preload started.");
         // Load assets from the /assets path (copied from public)
-        this.load.image('class_fighter', 'assets/class_fighter_1.png');
-        this.load.image('class_rogue', 'assets/class_rogue_1.png');
-        this.load.image('class_mage', 'assets/class_mage_1.png');
-        this.load.image('class_paladin', 'assets/class_paladin_1.png');
-        this.load.image('class_football', 'assets/class_football_1.png');
-        this.load.image('class_gambler', 'assets/class_gambler_1.png');
-        this.load.image('class_athlete', 'assets/class_athlete_1.png');
-        this.load.image('class_chef', 'assets/class_chef_1.png');
-        this.load.image('class_valkyrie', 'assets/class_valkyrie.png');
-        this.load.image('class_volleyball', 'assets/class_volleyball.png');
-        this.load.image(GRASS_ASSET_KEY, 'assets/grass.png');
-        this.load.image(SHADOW_ASSET_KEY, 'assets/shadow.png');
+        this.load.image('player_fighter', '/assets/class_fighter_1.png');
+        this.load.image('player_rogue', '/assets/class_rogue_1.png');
+        this.load.image('player_mage', '/assets/class_mage_1.png');
+        this.load.image('player_paladin', '/assets/class_paladin_1.png');
+        this.load.image('player_valkyrie', '/assets/class_valkyrie_1.png');
+        this.load.image(GRASS_ASSET_KEY, '/assets/grass.png');
+        this.load.image(SHADOW_ASSET_KEY, '/assets/shadow.png');
         
         // Load monster assets
-        this.load.image('monster_rat', 'assets/monster_rat.png');
-        this.load.image('monster_slime', 'assets/monster_slime.png');
-        this.load.image('monster_orc', 'assets/monster_orc.png');
-        this.load.image('monster_worm', 'assets/monster_worm.png');
-        this.load.image('monster_wolf', 'assets/monster_wolf.png');
-        this.load.image('monster_scorpion', 'assets/monster_scorpion.png');
-        this.load.image('monster_spawn_indicator', 'assets/monster_spawn_indicator.png');
+        this.load.image('monster_rat', '/assets/monster_rat.png');
+        this.load.image('monster_slime', '/assets/monster_slime.png');
+        this.load.image('monster_orc', '/assets/monster_orc.png');
+        this.load.image('monster_imp', '/assets/monster_imp.png');
+        this.load.image('monster_zombie', '/assets/monster_zombie.png');
+        this.load.image('monster_bat', '/assets/monster_bat.png');
+        this.load.image('monster_void_claw', '/assets/monster_void_claw.png');
+        this.load.image('monster_spawn_indicator', '/assets/monster_spawn_indicator.png');
         
         // Load boss monster assets
-        this.load.image('final_boss_jorge_phase_1', 'assets/final_boss_jorge_phase_1.png');
-        this.load.image('final_boss_jorge_phase_2', 'assets/final_boss_jorge_phase_2.png');
-        this.load.image('final_boss_bjorn_phase_1', 'assets/final_boss_phase_björn_1.png');
-        this.load.image('final_boss_bjorn_phase_2', 'assets/final_boss_phase_björn_2.png');
-        this.load.image('final_boss_simon_phase_1', 'assets/final_boss_simon_phase_1.png');
-        this.load.image('final_boss_simon_phase_2', 'assets/final_boss_simon_phase_2.png');
+        this.load.image('final_boss_phase1', '/assets/final_boss_phase_1.png');
+        this.load.image('final_boss_phase2', '/assets/final_boss_phase_2.png');
+        this.load.image('boss_agna_1', '/assets/boss_agna_1.png');
+        this.load.image('boss_agna_2', '/assets/boss_agna_2.png');
+        this.load.image('agna_flamethrower', '/assets/agna_flamethrower.png');
+        this.load.image('agna_magic_circle', '/assets/agna_magic_circle.png');
+        this.load.image('agna_big_circle', '/assets/agna_big_circle.png');
+        this.load.image('agna_circle_orb', '/assets/agna_circle_orb.png');
+        this.load.image('agna_candle', '/assets/agna_candle.png');
+        this.load.image('agna_candle_off', '/assets/agna_candle_off.png');
+        this.load.image('agna_big_circle', '/assets/agna_big_circle.png');
+        
+        // Load special monster assets
+        this.load.image('treasure_chest', '/assets/treasure_chest.png');
+        
+        // Load structure assets
+        this.load.image('structure_crate', '/assets/structure_crate.png');
+        this.load.image('structure_tree', '/assets/structure_tree.png');
+        this.load.image('structure_statue', '/assets/structure_statue.png');
         
         // Load attack assets
-        this.load.image('attack_sword', 'assets/attack_sword.png');
-        this.load.image('attack_wand', 'assets/attack_wand.png');
-        this.load.image('attack_knife', 'assets/attack_knife.png');
-        this.load.image('attack_shield', 'assets/attack_shield.png');
-        this.load.image('attack_football', 'assets/attack_football.png');
-        this.load.image('attack_cards', 'assets/attack_cards.png');
-        this.load.image('attack_dumbbell', 'assets/attack_dumbbell.png');
-        this.load.image('attack_garlic', 'assets/attack_garlic.png');
-        this.load.image('attack_boss_jorge', 'assets/attack_boss_jorge.png');
-        this.load.image('attack_boss_bjorn', 'assets/attack_boss_björn.png');
-        this.load.image('attack_boss_simon', 'assets/attack_boss_simon.png');
-        this.load.image('attack_spit', 'assets/attack_spit.png');
-        this.load.image('attack_sting', 'assets/attack_sting.png');
-
-        // Load combined weapon assets
-        this.load.image('attack_shuriken', 'assets/attack_shuriken.png');
-        this.load.image('attack_fire_sword', 'assets/attack_fire_sword.png');
-        this.load.image('attack_holy_hammer', 'assets/attack_holy_hammer.png');
-        this.load.image('attack_magic_dagger', 'assets/attack_magic_dagger.png');
-        this.load.image('attack_throwing_shield', 'assets/attack_throwing_shield.png');
-        this.load.image('attack_energy_orb', 'assets/attack_energy_orb.png');
-
+        this.load.image('attack_sword', '/assets/attack_sword.png');
+        this.load.image('attack_wand', '/assets/attack_wand.png');
+        this.load.image('attack_knife', '/assets/attack_knife.png');
+        this.load.image('attack_shield', '/assets/attack_shield.png');
+        this.load.image('attack_horn', '/assets/attack_horn.png');
+        this.load.image('attack_lightning', '/assets/attack_lightning.png');
+        
+        // Load monster attack assets
+        this.load.image('monster_attack_firebolt', '/assets/monster_attack_firebolt.png');
+        this.load.image('void_scythe', '/assets/void_scythe.png');
+        this.load.image('void_bolt', '/assets/void_bolt.png');
+        this.load.image('void_zone', '/assets/void_zone.png');
+        this.load.image('void_ball', '/assets/void_ball.png');
+        this.load.image('claw_spawn', '/assets/claw_spawn.png');
+        
+        // Also load class icons with ClassSelectScene keys to keep them cached
+        this.load.image('fighter_icon', '/assets/attack_sword.png');
+        this.load.image('rogue_icon', '/assets/attack_knife.png');
+        this.load.image('mage_icon', '/assets/attack_wand.png');
+        this.load.image('paladin_icon', '/assets/attack_shield.png');
+        this.load.image('valkyrie_icon', '/assets/attack_horn.png');
+        
         // Load upgrade assets
-        this.load.image('card_blank', 'assets/card_blank.png');
-        this.load.image('upgrade_maxHP', 'assets/upgrade_maxHP.png');
-        this.load.image('upgrade_regenHP', 'assets/upgrade_regenHP.png');
-        this.load.image('upgrade_speed', 'assets/upgrade_speed.png');
-        this.load.image('upgrade_armor', 'assets/upgrade_armor.png');
+        this.load.image('card_blank', '/assets/card_blank.png');
+        this.load.image('upgrade_maxHP', '/assets/upgrade_maxHP.png');
+        this.load.image('upgrade_regenHP', '/assets/upgrade_regenHP.png');
+        this.load.image('upgrade_speed', '/assets/upgrade_speed.png');
+        this.load.image('upgrade_armor', '/assets/upgrade_armor.png');
         
         // Load gem assets
-        this.load.image('gem_1', 'assets/gem_1.png');
-        this.load.image('gem_2', 'assets/gem_2.png');
-        this.load.image('gem_3', 'assets/gem_3.png');
-        this.load.image('gem_4', 'assets/gem_4.png');
+        this.load.image('gem_1', '/assets/gem_1.png');
+        this.load.image('gem_2', '/assets/gem_2.png');
+        this.load.image('gem_3', '/assets/gem_3.png');
+        this.load.image('gem_4', '/assets/gem_4.png');
+        this.load.image('soul', '/assets/soul.png');
+        this.load.image('fries', '/assets/fries.png');
+        this.load.image('dice', '/assets/dice.png');
+        this.load.image('booster_pack', '/assets/booster_pack.png');
+        this.load.image('lore_scroll', '/assets/lore_scroll.png');
+        
+        // Load loot capsule assets
+        this.load.image('void_capsule', '/assets/void_capsule.png');
+        
+        // Load VoidChest UI assets
+        this.load.image('void_arrow', '/assets/void_arrow.png');
+        
+        // Load Soul UI assets
+        this.load.image('soul_arrow', '/assets/soul_arrow.png');
         
         // Load a white pixel for particle effects
-        this.load.image('white_pixel', 'assets/white_pixel.png');
+        this.load.image('white_pixel', '/assets/white_pixel.png');
+        
+        // Load assets for options menu
+        this.load.image('icon_music', '/assets/icon_music.png');
+        this.load.image('icon_sound', '/assets/icon_sound.png');
+        this.load.image('button_pvp_on', '/assets/button_pvp_on.png');
+        this.load.image('button_pvp_off', '/assets/button_pvp_off.png');
+        
+        // Load audio files for gameplay sounds
+        this.load.audio('attack_fire', '/assets/sounds/attack_fire.mp3');
+        this.load.audio('attack_soft', '/assets/sounds/attack_soft.mp3');
+        this.load.audio('monster_death', '/assets/sounds/monster_death.mp3');
+        this.load.audio('level_up', '/assets/sounds/level_up.mp3');
+        
+        // Load lore scroll voice files (viberians_1 to viberians_13)
+        for (let i = 1; i <= 13; i++) {
+            this.load.audio(`viberians_${i}`, `/assets/sounds/viberians_${i}.mp3`);
+        }
+        this.load.audio('voice_level', '/assets/sounds/voice_level.mp3');
+        this.load.audio('voice_chest', '/assets/sounds/voice_chest.mp3');
+        this.load.audio('alert_event', '/assets/sounds/alert_event.mp3');
+        this.load.audio('player_damage', '/assets/sounds/player_damage.mp3');
+        this.load.audio('void_capsule_spawned', '/assets/sounds/void_capsule_spawned.mp3');
+        this.load.audio('void_capsule_lands', '/assets/sounds/void_capsule_lands.mp3');
+        this.load.audio('void_chest_destroyed', '/assets/sounds/void_chest_destroyed.mp3');
+        this.load.audio('structure_broken', '/assets/sounds/structure_broken.mp3');
+        this.load.audio('upgrade_bar_fill', '/assets/sounds/upgrade_bar_fill.mp3');
+        
+        // Load boss audio files
+        this.load.audio('boss_chase_cue', '/assets/sounds/boss_chase_cue.mp3');
+        this.load.audio('boss_bullet_cue', '/assets/sounds/boss_bullet_cue.mp3');
+        this.load.audio('boss_teleport_cue', '/assets/sounds/boss_teleport_cue.mp3');
+        this.load.audio('boss_vanish', '/assets/sounds/boss_vanish.mp3');
+        this.load.audio('boss_appear', '/assets/sounds/boss_appear.mp3');
+        this.load.audio('boss_roar', '/assets/sounds/boss_roar.mp3');
+        this.load.audio('chaos_bolt_fire', '/assets/sounds/chaos_bolt_fire.mp3');
+        this.load.audio('boss_teleport_attack', '/assets/sounds/boss_teleport_attack.mp3');
+        this.load.audio('boss_transform', '/assets/sounds/boss_transform.mp3');
+        this.load.audio('voice_boss', '/assets/sounds/voice_boss.mp3');
+        this.load.audio('voice_boss_2', '/assets/sounds/voice_boss_2.mp3');
+        this.load.audio('voice_transform', '/assets/sounds/voice_transform.mp3');
+        this.load.audio('ui_click', '/assets/sounds/ui_click.mp3');
+        this.load.audio('voice_agna_1', '/assets/sounds/narrator_agna_1.mp3');
+        this.load.audio('voice_agna_2', '/assets/sounds/narrator_agna_2.mp3');
+        this.load.audio('agna_phase_2', '/assets/sounds/agna_phase_2.mp3');
+        this.load.audio('agna_burned', '/assets/sounds/agna_burned.mp3');
+        this.load.audio('agna_closing_in', '/assets/sounds/agna_closing_in.mp3');
+        this.load.audio('agna_fire_orb', '/assets/sounds/agna_fire_orb.mp3');
+        this.load.audio('agna_flamethrower', '/assets/sounds/agna_flamethrower.mp3');
+        this.load.audio('agna_match', '/assets/sounds/agna_match.mp3');
+        this.load.audio('agna_wick', '/assets/sounds/agna_wick.mp3');
+        this.load.audio('agna_extinguished', '/assets/sounds/agna_extinguished.mp3');
+        this.load.audio('agna_ritual_fail', '/assets/sounds/agna_ritual_fail.mp3');
+        this.load.audio('agna_laugh', '/assets/sounds/agna_laugh.mp3');
+        
+        // Load thunder sound for Thunder Horn attack
+        this.load.audio('thunder', '/assets/sounds/thunder.mp3');
         
         // Add error handling for file loading errors
         this.load.on('loaderror', (fileObj: any) => {
@@ -237,17 +353,43 @@ export default class GameScene extends Phaser.Scene {
             console.log("player_rogue:", this.textures.exists('player_rogue'));
             console.log("player_mage:", this.textures.exists('player_mage'));
             console.log("player_paladin:", this.textures.exists('player_paladin'));
+            console.log("player_valkyrie:", this.textures.exists('player_valkyrie'));
             console.log("monster_rat:", this.textures.exists('monster_rat'));
             console.log("monster_slime:", this.textures.exists('monster_slime'));
             console.log("monster_orc:", this.textures.exists('monster_orc'));
-            console.log("monster_wolf:", this.textures.exists('monster_wolf'));
-            console.log("monster_worm:", this.textures.exists('monster_worm'));
+            console.log("monster_imp:", this.textures.exists('monster_imp'));
+            console.log("monster_zombie:", this.textures.exists('monster_zombie'));
+            console.log("monster_bat:", this.textures.exists('monster_bat'));
+            console.log("monster_void_claw:", this.textures.exists('monster_void_claw'));
+            console.log("structure_crate:", this.textures.exists('structure_crate'));
+            console.log("structure_tree:", this.textures.exists('structure_tree'));
+            console.log("structure_statue:", this.textures.exists('structure_statue'));
+            console.log("void_ball:", this.textures.exists('void_ball'));
             console.log("attack_sword:", this.textures.exists('attack_sword'));
             console.log("attack_wand:", this.textures.exists('attack_wand'));
             console.log("attack_knife:", this.textures.exists('attack_knife'));
             console.log("attack_shield:", this.textures.exists('attack_shield'));
+            console.log("void_arrow:", this.textures.exists('void_arrow'));
+            console.log("soul_arrow:", this.textures.exists('soul_arrow'));
             console.log(GRASS_ASSET_KEY + ":", this.textures.exists(GRASS_ASSET_KEY));
             console.log(SHADOW_ASSET_KEY + ":", this.textures.exists(SHADOW_ASSET_KEY));
+            
+            // Check audio assets
+            console.log("Audio assets loaded:");
+            console.log("attack_fire:", this.cache.audio.exists('attack_fire'));
+            console.log("attack_soft:", this.cache.audio.exists('attack_soft'));
+            console.log("monster_death:", this.cache.audio.exists('monster_death'));
+            console.log("level_up:", this.cache.audio.exists('level_up'));
+            console.log("voice_level:", this.cache.audio.exists('voice_level'));
+            console.log("voice_chest:", this.cache.audio.exists('voice_chest'));
+            console.log("player_damage:", this.cache.audio.exists('player_damage'));
+            console.log("void_capsule_spawned:", this.cache.audio.exists('void_capsule_spawned'));
+            console.log("void_capsule_lands:", this.cache.audio.exists('void_capsule_lands'));
+            console.log("void_chest_destroyed:", this.cache.audio.exists('void_chest_destroyed'));
+            console.log("structure_broken:", this.cache.audio.exists('structure_broken'));
+            console.log("upgrade_bar_fill:", this.cache.audio.exists('upgrade_bar_fill'));
+            console.log("boss_chase_cue:", this.cache.audio.exists('boss_chase_cue'));
+            console.log("voice_boss:", this.cache.audio.exists('voice_boss'));
         });
         
         console.log("GameScene preload finished. Started asset loading...");
@@ -256,8 +398,20 @@ export default class GameScene extends Phaser.Scene {
     create() {
         console.log("GameScene create started.");
 
-        // Debug: Log all available textures
-        console.log("Available textures:", Object.keys(this.textures.list));
+        // Set the global SoundManager's scene reference
+        const soundManager = (window as any).soundManager;
+        if (soundManager) {
+            soundManager.setScene(this);
+        }
+
+        // Initialize music manager and start main music
+        this.musicManager = new MusicManager(this);
+        this.musicManager.playTrack('main');
+
+        // Play welcome voice when entering the game
+        if (soundManager) {
+            soundManager.playSound('voice_welcome', 1.0);
+        }
 
         // Clean up any lingering UI elements from other scenes
         this.cleanupLingeringUIElements();
@@ -271,58 +425,37 @@ export default class GameScene extends Phaser.Scene {
 
         this.playerInitialized = false;
 
+        this.gameOver = false;
+
         // Setup keyboard input
         this.cursors = this.input.keyboard?.createCursorKeys() ?? null;
         
-        // Setup WASD keys
-        if (this.input.keyboard) {
-            this.wasdKeys = {
-                W: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
-                A: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
-                S: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-                D: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D)
-            };
-            
-            // Add debug key to toggle attack circles (use backtick key)
-            this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.BACKTICK).on('down', this.toggleAttackDebugCircles, this);
-            
-            // Add R key for rerolling upgrades
+        if (this.input.keyboard) 
+        {
             this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R).on('down', this.rerollUpgrades, this);
         }
-        console.log("Keyboard input set up.");
+        console.log("Keyboard input (excluding debug keys) set up.");
 
         // Initialize the boss timer UI
         this.bossTimerUI = new BossTimerUI(this, this.spacetimeDBClient);
         console.log("Boss timer UI initialized.");
         
         // Setup touch input
-        this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-            if (pointer.isDown && this.localPlayerSprite) {
-                this.tapTarget = new Phaser.Math.Vector2(pointer.worldX, pointer.worldY);
-                this.updateTapMarker();
-            }
-        });
-        this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-            if (this.localPlayerSprite) {
-                this.tapTarget = new Phaser.Math.Vector2(pointer.worldX, pointer.worldY);
-                this.updateTapMarker();
-            }
-        });
-        this.input.on('pointerup', () => {
-            // Don't clear tap target, we want to continue moving toward the target
-        });
+        this.setupTouchInput();
         console.log("Touch input set up.");
 
-        // Create tap marker using shape graphics instead of texture
-        // This is more reliable than the texture generation approach
-        // Make the outer circle more transparent (0.3 instead of 0.6)
+        // Create tap marker container
+        const tapMarkerContainer = this.add.container(0, 0);
+        
+        // Create outer circle
         const outerCircle = this.add.circle(0, 0, 32, 0xffffff, 0.3);
-        // Make the inner circle more transparent (0.5 instead of 0.8)
+        
+        // Create inner circle
         const innerCircle = this.add.circle(0, 0, 16, 0x00ffff, 0.5);
         
-        // Create an X using line graphics with reduced alpha
+        // Create an X using line graphics
         const crossGraphics = this.add.graphics();
-        crossGraphics.lineStyle(4, 0xffffff, 0.7); // Reduced alpha from 1.0 to 0.7
+        crossGraphics.lineStyle(4, 0xffffff, 0.7);
         crossGraphics.beginPath();
         crossGraphics.moveTo(-8, -8);
         crossGraphics.lineTo(8, 8);
@@ -331,21 +464,19 @@ export default class GameScene extends Phaser.Scene {
         crossGraphics.closePath();
         crossGraphics.strokePath();
         
-        // Group them all together
-        const container = this.add.container(0, 0, [outerCircle, innerCircle, crossGraphics]);
-        this.tapMarker = container;
+        // Add all elements to the container
+        tapMarkerContainer.add([outerCircle, innerCircle, crossGraphics]);
         
-        if (this.tapMarker) {
-            this.tapMarker.setVisible(false);
-            // Set depth to 0.5 - above floor (0) but below players (1)
-            this.tapMarker.setDepth(0.5);
-            // Add a slight overall alpha to the entire container
-            this.tapMarker.setAlpha(0.8);
-        }
-        console.log("Tap marker set up.");
+        // Set initial state
+        tapMarkerContainer.setVisible(false);
+        tapMarkerContainer.setDepth(100); // Just above grass (0) but below everything else
+        
+        // Store the container
+        this.tapMarker = tapMarkerContainer;
+        console.log("Tap marker created", { marker: this.tapMarker });
 
         // Background - Make it large enough to feel like a world
-        const worldSize = 20000; // World size - 10x larger
+        const worldSize = 6400; // World size - 10x larger
         this.backgroundTile = this.add.tileSprite(0, 0, worldSize, worldSize, GRASS_ASSET_KEY)
             .setOrigin(0, 0)
             .setScrollFactor(1); // Scroll with the camera
@@ -361,6 +492,11 @@ export default class GameScene extends Phaser.Scene {
         // Initialize AttackManager
         this.attackManager = new AttackManager(this, this.spacetimeDBClient);
         
+        // Initialize DebugManager AFTER AttackManager is created
+        this.debugManager = new DebugManager(this, this.spacetimeDBClient, this.attackManager);
+        this.debugManager.initializeDebugKeys();
+        console.log("DebugManager initialized in GameScene.");
+        
         // Initialize MonsterSpawnerManager
         this.monsterSpawnerManager = new MonsterSpawnerManager(this, this.spacetimeDBClient);
 
@@ -368,6 +504,42 @@ export default class GameScene extends Phaser.Scene {
         this.createMinimap();
 
         this.spacetimeDBClient.sdkConnection?.reducers.updateLastLogin();
+
+        // Initialize monster counter UI
+        this.monsterCounterUI = new MonsterCounterUI(this);
+
+        // Initialize VoidChest UI for alerts and directional arrow
+        this.voidChestUI = new VoidChestUI(this, this.spacetimeDBClient);
+
+        // Initialize Soul UI for guiding players to their soul
+        this.soulUI = new SoulUI(this, this.spacetimeDBClient);
+
+        // Set the SoulUI reference on the minimap if it exists
+        if (this.minimap) {
+            this.minimap.setSoulUI(this.soulUI);
+        }
+
+        // Initialize Options UI for settings
+        this.optionsUI = new GameplayOptionsUI(this);
+
+        // Add key listener for toggling monster counter UI
+        this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.D).on('down', () => {
+            if (this.monsterCounterUI) {
+                this.monsterCounterUI.toggleVisible();
+            }
+        });
+
+        // Add key listener for toggling options menu
+        this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.O).on('down', () => {
+            if (this.optionsUI) {
+                this.optionsUI.toggle();
+            }
+        });
+
+        // Handle window resize to update UI positions
+        this.scale.on('resize', this.handleResize, this);
+
+        console.log("Game world initialization complete.");
     }
 
     private registerEventListeners() {
@@ -381,13 +553,14 @@ export default class GameScene extends Phaser.Scene {
         this.gameEvents.on(GameEvents.PLAYER_DELETED, this.handlePlayerDeleted, this);
         this.gameEvents.on(GameEvents.PLAYER_DIED, this.handlePlayerDied, this);
         
-        // Entity events
-        this.gameEvents.on(GameEvents.ENTITY_CREATED, this.handleEntityCreated, this);
-        this.gameEvents.on(GameEvents.ENTITY_UPDATED, this.handleEntityUpdated, this);
-        this.gameEvents.on(GameEvents.ENTITY_DELETED, this.handleEntityDeleted, this);
-        
         // Connection events
         this.gameEvents.on(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
+
+        // Monster events for boss music detection
+        this.gameEvents.on(GameEvents.MONSTER_CREATED, this.handleMonsterCreatedForMusic, this);
+
+        // Listen for game state changes to hide haze when boss is defeated
+        this.gameEvents.on(GameEvents.GAME_STATE_UPDATED, this.handleGameStateUpdated, this);
 
         // Add table event handlers for upgrade options
         if (this.spacetimeDBClient.sdkConnection) {
@@ -409,42 +582,77 @@ export default class GameScene extends Phaser.Scene {
 
         if (this.spacetimeDBClient.identity && newAccount.identity.isEqual(this.spacetimeDBClient.identity)) 
         {
-            // Reset game state on rejoin
-            if (this.gameOver) {
-                console.log("Resetting game state after death when rejoining");
-                this.gameOver = false;
-                this.playerInitialized = false;
-                this.isPlayerDataReady = false;
+            console.log("GameScene: Local account updated");
+            
+            // Check if account state changed (this is critical for death transitions)
+            if (oldAccount.state.tag !== newAccount.state.tag) {
+                console.log("GameScene: Account state changed from", oldAccount.state.tag, "to", newAccount.state.tag);
                 
-                // Clear any direction and movement state
-                this.currentDirection.x = 0;
-                this.currentDirection.y = 0;
-                this.isMoving = false;
+                // IMMEDIATELY stop attack manager and disable controls when transitioning away from Playing
+                if (newAccount.state.tag !== 'Playing') {
+                    console.log("GameScene: Account leaving Playing state - stopping attacks and disabling controls");
+                    
+                    // Stop AttackManager immediately to prevent new attacks
+                    if (this.attackManager) {
+                        this.attackManager.shutdown();
+                        this.attackManager = null;
+                    }
+                    
+                    // Stop LootCapsuleManager immediately to prevent lingering sound effects
+                    if (this.lootCapsuleManager) {
+                        this.lootCapsuleManager.shutdown();
+                        this.lootCapsuleManager = null;
+                    }
+                    
+                    // Disable player controls immediately
+                    this.disablePlayerControls();
+                    
+                    // Set game over flag to prevent movement
+                    this.gameOver = true;
+                }
                 
-                // Reset server position to prevent interpolation issues
-                this.serverPosition = null;
+                // If state changed to Dead, transition to DeadScene
+                if (newAccount.state.tag === 'Dead') {
+                    console.log("GameScene: Account state is now Dead - transitioning to DeadScene");
+                    this.scene.start('DeadScene');
+                    return; // Exit early since we're transitioning scenes
+                }
                 
-                // Clear any tap targets
-                this.tapTarget = null;
-                if (this.tapMarker) {
-                    this.tapMarker.visible = false;
+                // If state changed to Winner, transition to VictoryScene
+                if (newAccount.state.tag === 'Winner') {
+                    console.log("GameScene: Account state is now Winner - transitioning to VictoryScene");
+                    this.scene.start('VictoryScene');
+                    return; // Exit early since we're transitioning scenes
+                }
+                
+                // If state changed away from Playing to something else, handle appropriately
+                if (newAccount.state.tag !== 'Playing') {
+                    console.log("GameScene: Account state is no longer Playing - transitioning to LoadingScene");
+                    this.scene.start('LoadingScene', { 
+                        message: 'Evaluating account state...', 
+                        waitingFor: 'account_evaluation'
+                    });
+                    return; // Exit early since we're transitioning scenes
                 }
             }
             
-            // Continue with normal initialization
-            console.log("Local account updated: ", newAccount);
-            
-            // Initialize game world if not already initialized
-            if (!this.playerInitialized) {
-                this.initializeGameWorld(ctx);
-            } else {
-                console.log("Game world already initialized, not reinitializing");
+            //Check if the login time was updated
+            if (oldAccount.lastLogin.microsSinceUnixEpoch !== newAccount.lastLogin.microsSinceUnixEpoch) {
+                //If we're getting this, then that means we sent the updateLastLogin reducer
+                //in the create, and are now getting the response.
+                //So we should initialize the game world at this point since
+                //hopefully all the data is ready.
+                console.log("New login detected, initializing game world: " + oldAccount.lastLogin.microsSinceUnixEpoch + " -> " + newAccount.lastLogin.microsSinceUnixEpoch);
+                this.initializeGameWorld(ctx);  
+            }
+            else
+            {
+                console.log("GameScene: Local account updated, but no new login detected");
             }
         }
         else
         {
-            //not local player
-            console.log("Other account updated: ", newAccount);
+            console.log("GameScene: Another user has logged on: " + newAccount.identity.toString());
         }
     }
 
@@ -463,15 +671,46 @@ export default class GameScene extends Phaser.Scene {
     }
 
     private handlePlayerUpdated(ctx: EventContext, oldPlayer: Player, newPlayer: Player, isLocalPlayer: boolean) {
-        //console.log("Player updated:", newPlayer.playerId, "Local:", isLocalPlayer);
-        
-        // If local player and unspent upgrades increased, check for upgrade options
-        if (isLocalPlayer && newPlayer.unspentUpgrades > oldPlayer.unspentUpgrades) {
-            console.log("Player level up: upgrade points available:", newPlayer.unspentUpgrades);
+        if (!oldPlayer || !newPlayer) {
+            console.warn("Received player update with missing data, skipping");
+            return;
+        }
+
+        // If local player and level increased, show level up effect
+        if (isLocalPlayer && newPlayer.level > oldPlayer.level) {
+            console.log("Player level up: from level", oldPlayer.level, "to level", newPlayer.level);
+            
+            // Play level up sound effects
+            const soundManager = (window as any).soundManager;
+            if (soundManager) {
+                soundManager.playSound('level_up', 0.8);
+                soundManager.playSound('voice_level', 1.0);
+            }
             
             // Play level up effect
             if (this.localPlayerSprite) {
                 this.createLevelUpEffect(this.localPlayerSprite);
+            }
+        }
+        
+        // If local player and unspent upgrades increased, check for upgrade options
+        if (isLocalPlayer && newPlayer.unspentUpgrades > oldPlayer.unspentUpgrades) {
+            console.log("Player gained upgrade points:", newPlayer.unspentUpgrades);
+
+            // Initialize upgrade UI if not already done
+            if (!this.upgradeUI && this.localPlayerId > 0) {
+                this.upgradeUI = new UpgradeUI(this, this.spacetimeDBClient, this.localPlayerId);
+            }
+            
+            // Check for upgrade options
+            if (this.upgradeUI) {
+                const playerUpgrades = Array.from(ctx.db.upgradeOptions.iter())
+                    .filter(option => option.playerId === this.localPlayerId);
+                
+                if (playerUpgrades.length > 0) {
+                    console.log("Setting upgrade options:", playerUpgrades);
+                    this.upgradeUI.setUpgradeOptions(playerUpgrades);
+                }
             }
         }
 
@@ -483,23 +722,44 @@ export default class GameScene extends Phaser.Scene {
         }
     }
 
-    private handlePlayerDeleted(ctx: EventContext, player: Player, isLocalPlayer: boolean = false) 
-    {
+    private handlePlayerDeleted(ctx: EventContext, player: Player, isLocalPlayer: boolean = false) {
+        if (!player) {
+            console.warn("Received player delete with missing data, skipping");
+            return;
+        }
+
         if (isLocalPlayer) {
-            // (Local player deletion is handled by handlePlayerDied)
-            console.log("Local player deleted event received");
+            // Handle local player deletion (death)
+            this.handlePlayerDied(ctx, player);
         } else {
-            // Find and remove the other player
-            console.log("Other player deleted:", player);
-            
+            // Handle other player deletion
             this.removeOtherPlayer(player.playerId);
         }
     }
 
     private handlePlayerDied(ctx: EventContext, player: Player) {
+        if (!player) {
+            console.warn("Received player death with missing data, skipping");
+            return;
+        }
+
         console.log("Player died event received in GameScene");
         // This is our local player that died
         console.log("Local player died:", player);
+        
+        // IMMEDIATELY stop attack manager to prevent new attacks
+        if (this.attackManager) {
+            console.log("GameScene: Player died - immediately stopping AttackManager");
+            this.attackManager.shutdown();
+            this.attackManager = null;
+        }
+        
+        // IMMEDIATELY stop loot capsule manager to prevent lingering sound effects
+        if (this.lootCapsuleManager) {
+            console.log("GameScene: Player died - immediately stopping LootCapsuleManager");
+            this.lootCapsuleManager.shutdown();
+            this.lootCapsuleManager = null;
+        }
         
         // Clear any upgrade UI that may be open
         if (this.upgradeUI) {
@@ -507,52 +767,58 @@ export default class GameScene extends Phaser.Scene {
             this.upgradeUI.hide();
         }
         
-        // Get the dead player record to check if this is a true survivor victory
-        const deadPlayerOpt = ctx.db?.deadPlayers.playerId.find(player.playerId);
-        console.log("Dead player record:", deadPlayerOpt);
-        
-        // Check specifically for the isTrueSurvivor property with detailed logging
-        let isTrueSurvivor = false;
-        
-        if (deadPlayerOpt) {
-            isTrueSurvivor = deadPlayerOpt.isTrueSurvivor;
-        }
-        
-        console.log("Final isTrueSurvivor value:", isTrueSurvivor);
-        
         //play death animation
         var center = this.localPlayerSprite?.getCenter();
         if (center) {
             this.createDeathEffects(center.x, center.y);
         }
         
-        // Show appropriate death screen
-        if (isTrueSurvivor) {
-            console.log("Showing TRUE SURVIVOR victory screen!");
-            this.showVictoryScreen();
-        } else {
-            console.log("Showing regular death screen");
-            this.showDeathScreen();
-        }
-
+        // Disable controls immediately 
+        this.disablePlayerControls();
+        
+        // Set game over flag
         this.gameOver = true;
+        
+        // Note: Scene transitions are now handled by the state-based system
+        // When the server sets the account state to Dead or Winner, 
+        // handleAccountUpdated will automatically transition to the appropriate scene
+        console.log("Player death effects complete. Waiting for server to update account state...");
     }
 
     private handleConnectionLost(_ctx:ErrorContext) {
         console.log("Connection lost event received in GameScene");
-        // Show a connection lost message
-        const { width, height } = this.scale;
-        const connectionLostText = this.add.text(width/2, height/2, 'CONNECTION LOST\nPlease refresh the page', {
-            fontFamily: 'Arial',
-            fontSize: '32px',
-            color: '#ffffff',
-            align: 'center',
-            stroke: '#000000',
-            strokeThickness: 6
-        }).setOrigin(0.5);
-        
-        // Disable controls
         this.disablePlayerControls();
+    }
+    
+    private handleMonsterCreatedForMusic(ctx: any, monster: any): void {
+        // Check if this is a boss monster
+        if (monster.bestiaryId && monster.bestiaryId.tag) {
+            const monsterType = monster.bestiaryId.tag;
+            //console.log("Monster created:", monsterType);
+            
+            // If a boss monster spawns, switch to boss music and show dark haze
+            if (this.isBoss(monsterType)) {
+                console.log("Boss detected! Switching to boss music and showing dark haze");
+                if (this.musicManager) {
+                    this.musicManager.playTrack('boss');
+                }
+                this.showBossHaze();
+            }
+            
+            // If a VoidChest spawns, show the alert
+            if (monsterType === 'VoidChest') {
+                console.log("VoidChest detected! Showing alert and playing voice");
+                if (this.voidChestUI) {
+                    this.voidChestUI.showVoidChestAlert();
+                }
+                // Play voice chest sound effect and alert event sound
+                const soundManager = (window as any).soundManager;
+                if (soundManager) {
+                    soundManager.playSound('voice_chest', 1.0);
+                    soundManager.playSound('alert_event', 0.8);
+                }
+            }
+        }
     }
 
     initializeGameWorld(ctx: EventContext) {
@@ -617,11 +883,65 @@ export default class GameScene extends Phaser.Scene {
             console.log("Existing attacks checked");
         }
 
+        // Create and initialize the monster attack manager
+        this.monsterAttackManager = new MonsterAttackManager(this, this.spacetimeDBClient);
+        this.monsterAttackManager.initializeMonsterAttacks(ctx);
+
         // Create and initialize the gem manager
         this.gemManager = new GemManager(this, this.spacetimeDBClient);
         this.gemManager.initializeGems(ctx);
 
+        // Create and initialize the loot capsule manager
+        this.lootCapsuleManager = new LootCapsuleManager(this, this.spacetimeDBClient);
+        this.lootCapsuleManager.initializeLootCapsules(ctx);
+
+        // Create and initialize the boss Claudia manager
+        this.bossAgnaManager = new BossAgnaManager(this, this.spacetimeDBClient);
+        this.loreScrollManager = new LoreScrollManager(this, this.spacetimeDBClient);
+        console.log("BossAgnaManager created successfully");
+        this.bossAgnaManager.initializeMagicCircles(ctx);
+        console.log("LoreScrollManager created successfully");
+        this.loreScrollManager.initializeLoreScrolls(ctx);
+        console.log("BossAgnaManager initialized with existing magic circles");
+
+        // Ensure appropriate music is playing based on current game state
+        if (this.musicManager) {
+            console.log("Setting appropriate music after game world initialization");
+            this.musicManager.stopCurrentTrack(); // Clear any existing state
+            
+            // Check if there's an active boss fight - if so, play boss music instead of main
+            const hasBoss = this.checkForActiveBoss(ctx);
+            if (hasBoss) {
+                console.log("Active boss detected during initialization - playing boss music");
+                this.musicManager.playTrack('boss');
+                this.showBossHaze(); // Also show boss haze
+            } else {
+                console.log("No active boss - playing main music");
+                this.musicManager.playTrack('main');
+            }
+        }
+
         console.log("Game world initialization complete.");
+    }
+    
+    // Helper method to check if there's an active boss fight during initialization
+    private checkForActiveBoss(ctx: EventContext): boolean {
+        if (!ctx.db) {
+            return false;
+        }
+        
+        // Check if there are any boss monsters present
+        for (const monster of ctx.db.monsters.iter()) {
+            if (monster.bestiaryId && monster.bestiaryId.tag) {
+                const monsterType = monster.bestiaryId.tag;
+                if (this.isBoss(monsterType)) {
+                    console.log(`Found active boss during initialization: ${monsterType} (ID: ${monster.monsterId})`);
+                    return true;
+                }
+            }
+        }
+        
+        return false;
     }
 
     /**
@@ -640,37 +960,38 @@ export default class GameScene extends Phaser.Scene {
         
         // Initialize PlayerHUD for reroll count display
         this.playerHUD = new PlayerHUD(this, this.spacetimeDBClient, this.localPlayerId);
-        
-        // Get the entity data for this player
-        const entityData = ctx.db?.entity.entityId.find(player.entityId);
-        if (!entityData) {
-            console.log("Entity data not found for local player, adding to pending players");
-            this.pendingPlayers.set(player.entityId, player);
-            return;
-        }
 
-        this.attackManager?.setLocalPlayerRadius(entityData.radius);
-
-        console.log("Found entity data for player:", entityData);
+        this.attackManager?.setLocalPlayerRadius(player.radius);
 
         // Set up the player sprite based on their class
         const spriteKey = this.getClassSpriteKey(player.playerClass);
         
         // Create the player sprite
         if (!this.localPlayerSprite) {
-            console.log("Creating new player sprite at position:", entityData.position);
-            this.localPlayerSprite = this.physics.add.sprite(entityData.position.x, entityData.position.y, spriteKey);
-            this.localPlayerSprite.setDepth(BASE_DEPTH + entityData.position.y);
+            console.log("Creating new player sprite at position:", player.position);
+            this.localPlayerSprite = this.physics.add.sprite(player.position.x, player.position.y, spriteKey);
+            this.localPlayerSprite.setDepth(BASE_DEPTH + player.position.y);
             
-            // Add shadow
-            this.localPlayerShadow = this.add.image(entityData.position.x, entityData.position.y, SHADOW_ASSET_KEY);
-            this.localPlayerShadow.setAlpha(SHADOW_ALPHA);
-            this.localPlayerShadow.setDepth(BASE_DEPTH + entityData.position.y + SHADOW_DEPTH_OFFSET);
+            // Store the entity ID for later reference
+            this.localPlayerSprite.setData('playerId', player.playerId);
+            
+            // Get shadow configuration for this player class
+            const shadowConfig = getPlayerShadowConfig(player.playerClass);
+            
+            // Add shadow with class-specific configuration
+            this.localPlayerShadow = this.add.image(
+                player.position.x + shadowConfig.offsetX, 
+                player.position.y + shadowConfig.offsetY, 
+                SHADOW_ASSET_KEY
+            );
+            this.localPlayerShadow.setAlpha(shadowConfig.alpha);
+            this.localPlayerShadow.setScale(shadowConfig.scale);
+            this.localPlayerShadow.setDepth(BASE_DEPTH + player.position.y + SHADOW_DEPTH_OFFSET);
             
             // Add player name text - Using consistent position calculation with NAME_OFFSET_Y
             this.localPlayerNameText = this.add.text(
-                entityData.position.x, 
-                entityData.position.y - Math.floor(this.localPlayerSprite.height / 2) - NAME_OFFSET_Y, 
+                player.position.x, 
+                player.position.y - Math.floor(this.localPlayerSprite.height / 2) - NAME_OFFSET_Y, 
                 `${player.name} (${player.level})`, 
                 {
                     fontSize: '16px',
@@ -680,11 +1001,11 @@ export default class GameScene extends Phaser.Scene {
                     fontStyle: 'bold'
                 }
             ).setOrigin(0.5);
-            this.localPlayerNameText.setDepth(BASE_DEPTH + entityData.position.y + NAME_DEPTH_OFFSET);
+            this.localPlayerNameText.setDepth(BASE_DEPTH + player.position.y + NAME_DEPTH_OFFSET);
             
             // Create health bar
-            const startX = entityData.position.x;
-            const startY = entityData.position.y;
+            const startX = player.position.x;
+            const startY = player.position.y;
             
             // Health bar background (black)
             const healthBarBackground = this.add.rectangle(
@@ -732,10 +1053,10 @@ export default class GameScene extends Phaser.Scene {
             ).setOrigin(0, 0.5);
             
             // Set appropriate depths
-            healthBarBackground.setDepth(BASE_DEPTH + entityData.position.y + HEALTH_BG_DEPTH_OFFSET);
-            healthBar.setDepth(BASE_DEPTH + entityData.position.y + HEALTH_BAR_DEPTH_OFFSET);
-            expBarBackground.setDepth(BASE_DEPTH + entityData.position.y + EXP_BG_DEPTH_OFFSET);
-            expBar.setDepth(BASE_DEPTH + entityData.position.y + EXP_BAR_DEPTH_OFFSET);
+            healthBarBackground.setDepth(BASE_DEPTH + player.position.y + HEALTH_BG_DEPTH_OFFSET);
+            healthBar.setDepth(BASE_DEPTH + player.position.y + HEALTH_BAR_DEPTH_OFFSET);
+            expBarBackground.setDepth(BASE_DEPTH + player.position.y + EXP_BG_DEPTH_OFFSET);
+            expBar.setDepth(BASE_DEPTH + player.position.y + EXP_BAR_DEPTH_OFFSET);
             
             // Store references to health bar elements and current health values
             this.localPlayerSprite.setData('healthBarBackground', healthBarBackground);
@@ -762,7 +1083,7 @@ export default class GameScene extends Phaser.Scene {
         } else {
             // Update the existing player sprite
             this.localPlayerSprite.setTexture(spriteKey);
-            this.localPlayerSprite.setPosition(entityData.position.x, entityData.position.y);
+            this.localPlayerSprite.setPosition(player.position.x, player.position.y);
             
             // Update health bar if it exists
             const healthBar = this.localPlayerSprite.getData('healthBar');
@@ -770,11 +1091,11 @@ export default class GameScene extends Phaser.Scene {
             
             if (healthBar && healthBarBackground) {
                 // Update health bar position
-                healthBarBackground.x = entityData.position.x;
-                healthBarBackground.y = entityData.position.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
+                healthBarBackground.x = player.position.x;
+                healthBarBackground.y = player.position.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
                 
-                healthBar.x = entityData.position.x - (HEALTH_BAR_WIDTH / 2);
-                healthBar.y = entityData.position.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
+                healthBar.x = player.position.x - (HEALTH_BAR_WIDTH / 2);
+                healthBar.y = player.position.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
                 
                 // Update health bar width
                 const healthPercent = Math.max(0, Math.min(1, player.hp / player.maxHp));
@@ -795,13 +1116,13 @@ export default class GameScene extends Phaser.Scene {
             
             if (expBar && expBarBackground) {
                 // Update exp bar position
-                expBarBackground.x = entityData.position.x;
-                expBarBackground.y = entityData.position.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
+                expBarBackground.x = player.position.x;
+                expBarBackground.y = player.position.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
                 
-                expBar.x = entityData.position.x - (EXP_BAR_WIDTH / 2);
-                expBar.y = entityData.position.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
+                expBar.x = player.position.x - (EXP_BAR_WIDTH / 2);
+                expBar.y = player.position.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
                 
-                // Calculate progress percentage
+                // Calculate exp progress percentage
                 const expProgress = player.expForNextLevel > 0 
                     ? Math.min(1, player.exp / player.expForNextLevel) 
                     : 0;
@@ -823,22 +1144,11 @@ export default class GameScene extends Phaser.Scene {
         this.registry.set('localPlayerSprite', this.localPlayerSprite);
         
         // Store server position for interpolation
-        this.serverPosition = new Phaser.Math.Vector2(entityData.position.x, entityData.position.y);
-        
-        // Store initial direction
-        this.currentDirection.x = entityData.direction.x;
-        this.currentDirection.y = entityData.direction.y;
-        this.isMoving = entityData.isMoving;
+        this.serverPosition = new Phaser.Math.Vector2(player.position.x, player.position.y);
         
         // Mark as initialized
         this.playerInitialized = true;
         this.isPlayerDataReady = true;
-
-        // Remove timer auto-start - it's now checked from database
-        // if (this.bossTimerUI) {
-        //    this.bossTimerUI.startTimer();
-        //    console.log("Boss timer started for testing after player initialization");
-        // }
 
         // Check if player has pending upgrades and initialize the upgrade UI if needed
         if (player.unspentUpgrades > 0) {
@@ -866,6 +1176,21 @@ export default class GameScene extends Phaser.Scene {
      * Update local player attributes when server data changes
      */
     private updateLocalPlayerAttributes(ctx: EventContext, player: Player) {
+        // Check for reroll increase first (before updating anything else)
+        if (this.localPlayerSprite) {
+            const currentRerolls = this.localPlayerSprite.getData('rerolls');
+            if (currentRerolls !== undefined && player.rerolls > currentRerolls) {
+                // Play dice sound when rerolls increase with pitch variation
+                const soundManager = (window as any).soundManager;
+                if (soundManager) {
+                    soundManager.playSoundWithPitch('dice', 0.8, 0.9, 1.1);
+                }
+                console.log(`Player gained reroll(s): ${currentRerolls} -> ${player.rerolls}`);
+            }
+            // Store current rerolls for next comparison
+            this.localPlayerSprite.setData('rerolls', player.rerolls);
+        }
+        
         // Update player name if it changed
         const previousLevel = this.localPlayerNameText ? 
             parseInt(this.localPlayerNameText.text.split('(')[1].split(')')[0]) : player.level;
@@ -886,12 +1211,40 @@ export default class GameScene extends Phaser.Scene {
             
             // Check if health values changed
             if (currentHp !== player.hp || currentMaxHp !== player.maxHp) {
-                // If HP decreased, show damage effect
+                // If HP decreased, show damage effect and play damage sound
                 if (currentHp !== undefined && player.hp < currentHp) {
                     createPlayerDamageEffect(this.localPlayerSprite);
                     
-                    // Check if the damage came from a scorpion
-                    this.checkForScorpionDamage(this.localPlayerSprite);
+                    // Play player damage sound (only if not already playing)
+                    if (!this.isPlayerDamageSoundPlaying) {
+                        this.isPlayerDamageSoundPlaying = true;
+                        
+                        // Use SoundManager for consistent volume control
+                        const soundManager = (window as any).soundManager;
+                        if (soundManager) {
+                            soundManager.playSound('player_damage', 1.0);
+                            
+                            // Reset flag after a short delay (since we can't listen for completion with SoundManager)
+                            this.time.delayedCall(500, () => {
+                                this.isPlayerDamageSoundPlaying = false;
+                            });
+                        } else {
+                            // Fallback to direct Phaser sound - apply global volume multiplier
+                            try {
+                                const adjustedVolume = 1.0 * getSoundVolume();
+                                const safeVolume = adjustedVolume > 0 ? adjustedVolume : 0.001;
+                                
+                                const sound = this.sound.add('player_damage', { volume: safeVolume });
+                                sound.once('complete', () => {
+                                    this.isPlayerDamageSoundPlaying = false;
+                                });
+                                sound.play();
+                            } catch (error) {
+                                console.log("Failed to play player damage sound");
+                                this.isPlayerDamageSoundPlaying = false;
+                            }
+                        }
+                    }
                 }
                 
                 // Update stored values
@@ -939,6 +1292,12 @@ export default class GameScene extends Phaser.Scene {
                     
                     // Briefly flash the exp bar when gaining exp
                     if (currentExp !== undefined && player.exp > currentExp) {
+                        // Play exp gain sound effect for local player only with pitch variation
+                        const soundManager = (window as any).soundManager;
+                        if (soundManager) {
+                            soundManager.playSoundWithPitch('exp_gem', 0.7, 0.9, 1.1);
+                        }
+                        
                         this.tweens.add({
                             targets: expBar,
                             fillColor: 0x00ffff, // Bright cyan
@@ -968,6 +1327,11 @@ export default class GameScene extends Phaser.Scene {
                             repeat: -1,
                             duration: 500,
                             onUpdate: () => {
+                                // Check if sprite still exists before accessing it
+                                if (!this.localPlayerSprite || !this.localPlayerSprite.active) {
+                                    return;
+                                }
+                                
                                 // Create cycling colors for more visible effect
                                 const t = Math.sin(this.time.now / 200) * 0.5 + 0.5;
                                 const color1 = new Phaser.Display.Color(255, 255, 255);
@@ -978,7 +1342,7 @@ export default class GameScene extends Phaser.Scene {
                                     100,
                                     Math.floor(t * 100)
                                 );
-                                this.localPlayerSprite?.setTint(Phaser.Display.Color.GetColor(color.r, color.g, color.b));
+                                this.localPlayerSprite.setTint(Phaser.Display.Color.GetColor(color.r, color.g, color.b));
                             }
                         });
                         this.localPlayerSprite.setData('graceTween', graceTween);
@@ -1006,14 +1370,20 @@ export default class GameScene extends Phaser.Scene {
         }
         
         // Get the latest entity data
-        const entityData = ctx.db?.entity.entityId.find(player.entityId);
-        if (entityData && this.serverPosition) {
-            this.serverPosition.set(entityData.position.x, entityData.position.y);
+        if (this.serverPosition) {
+            this.serverPosition.set(player.position.x, player.position.y);
+            
+            // Update local player PvP indicator position
+            const pvpIndicator = this.localPlayerSprite?.getData('pvpIndicator') as Phaser.GameObjects.Arc;
+            if (pvpIndicator) {
+                pvpIndicator.setPosition(this.serverPosition.x, this.serverPosition.y);
+                pvpIndicator.setDepth(BASE_DEPTH + this.serverPosition.y - 0.5);
+            }
         }
-        if(entityData)
-        {
-            this.attackManager?.setLocalPlayerRadius(entityData.radius);
-        }
+        this.attackManager?.setLocalPlayerRadius(player.radius);
+        
+        // Update local player PvP indicator based on PvP status
+        this.updateLocalPlayerPvpIndicator(player.pvp);
     }
     
     /**
@@ -1104,293 +1474,36 @@ export default class GameScene extends Phaser.Scene {
         });
     }
 
-    // Helper function to handle entity updates and move corresponding sprites
-    handleEntityUpdate(ctx: EventContext, entityData: Entity) {
-        // First check if this is a monster entity through the monster manager
-        const wasMonsterEntity = this.monsterManager?.handleEntityUpdate(ctx, entityData);
-        if (wasMonsterEntity) {
-            // If it was a monster entity, we're done
-            return;
-        }
-        
-        // Get local player EntityId by first getting account, then player
-        let localPlayerEntityId: number | undefined = undefined;
-        try {
-            if (this.spacetimeDBClient?.identity) 
-            {
-                // Get account by identity
-                const localAccount = ctx.db?.account.identity.find(
-                    this.spacetimeDBClient.identity
-                );
-                
-                if (localAccount && localAccount.currentPlayerId > 0) {
-                    // Get player by player_id from account
-                    const localPlayer = ctx.db?.player.playerId.find(
-                        localAccount.currentPlayerId
-                    );
-                    
-                    if (localPlayer) {
-                        localPlayerEntityId = localPlayer.entityId;
-                    }
-                }
-            }
-        } catch (error) {
-            console.error("Error getting local player entity ID:", error);
-        }
-        
-        // Check if this entity update is for the local player
-        if (localPlayerEntityId === entityData.entityId) {
-            // If local player sprite doesn't exist yet, create it now
-            if (!this.localPlayerSprite) {
-                const startX = Math.floor(entityData.position.x);
-                const startY = Math.floor(entityData.position.y);
-                
-                // Get local player data for the name
-                let playerName = 'Player';
-                let playerClass = PlayerClass.Fighter; // Default class
-                let playerLevel = 1; // Default level
-                let playerMaxHp = 100; // Default max HP
-                let playerHp = 100; // Default HP
-                let playerExp = 0; // Default EXP
-                let playerExpForNextLevel = 100; // Default EXP for next level
-                
-                try {
-                    if (this.spacetimeDBClient?.identity) {
-                        // Get account by identity
-                        const localAccount = ctx.db?.account.identity.find(
-                            this.spacetimeDBClient.identity
-                        );
-                        
-                        if (localAccount && localAccount.currentPlayerId > 0) {
-                            // Get player by player_id from account
-                            const localPlayer = ctx.db?.player.playerId.find(
-                                localAccount.currentPlayerId
-                            );
-                            
-                            if (localPlayer) {
-                                if (localPlayer.name) {
-                                    playerName = localPlayer.name;
-                                }
-                                if (localPlayer.playerClass) {
-                                    playerClass = localPlayer.playerClass;
-                                }
-                                if (localPlayer.level) {
-                                    playerLevel = localPlayer.level;
-                                }
-                                if (localPlayer.maxHp) {
-                                    playerMaxHp = localPlayer.maxHp;
-                                }
-                                if (localPlayer.hp) {
-                                    playerHp = localPlayer.hp;
-                                }
-                                if (localPlayer.exp !== undefined) {
-                                    playerExp = localPlayer.exp;
-                                }
-                                if (localPlayer.expForNextLevel) {
-                                    playerExpForNextLevel = localPlayer.expForNextLevel;
-                                }
-                            }
-                        }
-                    }
-                } catch (error) {
-                    console.error("Error getting player data:", error);
-                }
-                
-                // Get class-specific sprite key
-                const classKey = this.getClassSpriteKey(playerClass);
-                this.localPlayerSprite = this.physics.add.sprite(startX, startY, classKey);
-                
-                // Use Y position for depth instead of fixed value
-                const initialDepth = BASE_DEPTH + startY;
-                this.localPlayerNameText = this.add.text(startX, startY - Math.floor(this.localPlayerSprite.height / 2) - NAME_OFFSET_Y, 
-                    `${playerName} (${playerLevel})`, PLAYER_NAME_STYLE).setOrigin(0.5, 0.5);
-                this.localPlayerNameText.setDepth(initialDepth + NAME_DEPTH_OFFSET);
-
-                // Create health bar
-                const healthBarBackground = this.add.rectangle(
-                    startX,
-                    startY - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y,
-                    HEALTH_BAR_WIDTH,
-                    HEALTH_BAR_HEIGHT,
-                    0x000000,
-                    0.7
-                ).setOrigin(0.5, 0.5);
-                
-                const healthBar = this.add.rectangle(
-                    startX - (HEALTH_BAR_WIDTH / 2),
-                    startY - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y,
-                    HEALTH_BAR_WIDTH * (playerHp / playerMaxHp),
-                    HEALTH_BAR_HEIGHT,
-                    0x00FF00,
-                    1
-                ).setOrigin(0, 0.5);
-                
-                // Create exp bar
-                const expBarBackground = this.add.rectangle(
-                    startX,
-                    startY - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y,
-                    EXP_BAR_WIDTH,
-                    EXP_BAR_HEIGHT,
-                    0x000000,
-                    0.7
-                ).setOrigin(0.5, 0.5);
-                
-                // Calculate exp progress percentage
-                const expProgress = playerExpForNextLevel > 0 
-                    ? Math.min(1, playerExp / playerExpForNextLevel) 
-                    : 0;
-                
-                // Exp bar foreground (blue)
-                const expBar = this.add.rectangle(
-                    startX - (EXP_BAR_WIDTH / 2),
-                    startY - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y,
-                    EXP_BAR_WIDTH * expProgress,
-                    EXP_BAR_HEIGHT,
-                    0x3498db, // Blue color
-                    1
-                ).setOrigin(0, 0.5);
-                
-                // Set health bar properties with Y-based depth
-                healthBarBackground.setDepth(initialDepth + HEALTH_BG_DEPTH_OFFSET);
-                healthBar.setDepth(initialDepth + HEALTH_BAR_DEPTH_OFFSET);
-                expBarBackground.setDepth(initialDepth + EXP_BG_DEPTH_OFFSET);
-                expBar.setDepth(initialDepth + EXP_BAR_DEPTH_OFFSET);
-                
-                // Store health bar references
-                this.localPlayerSprite.setData('healthBarBackground', healthBarBackground);
-                this.localPlayerSprite.setData('healthBar', healthBar);
-                this.localPlayerSprite.setData('hp', playerHp);
-                this.localPlayerSprite.setData('maxHp', playerMaxHp);
-                
-                // Store exp bar references
-                this.localPlayerSprite.setData('expBarBackground', expBarBackground);
-                this.localPlayerSprite.setData('expBar', expBar);
-                this.localPlayerSprite.setData('exp', playerExp);
-                this.localPlayerSprite.setData('expForNextLevel', playerExpForNextLevel);
-                
-                this.localPlayerShadow = this.add.image(startX, startY + SHADOW_OFFSET_Y, SHADOW_ASSET_KEY)
-                    .setAlpha(SHADOW_ALPHA)
-                    .setDepth(initialDepth + SHADOW_DEPTH_OFFSET);
-
-                // Set collision bounds
-                this.localPlayerSprite.setCollideWorldBounds(true);
-
-                // Camera follow
-                this.cameras.main.startFollow(this.localPlayerSprite, true, 1, 1);
-                this.cameras.main.setRoundPixels(true);
-            }
-            
-            // Update server position for interpolation in update loop
-            if (this.serverPosition === null) {
-                this.serverPosition = new Phaser.Math.Vector2(entityData.position.x, entityData.position.y);
-            } else {
-                this.serverPosition.set(entityData.position.x, entityData.position.y);
-            }
-        } else {
-            // This is an entity update for another player
-            // Find which player owns this entity
-            let playerOwningEntity: Player | null = null;
-            try {
-                // Find player by entity ID
-                playerOwningEntity = ctx.db?.player.entityId.find(entityData.entityId) || null;
-            } catch (error) {
-                console.error("Error finding player for entity:", error);
-            }
-            
-            if (playerOwningEntity) {
-                // Update the other player's position
-                try {
-                    const otherPlayerContainer = this.otherPlayers.get(playerOwningEntity.playerId);
-                    if (otherPlayerContainer) {
-                        this.updateOtherPlayerPosition(playerOwningEntity.playerId, entityData.position.x, entityData.position.y);
-                    } else {
-                        // If we have the entity data but no sprite, we may need to create it
-                        // This can happen if the entity update comes before the player insert
-                        this.pendingPlayers.set(entityData.entityId, playerOwningEntity);
-                    }
-                } catch (error) {
-                    console.error("Error updating other player position:", error);
-                }
-            }
-        }
-    }
-
     // Get class-specific sprite key
     getClassSpriteKey(playerClass: any): string {
-    // Handle case when playerClass is a simple object with a tag property
-    if (playerClass && typeof playerClass === 'object' && 'tag' in playerClass) {
-        const className = playerClass.tag;
-        const iconMap: Record<string, string> = {
-            'Fighter': 'class_fighter',
-            'Rogue': 'class_rogue',
-            'Mage': 'class_mage',
-            'Paladin': 'class_paladin',
-            'Football': 'class_football',
-            'Gambler': 'class_gambler',
-            'Athlete': 'class_athlete',
-            'Gourmand': 'class_chef',
-            'Valkyrie': 'class_valkyrie',
-            'Volleyball': 'class_volleyball'
-        };
-        return iconMap[className] || 'class_fighter';
-    } 
-    
-    // Handle case when playerClass is just a string
-    if (typeof playerClass === 'string') {
-        const iconMap: Record<string, string> = {
-            'Fighter': 'class_fighter',
-            'Rogue': 'class_rogue',
-            'Mage': 'class_mage',
-            'Paladin': 'class_paladin',
-            'Football': 'class_football',
-            'Gambler': 'class_gambler',
-            'Athlete': 'class_athlete',
-            'Gourmand': 'class_chef',
-            'Valkyrie': 'class_valkyrie',
-            'Volleyball': 'class_volleyball'
-        };
-        return iconMap[playerClass] || 'class_fighter';
+        // Use the PlayerCharacterConfig helper function
+        const shadowConfig = getPlayerShadowConfig(playerClass);
+        console.log(`Using sprite key: ${shadowConfig.assetKey} for class: ${getPlayerClassName(playerClass)}`);
+        return shadowConfig.assetKey;
     }
     
-    // Handle case when playerClass is a number (enum value)
-    if (typeof playerClass === 'number') {
-        // Map numeric enum values to class names
-        const classNames = [
-            'class_fighter',  // 0 - Fighter
-            'class_rogue',    // 1 - Rogue
-            'class_mage',     // 2 - Mage
-            'class_paladin',  // 3 - Paladin
-            'class_football', // 4 - Football
-            'class_gambler',  // 5 - Gambler
-            'class_athlete',  // 6 - Athlete
-            'class_chef'      // 7 - Gourmand
-        ];
-        return classNames[playerClass] || 'class_fighter';
-    }
-    
-    // Default fallback
-    console.log("Using default fighter class");
-    return 'class_fighter_1';
-}
-
     // Update the function to properly use the player's playerId
-    createOtherPlayerSprite(playerData: Player, entityData: Entity) {
+    createOtherPlayerSprite(playerData: Player) {
         // Check if we already have this player
         if (this.otherPlayers.has(playerData.playerId)) {
-            this.updateOtherPlayerPosition(playerData.playerId, entityData.position.x, entityData.position.y);
+            this.updateOtherPlayerPosition(playerData.playerId, playerData.position.x, playerData.position.y);
             return;
         }
         
         // Round position on creation
-        const startX = Math.floor(entityData.position.x);
-        const startY = Math.floor(entityData.position.y);
+        const startX = Math.floor(playerData.position.x);
+        const startY = Math.floor(playerData.position.y);
         
         // Calculate depth based on Y position
         const initialDepth = BASE_DEPTH + startY;
         
+        // Get shadow configuration for this player class
+        const shadowConfig = getPlayerShadowConfig(playerData.playerClass);
+        
         // Create new player container with shadow, sprite and name
-        const shadow = this.add.image(0, SHADOW_OFFSET_Y, SHADOW_ASSET_KEY)
-            .setAlpha(SHADOW_ALPHA)
+        const shadow = this.add.image(shadowConfig.offsetX, shadowConfig.offsetY, SHADOW_ASSET_KEY)
+            .setAlpha(shadowConfig.alpha)
+            .setScale(shadowConfig.scale)
             .setDepth(SHADOW_DEPTH_OFFSET); // Relative depth within container
         
         // Get class-specific sprite
@@ -1453,12 +1566,16 @@ export default class GameScene extends Phaser.Scene {
         
         // Create container and add all elements
         const container = this.add.container(startX, startY, [shadow, sprite, text, healthBarBackground, healthBar, expBarBackground, expBar]);
-        container.setData('entityId', entityData.entityId);
+        container.setData('playerId', playerData.playerId);
         container.setData('hp', playerData.hp);
         container.setData('maxHp', playerData.maxHp);
         container.setData('exp', playerData.exp);
         container.setData('expForNextLevel', playerData.expForNextLevel);
         container.setData('sprite', sprite);
+        container.setData('pvp', playerData.pvp);
+        
+        // Add PvP indicator if player has PvP enabled
+        this.createPvpIndicator(container, playerData.pvp);
         
         // Name the elements so we can access them by name
         sprite.setName('sprite');
@@ -1486,19 +1603,24 @@ export default class GameScene extends Phaser.Scene {
                 yoyo: true,
                 repeat: -1,
                 duration: 500,
-                onUpdate: () => {
-                    // Create cycling colors for visible effect
-                    const t = Math.sin(this.time.now / 200) * 0.5 + 0.5;
-                    const color1 = new Phaser.Display.Color(255, 255, 255);
-                    const color2 = new Phaser.Display.Color(200, 200, 200);
-                    const color = Phaser.Display.Color.Interpolate.ColorWithColor(
-                        color1,
-                        color2,
-                        100,
-                        Math.floor(t * 100)
-                    );
-                    sprite.setTint(Phaser.Display.Color.GetColor(color.r, color.g, color.b));
-                }
+                                                        onUpdate: () => {
+                                            // Check if sprite still exists before accessing it
+                                            if (!sprite || !sprite.active) {
+                                                return;
+                                            }
+                                            
+                                            // Create cycling colors for visible effect
+                                            const t = Math.sin(this.time.now / 200) * 0.5 + 0.5;
+                                            const color1 = new Phaser.Display.Color(255, 255, 255);
+                                            const color2 = new Phaser.Display.Color(200, 200, 200);
+                                            const color = Phaser.Display.Color.Interpolate.ColorWithColor(
+                                                color1,
+                                                color2,
+                                                100,
+                                                Math.floor(t * 100)
+                                            );
+                                            sprite.setTint(Phaser.Display.Color.GetColor(color.r, color.g, color.b));
+                                        }
             });
             container.setData('graceTween', graceTween);
             console.log(`Player ${playerData.name} has grace period: ${playerData.spawnGracePeriodRemaining}`);
@@ -1518,18 +1640,10 @@ export default class GameScene extends Phaser.Scene {
             
             // If we don't have a container for this player yet, we need to find its entity
             if (!this.otherPlayers.has(playerData.playerId)) {
-                if (playerData.entityId) {
-                    const entityData = ctx.db?.entity.entityId.find(playerData.entityId);
-                    if (entityData) {
-                        // Create the sprite with the entity data
-                        this.createOtherPlayerSprite(playerData, entityData);
-                    } else {
-                        // If no entity found, we need to wait for the entity update
-                        // Store player data for later
-                        this.pendingPlayers.set(playerData.entityId, playerData);
-                    }
-                }
+                this.createOtherPlayerSprite(playerData);
             } else {
+                this.updateOtherPlayerPosition(playerData.playerId, playerData.position.x, playerData.position.y);
+
                 // Just update the container with any player changes if needed
                 const container = this.otherPlayers.get(playerData.playerId);
                 if (container) {
@@ -1558,9 +1672,6 @@ export default class GameScene extends Phaser.Scene {
                             const sprite = container.getByName('sprite') as Phaser.GameObjects.Sprite;
                             if (sprite) {
                                 createPlayerDamageEffect(sprite);
-                                
-                                // Check if the damage came from a scorpion
-                                this.checkForOtherPlayerScorpionDamage(sprite, container);
                             }
                         }
                         
@@ -1604,6 +1715,8 @@ export default class GameScene extends Phaser.Scene {
                             
                             // Briefly flash the exp bar when gaining exp
                             if (playerData.exp > currentExp) {
+                                // Don't play exp gain sound for other players - only for local player
+                                
                                 this.tweens.add({
                                     targets: expBar,
                                     fillColor: 0x00ffff, // Bright cyan
@@ -1615,6 +1728,13 @@ export default class GameScene extends Phaser.Scene {
                                 });
                             }
                         }
+                    }
+                    
+                    // Update PvP indicator if PvP status changed
+                    const currentPvpStatus = container.getData('pvp') || false;
+                    if (playerData.pvp !== currentPvpStatus) {
+                        container.setData('pvp', playerData.pvp);
+                        this.updatePvpIndicator(container, playerData.pvp);
                     }
                     
                     // Add or remove grace period effect
@@ -1635,6 +1755,11 @@ export default class GameScene extends Phaser.Scene {
                                         repeat: -1,
                                         duration: 500,
                                         onUpdate: () => {
+                                            // Check if sprite still exists before accessing it
+                                            if (!sprite || !sprite.active) {
+                                                return;
+                                            }
+                                            
                                             // Create cycling colors for visible effect
                                             const t = Math.sin(this.time.now / 200) * 0.5 + 0.5;
                                             const color1 = new Phaser.Display.Color(255, 255, 255);
@@ -1675,28 +1800,36 @@ export default class GameScene extends Phaser.Scene {
     }
 
     updateTapMarker() {
-        if (!this.tapMarker) {
-            console.warn("Cannot update tap marker - it doesn't exist!");
+        if (!this.tapMarker || !this.tapTarget) {
+            console.log("Cannot update tap marker - marker or target missing", {
+                hasMarker: !!this.tapMarker,
+                hasTarget: !!this.tapTarget
+            });
             return;
         }
         
-        if (this.tapTarget) {
-            // Position marker at tap target and make visible
-            // Add larger vertical offset to align with character feet (SHADOW_OFFSET_Y + 10)
-            this.tapMarker.setPosition(this.tapTarget.x, this.tapTarget.y + SHADOW_OFFSET_Y + 20);
-            this.tapMarker.setVisible(true);
-            
-            // Add a small animation to make it more noticeable
-            this.tweens.add({
-                targets: this.tapMarker,
-                scale: { from: 0.8, to: 1 },
-                duration: 300,
-                ease: 'Bounce.Out'
-            });
-        } else {
-            // Hide marker when no target
-            this.tapMarker.setVisible(false);
-        }
+        console.log("Updating tap marker position", {
+            x: this.tapTarget.x,
+            y: this.tapTarget.y,
+            markerVisible: this.tapMarker.visible
+        });
+        
+        // Position marker at tap target
+        // Add larger vertical offset to align with character feet (SHADOW_OFFSET_Y + 20)
+        this.tapMarker.setPosition(this.tapTarget.x, this.tapTarget.y + SHADOW_OFFSET_Y + 20);
+        
+        // Visibility is now handled in the update() method based on playerData.hasWaypoint
+        // console.log("After setting visible:", {
+        // markerVisible: this.tapMarker.visible
+        // });
+        
+        // Add a small animation to make it more noticeable
+        this.tweens.add({
+            targets: this.tapMarker,
+            scale: { from: 0.8, to: 1 },
+            duration: 300,
+            ease: 'Bounce.Out'
+        });
     }
 
     updateOtherPlayerPosition(playerId: number, x: number, y: number) {
@@ -1710,6 +1843,11 @@ export default class GameScene extends Phaser.Scene {
                 duration: 100, // Short duration for smooth sync
                 ease: 'Linear',
                 onUpdate: () => {
+                    // Check if container still exists before accessing it
+                    if (!container || !container.active) {
+                        return;
+                    }
+                    
                     // Update depth during the tween
                     container.setDepth(BASE_DEPTH + container.y);
                 }
@@ -1717,18 +1855,15 @@ export default class GameScene extends Phaser.Scene {
         }
     }
 
-    // Clean up a player's dot when they disconnect
-    private removeOtherPlayer(playerId: number) {
+    removeOtherPlayer(playerId: number) {
         const container = this.otherPlayers.get(playerId);
         if (container) {
-            // Delete the minimap dot if it exists
-            const dot = this.minimap?.otherPlayerDots.get(playerId);
-            if (dot) {
-                dot.destroy();
-                this.minimap?.otherPlayerDots.delete(playerId);
+            // Stop any active tweens
+            const graceTween = container.getData('graceTween');
+            if (graceTween) {
+                graceTween.stop();
             }
             
-            // Rest of existing removal code...
             container.destroy();
             this.otherPlayers.delete(playerId);
         }
@@ -1736,299 +1871,169 @@ export default class GameScene extends Phaser.Scene {
 
     // Add the update method to handle player movement
     update(time: number, delta: number) {
+        // Update SoundManager frame counter for frame-based throttling
+        const soundManager = (window as any).soundManager;
+        if (soundManager && soundManager.updateFrame) {
+            soundManager.updateFrame();
+        }
+        
         // Skip if local player sprite isn't initialized yet
-        if (!this.localPlayerSprite || !this.spacetimeDBClient?.sdkConnection?.db) {
-            return;
-        }
-        
-        // Determine movement direction from input
-        let dirX = 0;
-        let dirY = 0;
-        
-        // Track if any keyboard movement key was pressed
-        let keyboardInputDetected = false;
-        
-        // Handle keyboard input
-        if (this.cursors) {
-            if (this.cursors.left?.isDown) { dirX -= 1; keyboardInputDetected = true; }
-            if (this.cursors.right?.isDown) { dirX += 1; keyboardInputDetected = true; }
-            if (this.cursors.up?.isDown) { dirY -= 1; keyboardInputDetected = true; }
-            if (this.cursors.down?.isDown) { dirY += 1; keyboardInputDetected = true; }
-        }
-        
-        // Handle WASD keyboard input
-        if (this.wasdKeys) {
-            if (this.wasdKeys.A.isDown) { dirX -= 1; keyboardInputDetected = true; }
-            if (this.wasdKeys.D.isDown) { dirX += 1; keyboardInputDetected = true; }
-            if (this.wasdKeys.W.isDown) { dirY -= 1; keyboardInputDetected = true; }
-            if (this.wasdKeys.S.isDown) { dirY += 1; keyboardInputDetected = true; }
-        }
-        
-        // Clear tap target if keyboard input is detected
-        if (keyboardInputDetected && this.tapTarget) {
-            this.tapTarget = null;
-            this.tapMarker?.setVisible(false);
-        }
-        
-        // Handle tap target if no keyboard input
-        if (dirX === 0 && dirY === 0 && this.tapTarget) {
-            // Get entity radius
-            const entityRadius = this.getPlayerEntityRadius();
-            
-            // Clamp the tap target to valid world bounds
-            const clampedTarget = this.clampToWorldBounds(this.tapTarget, entityRadius);
-            
-            // Update tap target if it was clamped
-            if (clampedTarget.x !== this.tapTarget.x || clampedTarget.y !== this.tapTarget.y) {
-                this.tapTarget.set(clampedTarget.x, clampedTarget.y);
-                this.updateTapMarker();
-            }
-            
-            // Calculate direction toward tap target
-            const dx = this.tapTarget.x - this.localPlayerSprite.x;
-            const dy = this.tapTarget.y - this.localPlayerSprite.y;
-            
-            // Check if we're close enough to the target to stop moving
-            const distanceSquared = dx * dx + dy * dy;
-            if (distanceSquared > 100) { // Arbitrary threshold of 10 pixels squared
-                // Normalize direction vector
-                const length = Math.sqrt(distanceSquared);
-                dirX = dx / length;
-                dirY = dy / length;
-            } else {
-                // Clear tap target if we've reached it
-                this.tapTarget = null;
-                this.tapMarker?.setVisible(false);
-            }
-        }
-        
-        // Only send updates to server if direction has changed or periodically
-        const hasDirection = (dirX !== 0 || dirY !== 0);
-        const directionChanged = (this.currentDirection.x !== dirX || this.currentDirection.y !== dirY);
-        const timeForUpdate = (time - this.lastDirectionUpdateTime) > DIRECTION_UPDATE_RATE;
-        
-        if (directionChanged || (hasDirection && timeForUpdate)) {
-            // Update current direction
-           
-            this.currentDirection.set(dirX, dirY);
-            this.isMoving = hasDirection;
+        if (!this.localPlayerSprite || !this.isPlayerDataReady) return;
 
-            if(!this.gameOver) 
-            {
-                this.spacetimeDBClient.sdkConnection?.reducers.updatePlayerDirection(dirX, dirY);
-                this.lastDirectionUpdateTime = time;
-            }
-        }
+        // Get entity radius using helper function
+        const entityRadius = this.getPlayerEntityRadius();
         
-        // Client-side prediction - move sprite immediately, server will correct if needed
-        if (this.isMoving) {
-            // Calculate position delta based on direction, speed and time
-            const speed = PLAYER_SPEED * (delta / 1000); // pixels per millisecond
-            const dx = this.currentDirection.x * speed;
-            const dy = this.currentDirection.y * speed;
-            
-            // Get the entity radius for boundary checking
-            const entityRadius = this.getPlayerEntityRadius();
-            
-            // Calculate new position
-            const predictedPosition = {
-                x: this.localPlayerSprite.x + dx,
-                y: this.localPlayerSprite.y + dy
-            };
-            
-            // Clamp the predicted position to valid world bounds
-            const clampedPosition = this.clampToWorldBounds(predictedPosition, entityRadius);
-            
-            // Log when we hit boundaries for debugging
-            if (clampedPosition.x !== predictedPosition.x || clampedPosition.y !== predictedPosition.y) {
-                console.debug(`Movement clamped to boundary: (${predictedPosition.x.toFixed(1)}, ${predictedPosition.y.toFixed(1)}) → (${clampedPosition.x.toFixed(1)}, ${clampedPosition.y.toFixed(1)})`);
-            }
-            
-            // Move the player sprite to the clamped position
-            this.localPlayerSprite.x = clampedPosition.x;
-            this.localPlayerSprite.y = clampedPosition.y;
-            
-            // Update the depth based on new Y position
-            this.localPlayerSprite.setDepth(BASE_DEPTH + this.localPlayerSprite.y);
-            
-            // Update UI elements position
-            if (this.localPlayerNameText) {
-                this.localPlayerNameText.x = this.localPlayerSprite.x;
-                this.localPlayerNameText.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - NAME_OFFSET_Y;
-                this.localPlayerNameText.setDepth(BASE_DEPTH + this.localPlayerSprite.y + NAME_DEPTH_OFFSET);
-            }
-            
-            // Update shadow position
-            if (this.localPlayerShadow) {
-                this.localPlayerShadow.x = this.localPlayerSprite.x;
-                this.localPlayerShadow.y = this.localPlayerSprite.y + SHADOW_OFFSET_Y;
-                this.localPlayerShadow.setDepth(BASE_DEPTH + this.localPlayerSprite.y + SHADOW_DEPTH_OFFSET);
-            }
-            
-            // Update health bar position and depth
-            const healthBarBackground = this.localPlayerSprite.getData('healthBarBackground');
-            const healthBar = this.localPlayerSprite.getData('healthBar');
-            if (healthBarBackground && healthBar) {
-                healthBarBackground.x = this.localPlayerSprite.x;
-                healthBarBackground.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
-                healthBarBackground.setDepth(BASE_DEPTH + this.localPlayerSprite.y + HEALTH_BG_DEPTH_OFFSET);
-                
-                healthBar.x = this.localPlayerSprite.x - (HEALTH_BAR_WIDTH / 2);
-                healthBar.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
-                healthBar.setDepth(BASE_DEPTH + this.localPlayerSprite.y + HEALTH_BAR_DEPTH_OFFSET);
-            }
-            
-            // Update exp bar position and depth
-            const expBarBackground = this.localPlayerSprite.getData('expBarBackground');
-            const expBar = this.localPlayerSprite.getData('expBar');
-            if (expBarBackground && expBar) {
-                expBarBackground.x = this.localPlayerSprite.x;
-                expBarBackground.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
-                expBarBackground.setDepth(BASE_DEPTH + this.localPlayerSprite.y + EXP_BG_DEPTH_OFFSET);
-                
-                expBar.x = this.localPlayerSprite.x - (EXP_BAR_WIDTH / 2);
-                expBar.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
-                expBar.setDepth(BASE_DEPTH + this.localPlayerSprite.y + EXP_BAR_DEPTH_OFFSET);
-            }
-        }
+        // Calculate delta time in seconds
+        const deltaTime = delta / 1000;
         
-        // If server has sent an updated position that's far from our prediction, correct it
-        if (this.serverPosition && this.localPlayerSprite) {
-            // Get entity radius using helper function
-            const entityRadius = this.getPlayerEntityRadius();
-            
-            // Clamp server position to world bounds
-            const clampedServerPosition = this.clampToWorldBounds(this.serverPosition, entityRadius);
-            
-            // Calculate distance to clamped server position
-            const distX = clampedServerPosition.x - this.localPlayerSprite.x;
-            const distY = clampedServerPosition.y - this.localPlayerSprite.y;
+        // Get current entity data from server
+        const playerData = this.spacetimeDBClient?.sdkConnection?.db?.player.playerId.find(
+            this.localPlayerSprite.getData('playerId')
+        );
+        
+        if (!playerData) return;
+
+        // Always update server position if available
+        if (this.serverPosition) {
+            const distX = this.serverPosition.x - this.localPlayerSprite.x;
+            const distY = this.serverPosition.y - this.localPlayerSprite.y;
             const distSquared = distX * distX + distY * distY;
-            
-            // If difference is significant, update to match server position
-            if (distSquared > POSITION_CORRECTION_THRESHOLD) {
-                // Interpolate position
-                this.localPlayerSprite.x += distX * INTERPOLATION_SPEED;
-                this.localPlayerSprite.y += distY * INTERPOLATION_SPEED;
-                
-                // Update the depth based on new Y position
-                this.localPlayerSprite.setDepth(BASE_DEPTH + this.localPlayerSprite.y);
-                
-                // Update UI elements with interpolated position and depth
-                if (this.localPlayerNameText) {
-                    this.localPlayerNameText.x = this.localPlayerSprite.x;
-                    this.localPlayerNameText.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - NAME_OFFSET_Y;
-                    this.localPlayerNameText.setDepth(BASE_DEPTH + this.localPlayerSprite.y + NAME_DEPTH_OFFSET);
+
+            // If we're too far from server position, snap immediately
+            if (distSquared > POSITION_CORRECTION_THRESHOLD * 4) {
+                console.log(`Large position correction: ${Math.sqrt(distSquared).toFixed(2)} units`);
+                this.localPlayerSprite.x = this.serverPosition.x;
+                this.localPlayerSprite.y = this.serverPosition.y;
+                if (this.predictedPosition) {
+                    this.predictedPosition.set(this.serverPosition.x, this.serverPosition.y);
                 }
-                
-                if (this.localPlayerShadow) {
-                    this.localPlayerShadow.x = this.localPlayerSprite.x;
-                    this.localPlayerShadow.y = this.localPlayerSprite.y + SHADOW_OFFSET_Y;
-                    this.localPlayerShadow.setDepth(BASE_DEPTH + this.localPlayerSprite.y + SHADOW_DEPTH_OFFSET);
-                }
-                
-                // Update health bar with interpolated position and depth
-                const healthBarBackground = this.localPlayerSprite.getData('healthBarBackground');
-                const healthBar = this.localPlayerSprite.getData('healthBar');
-                if (healthBarBackground && healthBar) {
-                    healthBarBackground.x = this.localPlayerSprite.x;
-                    healthBarBackground.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
-                    healthBarBackground.setDepth(BASE_DEPTH + this.localPlayerSprite.y + HEALTH_BG_DEPTH_OFFSET);
-                    
-                    healthBar.x = this.localPlayerSprite.x - (HEALTH_BAR_WIDTH / 2);
-                    healthBar.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
-                    healthBar.setDepth(BASE_DEPTH + this.localPlayerSprite.y + HEALTH_BAR_DEPTH_OFFSET);
-                }
-                
-                // Update exp bar with interpolated position and depth
-                const expBarBackground = this.localPlayerSprite.getData('expBarBackground');
-                const expBar = this.localPlayerSprite.getData('expBar');
-                if (expBarBackground && expBar) {
-                    expBarBackground.x = this.localPlayerSprite.x;
-                    expBarBackground.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
-                    expBarBackground.setDepth(BASE_DEPTH + this.localPlayerSprite.y + EXP_BG_DEPTH_OFFSET);
-                    
-                    expBar.x = this.localPlayerSprite.x - (EXP_BAR_WIDTH / 2);
-                    expBar.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
-                    expBar.setDepth(BASE_DEPTH + this.localPlayerSprite.y + EXP_BAR_DEPTH_OFFSET);
+            }
+            // Otherwise interpolate towards server position
+            else if (distSquared > POSITION_CORRECTION_THRESHOLD) {
+                // Use faster interpolation when correction needed
+                const correctionSpeed = INTERPOLATION_SPEED * 2;
+                this.localPlayerSprite.x += distX * correctionSpeed;
+                this.localPlayerSprite.y += distY * correctionSpeed;
+                if (this.predictedPosition) {
+                    this.predictedPosition.set(this.localPlayerSprite.x, this.localPlayerSprite.y);
                 }
             }
         }
         
-        // Update depths for other players as well
-        this.otherPlayers.forEach((container) => {
-            container.setDepth(BASE_DEPTH + container.y);
-        });
-        
-        // Update monster positions with interpolation
-        this.monsterManager?.update(time, delta);
-        
-        // Update attack visuals with time for prediction
-        this.attackManager?.update(time, delta);
-        
-        // Let gem manager update animations
-        if (this.gemManager) {
-            this.gemManager.update(time, delta);
+        // Update tap marker visibility based on hasWaypoint
+        if (this.tapMarker) {
+            this.tapMarker.setVisible(playerData.hasWaypoint);
         }
-        
-        // Update upgrade UI if visible
+
+        // If we have a waypoint and are moving, update predicted position
+        if (playerData.hasWaypoint) {
+            // Initialize predicted position if needed
+            if (!this.predictedPosition) {
+                this.predictedPosition = new Phaser.Math.Vector2(
+                    this.localPlayerSprite.x,
+                    this.localPlayerSprite.y
+                );
+            }
+            
+            // Calculate direction to waypoint
+            const directionVector = new Phaser.Math.Vector2(
+                playerData.waypoint.x - this.predictedPosition.x,
+                playerData.waypoint.y - this.predictedPosition.y
+            );
+            
+            // Calculate distance to waypoint
+            const distanceToWaypoint = directionVector.length();
+            
+            // If we're close enough to the waypoint, stop moving
+            const WAYPOINT_REACHED_DISTANCE = 5.0;
+            if (distanceToWaypoint < WAYPOINT_REACHED_DISTANCE) {
+                // Reached waypoint, stop moving
+                this.currentDirection.set(0, 0);
+                this.predictedPosition.set(playerData.waypoint.x, playerData.waypoint.y);
+                
+                // Clear tap target 
+                this.tapTarget = null;
+                // tapMarker visibility is handled above by playerData.hasWaypoint
+            } else {
+                // Continue moving towards waypoint
+                
+                // Use exact player speed from server
+                const playerSpeed = playerData.speed;
+                
+                // Calculate movement (slightly slower than server to avoid overshooting)
+                const moveDistance = playerSpeed * deltaTime * 0.9; // 90% of actual speed to stay behind server
+                const normalizedDirection = directionVector.normalize();
+                
+                // Update predicted position
+                this.predictedPosition.x += normalizedDirection.x * moveDistance;
+                this.predictedPosition.y += normalizedDirection.y * moveDistance;
+                
+                // Clamp predicted position to world bounds
+                const clampedPosition = this.clampToWorldBounds(this.predictedPosition, entityRadius);
+                this.predictedPosition.set(clampedPosition.x, clampedPosition.y);
+                
+                // Update sprite position with prediction
+                this.localPlayerSprite.x = this.predictedPosition.x;
+                this.localPlayerSprite.y = this.predictedPosition.y;
+            }
+        } else {
+            // Not moving or no waypoint
+            this.currentDirection.set(0, 0);
+            this.predictedPosition = null; // Clear prediction when not moving
+
+            this.tapTarget = null;
+            // tapMarker visibility is handled above by playerData.hasWaypoint
+        }
+
+        // Always update depth and UI after any position change
+        this.localPlayerSprite.setDepth(BASE_DEPTH + this.localPlayerSprite.y);
+        this.updatePlayerUI();
+
+        // Update upgrade UI if it exists
         if (this.upgradeUI) {
             this.upgradeUI.update(time, delta);
         }
-        
-        // Update the player HUD if it exists
-        if (this.playerHUD) {
-            this.playerHUD.update(time, delta);
+
+        // Update gem manager for hover animations
+        if (this.gemManager) {
+            this.gemManager.update(time, delta);
         }
-        
-        // Update the boss timer UI if it exists
-        if (this.bossTimerUI) {
-            this.bossTimerUI.update(time, delta);
+
+        // Update monster attack manager for projectile movement
+        if (this.monsterAttackManager) {
+            this.monsterAttackManager.update(time, delta);
         }
-        
+
+        // Update monster manager for after images and other effects
+        if (this.monsterManager) {
+            this.monsterManager.update(time, delta);
+        }
+
+        // Update VoidChest UI for directional arrow
+        if (this.voidChestUI) {
+            this.voidChestUI.update();
+        }
+
+        // Update Soul UI for soul guidance
+        if (this.soulUI) {
+            this.soulUI.update();
+        }
+
+        // Boss Claudia Manager now handles updates automatically via event subscriptions
+
         // Update minimap
         this.updateMinimap();
     }
     
-    // Update the minimap with all players' positions
+    // Update the minimap with player's position
     private updateMinimap() {
         if (!this.minimap || !this.localPlayerSprite) return;
         
-        // Get world bounds and minimap size
+        // Get world bounds
         const worldBounds = this.physics.world.bounds;
-        const minimapSize = this.minimap.background.width;
         
-        // Update local player dot
-        const ratioX = this.localPlayerSprite.x / worldBounds.width;
-        const ratioY = this.localPlayerSprite.y / worldBounds.height;
-        this.minimap.playerDot.x = ratioX * minimapSize;
-        this.minimap.playerDot.y = ratioY * minimapSize;
-
-        // Update other player dots
-        this.otherPlayers.forEach((container, playerId) => {
-            let dot = this.minimap?.otherPlayerDots.get(playerId);
-            
-            // Create dot if it doesn't exist
-            if (!dot && this.minimap) {
-                dot = this.add.circle(
-                    0,
-                    0,
-                    5, // Same size as local player dot
-                    0x00ff00, // green for other players
-                    1
-                );
-                this.minimap.container.add(dot);
-                this.minimap.otherPlayerDots.set(playerId, dot);
-            }
-            
-            // Update dot position if it exists
-            if (dot) {
-                const otherRatioX = container.x / worldBounds.width;
-                const otherRatioY = container.y / worldBounds.height;
-                dot.x = otherRatioX * minimapSize;
-                dot.y = otherRatioY * minimapSize;
-            }
-        });
+        // Use the new Minimap class update method
+        this.minimap.update(this.localPlayerSprite, worldBounds);
     }
 
     // Force a synchronization of player entities
@@ -2048,21 +2053,8 @@ export default class GameScene extends Phaser.Scene {
             return;
         }
         
-        // First, handle local player if not already created
         if (!this.localPlayerSprite && localAccount.currentPlayerId > 0) {
-            //const localPlayer = allPlayers.find(p => p.playerId === localAccount.currentPlayerId);
-            const localPlayer = ctx.db.player.playerId.find(localAccount.currentPlayerId) as Player;
-            if (localPlayer) {
-                const entityData = ctx.db.entity.entityId.find(localPlayer.entityId) as Entity;
-                if (entityData) {
-                    console.log(`Creating local player during sync: ${localPlayer.name} at (${entityData.position.x}, ${entityData.position.y})`);
-                    this.handleEntityUpdate(ctx, entityData);
-                } else {
-                    console.warn(`Entity data not found for local player (entityId: ${localPlayer.entityId})`);
-                }
-            } else {
-                console.warn(`Local player data not found in player table during sync`);
-            }
+            throw new Error("Local player data not found in player table during sync");
         }
         
         // Then handle all other players
@@ -2072,20 +2064,14 @@ export default class GameScene extends Phaser.Scene {
                 continue;
             }
             
-            const entityData = ctx.db.entity.entityId.find(player.entityId) as Entity;
-            if (entityData) {
-                // Check if this player already has a sprite
-                const existingContainer = this.otherPlayers.get(player.playerId);
-                if (!existingContainer) {
-                    // Create the sprite directly - this bypasses the normal flow but ensures
-                    // the sprite is created immediately
-                    this.createOtherPlayerSprite(player, entityData);
-                } else {
-                    // Just update position if sprite already exists
-                    this.updateOtherPlayerPosition(player.playerId, entityData.position.x, entityData.position.y);
-                }
+            const existingContainer = this.otherPlayers.get(player.playerId);
+            if (!existingContainer) {
+                // Create the sprite directly - this bypasses the normal flow but ensures
+                // the sprite is created immediately
+                this.createOtherPlayerSprite(player);
             } else {
-                console.warn(`Entity data not found for player ${player.name} (entityId: ${player.entityId})`);
+                // Just update position if sprite already exists
+                this.updateOtherPlayerPosition(player.playerId, player.position.x, player.position.y);
             }
         }
         
@@ -2122,76 +2108,6 @@ export default class GameScene extends Phaser.Scene {
         });
     }
     
-    // Show death screen for local player
-    private showDeathScreen() {
-        console.log("Showing death screen for local player");
-        
-        // Create dark overlay covering the entire screen
-        const { width, height } = this.scale;
-        const overlay = this.add.rectangle(0, 0, width, height, 0x000000, 0.7)
-            .setOrigin(0, 0)
-            .setScrollFactor(0)  // Fix to camera
-            .setDepth(100000);    // Increased depth - extremely high to ensure it's on top
-            
-        // Add "You are no Survivor" text
-        const titleText = this.add.text(
-            width / 2, 
-            height / 2 - 50, 
-            "You are no Survivor", 
-            {
-                fontFamily: 'Arial',
-                fontSize: '48px',
-                color: '#FF0000',
-                stroke: '#000000',
-                strokeThickness: 6,
-                align: 'center'
-            }
-        )
-        .setOrigin(0.5)
-        .setScrollFactor(0)
-        .setDepth(100001);
-        
-        // Add "Choose a new character" text (updated from "refresh to play again")
-        const subtitleText = this.add.text(
-            width / 2, 
-            height / 2 + 50, 
-            "Choose a new character", 
-            {
-                fontFamily: 'Arial',
-                fontSize: '24px',
-                color: '#FFFFFF',
-                stroke: '#000000',
-                strokeThickness: 4,
-                align: 'center'
-            }
-        )
-        .setOrigin(0.5)
-        .setScrollFactor(0)
-        .setDepth(100001);
-        
-        // Fade in effect
-        overlay.alpha = 0;
-        titleText.alpha = 0;
-        subtitleText.alpha = 0;
-        
-        this.tweens.add({
-            targets: [overlay, titleText, subtitleText],
-            alpha: 1,
-            duration: 1000,
-            ease: 'Power2',
-            onComplete: () => {
-                // Wait 3 seconds before transitioning to ClassSelectScene
-                this.time.delayedCall(3000, () => {
-                    console.log("Death screen timer complete, transitioning to ClassSelectScene");
-                    this.scene.start('ClassSelectScene');
-                });
-            }
-        });
-        
-        // Disable input and controls for local player
-        this.disablePlayerControls();
-    }
-    
     // Disable player controls after death
     private disablePlayerControls() {
         // Clear tap target and hide marker
@@ -2200,9 +2116,6 @@ export default class GameScene extends Phaser.Scene {
             this.tapMarker.setVisible(false);
         }
         
-        // Set flag to prevent movement in update()
-        this.isMoving = false;
-        
         // Clear direction
         this.currentDirection.set(0, 0);
         
@@ -2210,16 +2123,29 @@ export default class GameScene extends Phaser.Scene {
         // (This is more for documentation, as the update method won't process input anyway)
         if (this.input) {
             // Remove pointer listeners
-            this.input.off('pointermove');
             this.input.off('pointerdown');
             this.input.off('pointerup');
         }
     }
 
     shutdown() {
-        console.log("GameScene shutting down...");
+        console.log("GameScene shutdown initiated.");
+
+        // Cleanup music manager
+        if (this.musicManager) {
+            this.musicManager.cleanup();
+        }
+        
+        // Important: Mark the scene as shutting down to prevent further updates
+        this.gameOver = true;
+        
+        // Reset player damage sound flag
+        this.isPlayerDamageSoundPlaying = false;
 
         this.monsterManager?.shutdown();
+        
+        // Clean up MonsterSpawnerManager
+        console.log("GameScene shutting down...");
         
         // Clean up MonsterSpawnerManager
         this.monsterSpawnerManager?.destroy();
@@ -2228,9 +2154,23 @@ export default class GameScene extends Phaser.Scene {
         // Clean up AttackManager properly
         this.attackManager?.shutdown();
 
+        // Clean up MonsterAttackManager
+        this.monsterAttackManager?.shutdown();
+        this.monsterAttackManager = null;
+
         // Clean up GemManager
         this.gemManager?.shutdown();
         this.gemManager = null;
+        
+        // Clean up LootCapsuleManager
+        this.lootCapsuleManager?.shutdown();
+        this.lootCapsuleManager = null;
+        
+        // Clean up BossAgnaManager
+        this.bossAgnaManager?.shutdown();
+        this.loreScrollManager?.shutdown();
+        this.bossAgnaManager = null;
+        this.loreScrollManager = null;
         
         // Clean up UpgradeUI
         if (this.upgradeUI) {
@@ -2250,27 +2190,90 @@ export default class GameScene extends Phaser.Scene {
             this.bossTimerUI = null;
         }
         
+        // Clean up monster counter UI
+        if (this.monsterCounterUI) {
+            this.monsterCounterUI.destroy();
+            this.monsterCounterUI = null;
+        }
+        
+        // Clean up VoidChest UI
+        if (this.voidChestUI) {
+            this.voidChestUI.destroy();
+            this.voidChestUI = null;
+        }
+
+        // Clean up Soul UI
+        if (this.soulUI) {
+            this.soulUI.destroy();
+            this.soulUI = null;
+        }
+
+        // Clean up Options UI
+        if (this.optionsUI) {
+            this.optionsUI.destroy();
+            this.optionsUI = null;
+        }
+        
+        // DEFENSIVE CLEANUP: Remove any lingering game objects that might persist between scenes
+        console.log("GameScene: Performing defensive cleanup of lingering game objects");
+        
+        // Clean up any remaining sprites/images with attack-related textures
+        const attackTextures = ['attack_sword', 'attack_wand', 'attack_knife', 'attack_shield'];
+        this.children.list.forEach(child => {
+            if (child instanceof Phaser.GameObjects.Sprite || child instanceof Phaser.GameObjects.Image) {
+                if (attackTextures.includes(child.texture.key)) {
+                    console.log("GameScene: Removing lingering attack sprite with texture:", child.texture.key);
+                    child.destroy();
+                }
+            }
+        });
+        
+        // Clean up any remaining containers that might contain attack sprites
+        this.children.list.forEach(child => {
+            if (child instanceof Phaser.GameObjects.Container) {
+                // Check if container has attack-related children
+                const hasAttackSprites = child.list.some(subChild => {
+                    if (subChild instanceof Phaser.GameObjects.Sprite || subChild instanceof Phaser.GameObjects.Image) {
+                        return attackTextures.includes(subChild.texture.key);
+                    }
+                    return false;
+                });
+                
+                if (hasAttackSprites) {
+                    console.log("GameScene: Removing container with attack sprites");
+                    child.destroy();
+                }
+            }
+        });
+        
+        // Clean up any particles or effects that might be running
+        this.children.list.forEach(child => {
+            if (child instanceof Phaser.GameObjects.Particles.ParticleEmitter) {
+                console.log("GameScene: Stopping and removing lingering particle emitter");
+                child.stop();
+                child.destroy();
+            }
+        });
+        
+        // Clean up any tweens that might be running
+        this.tweens.killAll();
+        console.log("GameScene: Killed all running tweens");
+        
         // Note: SpacetimeDB event handlers are managed by the SDK
         // The connection to the database will be cleaned up when the game is closed
         // or when we move to a different scene
 
-        // Remove event listeners
+        // Remove scene event listeners
         this.events.off("shutdown", this.shutdown, this);
-
         this.gameEvents.off(GameEvents.ACCOUNT_UPDATED, this.handleAccountUpdated, this);
-
         this.gameEvents.off(GameEvents.PLAYER_CREATED, this.handlePlayerCreated, this);
         this.gameEvents.off(GameEvents.PLAYER_UPDATED, this.handlePlayerUpdated, this);
         this.gameEvents.off(GameEvents.PLAYER_DELETED, this.handlePlayerDeleted, this);
         this.gameEvents.off(GameEvents.PLAYER_DIED, this.handlePlayerDied, this);
-        
-        // Remove entity event listeners
-        this.gameEvents.off(GameEvents.ENTITY_CREATED, this.handleEntityCreated, this);
-        this.gameEvents.off(GameEvents.ENTITY_UPDATED, this.handleEntityUpdated, this);
-        this.gameEvents.off(GameEvents.ENTITY_DELETED, this.handleEntityDeleted, this);
-        
         this.gameEvents.off(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
-        
+        this.gameEvents.off(GameEvents.MONSTER_CREATED, this.handleMonsterCreatedForMusic, this);
+        this.gameEvents.off(GameEvents.GAME_STATE_UPDATED, this.handleGameStateUpdated, this);
+
         // Clean up MonsterManager event listeners
         if (this.monsterManager) {
             this.monsterManager.unregisterListeners();
@@ -2306,38 +2309,31 @@ export default class GameScene extends Phaser.Scene {
         }
         
         // Remove debug key binding
-        if (this.input?.keyboard) {
-            try {
-                // Try different approach to remove the listener
-                this.input.keyboard.removeCapture(Phaser.Input.Keyboard.KeyCodes.BACKTICK);
-                // Just create a new key without listeners to replace the old one
-                this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.BACKTICK);
-            } catch (e) {
-                console.warn("Could not clean up debug key binding:", e);
-            }
+        if (this.input.keyboard) 
+        {
+            this.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.R);
+            this.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.D);
+            this.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.O);
         }
+        this.debugManager?.clearDebugKeys();
+        
+        // Remove resize listener
+        this.scale.off('resize', this.handleResize);
         
         // Clean up minimap
         if (this.minimap) {
-            this.minimap.container.destroy();
+            this.minimap.destroy();
             this.minimap = null;
+        }
+        this.minimapElements = null;
+        
+        // Clean up boss haze overlay
+        if (this.bossHazeOverlay) {
+            this.bossHazeOverlay.destroy();
+            this.bossHazeOverlay = null;
         }
         
         console.log("GameScene shutdown complete.");
-    }
-
-    // New entity event handlers
-    private handleEntityCreated(ctx: EventContext, entity: Entity) {
-        this.handleEntityUpdate(ctx, entity);
-    }
-
-    private handleEntityUpdated(ctx: EventContext, oldEntity: Entity, newEntity: Entity) {
-        this.handleEntityUpdate(ctx, newEntity);
-    }
-
-    private handleEntityDeleted(_ctx: EventContext, entity: Entity) {
-        // Handle entity deletion (if needed)
-        // Currently no specific handling is needed as player/monster deletions are handled by respective events
     }
 
     private cleanupLingeringUIElements() {
@@ -2371,27 +2367,18 @@ export default class GameScene extends Phaser.Scene {
         // Default fallback radius
         let entityRadius = 48;
         
-        try {
-            if (this.spacetimeDBClient?.identity && this.spacetimeDBClient?.sdkConnection?.db) {
-                const account = this.spacetimeDBClient.sdkConnection.db.account.identity.find(
-                    this.spacetimeDBClient.identity
+        if (this.spacetimeDBClient?.identity && this.spacetimeDBClient?.sdkConnection?.db) {
+            const account = this.spacetimeDBClient.sdkConnection.db.account.identity.find(
+                this.spacetimeDBClient.identity
+            );
+            
+            if (account && account.currentPlayerId > 0) {
+                const player = this.spacetimeDBClient.sdkConnection.db.player.playerId.find(
+                    account.currentPlayerId
                 );
-                
-                if (account && account.currentPlayerId > 0) {
-                    const player = this.spacetimeDBClient.sdkConnection.db.player.playerId.find(
-                        account.currentPlayerId
-                    );
-                    
-                    if (player && player.entityId) {
-                        const entity = this.spacetimeDBClient.sdkConnection.db.entity.entityId.find(player.entityId);
-                        if (entity && entity.radius) {
-                            entityRadius = entity.radius;
-                        }
-                    }
-                }
+
+                entityRadius = player?.radius ?? 48;
             }
-        } catch (error) {
-            console.error("Error getting entity radius:", error);
         }
         
         return entityRadius;
@@ -2424,25 +2411,11 @@ export default class GameScene extends Phaser.Scene {
         };
     }
 
-    // Add a debug key binding to toggle attack circles visibility
-    private toggleAttackDebugCircles() {
-        if (this.attackManager) {
-            // Create a private variable in the class to track the current state
-            if (this.attackManager['debugCirclesEnabled'] === undefined) {
-                this.attackManager['debugCirclesEnabled'] = false;
-            }
-            
-            // Toggle the state
-            const newState = !this.attackManager['debugCirclesEnabled'];
-            this.attackManager['debugCirclesEnabled'] = newState;
-            
-            // Call the method to update the attack manager
-            this.attackManager.setDebugCirclesEnabled(newState);
-            
-            console.log(`Attack debug circles ${newState ? 'enabled' : 'disabled'}`);
-        } else {
-            console.log("Attack manager not initialized, can't toggle debug circles");
+    public getLocalPlayerPosition(): { x: number, y: number } | null {
+        if (this.localPlayerSprite) {
+            return { x: this.localPlayerSprite.x, y: this.localPlayerSprite.y };
         }
+        return null;
     }
 
     /**
@@ -2578,7 +2551,7 @@ export default class GameScene extends Phaser.Scene {
     /**
      * Handle rerolling upgrades when the 'R' key is pressed
      */
-    private rerollUpgrades(): void {
+    public rerollUpgrades(): void {
         if (!this.spacetimeDBClient.sdkConnection?.db || this.localPlayerId <= 0) {
             console.log("Cannot reroll: Connection not available or player not initialized");
             return;
@@ -2698,337 +2671,293 @@ export default class GameScene extends Phaser.Scene {
 
     // Create a semi-transparent minimap in the bottom-left corner
     private createMinimap() {
-        const { width, height } = this.scale;
+        // Create the minimap using the new Minimap class
+        // SoulUI will be set later after it's initialized
+        this.minimap = new Minimap(this, this.spacetimeDBClient);
+        this.minimapElements = this.minimap.create();
         
-        // Constants for minimap sizing and positioning
-        const MINIMAP_SIZE = 150; // Size of the minimap (square)
-        const MINIMAP_MARGIN = 20; // Margin from screen edges
-        const MINIMAP_ALPHA = 0.7; // Semi-transparency
-        const PLAYER_DOT_SIZE = 5; // Size of player dot on minimap
-        const BORDER_SIZE = 2; // Width of minimap border
-        
-        // Create minimap container at the bottom-left corner
-        const container = this.add.container(
-            MINIMAP_MARGIN,
-            height - MINIMAP_MARGIN - MINIMAP_SIZE
-        );
-        
-        // Create semi-transparent dark background
-        const background = this.add.rectangle(
-            0, 
-            0, 
-            MINIMAP_SIZE, 
-            MINIMAP_SIZE, 
-            0x000000, 
-            0.5
-        ).setOrigin(0);
-        
-        // Create border
-        const border = this.add.rectangle(
-            0,
-            0,
-            MINIMAP_SIZE,
-            MINIMAP_SIZE,
-            0xFFFFFF,
-            0.3
-        ).setOrigin(0);
-        border.setStrokeStyle(BORDER_SIZE, 0xFFFFFF, 0.5);
-        
-        // Create local player dot (will be positioned in update)
-        const playerDot = this.add.circle(
-            0,
-            0,
-            PLAYER_DOT_SIZE,
-            0x0000ff, // blue for local player
-            1
-        );
-        
-        // Add all elements to container
-        container.add([background, border, playerDot]);
-        
-        // Fix to camera so it doesn't move with world
-        container.setScrollFactor(0);
-        
-        // Set initial alpha
-        container.setAlpha(MINIMAP_ALPHA);
-        
-        // Store reference to minimap elements
-        this.minimap = {
-            container,
-            background,
-            playerDot,
-            otherPlayerDots: new Map(),
-            border
-        };
-        
-        console.log("Minimap created");
+        console.log("Minimap created using Minimap class");
     }
 
-    // Show victory screen for True Survivors
-    private showVictoryScreen() {
-        console.log("Showing True Survivor victory screen");
-        
-        // Create bright overlay covering the entire screen
-        const { width, height } = this.scale;
-        const overlay = this.add.rectangle(0, 0, width, height, 0xFFFFFF, 0.7)
-            .setOrigin(0, 0)
-            .setScrollFactor(0)  // Fix to camera
-            .setDepth(100000);    // Increased depth - extremely high to ensure it's on top
+    // Setup touch input
+    private setupTouchInput() {        
+                this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+            // Check if this pointer is being handled by the upgrade UI
+            if (this.upgradeUI && this.upgradeUI.isPointerHandledByUI && this.upgradeUI.isPointerHandledByUI(pointer.id)) {
+                console.log("Pointer is handled by upgrade UI - skipping movement command");
+                return;
+            }
             
-        // Add "You are a True Survivor" text
-        const titleText = this.add.text(
-            width / 2, 
-            height / 2 - 50, 
-            "YOU ARE A TRUE SURVIVOR", 
-            {
-                fontFamily: 'Arial',
-                fontSize: '48px',
-                color: '#FFD700', // Gold
-                stroke: '#000000',
-                strokeThickness: 6,
-                align: 'center'
-            }
-        )
-        .setOrigin(0.5)
-        .setScrollFactor(0)
-        .setDepth(100001);
-        
-        // Add victory subtitle text
-        const subtitleText = this.add.text(
-            width / 2, 
-            height / 2 + 50, 
-            "The Final Boss has been defeated!", 
-            {
-                fontFamily: 'Arial',
-                fontSize: '24px',
-                color: '#FFFFFF',
-                stroke: '#000000',
-                strokeThickness: 4,
-                align: 'center'
-            }
-        )
-        .setOrigin(0.5)
-        .setScrollFactor(0)
-        .setDepth(100001);
-        
-        // Fade in effect
-        overlay.alpha = 0;
-        titleText.alpha = 0;
-        subtitleText.alpha = 0;
-        
-        this.tweens.add({
-            targets: [overlay, titleText, subtitleText],
-            alpha: 1,
-            duration: 1000,
-            ease: 'Power2',
-            onComplete: () => {
-                // Wait 5 seconds before transitioning to ClassSelectScene
-                this.time.delayedCall(5000, () => {
-                    console.log("Victory screen timer complete, transitioning to ClassSelectScene");
-                    this.scene.start('ClassSelectScene');
-                });
-            }
-        });
-        
-        // Create victory particles effect
-        this.createVictoryParticles();
-        
-        // Disable input and controls for local player
-        this.disablePlayerControls();
-    }
-    
-    // Create special particle effects for the victory screen
-    private createVictoryParticles() {
-        const { width, height } = this.scale;
-        
-        // Golden confetti particles
-        const confetti = this.add.particles(0, 0, 'white_pixel', {
-            x: { min: 0, max: width },
-            y: -50,
-            quantity: 2,
-            lifespan: 6000,
-            speedY: { min: 100, max: 300 },
-            speedX: { min: -100, max: 100 },
-            scale: { start: 0.5, end: 1 },
-            rotate: { start: 0, end: 360 },
-            tint: [0xFFD700, 0xFFA500, 0xFFFFFF, 0xDAA520], // Gold colors
-            frequency: 50,
-            emitting: true
-        }).setDepth(100002);
-        
-        // Star burst in the center
-        const stars = this.add.particles(width/2, height/2, 'white_pixel', {
-            speed: { min: 100, max: 500 },
-            angle: { min: 0, max: 360 },
-            scale: { start: 1, end: 0 },
-            lifespan: 2000,
-            blendMode: 'ADD',
-            tint: 0xFFD700, // Gold
-            quantity: 2,
-            frequency: 200,
-            emitting: true
-        }).setDepth(100002);
-        
-        // Stop particles after 5 seconds
-        this.time.delayedCall(5000, () => {
-            confetti.destroy();
-            stars.destroy();
-        });
-    }
-
-    /**
-     * Check if the player was damaged by a scorpion and apply poison effect if needed
-     * @param playerSprite The player sprite to check and apply effect to
-     */
-    private checkForScorpionDamage(playerSprite: Phaser.Physics.Arcade.Sprite): void {
-        // Skip if player is already poisoned
-        if (playerSprite.getData('isPoisoned')) {
-            return;
-        }
-        
-        if (!this.monsterManager || !this.spacetimeDBClient?.sdkConnection?.db) {
-            return;
-        }
-        
-        try {
-            // Check for nearby scorpions
-            const monsters = Array.from(this.spacetimeDBClient.sdkConnection.db.monsters.iter())
-                .filter(monster => monster.bestiaryId === MonsterType.Scorpion);
-                
-            if (monsters.length === 0) {
-                return; // No scorpions present
-            }
-                
-            // Get the player position
-            const playerX = playerSprite.x;
-            const playerY = playerSprite.y;
+            // Check if pointer is over options UI and skip movement if so
+            const isOverOptionsUI = this.optionsUI && this.isPointerOverOptionsUI(pointer);
             
-            // Check if any scorpion is close enough to have caused the damage
-            let scorpionHit = false;
-            for (const scorpion of monsters) {
-                const scorpionEntity = this.spacetimeDBClient.sdkConnection.db.entity.entityId.find(scorpion.entityId);
-                if (scorpionEntity) {
-                    // Calculate distance between player and scorpion
-                    const dx = playerX - scorpionEntity.position.x;
-                    const dy = playerY - scorpionEntity.position.y;
-                    const distanceSquared = dx * dx + dy * dy;
-                    
-                    // Use a slightly larger range than the actual monster radius to account for lag
-                    const hitRange = scorpionEntity.radius * 1.5;
-                    
-                    if (distanceSquared <= hitRange * hitRange) {
-                        scorpionHit = true;
-                        break;
+            if (isOverOptionsUI) {
+                console.log("Pointer is over options UI - skipping movement command");
+                return; // Return here to prevent movement processing
+            }
+            
+            if (this.optionsUI) {
+                console.log("Pointer not over options UI, proceeding with movement. Pointer pos:", pointer.x, pointer.y);
+            }
+            
+            if (this.localPlayerSprite) {
+                console.log("Pointer down - setting tap target");
+                const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+                this.tapTarget = new Phaser.Math.Vector2(worldPoint.x, worldPoint.y);
+                this.updateTapMarker();
+                
+                // Send waypoint to server immediately
+                if(!this.gameOver && this.spacetimeDBClient?.sdkConnection?.db) {
+                    // Play movement command sound
+                    const soundManager = (window as any).soundManager;
+                    if (soundManager) {
+                        soundManager.playSound('movement_command', 0.9);
                     }
+                    
+                    this.spacetimeDBClient.sdkConnection.reducers.setPlayerWaypoint(
+                        this.tapTarget.x,
+                        this.tapTarget.y
+                    );
                 }
             }
+        });
+    }
+
+    // Add updatePlayerUI method
+    private updatePlayerUI() {
+        if (!this.localPlayerSprite) return;
+
+        // Update name text
+        if (this.localPlayerNameText) {
+            this.localPlayerNameText.x = this.localPlayerSprite.x;
+            this.localPlayerNameText.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - NAME_OFFSET_Y;
+            this.localPlayerNameText.setDepth(BASE_DEPTH + this.localPlayerSprite.y + NAME_DEPTH_OFFSET);
+        }
+
+        // Update shadow
+        if (this.localPlayerShadow && this.spacetimeDBClient?.sdkConnection?.db) {
+            // Get the current player data to determine class
+            const playerData = this.spacetimeDBClient.sdkConnection.db.player.playerId.find(
+                this.localPlayerSprite.getData('playerId')
+            );
             
-            // If a scorpion hit the player, apply poison effect
-            if (scorpionHit) {
-                // Apply poison effect
-                createScorpionPoisonEffect(playerSprite, this);
-                
-                console.log("Player poisoned by scorpion!");
+            if (playerData) {
+                const shadowConfig = getPlayerShadowConfig(playerData.playerClass);
+                this.localPlayerShadow.x = this.localPlayerSprite.x + shadowConfig.offsetX;
+                this.localPlayerShadow.y = this.localPlayerSprite.y + shadowConfig.offsetY;
+            } else {
+                // Fallback to default values if player data not available
+                this.localPlayerShadow.x = this.localPlayerSprite.x;
+                this.localPlayerShadow.y = this.localPlayerSprite.y + 14; // Default SHADOW_OFFSET_Y
             }
-        } catch (error) {
-            console.error("Error checking for scorpion damage:", error);
+            this.localPlayerShadow.setDepth(BASE_DEPTH + this.localPlayerSprite.y + SHADOW_DEPTH_OFFSET);
+        }
+
+        // Update health bar
+        const healthBarBackground = this.localPlayerSprite.getData('healthBarBackground');
+        const healthBar = this.localPlayerSprite.getData('healthBar');
+        if (healthBarBackground && healthBar) {
+            healthBarBackground.x = this.localPlayerSprite.x;
+            healthBarBackground.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
+            healthBarBackground.setDepth(BASE_DEPTH + this.localPlayerSprite.y + HEALTH_BAR_DEPTH_OFFSET);
+            
+            healthBar.x = this.localPlayerSprite.x - (HEALTH_BAR_WIDTH / 2);
+            healthBar.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - HEALTH_BAR_OFFSET_Y;
+            healthBar.setDepth(BASE_DEPTH + this.localPlayerSprite.y + HEALTH_BAR_DEPTH_OFFSET);
+        }
+
+        // Update exp bar
+        const expBarBackground = this.localPlayerSprite.getData('expBarBackground');
+        const expBar = this.localPlayerSprite.getData('expBar');
+        if (expBarBackground && expBar) {
+            expBarBackground.x = this.localPlayerSprite.x;
+            expBarBackground.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
+            expBarBackground.setDepth(BASE_DEPTH + this.localPlayerSprite.y + EXP_BG_DEPTH_OFFSET);
+            
+            expBar.x = this.localPlayerSprite.x - (EXP_BAR_WIDTH / 2);
+            expBar.y = this.localPlayerSprite.y - Math.floor(this.localPlayerSprite.height / 2) - EXP_BAR_OFFSET_Y;
+            expBar.setDepth(BASE_DEPTH + this.localPlayerSprite.y + EXP_BAR_DEPTH_OFFSET);
         }
     }
 
-    /**
-     * Check if another player was damaged by a scorpion and apply poison effect if needed
-     * @param playerSprite The player sprite to check and apply effect to
-     * @param container The container holding the player sprite
-     */
-    private checkForOtherPlayerScorpionDamage(playerSprite: Phaser.GameObjects.Sprite, container: Phaser.GameObjects.Container): void {
-        // Skip if player is already poisoned
-        if (container.getData('isPoisoned')) return;
+    // Show dark haze overlay during boss fights
+    private showBossHaze(): void {
+        const hazeAlpha = 0.4; // Increased for testing
+        const hazeDepth = UI_DEPTH - 1; // Increased for testing
+
+        if (this.bossHazeOverlay) {
+            console.log("Boss haze overlay already exists. Setting visible and alpha.");
+            this.bossHazeOverlay.setVisible(true);
+            this.bossHazeOverlay.setAlpha(hazeAlpha); // Use test alpha
+            this.bossHazeOverlay.setDepth(hazeDepth); // Ensure depth is also set here
+            return;
+        }
+
+        const { width, height } = this.scale;
+        console.log(`Creating boss haze overlay with dimensions: ${width}x${height}`);
         
-        if (!this.monsterManager || !this.spacetimeDBClient?.sdkConnection?.db) return;
+        // Create dark semi-transparent overlay
+        this.bossHazeOverlay = this.add.rectangle(0, 0, width, height, 0x1A1E40, hazeAlpha) // Initial alpha is testAlpha (though it's set to 0 next)
+            .setOrigin(0, 0)
+            .setScrollFactor(0) // Fix to camera
+            .setDepth(hazeDepth); // Use test depth
         
-        try {
-            // Get the entity ID for this player container
-            const entityId = container.getData('entityId');
-            if (!entityId) return;
-            
-            // Check if there's a scorpion near this player's position
-            const playerX = container.x;
-            const playerY = container.y;
-            const detectionRadius = 60; // Detection radius for scorpion damage
-            
-            // Check all scorpions
-            for (const monster of this.spacetimeDBClient.sdkConnection.db.monsters.iter()) {
-                if (!monster.monsterType || monster.monsterType.tag !== 'Scorpion') continue;
-                
-                const monsterEntity = this.spacetimeDBClient.sdkConnection.db.entity.entityId.find(monster.entityId);
-                if (!monsterEntity) continue;
-                
-                // Calculate distance
-                const dx = playerX - monsterEntity.position.x;
-                const dy = playerY - monsterEntity.position.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                
-                if (distance <= detectionRadius) {
-                    // Apply poison effect
-                    console.log(`Applying poison effect to other player at position (${playerX}, ${playerY})`);
-                    createScorpionPoisonEffect(this, playerSprite, container.x, container.y);
-                    container.setData('isPoisoned', true);
-                    
-                    // Remove poison effect after duration
-                    this.time.delayedCall(3000, () => {
-                        container.setData('isPoisoned', false);
-                    });
-                    
-                    break; // Only apply poison once per check
+        // Fade in the haze
+        this.bossHazeOverlay.setAlpha(0); // Starts at alpha 0 for fade-in
+        this.tweens.add({
+            targets: this.bossHazeOverlay,
+            alpha: hazeAlpha, // Fades to test alpha
+            duration: 2000,
+            ease: 'Power2.easeIn',
+            onComplete: () => {
+                console.log("Boss haze fade-in tween complete. Alpha:", this.bossHazeOverlay?.alpha);
+            }
+        });
+        
+        console.log("Boss haze overlay creation initiated.");
+    }
+
+    // Hide dark haze overlay when boss is defeated
+    private hideBossHaze(): void {
+        if (!this.bossHazeOverlay) return;
+        
+        // Fade out the haze
+        this.tweens.add({
+            targets: this.bossHazeOverlay,
+            alpha: 0,
+            duration: 1500,
+            ease: 'Power2.easeOut',
+            onComplete: () => {
+                if (this.bossHazeOverlay) {
+                    this.bossHazeOverlay.destroy();
+                    this.bossHazeOverlay = null;
                 }
             }
-        } catch (error) {
-            console.error("Error checking scorpion damage for other player:", error);
+        });
+        
+        console.log("Boss haze overlay hidden");
+    }
+
+    // Handle game state changes to hide haze when boss is defeated
+    private handleGameStateUpdated(ctx: EventContext, oldState: any, newState: any): void {
+        // Check if boss becomes inactive (defeated)
+        if (oldState.bossActive && !newState.bossActive) {
+            console.log("Boss defeated! Hiding haze overlay");
+            this.hideBossHaze();
         }
     }
 
-    // ------ Debug Methods ------
-    
-    /**
-     * Test the weapon combination animation with predefined weapons
-     * This can be called from the browser console for testing
-     */
-    public testCombinationAnimation(): void {
-        console.log("Testing weapon combination animation...");
+    private handleResize(): void {
+        // Update MonsterCounterUI position when screen resizes
+        if (this.monsterCounterUI) {
+            this.monsterCounterUI.updatePosition();
+        }
+    }
+
+    private isPointerOverOptionsUI(pointer: Phaser.Input.Pointer): boolean {
+        if (!this.optionsUI) return false;
         
-        if (!this.upgradeUI) {
-            console.error("UpgradeUI not initialized - cannot test combination animation");
-            return;
+        // Check if options UI is visible
+        const container = (this.optionsUI as any).container;
+        if (!container || !container.visible) return false;
+        
+        // Options UI container has scrollFactor 0, so it's positioned in screen coordinates
+        // Container is at screen position (20, 20) with size 250x200
+        const uiScreenX = 20;
+        const uiScreenY = 20;
+        const uiWidth = 250;
+        const uiHeight = 200;
+        
+        // Use pointer screen coordinates (since UI doesn't move with camera)
+        const screenX = pointer.x;
+        const screenY = pointer.y;
+        
+        // Check if pointer is within the UI bounds in screen space
+        const isOverUI = screenX >= uiScreenX && 
+               screenX <= uiScreenX + uiWidth && 
+               screenY >= uiScreenY && 
+               screenY <= uiScreenY + uiHeight;
+               
+        if (isOverUI) {
+            console.log("Pointer IS over options UI bounds:", screenX, screenY, "vs bounds:", uiScreenX, uiScreenY, uiWidth, uiHeight);
         }
         
-        // Create mock AttackType objects for testing
-        const mockSword = { tag: 'Sword' };
-        const mockWand = { tag: 'Wand' };
-        const mockFireSword = { tag: 'FireSword' };
+        return isOverUI;
+    }
+
+    // Add PvP circle indicator around PvP-enabled players and manage attack transparency
+    private createPvpIndicator(container: Phaser.GameObjects.Container, isPvpEnabled: boolean): Phaser.GameObjects.Arc | null {
+        if (!isPvpEnabled) return null;
         
-        // Show the combination animation
-        this.upgradeUI.handleWeaponCombination(
-            mockSword as any,
-            mockWand as any,
-            mockFireSword as any
-        );
+        // Create a transparent red circle around the player
+        const pvpCircle = this.add.circle(0, 0, 60, 0xff0000, 0.3);
+        pvpCircle.setStrokeStyle(2, 0xff0000, 0.6);
+        pvpCircle.setName('pvpIndicator');
         
-        console.log("Combination animation test triggered!");
+        // Add pulsing animation
+        this.tweens.add({
+            targets: pvpCircle,
+            alpha: { from: 0.3, to: 0.1 },
+            yoyo: true,
+            repeat: -1,
+            duration: 1500,
+            ease: 'Sine.easeInOut'
+        });
+        
+        // Add to container
+        container.add(pvpCircle);
+        
+        return pvpCircle;
+    }
+
+    private updatePvpIndicator(container: Phaser.GameObjects.Container, isPvpEnabled: boolean): void {
+        const existingIndicator = container.getByName('pvpIndicator') as Phaser.GameObjects.Arc;
+        
+        if (isPvpEnabled && !existingIndicator) {
+            // Add PvP indicator
+            this.createPvpIndicator(container, true);
+        } else if (!isPvpEnabled && existingIndicator) {
+            // Remove PvP indicator
+            existingIndicator.destroy();
+        }
+    }
+
+    private updateLocalPlayerPvpIndicator(isPvpEnabled: boolean): void {
+        if (!this.localPlayerSprite) return;
+        
+        // Check if we already have a PvP indicator
+        const existingIndicator = this.localPlayerSprite.getData('pvpIndicator') as Phaser.GameObjects.Arc;
+        
+        if (isPvpEnabled && !existingIndicator) {
+            // Create PvP indicator for local player
+            const pvpCircle = this.add.circle(
+                this.localPlayerSprite.x, 
+                this.localPlayerSprite.y, 
+                60, 
+                0xff0000, 
+                0.3
+            );
+            pvpCircle.setStrokeStyle(2, 0xff0000, 0.6);
+            pvpCircle.setDepth(this.localPlayerSprite.depth - 0.5); // Just behind the player
+            
+            // Add pulsing animation
+            this.tweens.add({
+                targets: pvpCircle,
+                alpha: { from: 0.3, to: 0.1 },
+                yoyo: true,
+                repeat: -1,
+                duration: 1500,
+                ease: 'Sine.easeInOut'
+            });
+            
+            // Store reference on the player sprite
+            this.localPlayerSprite.setData('pvpIndicator', pvpCircle);
+        } else if (!isPvpEnabled && existingIndicator) {
+            // Remove PvP indicator
+            existingIndicator.destroy();
+            this.localPlayerSprite.setData('pvpIndicator', null);
+        }
     }
     
-    /**
-     * Debug the combination container visibility
-     */
-    public debugCombinationVisibility(): void {
-        console.log("Debugging combination container visibility...");
-        
-        if (!this.upgradeUI) {
-            console.error("UpgradeUI not initialized");
-            return;
-        }
-        
-        // Call the debug methods
-        this.upgradeUI.debugCombinationContainer();
-        this.upgradeUI.forceCombinationVisible();
-    }
+    // Development functions removed for production
 }

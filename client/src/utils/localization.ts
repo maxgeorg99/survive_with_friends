@@ -1,5 +1,5 @@
-import en from '@/loca/en.json';
-import de from '@/loca/de.json';
+import en from '../loca/en.json';
+import de from '../loca/de.json';
 
 type LocalizationData = typeof en;
 

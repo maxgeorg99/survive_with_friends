@@ -1,30 +1,20 @@
 import { Identity, ErrorContextInterface } from '@clockworklabs/spacetimedb-sdk';
 // Import generated classes, including the generated DbConnection
-import { RemoteReducers, SetReducerFlags, RemoteTables, DbConnection, ErrorContext, SubscriptionEventContext } from "./autobindings"; // Removed Reducer, EventContext import as they seem unused here
+import { RemoteReducers, SetReducerFlags, RemoteTables, DbConnection, ErrorContext, SubscriptionEventContext } from "./autobindings";
 import { GameEvents } from './constants/GameEvents';
 
 // Define your SpacetimeDB connection details
-const SPACETIMEDB_DB_NAME = "vibesurvivors-with-friends";
-const SPACETIMEDB_URI = "ws://localhost:3000"; // Local development server
-const REMOTE_SPACETIMEDB_URI = "wss://maincloud.spacetimedb.com"; // Production server
+const SPACETIME_DB_LIVE : string = "survive-with-friends";
+const SPACETIME_DB_PTR : string = "vibesurvivorsptr";
+const SPACETIMEDB_DB_NAME : string = SPACETIME_DB_LIVE;
 
-// Check if we're running in production mode based on the URL
-// If the URL includes 'localhost' or is a dev-specific domain, use local URI
-function isDevEnvironment() {
-    // In browser environment
-    if (typeof window !== 'undefined') {
-        return window.location.hostname === 'localhost' || 
-               window.location.port === '8080';
-    }
-    return false;
-}
+const LOCAL_SPACETIMEDB_URI : string = "ws://localhost:3000"; // Use wss for cloud, corrected order
+const REMOTE_SPACETIMEDB_URI : string = "wss://maincloud.spacetimedb.com";
+const PROXY_SPACETIMEDB_URI : string = "ws://localhost:3001";
 
-// Use the appropriate URI based on environment
-const URI_TO_USE = isDevEnvironment() ? SPACETIMEDB_URI : REMOTE_SPACETIMEDB_URI;
+const URI_TO_USE = LOCAL_SPACETIMEDB_URI;
 
-// Log the current environment and chosen URI
-console.log(`Environment: ${isDevEnvironment() ? 'Development' : 'Production'}`);
-console.log(`Using SpacetimeDB URI: ${URI_TO_USE}`);
+const TOKEN_TO_USE = (URI_TO_USE === REMOTE_SPACETIMEDB_URI) ? "space_token" : 'local_token';
 
 class SpacetimeDBClient {
     // Initialize sdkClient to null, it will be set in handleConnect
@@ -55,7 +45,8 @@ class SpacetimeDBClient {
         DbConnection.builder()
             .withUri(URI_TO_USE)
             .withModuleName(SPACETIMEDB_DB_NAME)
-            .withToken(localStorage.getItem('auth_token') || '')
+            .withToken(localStorage.getItem(TOKEN_TO_USE) || '')
+            //.withToken('')
             .onConnect(this.handleConnect.bind(this))
             .onDisconnect(this.handleDisconnect.bind(this))
             .onConnectError(this.handleConnectError.bind(this))
@@ -86,7 +77,7 @@ class SpacetimeDBClient {
         this.identity = identity;
         console.log("Local Identity:", this.identity?.toHexString());
 
-        localStorage.setItem('auth_token', token);
+        localStorage.setItem(TOKEN_TO_USE, token);
 
         // Subscribe using the subscriptionBuilder on the valid sdkClient
         console.log("Subscribing to relevant tables...");
@@ -100,8 +91,9 @@ class SpacetimeDBClient {
                 "SELECT * FROM dead_players",
                 "SELECT * FROM entity",
                 "SELECT * FROM monsters",
+                "SELECT * FROM monsters_boid",
                 "SELECT * FROM active_attacks",
-                "SELECT * FROM active_boss_attacks",
+                "SELECT * FROM active_monster_attacks",
                 "SELECT * FROM attack_data",
                 "SELECT * FROM gems",
                 "SELECT * FROM upgrade_options",
@@ -109,11 +101,12 @@ class SpacetimeDBClient {
                 "SELECT * FROM monster_spawners",
                 "SELECT * FROM game_state",
                 "SELECT * FROM boss_spawn_timer",
-                "SELECT * FROM boss_attack_timer",
-                "SELECT * FROM player_poison_effect",
+                "SELECT * FROM loot_capsules",
+                "SELECT * FROM agna_magic_circles",
+                "SELECT * FROM agna_candle_spawns",
+                "SELECT * FROM found_lore_scrolls",
                 "SELECT * FROM achievements",
-                "SELECT * FROM bestiary",
-                "SELECT * FROM game_quests",
+                "SELECT * FROM game_quests"
             ]);
 
         // Register table event callbacks
@@ -166,6 +159,13 @@ class SpacetimeDBClient {
             });
         }
 
+        // Monster Boid Events
+        if (connection.db.monstersBoid) {
+            connection.db.monstersBoid.onUpdate((ctx, oldBoid, newBoid) => {
+                this.gameEvents.emit(GameEvents.MONSTER_BOID_UPDATED, ctx, oldBoid, newBoid);
+            });
+        }
+
         // Game State Events
         if (connection.db.gameState) {
             connection.db.gameState.onUpdate((ctx, oldState, newState) => {
@@ -196,16 +196,16 @@ class SpacetimeDBClient {
             });
         }
 
-        // Boss Attack Events
-        if (connection.db.activeBossAttacks) {
-            connection.db.activeBossAttacks.onInsert((ctx, attack) => {
-                this.gameEvents.emit(GameEvents.BOSS_ATTACK_CREATED, ctx, attack);
+        // Monster Attack Events
+        if (connection.db.activeMonsterAttacks) {
+            connection.db.activeMonsterAttacks.onInsert((ctx, attack) => {
+                this.gameEvents.emit(GameEvents.MONSTER_ATTACK_CREATED, ctx, attack);
             });
-            connection.db.activeBossAttacks.onUpdate((ctx, oldAttack, newAttack) => {
-                this.gameEvents.emit(GameEvents.BOSS_ATTACK_UPDATED, ctx, oldAttack, newAttack);
+            connection.db.activeMonsterAttacks.onUpdate((ctx, oldAttack, newAttack) => {
+                this.gameEvents.emit(GameEvents.MONSTER_ATTACK_UPDATED, ctx, oldAttack, newAttack);
             });
-            connection.db.activeBossAttacks.onDelete((ctx, attack) => {
-                this.gameEvents.emit(GameEvents.BOSS_ATTACK_DELETED, ctx, attack);
+            connection.db.activeMonsterAttacks.onDelete((ctx, attack) => {
+                this.gameEvents.emit(GameEvents.MONSTER_ATTACK_DELETED, ctx, attack);
             });
         }
 
@@ -231,41 +231,34 @@ class SpacetimeDBClient {
             console.warn("Could not register gem event handlers - the gems table might not be in current bindings yet:", e);
         }
 
+        // LootCapsule Events - Check if the loot_capsules table exists in the bindings
+        try {
+            // @ts-ignore - Ignore TS error since table might not exist in current bindings
+            if (connection.db.lootCapsules) {
+                // @ts-ignore
+                connection.db.lootCapsules.onInsert((ctx, capsule) => {
+                    this.gameEvents.emit(GameEvents.LOOT_CAPSULE_CREATED, ctx, capsule);
+                });
+                // @ts-ignore
+                connection.db.lootCapsules.onUpdate((ctx, oldCapsule, newCapsule) => {
+                    this.gameEvents.emit(GameEvents.LOOT_CAPSULE_UPDATED, ctx, oldCapsule, newCapsule);
+                });
+                // @ts-ignore
+                connection.db.lootCapsules.onDelete((ctx, capsule) => {
+                    this.gameEvents.emit(GameEvents.LOOT_CAPSULE_DELETED, ctx, capsule);
+                });
+                console.log("Registered loot capsule event handlers successfully");
+            }
+        } catch (e) {
+            console.warn("Could not register loot capsule event handlers - the loot_capsules table might not be in current bindings yet:", e);
+        }
+
         if(connection.db.world) {
             connection.db.world.onUpdate((ctx, oldWorld, newWorld) => {
+                this.gameEvents.emit(GameEvents.WORLD_UPDATED, ctx, oldWorld, newWorld);
                 if(newWorld.tickCount % 50 == 0) {
                     console.log("Game tick:", newWorld.tickCount);
                 }
-            });
-        }
-
-        // Attack Data Events
-        if (connection.db.attackData) {
-            connection.db.attackData.onInsert((ctx, data) => {
-                this.gameEvents.emit(GameEvents.ATTACK_DATA_CREATED, ctx, data);
-            });
-            connection.db.attackData.onUpdate((ctx, oldData, newData) => {
-                this.gameEvents.emit(GameEvents.ATTACK_DATA_UPDATED, ctx, oldData, newData);
-            });
-        }
-
-        // Active Attack Cleanup Events
-        if (connection.db.activeAttackCleanup) {
-            connection.db.activeAttackCleanup.onInsert((ctx, cleanup) => {
-                this.gameEvents.emit(GameEvents.ACTIVE_ATTACK_CLEANUP_CREATED, ctx, cleanup);
-            });
-            connection.db.activeAttackCleanup.onDelete((ctx, cleanup) => {
-                this.gameEvents.emit(GameEvents.ACTIVE_ATTACK_CLEANUP_DELETED, ctx, cleanup);
-            });
-        }
-
-        // Active Boss Attack Cleanup Events
-        if (connection.db.activeBossAttackCleanup) {
-            connection.db.activeBossAttackCleanup.onInsert((ctx, cleanup) => {
-                this.gameEvents.emit(GameEvents.ACTIVE_BOSS_ATTACK_CLEANUP_CREATED, ctx, cleanup);
-            });
-            connection.db.activeBossAttackCleanup.onDelete((ctx, cleanup) => {
-                this.gameEvents.emit(GameEvents.ACTIVE_BOSS_ATTACK_CLEANUP_DELETED, ctx, cleanup);
             });
         }
     }
