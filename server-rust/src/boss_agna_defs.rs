@@ -925,6 +925,9 @@ pub fn update_agna_magic_circles(ctx: &ReducerContext, cache: &crate::collision:
     if(magic_circles_updated == 0) {
         log::warn!("No magic circles updated for Agna boss");
     }
+    else {
+        log::info!("Updated {} magic circles for Agna boss", magic_circles_updated);
+    }
 }
 
 

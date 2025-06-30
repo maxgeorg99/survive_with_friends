@@ -282,6 +282,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('void_arrow', '/assets/void_arrow.png');
         
         // Load Soul UI assets
+        this.load.audio('movement_command', '/assets/sounds/move_command.mp3');
         this.load.image('soul_arrow', '/assets/soul_arrow.png');
         
         // Load a white pixel for particle effects
