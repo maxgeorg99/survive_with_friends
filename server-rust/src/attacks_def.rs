@@ -503,8 +503,10 @@ pub fn server_trigger_attack(ctx: &ReducerContext, mut attack: PlayerScheduledAt
         trigger_attack_projectile(ctx, player_id, attack.attack_type.clone(), 0, attack.parameter_u, attack.parameter_i);
     }
 
-    // Update the scheduled attack in the database
-    ctx.db.player_scheduled_attacks().scheduled_id().update(attack);
+    // Update the scheduled attack in the database (if it still exists)
+    if ctx.db.player_scheduled_attacks().scheduled_id().find(&attack.scheduled_id).is_some() {
+        ctx.db.player_scheduled_attacks().scheduled_id().update(attack);
+    }
 }
 
 // Helper method to schedule attacks for a player
