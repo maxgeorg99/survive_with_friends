@@ -896,25 +896,34 @@ pub fn start_agna_fire_orb_attacks(ctx: &ReducerContext, boss_monster_id: u32, t
 // Update magic circle positions (called from game tick)
 pub fn update_agna_magic_circles(ctx: &ReducerContext, cache: &crate::collision::CollisionCache) {
     // Update all magic circles' tick counts and positions
+    let mut magic_circles_updated = 0;
     for circle in ctx.db.agna_magic_circles().iter() {
         let mut updated_circle = circle;
         updated_circle.ticks_elapsed += 1;
-        
+    
         // Get the target player's current position from cache
-        let player_position = if let Some(&player_cache_idx) = cache.player.player_id_to_cache_index.get(&updated_circle.target_player_id) {
-            DbVector2::new(
-                cache.player.pos_x_player[player_cache_idx as usize],
-                cache.player.pos_y_player[player_cache_idx as usize]
-            )
-        } else {
-            // Player no longer exists in cache, magic circle will be cleaned up elsewhere
-            continue;
+        let player_cache_idx = match cache.player.player_id_to_cache_index.get(&updated_circle.target_player_id) {
+            Some(&idx) => idx as usize,
+            None => {
+                log::warn!("Player {} not found when updating magic circle position", updated_circle.target_player_id);
+                continue;
+            }
         };
+
+        let player_position = DbVector2::new(
+            cache.player.pos_x_player[player_cache_idx],
+            cache.player.pos_y_player[player_cache_idx]
+        );
         
         // Calculate the current position of the magic circle
         updated_circle.position = calculate_magic_circle_position(&player_position, &updated_circle);
         
         ctx.db.agna_magic_circles().circle_id().update(updated_circle);
+        magic_circles_updated += 1; 
+    }
+    
+    if(magic_circles_updated == 0) {
+        log::warn!("No magic circles updated for Agna boss");
     }
 }
 
