@@ -367,12 +367,12 @@ export default class ClassSelectScene extends Phaser.Scene {
         };
         
         // Create all class buttons using the correct PlayerClass types
-        this.fighterButton = createClassButton('Fighter', PlayerClass.Fighter as PlayerClass, 'fighter_icon');
-        this.rogueButton = createClassButton('Rogue', PlayerClass.Rogue as PlayerClass, 'rogue_icon');
-        this.mageButton = createClassButton('Mage', PlayerClass.Mage as PlayerClass, 'mage_icon');
-        this.paladinButton = createClassButton('Paladin', PlayerClass.Paladin as PlayerClass, 'paladin_icon');
-        this.valkyrieButton = createClassButton('Valkyrie', PlayerClass.Valkyrie as PlayerClass, 'valkyrie_icon');
-        this.priestessButton = createClassButton('Priestess', PlayerClass.Priest as PlayerClass, 'priestess_icon');
+        this.fighterButton = createClassButton('Til', PlayerClass.Fighter as PlayerClass, 'fighter_icon');
+        this.rogueButton = createClassButton('Marc', PlayerClass.Rogue as PlayerClass, 'rogue_icon');
+        this.mageButton = createClassButton('Max', PlayerClass.Mage as PlayerClass, 'mage_icon');
+        this.paladinButton = createClassButton('Chris', PlayerClass.Paladin as PlayerClass, 'paladin_icon');
+        this.valkyrieButton = createClassButton('Gwen', PlayerClass.Valkyrie as PlayerClass, 'valkyrie_icon');
+        this.priestessButton = createClassButton('Enno', PlayerClass.Priest as PlayerClass, 'priestess_icon');
         
         // Add buttons to container in grid layout (2x3 grid)
         this.classButtonsContainer.appendChild(this.fighterButton);

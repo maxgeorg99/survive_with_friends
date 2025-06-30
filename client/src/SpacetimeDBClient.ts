@@ -4,7 +4,7 @@ import { RemoteReducers, SetReducerFlags, RemoteTables, DbConnection, ErrorConte
 import { GameEvents } from './constants/GameEvents';
 
 // Define your SpacetimeDB connection details
-const SPACETIME_DB_LIVE : string = "vibesurvivors";
+const SPACETIME_DB_LIVE : string = "vibe-survivors-with-friends";
 const SPACETIME_DB_PTR : string = "vibesurvivorsptr";
 const SPACETIMEDB_DB_NAME : string = SPACETIME_DB_LIVE;
 

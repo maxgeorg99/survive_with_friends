@@ -85,7 +85,7 @@ export default class NameSelectScene extends Phaser.Scene {
         console.log(`NameSelectScene: Responsive text sizing - Title: ${baseTitleSize}px, Subtitle: ${baseSubtitleSize}px for screen ${width}x${height}`);
         
         // Add game title
-        const titleText = this.add.text(0, -height * RESPONSIVE_CONFIG.TITLE_Y_OFFSET, 'VIBE SURVIVORS', {
+        const titleText = this.add.text(0, -height * RESPONSIVE_CONFIG.TITLE_Y_OFFSET, 'SURVIVE WITH FRIENDS', {
             fontFamily: 'Arial Black',
             fontSize: `${baseTitleSize}px`,
             color: '#ffffff',

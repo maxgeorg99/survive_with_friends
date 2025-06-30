@@ -7,8 +7,8 @@ declare global {
 }
 
 // Default volume settings
-const DEFAULT_MUSIC_VOLUME = 0.7;
-const DEFAULT_SOUND_VOLUME = 0.8;
+const DEFAULT_MUSIC_VOLUME = 0.5;
+const DEFAULT_SOUND_VOLUME = 0.5;
 
 // Initialize global volume settings
 export function initializeGlobalVolumes(): void {
