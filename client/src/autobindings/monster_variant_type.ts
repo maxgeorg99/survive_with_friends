@@ -39,6 +39,7 @@ export namespace MonsterVariant {
   // the tagged union.
   export type Default = { tag: "Default" };
   export type Shiny = { tag: "Shiny" };
+  export type Cursed = { tag: "Cursed" };
 
   // Helper functions for constructing each variant of the tagged union.
   // ```
@@ -48,11 +49,13 @@ export namespace MonsterVariant {
   // ```
   export const Default = { tag: "Default" };
   export const Shiny = { tag: "Shiny" };
+  export const Cursed = { tag: "Cursed" };
 
   export function getTypeScriptAlgebraicType(): AlgebraicType {
     return AlgebraicType.createSumType([
       new SumTypeVariant("Default", AlgebraicType.createProductType([])),
       new SumTypeVariant("Shiny", AlgebraicType.createProductType([])),
+      new SumTypeVariant("Cursed", AlgebraicType.createProductType([])),
     ]);
   }
 
@@ -67,7 +70,7 @@ export namespace MonsterVariant {
 }
 
 // The tagged union or sum type for the algebraic type `MonsterVariant`.
-export type MonsterVariant = MonsterVariant.Default | MonsterVariant.Shiny;
+export type MonsterVariant = MonsterVariant.Default | MonsterVariant.Shiny | MonsterVariant.Cursed;
 
 export default MonsterVariant;
 

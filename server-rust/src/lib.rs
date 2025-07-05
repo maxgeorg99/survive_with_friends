@@ -111,6 +111,7 @@ pub enum MonsterAttackType {
 pub enum MonsterVariant {
     Default,
     Shiny,
+    Cursed,
 }
 
 #[derive(SpacetimeType, Clone, Copy, Debug, PartialEq)]

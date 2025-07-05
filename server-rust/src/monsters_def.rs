@@ -17,6 +17,14 @@ const SHINY_ATTACK_MULTIPLIER: f32 = 2.0; // Shiny monsters have 2x attack
 const SHINY_SPEED_MULTIPLIER: f32 = 1.25; // Shiny monsters are 25% faster
 const SHINY_MAX_RADIUS: f32 = 128.0; // Maximum radius for shiny monsters
 
+// Cursed monster constants
+const CURSED_SPAWN_CHANCE_DENOMINATOR: u32 = 10; // 1 in 10 chance (10%) for cursed monsters
+const CURSED_SCALE_MULTIPLIER: f32 = 1.2; // Cursed monsters are 20% larger    
+const CURSED_HP_MULTIPLIER: f32 = 2.0; // Cursed monsters have 2x HP
+const CURSED_ATTACK_MULTIPLIER: f32 = 2.0; // Cursed monsters have 2x attack
+const CURSED_SPEED_MULTIPLIER: f32 = 1.25; // Cursed monsters are 25% faster
+const CURSED_MAX_RADIUS: f32 = 128.0; // Maximum radius for cursed monsters
+
 // Note: Monster spawning is now handled by tier-based weights in monster_spawn_defs.rs
 // VoidChests still have a fixed 0.5% spawn chance regardless of tier
 
@@ -286,17 +294,27 @@ pub fn spawn_monster(ctx: &ReducerContext, spawner: MonsterSpawners) {
         AIState::Default
     };
     
-    // Determine if this monster should be shiny
+    // Determine monster variant (priority: shiny > cursed > default)
     let is_shiny = should_spawn_as_shiny(ctx, &spawner.monster_type);
+    let is_cursed = if !is_shiny {
+        should_spawn_as_cursed(ctx, &spawner.monster_type)
+    } else {
+        false // Can't be both shiny and cursed
+    };
+    
     let variant = if is_shiny {
         crate::MonsterVariant::Shiny
+    } else if is_cursed {
+        crate::MonsterVariant::Cursed
     } else {
         crate::MonsterVariant::Default
     };
     
-    // Apply shiny modifiers if needed
+    // Apply variant modifiers (shiny, cursed, or default)
     let (mut final_hp, mut final_max_hp, mut final_atk, mut final_speed, final_radius) = if is_shiny {
         apply_shiny_modifiers(bestiary_entry.max_hp, bestiary_entry.max_hp, bestiary_entry.atk, bestiary_entry.speed, bestiary_entry.radius)
+    } else if is_cursed {
+        apply_cursed_modifiers(bestiary_entry.max_hp, bestiary_entry.max_hp, bestiary_entry.atk, bestiary_entry.speed, bestiary_entry.radius)
     } else {
         (bestiary_entry.max_hp, bestiary_entry.max_hp, bestiary_entry.atk, bestiary_entry.speed, bestiary_entry.radius)
     };
@@ -999,6 +1017,49 @@ fn apply_shiny_modifiers(hp: u32, max_hp: u32, atk: f32, speed: f32, radius: f32
     }
     
     (new_hp, new_max_hp, new_atk, new_speed, new_radius)
+}
+
+// Function to determine if a monster should spawn as cursed (excludes bosses, VoidChests, EnderClaws, and structures)
+fn should_spawn_as_cursed(ctx: &ReducerContext, monster_type: &MonsterType) -> bool {
+    // Only spawn cursed monsters if the CursedMonstersSpawn curse is active
+    if !crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::CursedMonstersSpawn) {
+        return false;
+    }
+    
+    // Never spawn bosses, VoidChests, EnderClaws, or structures as cursed
+    match monster_type {
+        MonsterType::BossEnderPhase1 | MonsterType::BossEnderPhase2 | 
+        MonsterType::BossAgnaPhase1 | MonsterType::BossAgnaPhase2 |
+        MonsterType::VoidChest | MonsterType::EnderClaw |
+        MonsterType::Crate | MonsterType::Tree | MonsterType::Statue => {
+            log::debug!("{} excluded from cursed spawning", crate::monster_types_def::get_monster_type_name(monster_type));
+            false
+        },
+        _ => {
+            // 10% chance for regular monsters to be cursed
+            let mut rng = ctx.rng();
+            let roll = rng.gen_range(1..=CURSED_SPAWN_CHANCE_DENOMINATOR);
+            roll == 1
+        }
+    }
+}
+
+// Function to apply cursed modifiers to monster stats
+fn apply_cursed_modifiers(hp: u32, max_hp: u32, atk: f32, speed: f32, radius: f32) -> (u32, u32, f32, f32, f32) {
+    let new_hp = (hp as f32 * CURSED_HP_MULTIPLIER) as u32;
+    let new_max_hp = (max_hp as f32 * CURSED_HP_MULTIPLIER) as u32;
+    let new_atk = atk * CURSED_ATTACK_MULTIPLIER;
+    let new_speed = speed * CURSED_SPEED_MULTIPLIER;
+    let scaled_radius = radius * CURSED_SCALE_MULTIPLIER;
+    let final_radius = scaled_radius.min(CURSED_MAX_RADIUS);
+    
+    // Log when radius is capped
+    if scaled_radius > CURSED_MAX_RADIUS {
+        log::info!("Cursed monster radius capped: {:.1} -> {:.1} (base: {:.1})", 
+                  scaled_radius, final_radius, radius);
+    }
+    
+    (new_hp, new_max_hp, new_atk, new_speed, final_radius)
 }
 
 // Function to trigger shiny monster death pinata - spawns void capsules

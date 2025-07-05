@@ -165,6 +165,56 @@ pub fn admin_clear_curses(ctx: &ReducerContext) {
     clear_all_curses(ctx);
 }
 
+// Admin reducer to add a specific curse from debug list (for testing)
+#[reducer]
+pub fn admin_add_debug_curse(ctx: &ReducerContext) {
+    crate::require_admin_access(ctx, "AdminAddDebugCurse");
+    
+    // Hardcoded list of curses for testing - starting with CursedMonstersSpawn
+    let debug_curses = vec![
+        CurseType::CursedMonstersSpawn,
+        // Add more curses here as needed for testing
+    ];
+    
+    log::info!("Admin adding debug curse from test list...");
+    
+    // Try to find a curse from the list that isn't already active
+    let mut curse_to_add: Option<CurseType> = None;
+    
+    for curse_type in &debug_curses {
+        if !is_curse_active(ctx, curse_type.clone()) {
+            curse_to_add = Some(curse_type.clone());
+            break;
+        }
+    }
+    
+    match curse_to_add {
+        Some(curse_type) => {
+            // Add the specific curse
+            let curse = ctx.db.curses().insert(Curse {
+                curse_id: 0,
+                curse_type: curse_type.clone(),
+            });
+            
+            log::info!("Admin added debug curse: {:?} (ID: {})", curse_type, curse.curse_id);
+            
+            // Log current total curse count
+            let total_curses = ctx.db.curses().count();
+            log::info!("Total active curses: {}", total_curses);
+            
+            // Start monster health regeneration if needed
+            start_monster_health_regen_if_needed(ctx);
+        },
+        None => {
+            log::info!("Admin debug curse: All test curses are already active!");
+            
+            // Log which curses are currently active
+            let active_curses: Vec<CurseType> = ctx.db.curses().iter().map(|curse| curse.curse_type).collect();
+            log::info!("Currently active curses: {:?}", active_curses);
+        }
+    }
+}
+
 // Monster health regeneration system
 #[table(name = monster_health_regen_timer, scheduled(monster_health_regen_tick), public)]
 pub struct MonsterHealthRegenTimer {

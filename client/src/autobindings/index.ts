@@ -36,6 +36,8 @@ import {
 // Import and reexport all reducer arg types
 import { AdminAddCurse } from "./admin_add_curse_reducer.ts";
 export { AdminAddCurse };
+import { AdminAddDebugCurse } from "./admin_add_debug_curse_reducer.ts";
+export { AdminAddDebugCurse };
 import { AdminClearCurses } from "./admin_clear_curses_reducer.ts";
 export { AdminClearCurses };
 import { ChangeMonsterState } from "./change_monster_state_reducer.ts";
@@ -984,6 +986,10 @@ const REMOTE_MODULE = {
       reducerName: "admin_add_curse",
       argsType: AdminAddCurse.getTypeScriptAlgebraicType(),
     },
+    admin_add_debug_curse: {
+      reducerName: "admin_add_debug_curse",
+      argsType: AdminAddDebugCurse.getTypeScriptAlgebraicType(),
+    },
     admin_clear_curses: {
       reducerName: "admin_clear_curses",
       argsType: AdminClearCurses.getTypeScriptAlgebraicType(),
@@ -1251,6 +1257,7 @@ const REMOTE_MODULE = {
 // A type representing all the possible variants of a reducer.
 export type Reducer = never
 | { name: "AdminAddCurse", args: AdminAddCurse }
+| { name: "AdminAddDebugCurse", args: AdminAddDebugCurse }
 | { name: "AdminClearCurses", args: AdminClearCurses }
 | { name: "ChangeMonsterState", args: ChangeMonsterState }
 | { name: "CheckAgnaRitualCompletion", args: CheckAgnaRitualCompletion }
@@ -1325,6 +1332,18 @@ export class RemoteReducers {
 
   removeOnAdminAddCurse(callback: (ctx: ReducerEventContext) => void) {
     this.connection.offReducer("admin_add_curse", callback);
+  }
+
+  adminAddDebugCurse() {
+    this.connection.callReducer("admin_add_debug_curse", new Uint8Array(0), this.setCallReducerFlags.adminAddDebugCurseFlags);
+  }
+
+  onAdminAddDebugCurse(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.onReducer("admin_add_debug_curse", callback);
+  }
+
+  removeOnAdminAddDebugCurse(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.offReducer("admin_add_debug_curse", callback);
   }
 
   adminClearCurses() {
@@ -2201,6 +2220,11 @@ export class SetReducerFlags {
   adminAddCurseFlags: CallReducerFlags = 'FullUpdate';
   adminAddCurse(flags: CallReducerFlags) {
     this.adminAddCurseFlags = flags;
+  }
+
+  adminAddDebugCurseFlags: CallReducerFlags = 'FullUpdate';
+  adminAddDebugCurse(flags: CallReducerFlags) {
+    this.adminAddDebugCurseFlags = flags;
   }
 
   adminClearCursesFlags: CallReducerFlags = 'FullUpdate';
