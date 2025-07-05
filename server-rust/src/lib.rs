@@ -27,6 +27,7 @@ pub mod upgrades_def;
 pub mod structure_defs;
 pub mod lorescrolls_defs;
 pub mod cheats_def;
+pub mod curses_defs;
 
 // Re-export public items from modules
 pub use config_def::*;
@@ -54,6 +55,7 @@ pub use upgrades_def::*;
 pub use structure_defs::*;
 pub use lorescrolls_defs::*;
 pub use cheats_def::*;
+pub use curses_defs::*;
 
 // --- Types ---
 #[derive(SpacetimeType, Clone, Debug, PartialEq)]

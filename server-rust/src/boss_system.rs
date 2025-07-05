@@ -165,6 +165,10 @@ pub fn spawn_boss_phase_one(ctx: &ReducerContext, _timer: BossSpawnTimer) {
     game_state.boss_active = true;
     game_state.boss_phase = 1;
     game_state.normal_spawning_paused = true;
+    let boss_type = ctx.db.boss_selection().id().find(&0)
+        .map(|selection| selection.boss_type)
+        .unwrap_or(BossType::Ender);
+    game_state.boss_type = boss_type;
     ctx.db.game_state().id().update(game_state);
     
     // Calculate position at center of map
@@ -356,6 +360,9 @@ pub fn handle_boss_defeated(ctx: &ReducerContext) {
     }
     
     log::info!("{} players marked as True Survivors and transitioned to Winner state!", true_survivors_count);
+    
+    // Add a new curse for increased difficulty in future runs
+    crate::curses_defs::add_random_curse(ctx);
     
     // Now that all players have been removed, call reset_world to clean up everything else
     // This will clean up all monsters, gems, spawners, attacks, cooldowns, etc.

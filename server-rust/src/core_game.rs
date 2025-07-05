@@ -197,6 +197,20 @@ pub fn damage_monster(ctx: &ReducerContext, monster_id: u32, damage_amount: u32)
     }
 }
 
+// Helper function to handle the scenario when all players have been defeated
+// This triggers the defeat condition and clears curses for a fresh start
+pub fn handle_all_players_defeated(ctx: &ReducerContext) {
+    log::info!("All players have been defeated! Triggering defeat condition...");
+    
+    // Clear all curses on defeat (fresh start for next run)
+    crate::curses_defs::clear_all_curses(ctx);
+    
+    // Reset the game world (cleanup monsters, gems, spawners, etc.)
+    crate::reset_world::reset_world(ctx);
+    
+    log::info!("World reset complete after all players defeated.");
+}
+
 //Helper function to damage a player
 //Returns true if the player is dead, false otherwise
 pub fn damage_player(ctx: &ReducerContext, player_id: u32, damage_amount: f32) -> bool {
@@ -282,8 +296,7 @@ pub fn damage_player(ctx: &ReducerContext, player_id: u32, damage_amount: f32) -
         
         // Check if all players are now dead
         if ctx.db.player().count() == 0 {
-            log::info!("Last player has died! Resetting the game world...");
-            crate::reset_world::reset_world(ctx);
+            handle_all_players_defeated(ctx);
         }
 
         true
