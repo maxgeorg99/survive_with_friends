@@ -135,14 +135,25 @@ pub fn clear_all_curses(ctx: &ReducerContext) {
     log::info!("Cleared {} curses", curse_count);
 }
 
-// Helper function to check if a specific curse type is currently active
-pub fn is_curse_active(ctx: &ReducerContext, target_curse_type: CurseType) -> bool {
+// Helper function to check if a specific curse is active
+pub fn is_curse_active(ctx: &ReducerContext, curse_type: CurseType) -> bool {
     for curse in ctx.db.curses().iter() {
-        if curse.curse_type == target_curse_type {
+        if curse.curse_type == curse_type {
             return true;
         }
     }
     false
+}
+
+// Helper function to count active Scaling curses (for stacking effects)
+pub fn count_scaling_curses(ctx: &ReducerContext) -> u32 {
+    let mut count = 0;
+    for curse in ctx.db.curses().iter() {
+        if curse.curse_type == CurseType::Scaling {
+            count += 1;
+        }
+    }
+    count
 }
 
 // Admin reducer to manually add a curse (as if players won)
@@ -170,8 +181,9 @@ pub fn admin_clear_curses(ctx: &ReducerContext) {
 pub fn admin_add_debug_curse(ctx: &ReducerContext) {
     crate::require_admin_access(ctx, "AdminAddDebugCurse");
     
-    // Hardcoded list of curses for testing - starting with game timing modifications
+    // Hardcoded list of curses for testing - starting with scaling curse
     let debug_curses = vec![
+        CurseType::Scaling,
         CurseType::BossAppearsSooner,
         // Add more curses here as needed for testing
     ];

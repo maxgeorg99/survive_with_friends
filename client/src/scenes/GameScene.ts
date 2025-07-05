@@ -21,6 +21,7 @@ import Minimap, { MinimapElements } from '../ui/Minimap';
 import MusicManager from '../managers/MusicManager';
 import { DebugManager } from '../managers/DebugManager'; // Added import for DebugManager
 import GameplayOptionsUI from '../ui/GameplayOptionsUI';
+import CurseUI from '../ui/CurseUI';
 import { getSoundVolume } from '../managers/VolumeSettings';
 import { getPlayerShadowConfig, getPlayerClassName } from '../constants/PlayerCharacterConfig';
 
@@ -165,6 +166,9 @@ export default class GameScene extends Phaser.Scene {
     // Add Options UI for settings
     private optionsUI: GameplayOptionsUI | null = null;
 
+    // Add Curse UI for curse display and management
+    private curseUI: CurseUI | null = null;
+
     // Track if player damage sound is currently playing
     private isPlayerDamageSoundPlaying: boolean = false;
 
@@ -284,6 +288,9 @@ export default class GameScene extends Phaser.Scene {
         // Load Soul UI assets
         this.load.audio('movement_command', '/assets/sounds/move_command.mp3');
         this.load.image('soul_arrow', '/assets/soul_arrow.png');
+        
+        // Load Curse UI assets
+        this.load.image('curse_card', '/assets/curse_card.png');
         
         // Load a white pixel for particle effects
         this.load.image('white_pixel', '/assets/white_pixel.png');
@@ -527,6 +534,9 @@ export default class GameScene extends Phaser.Scene {
 
         // Initialize Options UI for settings
         this.optionsUI = new GameplayOptionsUI(this);
+
+        // Initialize Curse UI for curse display and management
+        this.curseUI = new CurseUI(this, this.spacetimeDBClient);
 
         // Add key listener for toggling monster counter UI
         this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.D).on('down', () => {
@@ -2224,6 +2234,12 @@ export default class GameScene extends Phaser.Scene {
             this.optionsUI = null;
         }
         
+        // Clean up Curse UI
+        if (this.curseUI) {
+            this.curseUI.destroy();
+            this.curseUI = null;
+        }
+        
         // DEFENSIVE CLEANUP: Remove any lingering game objects that might persist between scenes
         console.log("GameScene: Performing defensive cleanup of lingering game objects");
         
@@ -2861,6 +2877,11 @@ export default class GameScene extends Phaser.Scene {
         // Update MonsterCounterUI position when screen resizes
         if (this.monsterCounterUI) {
             this.monsterCounterUI.updatePosition();
+        }
+        
+        // Update CurseUI position when screen resizes
+        if (this.curseUI) {
+            this.curseUI.updatePosition();
         }
     }
 

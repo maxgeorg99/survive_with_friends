@@ -5,6 +5,7 @@ import PlayerClass from '../autobindings/player_class_type';
 import { GameEvents } from '../constants/GameEvents';
 import MusicManager from '../managers/MusicManager';
 import OptionsUI from '../ui/OptionsUI';
+import CurseUI from '../ui/CurseUI';
 
 // Map player class to numeric class ID
 const CLASS_ID_MAP = {
@@ -57,6 +58,7 @@ export default class ClassSelectScene extends Phaser.Scene {
     private confirmButton!: HTMLButtonElement;
     private errorText!: Phaser.GameObjects.Text;
     private optionsUI!: OptionsUI;
+    private curseUI!: CurseUI;
     
     // Add status text for game state
     private statusText!: Phaser.GameObjects.Text;
@@ -100,6 +102,9 @@ export default class ClassSelectScene extends Phaser.Scene {
         // Load assets for options menu
         this.load.image('icon_music', '/assets/icon_music.png');
         this.load.image('icon_sound', '/assets/icon_sound.png');
+        
+        // Load Curse UI assets
+        this.load.image('curse_card', '/assets/curse_card.png');
         
         // Add load completion listener to ensure assets are ready
         this.load.on('complete', () => {
@@ -229,6 +234,9 @@ export default class ClassSelectScene extends Phaser.Scene {
         
         // Initialize options UI
         this.optionsUI = new OptionsUI(this);
+        
+        // Initialize Curse UI for curse display and management
+        this.curseUI = new CurseUI(this, this.spacetimeDBClient);
         
         // Handle options toggle key
         this.input.keyboard?.on('keydown-O', () => {
@@ -880,6 +888,11 @@ export default class ClassSelectScene extends Phaser.Scene {
         // Cleanup options UI
         if (this.optionsUI) {
             this.optionsUI.destroy();
+        }
+        
+        // Cleanup curse UI
+        if (this.curseUI) {
+            this.curseUI.destroy();
         }
         
         // Cleanup music manager

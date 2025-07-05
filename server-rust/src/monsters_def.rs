@@ -362,6 +362,17 @@ pub fn spawn_monster(ctx: &ReducerContext, spawner: MonsterSpawners) {
         }
     }
     
+    // Apply Scaling curse effects to all monsters (stacks for multiple Scaling curses)
+    let scaling_curse_count = crate::curses_defs::count_scaling_curses(ctx);
+    if scaling_curse_count > 0 {
+        let scaling_multiplier = 1.5_f32.powi(scaling_curse_count as i32);
+        final_hp = (final_hp as f32 * scaling_multiplier) as u32; // 1.5x HP per Scaling curse
+        final_max_hp = (final_max_hp as f32 * scaling_multiplier) as u32; // 1.5x max HP per Scaling curse
+        final_atk *= scaling_multiplier; // 1.5x damage per Scaling curse
+        // Speed stays the same (1.0x) as requested
+        log::info!("Scaling curse applied to monster ({} curses active) - HP: {}, ATK: {:.1}, Speed: {:.1}", scaling_curse_count, final_hp, final_atk, final_speed);
+    }
+    
     // Create the monster
     let monster_opt = ctx.db.monsters().insert(Monsters {
         monster_id: 0,
