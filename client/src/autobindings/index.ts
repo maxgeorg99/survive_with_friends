@@ -34,6 +34,10 @@ import {
 } from "@clockworklabs/spacetimedb-sdk";
 
 // Import and reexport all reducer arg types
+import { AdminAddCurse } from "./admin_add_curse_reducer.ts";
+export { AdminAddCurse };
+import { AdminClearCurses } from "./admin_clear_curses_reducer.ts";
+export { AdminClearCurses };
 import { ChangeMonsterState } from "./change_monster_state_reducer.ts";
 export { ChangeMonsterState };
 import { CheckAgnaRitualCompletion } from "./check_agna_ritual_completion_reducer.ts";
@@ -206,6 +210,8 @@ import { ClassDataTableHandle } from "./class_data_table.ts";
 export { ClassDataTableHandle };
 import { ConfigTableHandle } from "./config_table.ts";
 export { ConfigTableHandle };
+import { CursesTableHandle } from "./curses_table.ts";
+export { CursesTableHandle };
 import { DeadPlayerTransitionTimerTableHandle } from "./dead_player_transition_timer_table.ts";
 export { DeadPlayerTransitionTimerTableHandle };
 import { DeadPlayersTableHandle } from "./dead_players_table.ts";
@@ -334,6 +340,10 @@ import { ClassData } from "./class_data_type.ts";
 export { ClassData };
 import { Config } from "./config_type.ts";
 export { Config };
+import { Curse } from "./curse_type.ts";
+export { Curse };
+import { CurseType } from "./curse_type_type.ts";
+export { CurseType };
 import { DbVector2 } from "./db_vector_2_type.ts";
 export { DbVector2 };
 import { DeadPlayer } from "./dead_player_type.ts";
@@ -665,6 +675,15 @@ const REMOTE_MODULE = {
         colType: Config.getTypeScriptAlgebraicType().product.elements[0].algebraicType,
       },
     },
+    curses: {
+      tableName: "curses",
+      rowType: Curse.getTypeScriptAlgebraicType(),
+      primaryKey: "curseId",
+      primaryKeyInfo: {
+        colName: "curseId",
+        colType: Curse.getTypeScriptAlgebraicType().product.elements[0].algebraicType,
+      },
+    },
     dead_player_transition_timer: {
       tableName: "dead_player_transition_timer",
       rowType: DeadPlayerTransitionTimer.getTypeScriptAlgebraicType(),
@@ -946,6 +965,14 @@ const REMOTE_MODULE = {
     },
   },
   reducers: {
+    admin_add_curse: {
+      reducerName: "admin_add_curse",
+      argsType: AdminAddCurse.getTypeScriptAlgebraicType(),
+    },
+    admin_clear_curses: {
+      reducerName: "admin_clear_curses",
+      argsType: AdminClearCurses.getTypeScriptAlgebraicType(),
+    },
     change_monster_state: {
       reducerName: "change_monster_state",
       argsType: ChangeMonsterState.getTypeScriptAlgebraicType(),
@@ -1204,6 +1231,8 @@ const REMOTE_MODULE = {
 
 // A type representing all the possible variants of a reducer.
 export type Reducer = never
+| { name: "AdminAddCurse", args: AdminAddCurse }
+| { name: "AdminClearCurses", args: AdminClearCurses }
 | { name: "ChangeMonsterState", args: ChangeMonsterState }
 | { name: "CheckAgnaRitualCompletion", args: CheckAgnaRitualCompletion }
 | { name: "ChooseUpgrade", args: ChooseUpgrade }
@@ -1265,6 +1294,30 @@ export type Reducer = never
 
 export class RemoteReducers {
   constructor(private connection: DbConnectionImpl, private setCallReducerFlags: SetReducerFlags) {}
+
+  adminAddCurse() {
+    this.connection.callReducer("admin_add_curse", new Uint8Array(0), this.setCallReducerFlags.adminAddCurseFlags);
+  }
+
+  onAdminAddCurse(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.onReducer("admin_add_curse", callback);
+  }
+
+  removeOnAdminAddCurse(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.offReducer("admin_add_curse", callback);
+  }
+
+  adminClearCurses() {
+    this.connection.callReducer("admin_clear_curses", new Uint8Array(0), this.setCallReducerFlags.adminClearCursesFlags);
+  }
+
+  onAdminClearCurses(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.onReducer("admin_clear_curses", callback);
+  }
+
+  removeOnAdminClearCurses(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.offReducer("admin_clear_curses", callback);
+  }
 
   changeMonsterState(stateChange: MonsterStateChange) {
     const __args = { stateChange };
@@ -2109,6 +2162,16 @@ export class RemoteReducers {
 }
 
 export class SetReducerFlags {
+  adminAddCurseFlags: CallReducerFlags = 'FullUpdate';
+  adminAddCurse(flags: CallReducerFlags) {
+    this.adminAddCurseFlags = flags;
+  }
+
+  adminClearCursesFlags: CallReducerFlags = 'FullUpdate';
+  adminClearCurses(flags: CallReducerFlags) {
+    this.adminClearCursesFlags = flags;
+  }
+
   changeMonsterStateFlags: CallReducerFlags = 'FullUpdate';
   changeMonsterState(flags: CallReducerFlags) {
     this.changeMonsterStateFlags = flags;
@@ -2504,6 +2567,10 @@ export class RemoteTables {
 
   get config(): ConfigTableHandle {
     return new ConfigTableHandle(this.connection.clientCache.getOrCreateTable<Config>(REMOTE_MODULE.tables.config));
+  }
+
+  get curses(): CursesTableHandle {
+    return new CursesTableHandle(this.connection.clientCache.getOrCreateTable<Curse>(REMOTE_MODULE.tables.curses));
   }
 
   get deadPlayerTransitionTimer(): DeadPlayerTransitionTimerTableHandle {
