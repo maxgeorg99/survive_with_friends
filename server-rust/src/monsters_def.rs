@@ -341,6 +341,27 @@ pub fn spawn_monster(ctx: &ReducerContext, spawner: MonsterSpawners) {
         }
     }
     
+    // Apply boss stat modification curses if this is a boss monster
+    if spawner.monster_type == MonsterType::BossEnderPhase1 || spawner.monster_type == MonsterType::BossAgnaPhase1 {
+        // Apply DeadlierBosses curse modifications
+        if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::DeadlierBosses) {
+            final_hp = (final_hp as f32 * 2.0) as u32; // 2x HP
+            final_max_hp = (final_max_hp as f32 * 2.0) as u32; // 2x max HP
+            final_atk *= 1.5; // 1.5x damage
+            final_speed *= 1.2; // 1.2x speed
+            log::info!("DeadlierBosses curse applied to Phase 1 boss - HP: {}, ATK: {:.1}, Speed: {:.1}", final_hp, final_atk, final_speed);
+        }
+        
+        // Apply DeadlierBossesTwo curse modifications (stacks with first curse)
+        if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::DeadlierBossesTwo) {
+            final_hp = (final_hp as f32 * 2.0) as u32; // Additional 2x HP
+            final_max_hp = (final_max_hp as f32 * 2.0) as u32; // Additional 2x max HP
+            final_atk *= 1.5; // Additional 1.5x damage
+            final_speed *= 1.2; // Additional 1.2x speed
+            log::info!("DeadlierBossesTwo curse applied to Phase 1 boss - HP: {}, ATK: {:.1}, Speed: {:.1}", final_hp, final_atk, final_speed);
+        }
+    }
+    
     // Create the monster
     let monster_opt = ctx.db.monsters().insert(Monsters {
         monster_id: 0,

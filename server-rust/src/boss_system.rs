@@ -249,15 +249,39 @@ pub fn spawn_boss_phase_two(ctx: &ReducerContext, position: DbVector2) {
     // Find the closest player to target
     let closest_player_id = crate::monsters_def::get_closest_player(ctx, &position);
     
+    // Apply boss stat modification curses for Phase 2 bosses
+    let mut final_hp = bestiary_entry.max_hp;
+    let mut final_max_hp = bestiary_entry.max_hp;
+    let mut final_atk = bestiary_entry.atk;
+    let mut final_speed = bestiary_entry.speed;
+    
+    // Apply DeadlierBosses curse modifications
+    if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::DeadlierBosses) {
+        final_hp = (final_hp as f32 * 2.0) as u32; // 2x HP
+        final_max_hp = (final_max_hp as f32 * 2.0) as u32; // 2x max HP
+        final_atk *= 1.5; // 1.5x damage
+        final_speed *= 1.2; // 1.2x speed
+        log::info!("DeadlierBosses curse applied to Phase 2 boss - HP: {}, ATK: {:.1}, Speed: {:.1}", final_hp, final_atk, final_speed);
+    }
+    
+    // Apply DeadlierBossesTwo curse modifications (stacks with first curse)
+    if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::DeadlierBossesTwo) {
+        final_hp = (final_hp as f32 * 2.0) as u32; // Additional 2x HP
+        final_max_hp = (final_max_hp as f32 * 2.0) as u32; // Additional 2x max HP
+        final_atk *= 1.5; // Additional 1.5x damage
+        final_speed *= 1.2; // Additional 1.2x speed
+        log::info!("DeadlierBossesTwo curse applied to Phase 2 boss - HP: {}, ATK: {:.1}, Speed: {:.1}", final_hp, final_atk, final_speed);
+    }
+    
     // Create the phase 2 boss monster
     let monster_opt = ctx.db.monsters().insert(crate::Monsters {
         monster_id: 0,
         bestiary_id: boss_monster_type,
         variant: crate::MonsterVariant::Default,
-        hp: bestiary_entry.max_hp,
-        max_hp: bestiary_entry.max_hp,
-        atk: bestiary_entry.atk,
-        speed: bestiary_entry.speed,
+        hp: final_hp,
+        max_hp: final_max_hp,
+        atk: final_atk,
+        speed: final_speed,
         target_player_id: closest_player_id,
         radius: bestiary_entry.radius,
         spawn_position: position.clone(),
