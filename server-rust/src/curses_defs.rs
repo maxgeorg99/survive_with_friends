@@ -1,4 +1,5 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, SpacetimeType, rand::Rng};
+use crate::monsters;
 
 // Curse type enum defining all possible curse effects
 #[derive(SpacetimeType, Clone, Debug, PartialEq, Eq, Hash)]
@@ -110,6 +111,9 @@ pub fn add_random_curse(ctx: &ReducerContext) {
     // Log current total curse count
     let total_curses = ctx.db.curses().count();
     log::info!("Total active curses: {}", total_curses);
+    
+    // Start monster health regeneration if needed
+    start_monster_health_regen_if_needed(ctx);
 }
 
 // Helper function to clear all curses on defeat
@@ -131,6 +135,16 @@ pub fn clear_all_curses(ctx: &ReducerContext) {
     log::info!("Cleared {} curses", curse_count);
 }
 
+// Helper function to check if a specific curse type is currently active
+pub fn is_curse_active(ctx: &ReducerContext, target_curse_type: CurseType) -> bool {
+    for curse in ctx.db.curses().iter() {
+        if curse.curse_type == target_curse_type {
+            return true;
+        }
+    }
+    false
+}
+
 // Admin reducer to manually add a curse (as if players won)
 #[reducer]
 pub fn admin_add_curse(ctx: &ReducerContext) {
@@ -138,6 +152,8 @@ pub fn admin_add_curse(ctx: &ReducerContext) {
     
     log::info!("Admin manually adding curse");
     add_random_curse(ctx);
+    
+    // Note: start_monster_health_regen_if_needed is already called within add_random_curse
 }
 
 // Admin reducer to clear all curses
@@ -147,4 +163,65 @@ pub fn admin_clear_curses(ctx: &ReducerContext) {
     
     log::info!("Admin manually clearing all curses");
     clear_all_curses(ctx);
+}
+
+// Monster health regeneration system
+#[table(name = monster_health_regen_timer, scheduled(monster_health_regen_tick), public)]
+pub struct MonsterHealthRegenTimer {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    pub scheduled_at: spacetimedb::ScheduleAt,
+}
+
+// Reducer to handle monster health regeneration
+#[reducer]
+pub fn monster_health_regen_tick(ctx: &ReducerContext, _timer: MonsterHealthRegenTimer) {
+    if ctx.sender != ctx.identity() {
+        panic!("MonsterHealthRegenTick may not be invoked by clients, only via scheduling.");
+    }
+    
+    // Only regenerate if the MonsterHealthRegen curse is active
+    if !is_curse_active(ctx, CurseType::MonsterHealthRegen) {
+        return;
+    }
+    
+    const REGEN_AMOUNT: u32 = 1; // HP to regenerate per tick
+    
+    // Iterate through all living monsters and regenerate their health
+    let monsters_to_update: Vec<_> = ctx.db.monsters().iter().collect();
+    
+    for monster in monsters_to_update {
+        if monster.hp < monster.max_hp {
+            let mut updated_monster = monster;
+            updated_monster.hp = (updated_monster.hp + REGEN_AMOUNT).min(updated_monster.max_hp);
+            ctx.db.monsters().monster_id().update(updated_monster);
+        }
+    }
+    
+    // Schedule the next regeneration tick
+    schedule_monster_health_regen(ctx);
+}
+
+// Helper function to schedule monster health regeneration
+pub fn schedule_monster_health_regen(ctx: &ReducerContext) {
+    use std::time::Duration;
+    
+    // Schedule regeneration every 2 seconds
+    ctx.db.monster_health_regen_timer().insert(MonsterHealthRegenTimer {
+        scheduled_id: 0,
+        scheduled_at: spacetimedb::ScheduleAt::Time(ctx.timestamp + Duration::from_millis(2000)),
+    });
+}
+
+// Function to start monster health regeneration when curse becomes active
+pub fn start_monster_health_regen_if_needed(ctx: &ReducerContext) {
+    if is_curse_active(ctx, CurseType::MonsterHealthRegen) {
+        // Check if there's already a regen timer scheduled
+        let existing_timer_count = ctx.db.monster_health_regen_timer().count();
+        if existing_timer_count == 0 {
+            log::info!("Starting monster health regeneration due to active curse");
+            schedule_monster_health_regen(ctx);
+        }
+    }
 }

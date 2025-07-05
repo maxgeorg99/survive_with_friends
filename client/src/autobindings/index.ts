@@ -72,6 +72,8 @@ import { InitHealthRegenSystem } from "./init_health_regen_system_reducer.ts";
 export { InitHealthRegenSystem };
 import { LoadBuild } from "./load_build_reducer.ts";
 export { LoadBuild };
+import { MonsterHealthRegenTick } from "./monster_health_regen_tick_reducer.ts";
+export { MonsterHealthRegenTick };
 import { PreSpawnMonsterWave } from "./pre_spawn_monster_wave_reducer.ts";
 export { PreSpawnMonsterWave };
 import { ProcessHealthRegen } from "./process_health_regen_reducer.ts";
@@ -246,6 +248,8 @@ import { LootCapsulesTableHandle } from "./loot_capsules_table.ts";
 export { LootCapsulesTableHandle };
 import { MonsterDamageTableHandle } from "./monster_damage_table.ts";
 export { MonsterDamageTableHandle };
+import { MonsterHealthRegenTimerTableHandle } from "./monster_health_regen_timer_table.ts";
+export { MonsterHealthRegenTimerTableHandle };
 import { MonsterHitCleanupTableHandle } from "./monster_hit_cleanup_table.ts";
 export { MonsterHitCleanupTableHandle };
 import { MonsterSpawnTimerTableHandle } from "./monster_spawn_timer_table.ts";
@@ -386,6 +390,8 @@ import { MonsterBoid } from "./monster_boid_type.ts";
 export { MonsterBoid };
 import { MonsterDamage } from "./monster_damage_type.ts";
 export { MonsterDamage };
+import { MonsterHealthRegenTimer } from "./monster_health_regen_timer_type.ts";
+export { MonsterHealthRegenTimer };
 import { MonsterHitCleanup } from "./monster_hit_cleanup_type.ts";
 export { MonsterHitCleanup };
 import { MonsterSpawnTimer } from "./monster_spawn_timer_type.ts";
@@ -837,6 +843,15 @@ const REMOTE_MODULE = {
         colType: MonsterDamage.getTypeScriptAlgebraicType().product.elements[0].algebraicType,
       },
     },
+    monster_health_regen_timer: {
+      tableName: "monster_health_regen_timer",
+      rowType: MonsterHealthRegenTimer.getTypeScriptAlgebraicType(),
+      primaryKey: "scheduledId",
+      primaryKeyInfo: {
+        colName: "scheduledId",
+        colType: MonsterHealthRegenTimer.getTypeScriptAlgebraicType().product.elements[0].algebraicType,
+      },
+    },
     monster_hit_cleanup: {
       tableName: "monster_hit_cleanup",
       rowType: MonsterHitCleanup.getTypeScriptAlgebraicType(),
@@ -1040,6 +1055,10 @@ const REMOTE_MODULE = {
     load_build: {
       reducerName: "load_build",
       argsType: LoadBuild.getTypeScriptAlgebraicType(),
+    },
+    monster_health_regen_tick: {
+      reducerName: "monster_health_regen_tick",
+      argsType: MonsterHealthRegenTick.getTypeScriptAlgebraicType(),
     },
     pre_spawn_monster_wave: {
       reducerName: "pre_spawn_monster_wave",
@@ -1250,6 +1269,7 @@ export type Reducer = never
 | { name: "InitAttackData", args: InitAttackData }
 | { name: "InitHealthRegenSystem", args: InitHealthRegenSystem }
 | { name: "LoadBuild", args: LoadBuild }
+| { name: "MonsterHealthRegenTick", args: MonsterHealthRegenTick }
 | { name: "PreSpawnMonsterWave", args: PreSpawnMonsterWave }
 | { name: "ProcessHealthRegen", args: ProcessHealthRegen }
 | { name: "RerollUpgrades", args: RerollUpgrades }
@@ -1553,6 +1573,22 @@ export class RemoteReducers {
 
   removeOnLoadBuild(callback: (ctx: ReducerEventContext) => void) {
     this.connection.offReducer("load_build", callback);
+  }
+
+  monsterHealthRegenTick(timer: MonsterHealthRegenTimer) {
+    const __args = { timer };
+    let __writer = new BinaryWriter(1024);
+    MonsterHealthRegenTick.getTypeScriptAlgebraicType().serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("monster_health_regen_tick", __argsBuffer, this.setCallReducerFlags.monsterHealthRegenTickFlags);
+  }
+
+  onMonsterHealthRegenTick(callback: (ctx: ReducerEventContext, timer: MonsterHealthRegenTimer) => void) {
+    this.connection.onReducer("monster_health_regen_tick", callback);
+  }
+
+  removeOnMonsterHealthRegenTick(callback: (ctx: ReducerEventContext, timer: MonsterHealthRegenTimer) => void) {
+    this.connection.offReducer("monster_health_regen_tick", callback);
   }
 
   preSpawnMonsterWave(timer: MonsterSpawnTimer) {
@@ -2252,6 +2288,11 @@ export class SetReducerFlags {
     this.loadBuildFlags = flags;
   }
 
+  monsterHealthRegenTickFlags: CallReducerFlags = 'FullUpdate';
+  monsterHealthRegenTick(flags: CallReducerFlags) {
+    this.monsterHealthRegenTickFlags = flags;
+  }
+
   preSpawnMonsterWaveFlags: CallReducerFlags = 'FullUpdate';
   preSpawnMonsterWave(flags: CallReducerFlags) {
     this.preSpawnMonsterWaveFlags = flags;
@@ -2639,6 +2680,10 @@ export class RemoteTables {
 
   get monsterDamage(): MonsterDamageTableHandle {
     return new MonsterDamageTableHandle(this.connection.clientCache.getOrCreateTable<MonsterDamage>(REMOTE_MODULE.tables.monster_damage));
+  }
+
+  get monsterHealthRegenTimer(): MonsterHealthRegenTimerTableHandle {
+    return new MonsterHealthRegenTimerTableHandle(this.connection.clientCache.getOrCreateTable<MonsterHealthRegenTimer>(REMOTE_MODULE.tables.monster_health_regen_timer));
   }
 
   get monsterHitCleanup(): MonsterHitCleanupTableHandle {

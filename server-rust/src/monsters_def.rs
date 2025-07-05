@@ -295,11 +295,33 @@ pub fn spawn_monster(ctx: &ReducerContext, spawner: MonsterSpawners) {
     };
     
     // Apply shiny modifiers if needed
-    let (final_hp, final_max_hp, final_atk, final_speed, final_radius) = if is_shiny {
+    let (mut final_hp, mut final_max_hp, mut final_atk, mut final_speed, final_radius) = if is_shiny {
         apply_shiny_modifiers(bestiary_entry.max_hp, bestiary_entry.max_hp, bestiary_entry.atk, bestiary_entry.speed, bestiary_entry.radius)
     } else {
         (bestiary_entry.max_hp, bestiary_entry.max_hp, bestiary_entry.atk, bestiary_entry.speed, bestiary_entry.radius)
     };
+    
+    // Apply curse multipliers for non-boss, non-structure monsters
+    let is_boss = matches!(spawner.monster_type, 
+        MonsterType::BossEnderPhase1 | MonsterType::BossEnderPhase2 |
+        MonsterType::BossAgnaPhase1 | MonsterType::BossAgnaPhase2);
+    let is_structure = crate::structure_defs::is_structure_type(&spawner.monster_type);
+    
+    if !is_boss && !is_structure {
+        // Apply curse effects if curses are active
+        if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::MonsterMoreHp) {
+            final_hp = (final_hp as f32 * 1.5) as u32;
+            final_max_hp = (final_max_hp as f32 * 1.5) as u32;
+        }
+        
+        if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::MonsterMoreDamage) {
+            final_atk *= 2.0;
+        }
+        
+        if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::MonsterMoreSpeed) {
+            final_speed *= 1.2;
+        }
+    }
     
     // Create the monster
     let monster_opt = ctx.db.monsters().insert(Monsters {
