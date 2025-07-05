@@ -34,6 +34,7 @@ pub struct GuaranteedVoidChestSpawn {
     #[auto_inc]
     pub scheduled_id: u64,
     pub scheduled_at: ScheduleAt,
+    pub chest_index: u32, // 0 for first chest, 1 for second chest, etc.
 }
 
 // Scheduled reducer to spawn a gem when a loot capsule arrives at its destination
@@ -64,12 +65,23 @@ pub fn spawn_loot_capsule(ctx: &ReducerContext, capsule: LootCapsules) {
 
 // Scheduled reducer to spawn a guaranteed VoidChest at timed intervals
 #[reducer]
-pub fn spawn_guaranteed_void_chest(ctx: &ReducerContext, _spawn: GuaranteedVoidChestSpawn) {
+pub fn spawn_guaranteed_void_chest(ctx: &ReducerContext, spawn: GuaranteedVoidChestSpawn) {
     if ctx.sender != ctx.identity() {
         panic!("spawn_guaranteed_void_chest may not be invoked by clients, only via scheduling.");
     }
     
-    log::info!("Guaranteed VoidChest spawn triggered!");
+    log::info!("Guaranteed VoidChest spawn triggered for chest index {}!", spawn.chest_index);
+    
+    // Check for curse-based skipping
+    if spawn.chest_index == 0 && crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::OneLessVoidChest) {
+        log::info!("OneLessVoidChest curse active - skipping first void chest spawn (index 0)");
+        return;
+    }
+    
+    if spawn.chest_index == 1 && crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::OneLessVoidChestSecond) {
+        log::info!("OneLessVoidChestSecond curse active - skipping second void chest spawn (index 1)");
+        return;
+    }
     
     // Check if there are any players online
     let player_count = ctx.db.player().count();
@@ -358,12 +370,14 @@ pub fn schedule_guaranteed_void_chest_spawns(ctx: &ReducerContext) {
     ctx.db.guaranteed_void_chest_spawns().insert(GuaranteedVoidChestSpawn {
         scheduled_id: 0,
         scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_secs(90)),
+        chest_index: 0, // First void chest
     });
     
     // Schedule second guaranteed VoidChest at 180 seconds (3 minutes)
     ctx.db.guaranteed_void_chest_spawns().insert(GuaranteedVoidChestSpawn {
         scheduled_id: 0,
         scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_secs(180)),
+        chest_index: 1, // Second void chest
     });
     
     log::info!("Guaranteed VoidChest spawns scheduled for 90s and 180s");

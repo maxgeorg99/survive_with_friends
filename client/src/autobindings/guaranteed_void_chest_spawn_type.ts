@@ -35,6 +35,7 @@ import {
 export type GuaranteedVoidChestSpawn = {
   scheduledId: bigint,
   scheduledAt: { tag: "Interval", value: TimeDuration } | { tag: "Time", value: Timestamp },
+  chestIndex: number,
 };
 
 /**
@@ -49,6 +50,7 @@ export namespace GuaranteedVoidChestSpawn {
     return AlgebraicType.createProductType([
       new ProductTypeElement("scheduledId", AlgebraicType.createU64Type()),
       new ProductTypeElement("scheduledAt", AlgebraicType.createScheduleAtType()),
+      new ProductTypeElement("chestIndex", AlgebraicType.createU32Type()),
     ]);
   }
 
