@@ -87,9 +87,41 @@ pub fn create_gem(ctx: &ReducerContext, position: DbVector2, level: GemLevel) ->
 
     let config = config.unwrap();
     let gem_radius = config.gem_radius;
+    
+    // Apply curse restrictions - convert special gems to normal gems when curses are active
+    let actual_level = match level {
+        GemLevel::Dice if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::NoDiceDrops) => {
+            // Convert dice to random normal gem
+            match ctx.rng().gen_range(0..4) {
+                0 => GemLevel::Small,
+                1 => GemLevel::Medium,
+                2 => GemLevel::Large,
+                _ => GemLevel::Huge,
+            }
+        },
+        GemLevel::Fries if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::NoFoodDrops) => {
+            // Convert food to random normal gem
+            match ctx.rng().gen_range(0..4) {
+                0 => GemLevel::Small,
+                1 => GemLevel::Medium,
+                2 => GemLevel::Large,
+                _ => GemLevel::Huge,
+            }
+        },
+        GemLevel::BoosterPack if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::NoBoosterPackDrops) => {
+            // Convert booster pack to random normal gem
+            match ctx.rng().gen_range(0..4) {
+                0 => GemLevel::Small,
+                1 => GemLevel::Medium,
+                2 => GemLevel::Large,
+                _ => GemLevel::Huge,
+            }
+        },
+        _ => level, // No curse active or not a restricted gem type
+    };
 
     // Calculate the gem value based on level
-    let gem_value = match level {
+    let gem_value = match actual_level {
         GemLevel::Small => config.exp_small_gem,
         GemLevel::Medium => config.exp_medium_gem,
         GemLevel::Large => config.exp_large_gem,
@@ -117,7 +149,7 @@ pub fn create_gem(ctx: &ReducerContext, position: DbVector2, level: GemLevel) ->
     let gem_opt = ctx.db.gems().insert(Gem {
         gem_id: 0,
         entity_id: gem_entity.entity_id,
-        level,
+        level: actual_level, // Use the curse-modified level
         value: gem_value,
     });
 
