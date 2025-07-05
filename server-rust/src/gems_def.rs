@@ -399,9 +399,11 @@ pub fn give_player_exp(ctx: &ReducerContext, player_id: u32, exp_amount: u32) {
         // Grant an unspent upgrade point for each level gained
         player.unspent_upgrades += levels_gained;
         
-        // Heal player to max HP when leveling up
+        // Heal player to max HP when leveling up (unless NoHealOnLevelUp curse is active)
         let old_hp = player.hp;
-        player.hp = player.max_hp;
+        if !crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::NoHealOnLevelUp) {
+            player.hp = player.max_hp;
+        }
 
         if prev_unspent_upgrades == 0 {
             // Draw upgrade options for the player
