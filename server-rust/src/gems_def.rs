@@ -279,7 +279,12 @@ pub fn spawn_gem_on_monster_death(ctx: &ReducerContext, monster_id: u32, positio
     let bestiary_entry = bestiary_entry_opt.unwrap();
     let monster_tier = bestiary_entry.tier;
 
-    let drop_chance = 1.0; // Default 100% drop chance for now
+    // Check for MonstersDropFewerGems curse - reduces drop chance by 10%
+    let drop_chance = if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::MonstersDropFewerGems) {
+        0.9 // 90% drop chance when curse is active (10% chance of no drop)
+    } else {
+        1.0 // Default 100% drop chance
+    };
 
     // Roll for gem drop
     let mut rng = ctx.rng();

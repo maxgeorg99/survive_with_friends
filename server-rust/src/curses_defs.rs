@@ -170,10 +170,9 @@ pub fn admin_clear_curses(ctx: &ReducerContext) {
 pub fn admin_add_debug_curse(ctx: &ReducerContext) {
     crate::require_admin_access(ctx, "AdminAddDebugCurse");
     
-    // Hardcoded list of curses for testing - starting with void chest restrictions
+    // Hardcoded list of curses for testing - starting with drop restrictions
     let debug_curses = vec![
-        CurseType::OneLessVoidChest,
-        CurseType::OneLessVoidChestSecond,
+        CurseType::MonstersDropFewerGems,
         // Add more curses here as needed for testing
     ];
     
