@@ -363,16 +363,22 @@ export default class MonsterManager {
                 sprite.setAlpha(1.1); // Slightly more visible than normal
                 
                 // Create dark flame particle emitter for cursed effect
+                // Calculate particle area based on monster radius
+                const particleRadius = Math.max(monsterData.radius * 0.8, 20); // Use 80% of monster radius, min 20px
+                
                 const cursedParticles = this.scene.add.particles(0, 0, 'white_pixel', {
                     speed: CURSED_PARTICLE_SPEED,
                     scale: CURSED_PARTICLE_SCALE,
-                    blendMode: Phaser.BlendModes.MULTIPLY,
+                    blendMode: Phaser.BlendModes.ADD, // Changed from MULTIPLY to make particles visible
                     lifespan: CURSED_PARTICLE_LIFESPAN,
                     tint: CURSED_FLAME_COLORS,
-                    quantity: 1,
-                    frequency: 150, // Slightly slower than shiny
+                    quantity: 2, // Increase quantity for better visibility  
+                    frequency: 120, // Slightly more frequent
                     emitting: true,
-                    gravityY: -20 // Flame-like upward movement
+                    gravityY: -25, // Stronger upward flame movement
+                    alpha: { start: 0.8, end: 0.2 }, // Better alpha fade for visibility
+                    x: { min: -particleRadius, max: particleRadius }, // Spread particles horizontally
+                    y: { min: -particleRadius, max: particleRadius }  // Spread particles vertically
                 });
                 cursedParticles.setDepth(0.1); // Just above the sprite
                 container.add(cursedParticles);

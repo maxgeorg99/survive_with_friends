@@ -20,9 +20,9 @@ const SHINY_MAX_RADIUS: f32 = 128.0; // Maximum radius for shiny monsters
 // Cursed monster constants
 const CURSED_SPAWN_CHANCE_DENOMINATOR: u32 = 10; // 1 in 10 chance (10%) for cursed monsters
 const CURSED_SCALE_MULTIPLIER: f32 = 1.2; // Cursed monsters are 20% larger    
-const CURSED_HP_MULTIPLIER: f32 = 2.0; // Cursed monsters have 2x HP
+const CURSED_HP_MULTIPLIER: f32 = 5.0; // Cursed monsters have 5x HP
 const CURSED_ATTACK_MULTIPLIER: f32 = 2.0; // Cursed monsters have 2x attack
-const CURSED_SPEED_MULTIPLIER: f32 = 1.25; // Cursed monsters are 25% faster
+const CURSED_SPEED_MULTIPLIER: f32 = 1.3; // Cursed monsters are 30% faster
 const CURSED_MAX_RADIUS: f32 = 128.0; // Maximum radius for cursed monsters
 
 // Note: Monster spawning is now handled by tier-based weights in monster_spawn_defs.rs
