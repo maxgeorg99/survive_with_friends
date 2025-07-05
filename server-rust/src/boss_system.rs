@@ -90,11 +90,17 @@ pub fn init_boss_selection(_ctx: &ReducerContext) {
     // It will be randomly selected in schedule_boss_spawn when the first player joins
 }
 
-// Schedule the boss to spawn after 5 minutes
+// Schedule the boss to spawn after 5 minutes (or 4.5 minutes with BossAppearsSooner curse)
 pub fn schedule_boss_spawn(ctx: &ReducerContext) {
-    const BOSS_SPAWN_DELAY_MS: u64 = 300_000; // 5 minutes in milliseconds
+    // Check for BossAppearsSooner curse to reduce boss spawn delay
+    let boss_spawn_delay_ms = if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::BossAppearsSooner) {
+        270_000 // 4.5 minutes when curse is active
+    } else {
+        300_000 // Normal 5 minutes
+    };
     
-    log::info!("Scheduling boss spawn in 5 minutes...");
+    let delay_minutes = boss_spawn_delay_ms as f32 / 60_000.0;
+    log::info!("Scheduling boss spawn in {:.1} minutes...", delay_minutes);
     
     // Randomly select boss type when first scheduling the boss spawn
     let mut rng = ctx.rng();
@@ -124,7 +130,7 @@ pub fn schedule_boss_spawn(ctx: &ReducerContext) {
     // Schedule the boss spawn timer
     ctx.db.boss_spawn_timer().insert(BossSpawnTimer {
         scheduled_id: 0,
-        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(BOSS_SPAWN_DELAY_MS)),
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(boss_spawn_delay_ms)),
         session_start_time: ctx.timestamp,
     });
     

@@ -93,8 +93,15 @@ pub fn calculate_current_tier(ctx: &ReducerContext) -> u32 {
     if let Some(elapsed_duration) = ctx.timestamp.duration_since(session_start_time) {
         let elapsed_seconds = elapsed_duration.as_secs();
         
-        // Calculate tier (increases every 30 seconds)
-        let calculated_tier = elapsed_seconds / TIER_INCREASE_INTERVAL_SECONDS;
+        // Check for BossAppearsSooner curse to accelerate tier progression
+        let tier_interval = if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::BossAppearsSooner) {
+            45 // Faster tier progression when curse is active
+        } else {
+            TIER_INCREASE_INTERVAL_SECONDS // Normal 50 second intervals
+        };
+        
+        // Calculate tier (increases every tier_interval seconds)
+        let calculated_tier = elapsed_seconds / tier_interval;
         
         // Cap at maximum tier
         calculated_tier.min(MAX_TIER as u64) as u32
