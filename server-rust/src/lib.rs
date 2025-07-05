@@ -569,12 +569,25 @@ pub fn create_new_player_with_position(ctx: &ReducerContext, name: &str, player_
     let class_data = ctx.db.class_data().class_id().find(&(player_class.clone() as u32));
     
     // Define default stats in case class data isn't found
-    let (max_hp, armor, speed, starting_attack_type) = if let Some(class_data) = class_data {
+    let (base_max_hp, armor, base_speed, starting_attack_type) = if let Some(class_data) = class_data {
         (class_data.max_hp as f32, class_data.armor, class_data.speed, class_data.starting_attack_type)
     } else {
         log::error!("CreateNewPlayerWithPosition: No class data found for {:?}", player_class.clone());
         // Fall back to default values if class data not found
         (100.0, 0, PLAYER_SPEED, AttackType::Sword)
+    };
+    
+    // Apply curse modifications to starting stats
+    let max_hp = if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::PlayersStartLessHp) {
+        base_max_hp * 0.5 // 50% of normal HP when curse is active
+    } else {
+        base_max_hp // Normal HP from class data
+    };
+    
+    let speed = if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::PlayersStartLessSpeed) {
+        (base_speed as f32 * 0.9) as u32 // 90% of normal speed (10% reduction) when curse is active
+    } else {
+        base_speed as u32 // Normal speed from class data
     };
 
     let shield_count = if starting_attack_type == AttackType::Shield { 2 } else { 0 };
@@ -599,7 +612,7 @@ pub fn create_new_player_with_position(ctx: &ReducerContext, name: &str, player_
         max_hp,
         hp: max_hp,
         hp_regen: 0,
-        speed,
+        speed: speed as f32,
         armor: armor as u32,
         unspent_upgrades: 0,
         rerolls: if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::NoFreeReroll) {

@@ -170,12 +170,10 @@ pub fn admin_clear_curses(ctx: &ReducerContext) {
 pub fn admin_add_debug_curse(ctx: &ReducerContext) {
     crate::require_admin_access(ctx, "AdminAddDebugCurse");
     
-    // Hardcoded list of curses for testing - starting with NegativeHealthRegen
+    // Hardcoded list of curses for testing - starting with PlayersStartLessHp
     let debug_curses = vec![
-        CurseType::NegativeHealthRegen,
-        CurseType::NoHealOnLevelUp,
-        CurseType::NoFreeReroll,
-        CurseType::CursedMonstersSpawn,
+        CurseType::PlayersStartLessHp,
+        CurseType::PlayersStartLessSpeed,
         // Add more curses here as needed for testing
     ];
     
