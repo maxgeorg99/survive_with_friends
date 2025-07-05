@@ -602,7 +602,11 @@ pub fn create_new_player_with_position(ctx: &ReducerContext, name: &str, player_
         speed,
         armor: armor as u32,
         unspent_upgrades: 0,
-        rerolls: 1,
+        rerolls: if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::NoFreeReroll) {
+            0 // No free reroll when curse is active
+        } else {
+            1 // Normal starting reroll
+        },
         shield_count,
         pvp: false,  // PvP is disabled by default
         position,
