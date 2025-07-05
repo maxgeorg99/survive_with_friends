@@ -1221,8 +1221,12 @@ export default class GameScene extends Phaser.Scene {
                 if (currentHp !== undefined && player.hp < currentHp) {
                     createPlayerDamageEffect(this.localPlayerSprite);
                     
-                    // Play player damage sound (only if not already playing)
-                    if (!this.isPlayerDamageSoundPlaying) {
+                    // Calculate damage amount to check if it's from negative health regen
+                    const damageAmount = currentHp - player.hp;
+                    const isNegativeRegenDamage = Math.abs(damageAmount - 4.953) < 0.01; // Allow small floating point tolerance
+                    
+                    // Play player damage sound (only if not already playing and not from negative regen)
+                    if (!this.isPlayerDamageSoundPlaying && !isNegativeRegenDamage) {
                         this.isPlayerDamageSoundPlaying = true;
                         
                         // Use SoundManager for consistent volume control

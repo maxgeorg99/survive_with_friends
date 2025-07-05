@@ -1,7 +1,7 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, ScheduleAt, rand::Rng};
 use crate::{account, collision, config, get_world_cell_from_position, DbVector2, PlayerClass, DELTA_TIME, WORLD_SIZE, 
            WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT, spatial_hash_collision_checker,
-           monsters};
+           monsters, world}; // Added world to imports
 use std::{f32, u16};
 use std::time::Duration;
 
@@ -380,6 +380,36 @@ pub fn process_player_monster_collisions_spatial_hash(ctx: &ReducerContext, coll
             }
         }
     }
+}
+
+// Apply negative health regeneration damage when NegativeHealthRegen curse is active
+pub fn apply_negative_health_regen_damage(ctx: &ReducerContext, collision_cache: &mut collision::CollisionCache) {
+    // Only apply damage if NegativeHealthRegen curse is active
+    if !crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::NegativeHealthRegen) {
+        return;
+    }
+    
+    // Apply damage every X ticks
+    const NEGATIVE_REGEN_TICK_INTERVAL: u64 = 60;
+    const NEGATIVE_REGEN_DAMAGE: f32 = 4.953;
+    
+    // Get current game tick count
+    let current_tick = if let Some(world) = ctx.db.world().world_id().find(&0) {
+        world.tick_count as u64
+    } else {
+        0
+    };
+    
+    // Only apply damage on the interval ticks
+    if current_tick % NEGATIVE_REGEN_TICK_INTERVAL != 0 {
+        return;
+    }
+    
+    // Apply damage to all players
+    for pid in 0..collision_cache.player.cached_count_players as usize {
+        collision_cache.player.damage_to_player[pid] += NEGATIVE_REGEN_DAMAGE;
+    }
+
 }
 
 pub fn commit_player_damage(ctx: &ReducerContext, collision_cache: &collision::CollisionCache) {

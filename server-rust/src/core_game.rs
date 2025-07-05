@@ -579,6 +579,10 @@ pub fn game_tick(ctx: &ReducerContext, _timer: GameTickTimer) {
         return;
     }
 
+    // Apply negative health regeneration damage if curse is active
+    let mut collision_cache = crate::monsters_def::get_collision_cache();
+    crate::player_def::apply_negative_health_regen_damage(ctx, collision_cache);
+
     commit_player_damage(ctx);
 
     process_gem_collisions_spatial_hash(ctx);
