@@ -5,6 +5,7 @@ import NameSelectScene from './scenes/NameSelectScene';
 import ClassSelectScene from './scenes/ClassSelectScene';
 import DeadScene from './scenes/DeadScene';
 import VictoryScene from './scenes/VictoryScene';
+import CurseVictoryScene from './scenes/CurseVictoryScene';
 import LoadingScene from './scenes/LoadingScene';
 import { Identity } from '@clockworklabs/spacetimedb-sdk';
 import SpacetimeDBClient from './SpacetimeDBClient';
@@ -97,7 +98,7 @@ const config: Phaser.Types.Core.GameConfig = {
             // debug: true // Set to true for physics debugging
         }
     },
-    scene: [TitleScene, NameSelectScene, ClassSelectScene, GameScene, DeadScene, VictoryScene, LoadingScene],
+    scene: [TitleScene, NameSelectScene, ClassSelectScene, GameScene, DeadScene, VictoryScene, CurseVictoryScene, LoadingScene],
     scale: {
         mode: Phaser.Scale.RESIZE,
         autoCenter: Phaser.Scale.CENTER_BOTH

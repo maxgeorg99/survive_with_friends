@@ -243,6 +243,12 @@ export default class ClassSelectScene extends Phaser.Scene {
             this.optionsUI.toggle();
         });
         
+        // Handle debug key to test curse victory screen (C key)
+        // Note: This allows testing the curse screen without beating a boss
+        this.input.keyboard?.on('keydown-C', () => {
+            this.launchCurseVictoryScreenDebug();
+        });
+        
         // Only clean up when the scene is actually shut down, not at scene start
         this.events.on('shutdown', this.shutdown, this);
         
@@ -880,6 +886,13 @@ export default class ClassSelectScene extends Phaser.Scene {
             console.error("Error extracting timestamp:", error);
             return null;
         }
+    }
+
+    private launchCurseVictoryScreenDebug() {
+        console.log("ClassSelectScene: Debug command - launching CurseVictoryScene for testing");
+        
+        // Start the CurseVictoryScene for testing
+        this.scene.start('CurseVictoryScene');
     }
 
     shutdown() {

@@ -68,6 +68,7 @@ export default class CurseVictoryScene extends Phaser.Scene {
         
         // Initialize music manager
         this.musicManager = new MusicManager(this);
+        this.musicManager.stopCurrentTrack();
         
         // Set background to a neutral color
         this.cameras.main.setBackgroundColor('#000000');
@@ -104,13 +105,16 @@ export default class CurseVictoryScene extends Phaser.Scene {
         const { width, height } = this.scale;
         
         // Calculate responsive positioning for curse card at bottom of screen
-        const cardBottomY = height * 0.4; // Position in bottom area relative to container center
+        const cardLeftX = -width * 0.09;
+        const cardBottomY = height * 0.3; // Position in bottom area relative to container center
         
         // Create curse card sprite
-        this.curseCard = this.add.image(0, cardBottomY, 'curse_card')
+        this.curseCard = this.add.image(cardLeftX, cardBottomY, 'curse_card')
             .setName('curseCard')
             .setAlpha(0) // Start invisible
-            .setDepth(10); // Ensure it's on top
+            .setDepth(10) // Ensure it's on top
+            .setScale(1.35)
+            .setRotation(-0.12);
         
         // Add to container
         this.curseContainer.add(this.curseCard);
@@ -187,6 +191,7 @@ export default class CurseVictoryScene extends Phaser.Scene {
             targets: this.curseCard,
             x: relativeTargetX,
             y: relativeTargetY,
+            rotation: 0,
             scaleX: targetScale,
             scaleY: targetScale,
             duration: 1500, // 1.5 seconds for smooth flight
