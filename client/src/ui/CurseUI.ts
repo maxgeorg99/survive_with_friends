@@ -4,32 +4,32 @@ import SpacetimeDBClient from '../SpacetimeDBClient';
 // Curse name mapping dictionary for display
 const CURSE_NAMES: { [key: string]: string } = {
     // Monster enhancements
-    'MonsterMoreHp': 'Monstrous Vitality',
-    'MonsterMoreDamage': 'Savage Beasts',
-    'MonsterMoreSpeed': 'Swift Predators',
-    'MonsterHealthRegen': 'Regenerating Horrors',
-    'CursedMonstersSpawn': 'Cursed Spawns',
+    'MonsterMoreHp': 'Monster HP',
+    'MonsterMoreDamage': 'Monster Damage',
+    'MonsterMoreSpeed': 'Monster Speed',
+    'MonsterHealthRegen': 'Monster Regen',
+    'CursedMonstersSpawn': 'Cursed Spawn',
     
     // Player restrictions
-    'NoFreeReroll': 'No Free Choices',
-    'NoHealOnLevelUp': 'Weakened Growth',
-    'NegativeHealthRegen': 'Withering Curse',
-    'PlayersStartLessHp': 'Fragile Beginning',
-    'PlayersStartLessSpeed': 'Sluggish Start',
+    'NoFreeReroll': 'No Free Reroll',
+    'NoHealOnLevelUp': 'Full Heal Disabled',
+    'NegativeHealthRegen': 'Health Drain',
+    'PlayersStartLessHp': 'Reduced HP',
+    'PlayersStartLessSpeed': 'Reduced Speed',
     
     // Loot restrictions
     'NoDiceDrops': 'Dice Drought',
     'NoFoodDrops': 'Food Famine',
     'NoBoosterPackDrops': 'Pack Prohibition',
     'NoStructureLoot': 'Barren Structures',
-    'OneLessVoidChest': 'Void Scarcity',
-    'OneLessVoidChestSecond': 'Greater Void Scarcity',
-    'MonstersDropFewerGems': 'Meager Rewards',
+    'OneLessVoidChest': 'Skip Void Chest A',
+    'OneLessVoidChestSecond': 'Skip Void Chest B',
+    'MonstersDropFewerGems': 'Gem Thief',
     
     // Game progression
     'BossAppearsSooner': 'Hastened Doom',
-    'DeadlierBosses': 'Empowered Bosses',
-    'DeadlierBossesTwo': 'Supremely Deadly Bosses',
+    'DeadlierBosses': 'Empowered Bosses A',
+    'DeadlierBossesTwo': 'Empowered Bosses B',
     
     // Scaling curse
     'Scaling': 'Endless Suffering'
@@ -295,7 +295,7 @@ export default class CurseUI {
         const padding = 20; // Top and bottom padding
         
         // Calculate total menu height needed
-        const contentHeight = (curseCount * lineHeight) + titleHeight + closeButtonHeight + (padding * 2);
+        const contentHeight = (curseCount * lineHeight) + titleHeight + closeButtonHeight + (padding * 3);
         const menuWidth = 400;
         
         // Update background size dynamically - positioned to expand downward from top
@@ -346,7 +346,7 @@ export default class CurseUI {
         const closeButton = this.cursesMenuContainer.getByName('closeButton') as Phaser.GameObjects.Text;
         if (closeButton) {
             // Position close button after the last curse item with some padding
-            const closeButtonY = startY + (curseCount * lineHeight) + (padding / 2);
+            const closeButtonY = startY + (curseCount * lineHeight) + (padding);
             closeButton.setPosition(0, closeButtonY);
         }
     }
