@@ -104,12 +104,12 @@ export default class CurseUI {
         this.cursesMenuContainer.setDepth(100002); // Above everything
         this.cursesMenuContainer.setVisible(false);
         
-        // Create background
-        const menuBg = this.scene.add.rectangle(0, 0, 400, 500, 0x000000, 0.9);
+        // Create background - taller to accommodate all 21 possible curse rows
+        const menuBg = this.scene.add.rectangle(0, 0, 400, 650, 0x000000, 0.9);
         menuBg.setStrokeStyle(3, 0xff0000, 1.0); // Red border for curse theme
         
         // Create title
-        const titleText = this.scene.add.text(0, -220, 'Active Curses', {
+        const titleText = this.scene.add.text(0, -300, 'Active Curses', {
             fontSize: '24px',
             color: '#ffffff',
             fontStyle: 'bold'
@@ -117,7 +117,7 @@ export default class CurseUI {
         titleText.setOrigin(0.5, 0.5);
         
         // Create close button using same pattern as OptionsUI
-        const closeButton = this.scene.add.text(150, -220, 'Close', {
+        const closeButton = this.scene.add.text(150, -300, 'Close', {
             fontSize: '16px',
             color: '#ffffff',
             fontStyle: 'bold',
@@ -203,19 +203,27 @@ export default class CurseUI {
                 const curseCount = this.activeCurses.length;
                 
                 if (curseCount > 0) {
-                    // Show curse card and count
-                    this.curseCard.setVisible(true);
-                    this.curseCountText.setVisible(true);
+                    // Show curse card and count (with null safety checks)
+                    if (this.curseCard) {
+                        this.curseCard.setVisible(true);
+                    }
+                    if (this.curseCountText) {
+                        this.curseCountText.setVisible(true);
+                        
+                        // Set Roman numeral (cap at XX for readability)
+                        const romanNumeral = curseCount <= 20 ? ROMAN_NUMERALS[curseCount] : 'XX+';
+                        this.curseCountText.setText(romanNumeral);
+                    }
                     
-                    // Set Roman numeral (cap at XX for readability)
-                    const romanNumeral = curseCount <= 20 ? ROMAN_NUMERALS[curseCount] : 'XX+';
-                    this.curseCountText.setText(romanNumeral);
-                    
-                    console.log(`Displaying ${curseCount} active curses: ${romanNumeral}`);
+                    console.log(`Displaying ${curseCount} active curses`);
                 } else {
-                    // Hide curse card when no curses active
-                    this.curseCard.setVisible(false);
-                    this.curseCountText.setVisible(false);
+                    // Hide curse card when no curses active (with null safety checks)
+                    if (this.curseCard) {
+                        this.curseCard.setVisible(false);
+                    }
+                    if (this.curseCountText) {
+                        this.curseCountText.setVisible(false);
+                    }
                     
                     // Also hide menu if it's open
                     if (this.isMenuVisible) {
@@ -243,24 +251,48 @@ export default class CurseUI {
             text.destroy();
         });
         
-        // Add curse names to menu
-        const startY = -180;
-        const lineHeight = 25;
+        // Group curses by type and count scaling curses specially
+        const curseGroups = new Map<string, { name: string; count: number }>();
         
-        this.activeCurses.forEach((curse, index) => {
-            // Safely get curse name with better error handling
-            let curseName = 'Unknown Curse';
+        this.activeCurses.forEach(curse => {
             try {
-                if (curse && curse.curseType) {
-                    curseName = CURSE_NAMES[curse.curseType] || curse.curseType.toString();
+                if (curse && curse.curseType && curse.curseType.tag) {
+                    const curseTag = curse.curseType.tag;
+                    const curseName = CURSE_NAMES[curseTag] || curseTag;
+                    
+                    if (curseGroups.has(curseTag)) {
+                        curseGroups.get(curseTag)!.count++;
+                    } else {
+                        curseGroups.set(curseTag, { name: curseName, count: 1 });
+                    }
                 } else {
-                    console.warn('Curse object missing curseType:', curse);
+                    console.warn('Curse object missing curseType or tag:', curse);
                 }
             } catch (e) {
-                console.error('Error processing curse name:', e, curse);
+                console.error('Error processing curse for grouping:', e, curse);
+            }
+        });
+        
+        // Add curse names to menu with special handling for Scaling
+        const startY = -240; // Start higher due to taller menu
+        const lineHeight = 25;
+        let currentIndex = 0;
+        
+        curseGroups.forEach((curseData, curseTag) => {
+            let displayText;
+            
+            if (curseTag === 'Scaling' && curseData.count > 1) {
+                // Special case: Show "Scaling X" for multiple scaling curses
+                displayText = `• ${curseData.name} ${curseData.count}`;
+            } else if (curseTag === 'Scaling') {
+                // Single scaling curse
+                displayText = `• ${curseData.name}`;
+            } else {
+                // Regular curses (should only have count of 1 each)
+                displayText = `• ${curseData.name}`;
             }
             
-            const curseText = this.scene.add.text(0, startY + (index * lineHeight), `• ${curseName}`, {
+            const curseText = this.scene.add.text(0, startY + (currentIndex * lineHeight), displayText, {
                 fontSize: '16px',
                 color: '#ffaaaa',
                 wordWrap: { width: 350 }
@@ -269,9 +301,8 @@ export default class CurseUI {
             (curseText as any).isCurseListItem = true; // Mark for cleanup
             
             this.cursesMenuContainer.add(curseText);
+            currentIndex++;
         });
-        
-        // Remove the redundant count summary text - it's already shown via Roman numerals on the card
     }
 
     protected toggleCursesMenu(): void {
