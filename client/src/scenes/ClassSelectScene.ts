@@ -260,6 +260,12 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.input.keyboard?.on('keydown-Z', () => {
             this.clearAllCursesDebug();
         });
+
+        // Handle debug key to add debug curse (V key)
+        // Note: This calls the admin command to add a debug curse for testing
+        this.input.keyboard?.on('keydown-V', () => {
+            this.addDebugCurseDebug();
+        });
         
         // Only clean up when the scene is actually shut down, not at scene start
         this.events.on('shutdown', this.shutdown, this);
@@ -955,6 +961,30 @@ export default class ClassSelectScene extends Phaser.Scene {
         }
     }
 
+    private addDebugCurseDebug() {
+        console.log("ClassSelectScene: Debug command - adding debug curse via admin reducer");
+        
+        try {
+            if (this.spacetimeDBClient.sdkConnection?.reducers) {
+                console.log("ClassSelectScene: Calling adminAddDebugCurse reducer");
+                this.spacetimeDBClient.sdkConnection.reducers.adminAddDebugCurse();
+                console.log("ClassSelectScene: adminAddDebugCurse reducer call completed successfully");
+                
+                // Play a sound effect to confirm the command was executed
+                const soundManager = (window as any).soundManager;
+                if (soundManager) {
+                    soundManager.playSound('curse_created', 0.8);
+                }
+            } else {
+                console.error("ClassSelectScene: Cannot add debug curse - no reducers available");
+                this.showError('Cannot add debug curse: Server connection not available');
+            }
+        } catch (error) {
+            console.error('ClassSelectScene: Error calling adminAddDebugCurse reducer:', error);
+            this.showError('Error adding debug curse: ' + (error as Error).message);
+        }
+    }
+
     shutdown() {
         console.log("ClassSelectScene shutdown called");
         
@@ -984,6 +1014,7 @@ export default class ClassSelectScene extends Phaser.Scene {
             this.input.keyboard.off('keydown-C'); // Debug curse victory screen key
             this.input.keyboard.off('keydown-X'); // Debug add curse key
             this.input.keyboard.off('keydown-Z'); // Debug clear curses key
+            this.input.keyboard.off('keydown-V'); // Debug add debug curse key
         }
         
         // Use our dedicated cleanup method
