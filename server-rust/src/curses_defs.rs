@@ -183,8 +183,8 @@ pub fn admin_add_debug_curse(ctx: &ReducerContext) {
     
     // Hardcoded list of curses for testing - starting with scaling curse
     let debug_curses = vec![
-        CurseType::Scaling,
-        CurseType::BossAppearsSooner,
+        CurseType::MonsterMoreDamage,
+        CurseType::NoDiceDrops,
         // Add more curses here as needed for testing
     ];
     
