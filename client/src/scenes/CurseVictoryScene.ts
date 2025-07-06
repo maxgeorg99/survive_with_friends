@@ -17,6 +17,9 @@ export default class CurseVictoryScene extends Phaser.Scene {
     // UI Elements
     private curseContainer!: Phaser.GameObjects.Container;
     private curseCard!: Phaser.GameObjects.Image;
+    
+    // Animation state tracking
+    private isCardFlying: boolean = false;
 
     constructor() {
         super('CurseVictoryScene');
@@ -137,10 +140,76 @@ export default class CurseVictoryScene extends Phaser.Scene {
             ease: 'Power2',
             onComplete: () => {
                 console.log("CurseVictoryScene: Curse card fade-in complete");
+                // Chain the card flight animation
+                this.flyCardToTopRight();
             }
         });
         
         console.log("CurseVictoryScene: Curse card fade-in animation started");
+    }
+    
+    private flyCardToTopRight() {
+        if (!this.curseCard) {
+            console.warn("CurseVictoryScene: Curse card not found for flight animation");
+            return;
+        }
+        
+        // Play curse_created sound when flight animation begins
+        const soundManager = (window as any).soundManager;
+        if (soundManager) {
+            try {
+                soundManager.playSound('curse_created', 1.0);
+                console.log("CurseVictoryScene: curse_created sound played successfully");
+            } catch (error) {
+                console.error("CurseVictoryScene: Error playing curse_created sound:", error);
+            }
+        }
+        
+        // Calculate target position (top-right corner matching curse UI)
+        const { width, height } = this.scale;
+        const targetX = width - 80; // 80 pixels from right edge (matching CurseUI)
+        const targetY = 80; // 80 pixels from top (matching CurseUI)
+        
+        // Convert target position to container-relative coordinates
+        const containerX = width / 2; // Container is centered
+        const containerY = height / 2;
+        const relativeTargetX = targetX - containerX;
+        const relativeTargetY = targetY - containerY;
+        
+        // Calculate scale target (matching CurseUI scale of 0.3)
+        const targetScale = 0.3;
+        
+        // Set flight state flag
+        this.isCardFlying = true;
+        
+        // Animate card flying to top-right with smooth curve
+        this.tweens.add({
+            targets: this.curseCard,
+            x: relativeTargetX,
+            y: relativeTargetY,
+            scaleX: targetScale,
+            scaleY: targetScale,
+            duration: 1500, // 1.5 seconds for smooth flight
+            ease: 'Power2',
+            onComplete: () => {
+                console.log("CurseVictoryScene: Card flight animation complete");
+                // Schedule transition delay after card reaches target
+                this.time.addEvent({
+                    delay: 1000, // 1 second delay 
+                    callback: () => {
+                        this.returnToCharacterSelect();
+                    }
+                });
+            }
+        });
+        
+        console.log(`CurseVictoryScene: Card flight animation started to position (${relativeTargetX}, ${relativeTargetY})`);
+    }
+    
+    private returnToCharacterSelect() {
+        console.log("CurseVictoryScene: Returning to character select");
+        // TODO: Implement in Task 6 - transition back to character select
+        this.scene.start('ClassSelectScene');
     }
     
     private handleResize() {
@@ -159,12 +228,14 @@ export default class CurseVictoryScene extends Phaser.Scene {
         if (this.curseContainer) {
             this.curseContainer.setPosition(width/2, height/2);
             
-            // Update curse card position within container
+            // Update curse card position within container (only if not currently flying)
             const curseCard = this.curseContainer.getByName('curseCard') as Phaser.GameObjects.Image;
-            if (curseCard) {
+            if (curseCard && !this.isCardFlying) {
                 const cardBottomY = height * 0.4; // Recalculate responsive position
                 curseCard.setPosition(0, cardBottomY);
                 console.log(`CurseVictoryScene: Updated curse card position to (0, ${cardBottomY})`);
+            } else if (this.isCardFlying) {
+                console.log("CurseVictoryScene: Card is flying, skipping position update");
             }
         }
         
