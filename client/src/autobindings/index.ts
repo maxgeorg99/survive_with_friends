@@ -130,10 +130,12 @@ import { SpawnMonster } from "./spawn_monster_reducer.ts";
 export { SpawnMonster };
 import { SpawnPlayer } from "./spawn_player_reducer.ts";
 export { SpawnPlayer };
+import { TransitionCurseToChoosingClass } from "./transition_curse_to_choosing_class_reducer.ts";
+export { TransitionCurseToChoosingClass };
 import { TransitionDeadToChoosingClass } from "./transition_dead_to_choosing_class_reducer.ts";
 export { TransitionDeadToChoosingClass };
-import { TransitionWinnerToChoosingClass } from "./transition_winner_to_choosing_class_reducer.ts";
-export { TransitionWinnerToChoosingClass };
+import { TransitionWinnerToCurseCutscene } from "./transition_winner_to_curse_cutscene_reducer.ts";
+export { TransitionWinnerToCurseCutscene };
 import { TriggerAgnaCandleBolt } from "./trigger_agna_candle_bolt_reducer.ts";
 export { TriggerAgnaCandleBolt };
 import { TriggerAgnaFireOrbAttack } from "./trigger_agna_fire_orb_attack_reducer.ts";
@@ -214,6 +216,8 @@ import { ClassDataTableHandle } from "./class_data_table.ts";
 export { ClassDataTableHandle };
 import { ConfigTableHandle } from "./config_table.ts";
 export { ConfigTableHandle };
+import { CurseTransitionTimerTableHandle } from "./curse_transition_timer_table.ts";
+export { CurseTransitionTimerTableHandle };
 import { CursesTableHandle } from "./curses_table.ts";
 export { CursesTableHandle };
 import { DeadPlayerTransitionTimerTableHandle } from "./dead_player_transition_timer_table.ts";
@@ -348,6 +352,8 @@ import { Config } from "./config_type.ts";
 export { Config };
 import { Curse } from "./curse_type.ts";
 export { Curse };
+import { CurseTransitionTimer } from "./curse_transition_timer_type.ts";
+export { CurseTransitionTimer };
 import { CurseType } from "./curse_type_type.ts";
 export { CurseType };
 import { DbVector2 } from "./db_vector_2_type.ts";
@@ -681,6 +687,15 @@ const REMOTE_MODULE = {
       primaryKeyInfo: {
         colName: "id",
         colType: Config.getTypeScriptAlgebraicType().product.elements[0].algebraicType,
+      },
+    },
+    curse_transition_timer: {
+      tableName: "curse_transition_timer",
+      rowType: CurseTransitionTimer.getTypeScriptAlgebraicType(),
+      primaryKey: "scheduledId",
+      primaryKeyInfo: {
+        colName: "scheduledId",
+        colType: CurseTransitionTimer.getTypeScriptAlgebraicType().product.elements[0].algebraicType,
       },
     },
     curses: {
@@ -1174,13 +1189,17 @@ const REMOTE_MODULE = {
       reducerName: "spawn_player",
       argsType: SpawnPlayer.getTypeScriptAlgebraicType(),
     },
+    transition_curse_to_choosing_class: {
+      reducerName: "transition_curse_to_choosing_class",
+      argsType: TransitionCurseToChoosingClass.getTypeScriptAlgebraicType(),
+    },
     transition_dead_to_choosing_class: {
       reducerName: "transition_dead_to_choosing_class",
       argsType: TransitionDeadToChoosingClass.getTypeScriptAlgebraicType(),
     },
-    transition_winner_to_choosing_class: {
-      reducerName: "transition_winner_to_choosing_class",
-      argsType: TransitionWinnerToChoosingClass.getTypeScriptAlgebraicType(),
+    transition_winner_to_curse_cutscene: {
+      reducerName: "transition_winner_to_curse_cutscene",
+      argsType: TransitionWinnerToCurseCutscene.getTypeScriptAlgebraicType(),
     },
     trigger_agna_candle_bolt: {
       reducerName: "trigger_agna_candle_bolt",
@@ -1304,8 +1323,9 @@ export type Reducer = never
 | { name: "SpawnLootCapsule", args: SpawnLootCapsule }
 | { name: "SpawnMonster", args: SpawnMonster }
 | { name: "SpawnPlayer", args: SpawnPlayer }
+| { name: "TransitionCurseToChoosingClass", args: TransitionCurseToChoosingClass }
 | { name: "TransitionDeadToChoosingClass", args: TransitionDeadToChoosingClass }
-| { name: "TransitionWinnerToChoosingClass", args: TransitionWinnerToChoosingClass }
+| { name: "TransitionWinnerToCurseCutscene", args: TransitionWinnerToCurseCutscene }
 | { name: "TriggerAgnaCandleBolt", args: TriggerAgnaCandleBolt }
 | { name: "TriggerAgnaFireOrbAttack", args: TriggerAgnaFireOrbAttack }
 | { name: "TriggerAgnaFlamethrowerAttack", args: TriggerAgnaFlamethrowerAttack }
@@ -2010,6 +2030,22 @@ export class RemoteReducers {
     this.connection.offReducer("spawn_player", callback);
   }
 
+  transitionCurseToChoosingClass(timer: CurseTransitionTimer) {
+    const __args = { timer };
+    let __writer = new BinaryWriter(1024);
+    TransitionCurseToChoosingClass.getTypeScriptAlgebraicType().serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("transition_curse_to_choosing_class", __argsBuffer, this.setCallReducerFlags.transitionCurseToChoosingClassFlags);
+  }
+
+  onTransitionCurseToChoosingClass(callback: (ctx: ReducerEventContext, timer: CurseTransitionTimer) => void) {
+    this.connection.onReducer("transition_curse_to_choosing_class", callback);
+  }
+
+  removeOnTransitionCurseToChoosingClass(callback: (ctx: ReducerEventContext, timer: CurseTransitionTimer) => void) {
+    this.connection.offReducer("transition_curse_to_choosing_class", callback);
+  }
+
   transitionDeadToChoosingClass(timer: DeadPlayerTransitionTimer) {
     const __args = { timer };
     let __writer = new BinaryWriter(1024);
@@ -2026,20 +2062,20 @@ export class RemoteReducers {
     this.connection.offReducer("transition_dead_to_choosing_class", callback);
   }
 
-  transitionWinnerToChoosingClass(timer: WinnerTransitionTimer) {
+  transitionWinnerToCurseCutscene(timer: WinnerTransitionTimer) {
     const __args = { timer };
     let __writer = new BinaryWriter(1024);
-    TransitionWinnerToChoosingClass.getTypeScriptAlgebraicType().serialize(__writer, __args);
+    TransitionWinnerToCurseCutscene.getTypeScriptAlgebraicType().serialize(__writer, __args);
     let __argsBuffer = __writer.getBuffer();
-    this.connection.callReducer("transition_winner_to_choosing_class", __argsBuffer, this.setCallReducerFlags.transitionWinnerToChoosingClassFlags);
+    this.connection.callReducer("transition_winner_to_curse_cutscene", __argsBuffer, this.setCallReducerFlags.transitionWinnerToCurseCutsceneFlags);
   }
 
-  onTransitionWinnerToChoosingClass(callback: (ctx: ReducerEventContext, timer: WinnerTransitionTimer) => void) {
-    this.connection.onReducer("transition_winner_to_choosing_class", callback);
+  onTransitionWinnerToCurseCutscene(callback: (ctx: ReducerEventContext, timer: WinnerTransitionTimer) => void) {
+    this.connection.onReducer("transition_winner_to_curse_cutscene", callback);
   }
 
-  removeOnTransitionWinnerToChoosingClass(callback: (ctx: ReducerEventContext, timer: WinnerTransitionTimer) => void) {
-    this.connection.offReducer("transition_winner_to_choosing_class", callback);
+  removeOnTransitionWinnerToCurseCutscene(callback: (ctx: ReducerEventContext, timer: WinnerTransitionTimer) => void) {
+    this.connection.offReducer("transition_winner_to_curse_cutscene", callback);
   }
 
   triggerAgnaCandleBolt(scheduler: AgnaCandleBoltScheduler) {
@@ -2452,14 +2488,19 @@ export class SetReducerFlags {
     this.spawnPlayerFlags = flags;
   }
 
+  transitionCurseToChoosingClassFlags: CallReducerFlags = 'FullUpdate';
+  transitionCurseToChoosingClass(flags: CallReducerFlags) {
+    this.transitionCurseToChoosingClassFlags = flags;
+  }
+
   transitionDeadToChoosingClassFlags: CallReducerFlags = 'FullUpdate';
   transitionDeadToChoosingClass(flags: CallReducerFlags) {
     this.transitionDeadToChoosingClassFlags = flags;
   }
 
-  transitionWinnerToChoosingClassFlags: CallReducerFlags = 'FullUpdate';
-  transitionWinnerToChoosingClass(flags: CallReducerFlags) {
-    this.transitionWinnerToChoosingClassFlags = flags;
+  transitionWinnerToCurseCutsceneFlags: CallReducerFlags = 'FullUpdate';
+  transitionWinnerToCurseCutscene(flags: CallReducerFlags) {
+    this.transitionWinnerToCurseCutsceneFlags = flags;
   }
 
   triggerAgnaCandleBoltFlags: CallReducerFlags = 'FullUpdate';
@@ -2632,6 +2673,10 @@ export class RemoteTables {
 
   get config(): ConfigTableHandle {
     return new ConfigTableHandle(this.connection.clientCache.getOrCreateTable<Config>(REMOTE_MODULE.tables.config));
+  }
+
+  get curseTransitionTimer(): CurseTransitionTimerTableHandle {
+    return new CurseTransitionTimerTableHandle(this.connection.clientCache.getOrCreateTable<CurseTransitionTimer>(REMOTE_MODULE.tables.curse_transition_timer));
   }
 
   get curses(): CursesTableHandle {

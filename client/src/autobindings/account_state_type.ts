@@ -42,6 +42,7 @@ export namespace AccountState {
   export type Playing = { tag: "Playing" };
   export type Dead = { tag: "Dead" };
   export type Winner = { tag: "Winner" };
+  export type CurseCutscene = { tag: "CurseCutscene" };
 
   // Helper functions for constructing each variant of the tagged union.
   // ```
@@ -54,6 +55,7 @@ export namespace AccountState {
   export const Playing = { tag: "Playing" };
   export const Dead = { tag: "Dead" };
   export const Winner = { tag: "Winner" };
+  export const CurseCutscene = { tag: "CurseCutscene" };
 
   export function getTypeScriptAlgebraicType(): AlgebraicType {
     return AlgebraicType.createSumType([
@@ -62,6 +64,7 @@ export namespace AccountState {
       new SumTypeVariant("Playing", AlgebraicType.createProductType([])),
       new SumTypeVariant("Dead", AlgebraicType.createProductType([])),
       new SumTypeVariant("Winner", AlgebraicType.createProductType([])),
+      new SumTypeVariant("CurseCutscene", AlgebraicType.createProductType([])),
     ]);
   }
 
@@ -76,7 +79,7 @@ export namespace AccountState {
 }
 
 // The tagged union or sum type for the algebraic type `AccountState`.
-export type AccountState = AccountState.ChoosingName | AccountState.ChoosingClass | AccountState.Playing | AccountState.Dead | AccountState.Winner;
+export type AccountState = AccountState.ChoosingName | AccountState.ChoosingClass | AccountState.Playing | AccountState.Dead | AccountState.Winner | AccountState.CurseCutscene;
 
 export default AccountState;
 

@@ -32,34 +32,36 @@ import {
   type ReducerEventContextInterface,
   type SubscriptionEventContextInterface,
 } from "@clockworklabs/spacetimedb-sdk";
-
-import { WinnerTransitionTimer as __WinnerTransitionTimer } from "./winner_transition_timer_type";
-
-export type TransitionWinnerToChoosingClass = {
-  timer: __WinnerTransitionTimer,
+export type CurseTransitionTimer = {
+  scheduledId: bigint,
+  scheduledAt: { tag: "Interval", value: TimeDuration } | { tag: "Time", value: Timestamp },
+  identity: Identity,
 };
 
 /**
  * A namespace for generated helper functions.
  */
-export namespace TransitionWinnerToChoosingClass {
+export namespace CurseTransitionTimer {
   /**
   * A function which returns this type represented as an AlgebraicType.
   * This function is derived from the AlgebraicType used to generate this type.
   */
   export function getTypeScriptAlgebraicType(): AlgebraicType {
     return AlgebraicType.createProductType([
-      new ProductTypeElement("timer", __WinnerTransitionTimer.getTypeScriptAlgebraicType()),
+      new ProductTypeElement("scheduledId", AlgebraicType.createU64Type()),
+      new ProductTypeElement("scheduledAt", AlgebraicType.createScheduleAtType()),
+      new ProductTypeElement("identity", AlgebraicType.createIdentityType()),
     ]);
   }
 
-  export function serialize(writer: BinaryWriter, value: TransitionWinnerToChoosingClass): void {
-    TransitionWinnerToChoosingClass.getTypeScriptAlgebraicType().serialize(writer, value);
+  export function serialize(writer: BinaryWriter, value: CurseTransitionTimer): void {
+    CurseTransitionTimer.getTypeScriptAlgebraicType().serialize(writer, value);
   }
 
-  export function deserialize(reader: BinaryReader): TransitionWinnerToChoosingClass {
-    return TransitionWinnerToChoosingClass.getTypeScriptAlgebraicType().deserialize(reader);
+  export function deserialize(reader: BinaryReader): CurseTransitionTimer {
+    return CurseTransitionTimer.getTypeScriptAlgebraicType().deserialize(reader);
   }
 
 }
+
 

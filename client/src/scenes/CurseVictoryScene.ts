@@ -106,6 +106,9 @@ export default class CurseVictoryScene extends Phaser.Scene {
         // Create curse card sprite at bottom of screen (initially invisible)
         this.createCurseCard();
         
+        // Register event listeners
+        this.registerEventListeners();
+        
         // Handle window resize
         this.scale.on('resize', this.handleResize, this);
         this.events.on("shutdown", this.shutdown, this);
@@ -302,14 +305,6 @@ export default class CurseVictoryScene extends Phaser.Scene {
         
         // Add visual feedback effects (pulse, glow) to represent the curse addition
         this.addCurseVisualFeedback();
-        
-        // Schedule the transition delay after visual feedback
-        this.time.addEvent({
-            delay: 600, // Short delay for visual feedback to complete
-            callback: () => {
-                this.scheduleTransitionDelay();
-            }
-        });
     }
     
     private incrementCurseCountDisplay() {
@@ -378,20 +373,37 @@ export default class CurseVictoryScene extends Phaser.Scene {
         console.log("CurseVictoryScene: Curse visual feedback animation started");
     }
     
-    private scheduleTransitionDelay() {
-        console.log("CurseVictoryScene: Scheduling transition delay");
-        this.time.addEvent({
-            delay: 1000, // 1 second delay before returning to character select
-            callback: () => {
-                this.returnToCharacterSelect();
-            }
-        });
+    private registerEventListeners() {
+        // Listen for account updates that might change our state
+        this.gameEvents.on(GameEvents.ACCOUNT_UPDATED, this.handleAccountUpdated, this);
+        this.gameEvents.on(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
     }
     
-    private returnToCharacterSelect() {
-        console.log("CurseVictoryScene: Returning to character select");
-        // TODO: Implement in Task 6 - transition back to character select
-        this.scene.start('ClassSelectScene');
+    private handleAccountUpdated(ctx: any, oldAccount: any, newAccount: any) {
+        console.log("Account updated in CurseVictoryScene", newAccount.state);
+        
+        // Check if this is our account
+        if (newAccount.identity.isEqual(this.spacetimeDBClient.identity)) {
+            // Check if state changed away from CurseCutscene
+            if (newAccount.state.tag !== 'CurseCutscene') {
+                console.log("Account state changed from CurseCutscene to", newAccount.state.tag);
+                
+                // Transition to LoadingScene which will evaluate the new state
+                this.scene.start('LoadingScene', { 
+                    message: 'Evaluating account state...', 
+                    waitingFor: 'account_evaluation'
+                });
+            }
+        }
+    }
+    
+    private handleConnectionLost() {
+        console.log("Connection lost in CurseVictoryScene");
+        // Don't show error text in curse scene, just transition to loading
+        this.scene.start('LoadingScene', { 
+            message: 'Connection lost. Reconnecting...', 
+            waitingFor: 'connection'
+        });
     }
     
     private handleResize() {
@@ -436,6 +448,8 @@ export default class CurseVictoryScene extends Phaser.Scene {
         // Clean up event listeners
         this.scale.off('resize', this.handleResize, this);
         this.events.off("shutdown", this.shutdown, this);
+        this.gameEvents.off(GameEvents.ACCOUNT_UPDATED, this.handleAccountUpdated, this);
+        this.gameEvents.off(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
         
         // Clean up curse card, count text, and container
         if (this.curseCard) {

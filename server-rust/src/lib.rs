@@ -76,6 +76,7 @@ pub enum AccountState {
     Playing,
     Dead,
     Winner,
+    CurseCutscene,
 }
 
 // Attack type enum
@@ -197,8 +198,18 @@ pub struct DeadPlayerTransitionTimer {
 }
 
 // Timer for transitioning winner players back to character select  
-#[table(name = winner_transition_timer, scheduled(transition_winner_to_choosing_class))]
+#[table(name = winner_transition_timer, scheduled(transition_winner_to_curse_cutscene))]
 pub struct WinnerTransitionTimer {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    pub scheduled_at: ScheduleAt,
+    pub identity: Identity,  // Which player this timer is for
+}
+
+// Timer for transitioning from curse cutscene back to character select
+#[table(name = curse_transition_timer, scheduled(transition_curse_to_choosing_class))]
+pub struct CurseTransitionTimer {
     #[primary_key]
     #[auto_inc]
     pub scheduled_id: u64,
@@ -369,6 +380,9 @@ pub fn client_connected(ctx: &ReducerContext) {
             },
             AccountState::Winner => {
                 log::info!("Account {} reconnected in Winner state", identity);
+            },
+            AccountState::CurseCutscene => {
+                log::info!("Account {} reconnected in CurseCutscene state", identity);
             },
         }
     } else {
@@ -663,28 +677,64 @@ pub fn transition_dead_to_choosing_class(ctx: &ReducerContext, timer: DeadPlayer
     }
 }
 
-// Scheduled reducer to transition winner players back to choosing class
+// Scheduled reducer to transition winner players to curse cutscene
 #[reducer]
-pub fn transition_winner_to_choosing_class(ctx: &ReducerContext, timer: WinnerTransitionTimer) {
+pub fn transition_winner_to_curse_cutscene(ctx: &ReducerContext, timer: WinnerTransitionTimer) {
     if ctx.sender != ctx.identity() {
-        panic!("TransitionWinnerToChoosingClass may not be invoked by clients, only via scheduling.");
+        panic!("TransitionWinnerToCurseCutscene may not be invoked by clients, only via scheduling.");
     }
 
     let identity = timer.identity;
-    log::info!("Transitioning winner player {} back to choosing class", identity);
+    log::info!("Transitioning winner player {} to curse cutscene", identity);
 
     // Find the account
     if let Some(mut account) = ctx.db.account().identity().find(&identity) {
         if account.state == AccountState::Winner {
-            account.state = AccountState::ChoosingClass;
+            account.state = AccountState::CurseCutscene;
             account.current_player_id = 0;  // Reset player ID
             ctx.db.account().identity().update(account);
-            log::info!("Account {} transitioned from Winner to ChoosingClass", identity);
+            log::info!("Account {} transitioned from Winner to CurseCutscene", identity);
+            
+            // Schedule transition from curse cutscene to choosing class
+            const CURSE_CUTSCENE_DURATION_MS: u64 = 8000; // 8 seconds for curse cutscene
+            
+            ctx.db.curse_transition_timer().insert(CurseTransitionTimer {
+                scheduled_id: 0,
+                scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(CURSE_CUTSCENE_DURATION_MS)),
+                identity,
+            });
+            
+            log::info!("Scheduled transition from CurseCutscene to ChoosingClass for account {} in {} ms", identity, CURSE_CUTSCENE_DURATION_MS);
         } else {
             log::warn!("Account {} was not in Winner state when transition timer fired. Current state: {:?}", identity, account.state);
         }
     } else {
         log::warn!("Account {} not found when winner transition timer fired", identity);
+    }
+}
+
+// Scheduled reducer to transition from curse cutscene back to choosing class
+#[reducer]
+pub fn transition_curse_to_choosing_class(ctx: &ReducerContext, timer: CurseTransitionTimer) {
+    if ctx.sender != ctx.identity() {
+        panic!("TransitionCurseToChoosingClass may not be invoked by clients, only via scheduling.");
+    }
+
+    let identity = timer.identity;
+    log::info!("Transitioning player {} from curse cutscene back to choosing class", identity);
+
+    // Find the account
+    if let Some(mut account) = ctx.db.account().identity().find(&identity) {
+        if account.state == AccountState::CurseCutscene {
+            account.state = AccountState::ChoosingClass;
+            account.current_player_id = 0;  // Ensure player ID is reset
+            ctx.db.account().identity().update(account);
+            log::info!("Account {} transitioned from CurseCutscene to ChoosingClass", identity);
+        } else {
+            log::warn!("Account {} was not in CurseCutscene state when transition timer fired. Current state: {:?}", identity, account.state);
+        }
+    } else {
+        log::warn!("Account {} not found when curse transition timer fired", identity);
     }
 }
 
@@ -747,8 +797,8 @@ pub fn transition_player_to_winner_state(ctx: &ReducerContext, player_id: u32) {
         
         log::info!("Account {} transitioned to Winner state and reset player ID to 0", identity);
         
-        // Schedule transition back to choosing class after a few seconds
-        const WINNER_TRANSITION_DELAY_MS: u64 = 10000; // 10 seconds to celebrate
+        // Schedule transition to next scene after a few seconds
+        const WINNER_TRANSITION_DELAY_MS: u64 = 7000; // 7 seconds to celebrate
         
         ctx.db.winner_transition_timer().insert(WinnerTransitionTimer {
             scheduled_id: 0,
