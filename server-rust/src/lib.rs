@@ -696,7 +696,7 @@ pub fn transition_winner_to_curse_cutscene(ctx: &ReducerContext, timer: WinnerTr
             log::info!("Account {} transitioned from Winner to CurseCutscene", identity);
             
             // Schedule transition from curse cutscene to choosing class
-            const CURSE_CUTSCENE_DURATION_MS: u64 = 8000; // 8 seconds for curse cutscene
+            const CURSE_CUTSCENE_DURATION_MS: u64 = 7300; // a few seconds for curse cutscene
             
             ctx.db.curse_transition_timer().insert(CurseTransitionTimer {
                 scheduled_id: 0,
