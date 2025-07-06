@@ -1,0 +1,89 @@
+{
+  "version": "2.0.0",
+  "tags": {
+    "master": {
+      "description": "Main development tasks for Vibe Survivors",
+      "metadata": {
+        "created": "2024-12-19T00:00:00.000Z",
+        "lastModified": "2024-12-19T15:30:00.000Z"
+      },
+      "tasks": [
+        {
+          "id": "1",
+          "title": "Create CurseVictoryScene",
+          "description": "Create a new Phaser scene that appears after player victory to show curse acquisition",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": [],
+          "details": "Create a new scene class called CurseVictoryScene in the scenes directory. The scene should:\n- Use curse_bg asset as the background\n- Initialize with proper scene management\n- Set up containers for UI elements\n- Handle scene transitions properly\n- Follow the existing scene patterns used in the game",
+          "testStrategy": "Test by triggering victory condition and verifying the scene appears with curse_bg background"
+        },
+        {
+          "id": "2", 
+          "title": "Implement curse_incant sound on scene entry",
+          "description": "Play the curse_incant sound effect when CurseVictoryScene starts",
+          "status": "pending",
+          "priority": "medium",
+          "dependencies": ["1"],
+          "details": "Add sound playback functionality to CurseVictoryScene:\n- Use the existing SoundManager to play 'curse_incant' sound\n- Trigger sound in the scene's create() method\n- Ensure sound volume respects user settings\n- Handle cases where sound assets might not be loaded",
+          "testStrategy": "Enter CurseVictoryScene and verify curse_incant sound plays immediately"
+        },
+        {
+          "id": "3",
+          "title": "Add curse_card sprite with fade-in animation", 
+          "description": "Display curse_card sprite at bottom of screen with fade-in effect",
+          "status": "pending",
+          "priority": "medium", 
+          "dependencies": ["1"],
+          "details": "Implement curse card appearance:\n- Position curse_card sprite at bottom center of screen\n- Start with alpha=0 (invisible)\n- Create fade-in tween animation\n- Time the fade-in to occur after curse_incant sound\n- Use responsive positioning for different screen sizes",
+          "testStrategy": "Verify curse_card appears at bottom and fades in smoothly after sound"
+        },
+        {
+          "id": "4",
+          "title": "Implement card fly-to-UI animation with curse_created sound",
+          "description": "Animate curse_card flying to top-right position with sound effect",
+          "status": "pending", 
+          "priority": "high",
+          "dependencies": ["3"],
+          "details": "Create card flight animation:\n- Calculate target position matching curse UI location (top-right)\n- Create smooth bezier curve or straight line tween animation\n- Play 'curse_created' sound when animation starts\n- Card should maintain its scale/appearance during flight\n- Animation duration should feel satisfying (~1-2 seconds)",
+          "testStrategy": "Verify card flies smoothly to top-right and curse_created sound plays at start of animation"
+        },
+        {
+          "id": "5",
+          "title": "Integrate with curse UI system",
+          "description": "Show curse UI or increment counter when card reaches destination",
+          "status": "pending",
+          "priority": "high", 
+          "dependencies": ["4"],
+          "details": "Handle curse UI updates:\n- Check if this is the first curse for the player\n- If first curse: make curse UI visible/slide it in\n- If not first curse: increment the curse counter number\n- Add visual feedback (pulse, glow) when curse is added\n- Ensure curse data is persisted to server/storage\n- Update curse UI state properly",
+          "testStrategy": "Test both first curse (UI appears) and subsequent curses (counter increments)"
+        },
+        {
+          "id": "6",
+          "title": "Add transition delay and return to character select",
+          "description": "Wait briefly then transition back to character select menu",
+          "status": "pending",
+          "priority": "medium",
+          "dependencies": ["5"], 
+          "details": "Implement scene exit:\n- Add appropriate delay after curse UI update (2-3 seconds)\n- Transition smoothly back to character select scene\n- Ensure all tweens/animations are cleaned up\n- Reset any temporary state\n- Follow existing scene transition patterns",
+          "testStrategy": "Verify scene waits appropriate time then smoothly returns to character select"
+        },
+        {
+          "id": "7",
+          "title": "Wire CurseVictoryScene into victory flow",
+          "description": "Integrate the new scene into the existing victory condition handling",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": ["6"],
+          "details": "Connect to existing victory system:\n- Modify victory handling code to go to CurseVictoryScene instead of direct VictoryScene\n- Ensure scene is properly added to the game's scene list\n- Handle proper scene order: GameScene -> CurseVictoryScene -> CharacterSelectScene\n- Test with different victory conditions (boss defeat, etc.)\n- Ensure multiplayer victory scenarios work correctly",
+          "testStrategy": "Achieve victory in game and verify CurseVictoryScene appears before character select"
+        }
+      ]
+    }
+  },
+  "currentTag": "master",
+  "metadata": {
+    "created": "2024-12-19T00:00:00.000Z",
+    "lastModified": "2024-12-19T15:30:00.000Z"
+  }
+} 
