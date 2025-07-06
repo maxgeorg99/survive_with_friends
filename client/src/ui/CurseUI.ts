@@ -68,7 +68,7 @@ export default class CurseUI {
         this.curseCard = this.scene.add.image(cardX, cardY, 'curse_card');
         this.curseCard.setScale(0.3); // Scale down to reasonable size
         this.curseCard.setScrollFactor(0); // Fixed position on screen
-        this.curseCard.setDepth(100000); // Very high priority
+        this.curseCard.setDepth(100002); // Very high priority
         this.curseCard.setVisible(false); // Initially hidden
         this.curseCard.setInteractive(); // Make clickable
         
@@ -82,11 +82,22 @@ export default class CurseUI {
         });
         this.curseCountText.setOrigin(0.5, 0.5);
         this.curseCountText.setScrollFactor(0);
-        this.curseCountText.setDepth(100001); // Above the card
+        this.curseCountText.setDepth(100003); // Above the card
         this.curseCountText.setVisible(false);
         
         // Create curse details menu (initially hidden)
         this.createCursesMenu();
+        
+        // Add hover effects to curse card to show it's interactive
+        this.curseCard.on('pointerover', () => {
+            this.curseCard.setTint(0xdddddd); // Slightly darker tint on hover
+            this.curseCard.setScale(0.32); // Slightly larger on hover
+        });
+        
+        this.curseCard.on('pointerout', () => {
+            this.curseCard.clearTint(); // Remove tint
+            this.curseCard.setScale(0.3); // Back to normal size
+        });
         
         // Handle curse card click
         this.curseCard.on('pointerdown', () => {
@@ -96,37 +107,40 @@ export default class CurseUI {
 
     protected createCursesMenu(): void {
         // Position menu on the right side of screen instead of center
-        const menuX = this.scene.scale.width - 200; // Right side positioning
-        const menuY = this.scene.scale.height / 2;
+        const menuX = this.scene.scale.width - 232; // Right side positioning
+        const menuY = 100;
         
         this.cursesMenuContainer = this.scene.add.container(menuX, menuY);
         this.cursesMenuContainer.setScrollFactor(0);
-        this.cursesMenuContainer.setDepth(100002); // Above everything
+        this.cursesMenuContainer.setDepth(100001); // Above everything
         this.cursesMenuContainer.setVisible(false);
         
-        // Create background - taller to accommodate all 21 possible curse rows
-        const menuBg = this.scene.add.rectangle(0, 0, 400, 650, 0x000000, 0.9);
+        // Create initial background - will be resized dynamically
+        const menuBg = this.scene.add.rectangle(0, 0, 400, 150, 0x000000, 0.9);
         menuBg.setStrokeStyle(3, 0xff0000, 1.0); // Red border for curse theme
+        menuBg.setName('menuBackground'); // Name it for easy lookup
         
         // Create title
-        const titleText = this.scene.add.text(0, -300, 'Active Curses', {
+        const titleText = this.scene.add.text(0, -52, 'Active Curses', {
             fontSize: '24px',
             color: '#ffffff',
-            fontStyle: 'bold'
+            fontStyle: 'bold',
         });
         titleText.setOrigin(0.5, 0.5);
+        titleText.setName('titleText'); // Name it for easy lookup
         
-        // Create close button using same pattern as OptionsUI
-        const closeButton = this.scene.add.text(150, -300, 'Close', {
+        // Create close button - will be positioned dynamically
+        const closeButton = this.scene.add.text(0, 50, 'Close', {
             fontSize: '16px',
             color: '#ffffff',
             fontStyle: 'bold',
             backgroundColor: '#666666',
-            padding: { x: 12, y: 6 }
+            padding: { x: 12, y: 6 },
         });
         closeButton.setOrigin(0.5, 0.5);
         closeButton.setScrollFactor(0);
         closeButton.setInteractive({ useHandCursor: true });
+        closeButton.setName('closeButton'); // Name it for easy lookup
         
         // Add hover effects like OptionsUI
         closeButton.on('pointerover', () => {
@@ -273,9 +287,33 @@ export default class CurseUI {
             }
         });
         
-        // Add curse names to menu with special handling for Scaling
-        const startY = -240; // Start higher due to taller menu
+        // Calculate dynamic sizing based on number of curses
+        const curseCount = curseGroups.size;
         const lineHeight = 25;
+        const titleHeight = 30; // Space for title
+        const closeButtonHeight = 30; // Space for close button
+        const padding = 20; // Top and bottom padding
+        
+        // Calculate total menu height needed
+        const contentHeight = (curseCount * lineHeight) + titleHeight + closeButtonHeight + (padding * 2);
+        const menuWidth = 400;
+        
+        // Update background size dynamically - positioned to expand downward from top
+        const menuBg = this.cursesMenuContainer.getByName('menuBackground') as Phaser.GameObjects.Rectangle;
+        if (menuBg) {
+            menuBg.setSize(menuWidth, contentHeight);
+            // Position background so top edge stays fixed and it expands downward
+            menuBg.setPosition(0, contentHeight / 2 - 75); // -75 to anchor near top of original position
+        }
+        
+        // Position title at fixed top position
+        const titleText = this.cursesMenuContainer.getByName('titleText') as Phaser.GameObjects.Text;
+        if (titleText) {
+            titleText.setPosition(0, -52); // Fixed top position
+        }
+        
+        // Add curse names to menu with special handling for Scaling
+        const startY = -52 + titleHeight + (lineHeight / 2); // Start after title at fixed position
         let currentIndex = 0;
         
         curseGroups.forEach((curseData, curseTag) => {
@@ -303,6 +341,14 @@ export default class CurseUI {
             this.cursesMenuContainer.add(curseText);
             currentIndex++;
         });
+        
+        // Position close button dynamically after the last curse item
+        const closeButton = this.cursesMenuContainer.getByName('closeButton') as Phaser.GameObjects.Text;
+        if (closeButton) {
+            // Position close button after the last curse item with some padding
+            const closeButtonY = startY + (curseCount * lineHeight) + (padding / 2);
+            closeButton.setPosition(0, closeButtonY);
+        }
     }
 
     protected toggleCursesMenu(): void {
