@@ -193,17 +193,71 @@ export default class CurseVictoryScene extends Phaser.Scene {
             ease: 'Power2',
             onComplete: () => {
                 console.log("CurseVictoryScene: Card flight animation complete");
-                // Schedule transition delay after card reaches target
-                this.time.addEvent({
-                    delay: 1000, // 1 second delay 
-                    callback: () => {
-                        this.returnToCharacterSelect();
-                    }
-                });
+                // Add visual feedback to represent the curse that was already added
+                this.showCurseAddedFeedback();
             }
         });
         
         console.log(`CurseVictoryScene: Card flight animation started to position (${relativeTargetX}, ${relativeTargetY})`);
+    }
+    
+    private showCurseAddedFeedback() {
+        console.log("CurseVictoryScene: Showing visual feedback for curse that was added");
+        
+        // Add visual feedback effects (pulse, glow) to represent the curse addition
+        this.addCurseVisualFeedback();
+        
+        // Schedule the transition delay after visual feedback
+        this.time.addEvent({
+            delay: 600, // Short delay for visual feedback to complete
+            callback: () => {
+                this.scheduleTransitionDelay();
+            }
+        });
+    }
+    
+    private addCurseVisualFeedback() {
+        if (!this.curseCard) {
+            console.warn("CurseVictoryScene: Cannot add visual feedback - card not found");
+            return;
+        }
+        
+        // Add a pulsing glow effect to indicate curse was successfully added
+        this.tweens.add({
+            targets: this.curseCard,
+            scaleX: 0.35, // Slightly larger
+            scaleY: 0.35,
+            duration: 200,
+            ease: 'Power2',
+            yoyo: true,
+            repeat: 2, // Pulse 3 times total
+            onComplete: () => {
+                console.log("CurseVictoryScene: Curse visual feedback complete");
+            }
+        });
+        
+        // Add a brief tint effect
+        this.curseCard.setTint(0xffaa00); // Orange glow
+        this.time.addEvent({
+            delay: 600, // After pulsing
+            callback: () => {
+                if (this.curseCard) {
+                    this.curseCard.clearTint();
+                }
+            }
+        });
+        
+        console.log("CurseVictoryScene: Curse visual feedback animation started");
+    }
+    
+    private scheduleTransitionDelay() {
+        console.log("CurseVictoryScene: Scheduling transition delay");
+        this.time.addEvent({
+            delay: 1000, // 1 second delay before returning to character select
+            callback: () => {
+                this.returnToCharacterSelect();
+            }
+        });
     }
     
     private returnToCharacterSelect() {
