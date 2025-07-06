@@ -16,6 +16,7 @@ export default class CurseVictoryScene extends Phaser.Scene {
     
     // UI Elements
     private curseContainer!: Phaser.GameObjects.Container;
+    private curseCard!: Phaser.GameObjects.Image;
 
     constructor() {
         super('CurseVictoryScene');
@@ -86,11 +87,60 @@ export default class CurseVictoryScene extends Phaser.Scene {
         // Create a container for all curse UI elements
         this.curseContainer = this.add.container(width/2, height/2);
         
+        // Create curse card sprite at bottom of screen (initially invisible)
+        this.createCurseCard();
+        
         // Handle window resize
         this.scale.on('resize', this.handleResize, this);
         this.events.on("shutdown", this.shutdown, this);
         
         console.log("CurseVictoryScene created with curse_bg background");
+    }
+    
+    private createCurseCard() {
+        const { width, height } = this.scale;
+        
+        // Calculate responsive positioning for curse card at bottom of screen
+        const cardBottomY = height * 0.4; // Position in bottom area relative to container center
+        
+        // Create curse card sprite
+        this.curseCard = this.add.image(0, cardBottomY, 'curse_card')
+            .setName('curseCard')
+            .setAlpha(0) // Start invisible
+            .setDepth(10); // Ensure it's on top
+        
+        // Add to container
+        this.curseContainer.add(this.curseCard);
+        
+        // Schedule fade-in animation to start after curse_incant sound has time to play
+        this.time.addEvent({
+            delay: 800, // Wait 800ms for sound to play
+            callback: () => {
+                this.fadeInCurseCard();
+            }
+        });
+        
+        console.log("CurseVictoryScene: Curse card created at bottom of screen (invisible)");
+    }
+    
+    private fadeInCurseCard() {
+        if (!this.curseCard) {
+            console.warn("CurseVictoryScene: Curse card not found for fade-in animation");
+            return;
+        }
+        
+        // Fade in the curse card
+        this.tweens.add({
+            targets: this.curseCard,
+            alpha: 1,
+            duration: 1000, // 1 second fade-in
+            ease: 'Power2',
+            onComplete: () => {
+                console.log("CurseVictoryScene: Curse card fade-in complete");
+            }
+        });
+        
+        console.log("CurseVictoryScene: Curse card fade-in animation started");
     }
     
     private handleResize() {
@@ -108,6 +158,14 @@ export default class CurseVictoryScene extends Phaser.Scene {
         // Update container position to new center
         if (this.curseContainer) {
             this.curseContainer.setPosition(width/2, height/2);
+            
+            // Update curse card position within container
+            const curseCard = this.curseContainer.getByName('curseCard') as Phaser.GameObjects.Image;
+            if (curseCard) {
+                const cardBottomY = height * 0.4; // Recalculate responsive position
+                curseCard.setPosition(0, cardBottomY);
+                console.log(`CurseVictoryScene: Updated curse card position to (0, ${cardBottomY})`);
+            }
         }
         
         // Update corner shading
@@ -126,7 +184,11 @@ export default class CurseVictoryScene extends Phaser.Scene {
         this.scale.off('resize', this.handleResize, this);
         this.events.off("shutdown", this.shutdown, this);
         
-        // Clean up container
+        // Clean up curse card and container
+        if (this.curseCard) {
+            this.curseCard.destroy();
+        }
+        
         if (this.curseContainer) {
             this.curseContainer.destroy();
         }
