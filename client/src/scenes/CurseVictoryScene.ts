@@ -3,6 +3,10 @@ import SpacetimeDBClient from '../SpacetimeDBClient';
 import { GameEvents } from '../constants/GameEvents';
 import MusicManager from '../managers/MusicManager';
 
+// Roman numeral mapping (same as CurseUI)
+const ROMAN_NUMERALS = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 
+                        'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX'];
+
 // Constants for responsive design
 const RESPONSIVE_CONFIG = {
     // Add constants for future text and positioning if needed
@@ -17,9 +21,14 @@ export default class CurseVictoryScene extends Phaser.Scene {
     // UI Elements
     private curseContainer!: Phaser.GameObjects.Container;
     private curseCard!: Phaser.GameObjects.Image;
+    private curseCountText!: Phaser.GameObjects.Text;
     
     // Animation state tracking
     private isCardFlying: boolean = false;
+    
+    // Curse counting state
+    private initialCurseCount: number = 0;
+    private finalCurseCount: number = 0;
 
     constructor() {
         super('CurseVictoryScene');
@@ -50,6 +59,9 @@ export default class CurseVictoryScene extends Phaser.Scene {
 
     create() {
         const { width, height } = this.scale;
+        
+        // Check current curse count to determine scene behavior
+        this.checkCurrentCurseCount();
         
         // Set the global SoundManager's scene reference
         const soundManager = (window as any).soundManager;
@@ -102,6 +114,17 @@ export default class CurseVictoryScene extends Phaser.Scene {
     }
     
     private createCurseCard() {
+        // ALWAYS create the bottom card that will fly up
+        this.createCardAtBottom();
+        
+        // If there are already 2+ curses, also create a static card at top-right
+        // showing the current count, so the flying card joins an existing "deck"
+        if (this.initialCurseCount >= 1) {
+            this.createStaticCardAtTopRight();
+        }
+    }
+    
+    private createCardAtBottom() {
         const { width, height } = this.scale;
         
         // Calculate responsive positioning for curse card at bottom of screen
@@ -127,7 +150,50 @@ export default class CurseVictoryScene extends Phaser.Scene {
             }
         });
         
-        console.log("CurseVictoryScene: Curse card created at bottom of screen (invisible)");
+        console.log("CurseVictoryScene: Curse card created at bottom of screen (animation always happens)");
+    }
+    
+    private createStaticCardAtTopRight() {
+        const { width, height } = this.scale;
+        
+        // Create a static card at the final position (top-right corner)
+        const staticCard = this.add.image(width - 80, 80, 'curse_card')
+            .setName('staticCurseCard')
+            .setScale(0.3)
+            .setScrollFactor(0)
+            .setDepth(100001);
+        
+        // Create Roman numeral text showing the current count
+        this.createCurseCountText(this.initialCurseCount);
+        
+        console.log(`CurseVictoryScene: Created static card at top-right showing count ${this.initialCurseCount}`);
+    }
+    
+    private createCurseCountText(count: number) {
+        if (!this.curseCard) return;
+        
+        const { width, height } = this.scale;
+        
+        // Position text at same location as card (top-right corner)
+        const targetX = width - 80; // Same as card position
+        const targetY = 80; // Same as card position
+        
+        // Create Roman numeral text (same as CurseUI)
+        const romanNumeral = count <= 20 ? ROMAN_NUMERALS[count] : 'XX+';
+        
+        this.curseCountText = this.add.text(targetX, targetY, romanNumeral, {
+            fontSize: '24px',
+            color: '#ffffff',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 2
+        });
+        this.curseCountText.setOrigin(0.5, 0.5);
+        this.curseCountText.setScrollFactor(0);
+        this.curseCountText.setDepth(100003); // Above the card
+        this.curseCountText.setVisible(count > 0);
+        
+        console.log(`CurseVictoryScene: Created curse count text: ${romanNumeral}`);
     }
     
     private fadeInCurseCard() {
@@ -198,16 +264,41 @@ export default class CurseVictoryScene extends Phaser.Scene {
             ease: 'Power2',
             onComplete: () => {
                 console.log("CurseVictoryScene: Card flight animation complete");
-                // Add visual feedback to represent the curse that was already added
-                this.showCurseAddedFeedback();
+                // Handle different scenarios based on initial curse count
+                this.handleCardReachedDestination();
             }
         });
         
         console.log(`CurseVictoryScene: Card flight animation started to position (${relativeTargetX}, ${relativeTargetY})`);
     }
     
+    private handleCardReachedDestination() {
+        if (this.initialCurseCount === 0) {
+            // First curse: Show curse system appearing for the first time
+            this.createCurseCountText(1); // Show "I" - the curse system is now visible
+            console.log("CurseVictoryScene: First curse - showing curse system appearing");
+        } else {
+            // Existing curses: Text already exists from static card, just note this
+            console.log(`CurseVictoryScene: Card joined existing deck - current count ${this.initialCurseCount}, will increment to ${this.finalCurseCount}`);
+        }
+        
+        // Add visual feedback to represent the curse that was already added
+        this.showCurseAddedFeedback();
+    }
+    
     private showCurseAddedFeedback() {
         console.log("CurseVictoryScene: Showing visual feedback for curse that was added");
+        
+        // If there are existing curses, increment the Roman numeral to show the new curse
+        if (this.initialCurseCount > 0 && this.curseCountText) {
+            // Small delay before incrementing to let the user see the current count first
+            this.time.addEvent({
+                delay: 300, // Brief pause to show current count
+                callback: () => {
+                    this.incrementCurseCountDisplay();
+                }
+            });
+        }
         
         // Add visual feedback effects (pulse, glow) to represent the curse addition
         this.addCurseVisualFeedback();
@@ -217,6 +308,38 @@ export default class CurseVictoryScene extends Phaser.Scene {
             delay: 600, // Short delay for visual feedback to complete
             callback: () => {
                 this.scheduleTransitionDelay();
+            }
+        });
+    }
+    
+    private incrementCurseCountDisplay() {
+        if (!this.curseCountText) return;
+        
+        const newCount = this.initialCurseCount + 1;
+        const newRomanNumeral = newCount <= 20 ? ROMAN_NUMERALS[newCount] : 'XX+';
+        
+        // Animate the text change with a brief scale effect
+        this.tweens.add({
+            targets: this.curseCountText,
+            scaleX: 1.2,
+            scaleY: 1.2,
+            duration: 150,
+            ease: 'Power2',
+            yoyo: true,
+            onComplete: () => {
+                // Update the text during the scale animation
+                this.curseCountText.setText(newRomanNumeral);
+                console.log(`CurseVictoryScene: Incremented curse count display to ${newRomanNumeral}`);
+            }
+        });
+        
+        // Update the text at the peak of the scale animation
+        this.time.addEvent({
+            delay: 75, // Halfway through the scale animation
+            callback: () => {
+                if (this.curseCountText) {
+                    this.curseCountText.setText(newRomanNumeral);
+                }
             }
         });
     }
@@ -314,9 +437,13 @@ export default class CurseVictoryScene extends Phaser.Scene {
         this.scale.off('resize', this.handleResize, this);
         this.events.off("shutdown", this.shutdown, this);
         
-        // Clean up curse card and container
+        // Clean up curse card, count text, and container
         if (this.curseCard) {
             this.curseCard.destroy();
+        }
+        
+        if (this.curseCountText) {
+            this.curseCountText.destroy();
         }
         
         if (this.curseContainer) {
@@ -354,5 +481,36 @@ export default class CurseVictoryScene extends Phaser.Scene {
         cornerShading.fillTriangle(width, height, width * 0.7, height, width, height * 0.7);
         
         console.log("CurseVictoryScene: Corner shading created");
+    }
+    
+    private checkCurrentCurseCount() {
+        if (!this.spacetimeDBClient.isConnected || !this.spacetimeDBClient.sdkConnection?.db) {
+            console.log("CurseVictoryScene: SpacetimeDB not connected, assuming first curse");
+            this.initialCurseCount = 0;
+            this.finalCurseCount = 1;
+            return;
+        }
+        
+        try {
+            // Get current curse count from database
+            // @ts-ignore - Handle potential binding issues
+            if (this.spacetimeDBClient.sdkConnection.db.curses) {
+                // @ts-ignore
+                this.initialCurseCount = this.spacetimeDBClient.sdkConnection.db.curses.count() - 1;
+                if(this.initialCurseCount < 0) {
+                    this.initialCurseCount = 0;
+                }
+                this.finalCurseCount = this.initialCurseCount + 1;
+                console.log(`CurseVictoryScene: Current curse count: ${this.initialCurseCount}`);
+            } else {
+                console.log("CurseVictoryScene: Curses table not available, assuming first curse");
+                this.initialCurseCount = 0;
+                this.finalCurseCount = 1;
+            }
+        } catch (error) {
+            console.warn("CurseVictoryScene: Error checking curse count, assuming first curse:", error);
+            this.initialCurseCount = 0;
+            this.finalCurseCount = 1;
+        }
     }
 } 
