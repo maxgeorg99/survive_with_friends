@@ -38,6 +38,22 @@ pub fn get_parameter_u(ctx: &ReducerContext, attack: &PlayerScheduledAttack) -> 
             // Angel Staff doesn't need special parameters since it's a simple area effect
             0
         }
+        AttackType::Football | AttackType::Cards | AttackType::Dumbbell => {
+            // For now, use a simple alternating parameter like Sword
+            if attack.parameter_u == 0 {
+                1
+            } else {
+                0
+            }
+        }
+        AttackType::Volleyball => {
+            // For Volleyball, parameter_u stores the bounce count
+            3 // Start with 0 bounces
+        }
+        AttackType::Garlic => {
+            // Garlic has no direction, so no parameter needed
+            0
+        }
         _ => 0,
     }
 }
@@ -110,6 +126,66 @@ pub fn determine_attack_direction(
         }
         AttackType::AngelStaff => {
             // Angel Staff is an area effect at player position - direction doesn't matter
+            DbVector2::new(0.0, 0.0)
+        }
+        AttackType::Football | AttackType::Dumbbell => {
+            // Simple pattern: Target nearest enemy. If none, use player's direction.
+            if let Some(target_position) = find_nearest_target(ctx, player.position, player_id) {
+                let dx = target_position.x - player.position.x;
+                let dy = target_position.y - player.position.y;
+                DbVector2::new(dx, dy).normalize()
+            } else {
+                let waypoint = player.waypoint;
+                let wdx = waypoint.x - player.position.x;
+                let wdy = waypoint.y - player.position.y;
+                DbVector2::new(wdx, wdy).normalize()
+            }
+        }
+        AttackType::Volleyball => {
+            // Volleyball initially targets nearest enemy, then bounces to others
+            if let Some(target_position) = find_nearest_target(ctx, player.position, player_id) {
+                let dx = target_position.x - player.position.x;
+                let dy = target_position.y - player.position.y;
+                DbVector2::new(dx, dy).normalize()
+            } else {
+                let waypoint = player.waypoint;
+                let wdx = waypoint.x - player.position.x;
+                let wdy = waypoint.y - player.position.y;
+                DbVector2::new(wdx, wdy).normalize()
+            }
+        }
+        AttackType::Cards => {
+            // Shoots a fan of cards towards the nearest enemy.
+            if let Some(target_position) = find_nearest_target(ctx, player.position, player_id) {
+                let dx = target_position.x - player.position.x;
+                let dy = target_position.y - player.position.y;
+                let base_dir = DbVector2::new(dx, dy).normalize();
+
+                let fan_angle_range = 45.0; // degrees
+                let fan_angle = if projectiles > 1 {
+                    -fan_angle_range / 2.0 + (fan_angle_range * id_within_burst as f64 / (projectiles - 1) as f64)
+                } else {
+                    0.0
+                };
+
+                let fan_angle_rad = fan_angle * PI / 180.0;
+                let cos_a = fan_angle_rad.cos() as f32;
+                let sin_a = fan_angle_rad.sin() as f32;
+
+                DbVector2::new(
+                    base_dir.x * cos_a - base_dir.y * sin_a,
+                    base_dir.x * sin_a + base_dir.y * cos_a,
+                )
+            } else {
+                // Fallback to circular pattern if no enemy
+                let start_angle = (parameter_u as f64) * PI / 180.0;
+                let angle_step = 360.0 / (projectiles as f64) * PI / 180.0;
+                let attack_angle = start_angle + (angle_step * (id_within_burst as f64));
+                DbVector2::new(attack_angle.cos() as f32, attack_angle.sin() as f32)
+            }
+        }
+        AttackType::Garlic | AttackType::Joint => {
+            // Garlic aura has no direction.
             DbVector2::new(0.0, 0.0)
         }
     }
@@ -250,4 +326,4 @@ pub fn find_random_target_in_radius(ctx: &ReducerContext, attacker_position: DbV
     let mut rng = ctx.rng();
     let random_index = rng.gen_range(0..targets_in_range.len());
     Some(targets_in_range[random_index])
-} 
+}

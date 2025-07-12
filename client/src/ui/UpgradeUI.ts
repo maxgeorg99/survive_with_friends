@@ -3,6 +3,7 @@ import { UpgradeOptionData, UpgradeType } from '../autobindings';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { ChooseUpgrade } from '../autobindings';
 import { getSoundVolume } from '../managers/VolumeSettings';
+import { isMobileDevice } from '../utils/device';
 
 // Define a type for our attack graphic data with prediction capabilities
 interface AttackGraphicData {
@@ -34,18 +35,20 @@ interface CardHoldState {
 }
 
 // Constants
-const CARD_WIDTH = 200;
-const CARD_HEIGHT = 260;
-const CARD_SPACING = 20;
-const CARD_SCALE = 0.8;
+const IS_MOBILE = isMobileDevice();
+
+const CARD_WIDTH = IS_MOBILE ? 160 : 200;
+const CARD_HEIGHT = IS_MOBILE ? 208 : 260;
+const CARD_SPACING = IS_MOBILE ? 10 : 20;
+const CARD_SCALE = IS_MOBILE ? 0.7 : 0.8;
 const UI_DEPTH = 100000; // Extremely high depth to ensure UI stays on top of all game elements
 
 // Hold mechanic constants
-const HOLD_DURATION_MS = 400; // Time required to hold for selection (800ms)
+const HOLD_DURATION_MS = 400; 
 const PROGRESS_BAR_WIDTH = CARD_WIDTH * CARD_SCALE * 0.8;
 const PROGRESS_BAR_HEIGHT = 8;
-const PROGRESS_BAR_Y_OFFSET = (CARD_HEIGHT * CARD_SCALE) / 2 - 35; // Moved down slightly more
-const NUMBER_TEXT_Y_OFFSET = (CARD_HEIGHT * CARD_SCALE) / 2 + 5; // Moved up closer to cards (was +15, now +5)
+const PROGRESS_BAR_Y_OFFSET = (CARD_HEIGHT * CARD_SCALE) / 2 - 35; 
+const NUMBER_TEXT_Y_OFFSET = (CARD_HEIGHT * CARD_SCALE) / 2 + (IS_MOBILE ? 5 : 15);
 
 // Define upgrade icon mapping
 const UPGRADE_ICON_MAP: { [key: string]: string } = {
@@ -120,7 +123,7 @@ export default class UpgradeUI {
         this.rerollText.setOrigin(0.5);
         this.container.add(this.rerollText);
 
-        console.log('UpgradeUI initialized with hold mechanics');
+        console.log(`UpgradeUI initialized for ${IS_MOBILE ? 'mobile' : 'desktop'}`);
     }
 
     public update(time: number, delta: number): void {
@@ -144,30 +147,32 @@ export default class UpgradeUI {
             }
         }
 
-        // Update progress bars for cards being held
-        this.cardHoldStates.forEach((holdState, index) => {
-            if (holdState.isHolding && holdState.progressBar && holdState.holdStartTime > 0) {
-                const elapsed = time - holdState.holdStartTime;
-                const progress = Math.min(elapsed / HOLD_DURATION_MS, 1);
-                
-                // Update progress bar width
-                holdState.progressBar.width = PROGRESS_BAR_WIDTH * progress;
-                
-                // Change color as it progresses
-                if (progress < 0.3) {
-                    holdState.progressBar.fillColor = 0xff4444; // Red
-                } else if (progress < 0.7) {
-                    holdState.progressBar.fillColor = 0xffaa00; // Orange
-                } else {
-                    holdState.progressBar.fillColor = 0x44ff44; // Green
+        if (!IS_MOBILE) {
+            // Update progress bars for cards being held
+            this.cardHoldStates.forEach((holdState, index) => {
+                if (holdState.isHolding && holdState.progressBar && holdState.holdStartTime > 0) {
+                    const elapsed = time - holdState.holdStartTime;
+                    const progress = Math.min(elapsed / HOLD_DURATION_MS, 1);
+                    
+                    // Update progress bar width
+                    holdState.progressBar.width = PROGRESS_BAR_WIDTH * progress;
+                    
+                    // Change color as it progresses
+                    if (progress < 0.3) {
+                        holdState.progressBar.fillColor = 0xff4444; // Red
+                    } else if (progress < 0.7) {
+                        holdState.progressBar.fillColor = 0xffaa00; // Orange
+                    } else {
+                        holdState.progressBar.fillColor = 0x44ff44; // Green
+                    }
+                    
+                    // Complete selection if progress is full
+                    if (progress >= 1) {
+                        this.completeHoldSelection(index);
+                    }
                 }
-                
-                // Complete selection if progress is full
-                if (progress >= 1) {
-                    this.completeHoldSelection(index);
-                }
-            }
-        });
+            });
+        }
 
         // Check for number key presses (immediate selection)
         for (let i = 0; i < this.keyListeners.length; i++) {
@@ -199,12 +204,12 @@ export default class UpgradeUI {
         this.cardHoldStates = [];
 
         // Calculate total width of all cards with spacing
-        const totalWidth = (this.upgradeOptions.length * CARD_WIDTH) + ((this.upgradeOptions.length - 1) * CARD_SPACING);
-        const startX = -totalWidth / 2 + CARD_WIDTH / 2;
+        const totalWidth = (this.upgradeOptions.length * CARD_WIDTH * CARD_SCALE) + ((this.upgradeOptions.length - 1) * CARD_SPACING);
+        const startX = -totalWidth / 2 + (CARD_WIDTH * CARD_SCALE) / 2;
 
         // Create a card for each option - moved up closer to text
         this.upgradeOptions.forEach((option, index) => {
-            const x = startX + (index * (CARD_WIDTH + CARD_SPACING));
+            const x = startX + (index * (CARD_WIDTH * CARD_SCALE + CARD_SPACING));
             const card = this.createCard(x, -20, option, index); // Moved up from y=0 to y=-30
             this.cards.push(card);
             this.container.add(card);
@@ -228,39 +233,41 @@ export default class UpgradeUI {
         background.setScale(CARD_SCALE);
         card.add(background);
         
-        // Create progress bar background (initially hidden)
-        const progressBarBackground = this.scene.add.rectangle(
-            0, 
-            PROGRESS_BAR_Y_OFFSET, 
-            PROGRESS_BAR_WIDTH, 
-            PROGRESS_BAR_HEIGHT, 
-            0x333333, 
-            0.8
-        );
-        progressBarBackground.setVisible(false);
-        card.add(progressBarBackground);
-        
-        // Create progress bar (initially hidden)
-        const progressBar = this.scene.add.rectangle(
-            -PROGRESS_BAR_WIDTH / 2, 
-            PROGRESS_BAR_Y_OFFSET, 
-            0, 
-            PROGRESS_BAR_HEIGHT, 
-            0xff4444, 
-            1
-        );
-        progressBar.setOrigin(0, 0.5);
-        progressBar.setVisible(false);
-        card.add(progressBar);
-        
-        // Store progress bar references
-        this.cardHoldStates[index] = {
-            isHolding: false,
-            holdStartTime: 0,
-            holdTimer: null,
-            progressBar: progressBar,
-            progressBarBackground: progressBarBackground
-        };
+        if (!IS_MOBILE) {
+            // Create progress bar background (initially hidden)
+            const progressBarBackground = this.scene.add.rectangle(
+                0, 
+                PROGRESS_BAR_Y_OFFSET, 
+                PROGRESS_BAR_WIDTH, 
+                PROGRESS_BAR_HEIGHT, 
+                0x333333, 
+                0.8
+            );
+            progressBarBackground.setVisible(false);
+            card.add(progressBarBackground);
+            
+            // Create progress bar (initially hidden)
+            const progressBar = this.scene.add.rectangle(
+                -PROGRESS_BAR_WIDTH / 2, 
+                PROGRESS_BAR_Y_OFFSET, 
+                0, 
+                PROGRESS_BAR_HEIGHT, 
+                0xff4444, 
+                1
+            );
+            progressBar.setOrigin(0, 0.5);
+            progressBar.setVisible(false);
+            card.add(progressBar);
+            
+            // Store progress bar references
+            this.cardHoldStates[index] = {
+                isHolding: false,
+                holdStartTime: 0,
+                holdTimer: null,
+                progressBar: progressBar,
+                progressBarBackground: progressBarBackground
+            };
+        }
         
         // Make card interactive with proper input consumption
         background.setInteractive({ useHandCursor: true });
@@ -273,8 +280,10 @@ export default class UpgradeUI {
         
         background.on('pointerout', () => {
             background.clearTint();
-            // Cancel hold if pointer leaves the card
-            this.cancelHold(index);
+            if (!IS_MOBILE) {
+                // Cancel hold if pointer leaves the card
+                this.cancelHold(index);
+            }
         });
         
         // CRITICAL: Use input manager to consume pointer events properly
@@ -287,8 +296,10 @@ export default class UpgradeUI {
             // Stop this pointer from being processed by other input handlers
             this.scene.input.stopPropagation();
             
-            this.startHold(index);
-            console.log(`Started holding upgrade card ${index + 1}`);
+            if (!IS_MOBILE) {
+                this.startHold(index);
+                console.log(`Started holding upgrade card ${index + 1}`);
+            }
         });
         
         background.on('pointerup', (pointer: Phaser.Input.Pointer) => {
@@ -297,8 +308,12 @@ export default class UpgradeUI {
             // Remove this pointer from handled set
             this.handledPointers.delete(pointer.id);
             
-            this.cancelHold(index);
-            console.log(`Released upgrade card ${index + 1}`);
+            if (IS_MOBILE) {
+                this.chooseUpgrade(index);
+            } else {
+                this.cancelHold(index);
+                console.log(`Released upgrade card ${index + 1}`);
+            }
         });
         
         // Also handle pointer leave to clean up handled pointers
@@ -602,19 +617,21 @@ export default class UpgradeUI {
         this.isVisible = false;
         this.container.setVisible(false);
         
-        // Cancel any active holds when hiding
-        this.cardHoldStates.forEach((_, index) => {
-            this.cancelHold(index);
-        });
-        
-        // Stop upgrade bar fill sound if playing
-        if (this.upgradeBarFillSound) {
-            try {
-                this.upgradeBarFillSound.stop();
-                this.upgradeBarFillSound.destroy();
-                this.upgradeBarFillSound = null;
-            } catch (error) {
-                console.warn("Failed to stop upgrade bar fill sound in hide:", error);
+        if (!IS_MOBILE) {
+            // Cancel any active holds when hiding
+            this.cardHoldStates.forEach((_, index) => {
+                this.cancelHold(index);
+            });
+            
+            // Stop upgrade bar fill sound if playing
+            if (this.upgradeBarFillSound) {
+                try {
+                    this.upgradeBarFillSound.stop();
+                    this.upgradeBarFillSound.destroy();
+                    this.upgradeBarFillSound = null;
+                } catch (error) {
+                    console.warn("Failed to stop upgrade bar fill sound in hide:", error);
+                }
             }
         }
         
@@ -623,19 +640,21 @@ export default class UpgradeUI {
     }
 
     public destroy(): void {
-        // Cancel all holds and clean up timers
-        this.cardHoldStates.forEach((_, index) => {
-            this.cancelHold(index);
-        });
-        
-        // Stop upgrade bar fill sound if playing
-        if (this.upgradeBarFillSound) {
-            try {
-                this.upgradeBarFillSound.stop();
-                this.upgradeBarFillSound.destroy();
-                this.upgradeBarFillSound = null;
-            } catch (error) {
-                console.warn("Failed to stop upgrade bar fill sound in destroy:", error);
+        if (!IS_MOBILE) {
+            // Cancel all holds and clean up timers
+            this.cardHoldStates.forEach((_, index) => {
+                this.cancelHold(index);
+            });
+            
+            // Stop upgrade bar fill sound if playing
+            if (this.upgradeBarFillSound) {
+                try {
+                    this.upgradeBarFillSound.stop();
+                    this.upgradeBarFillSound.destroy();
+                    this.upgradeBarFillSound = null;
+                } catch (error) {
+                    console.warn("Failed to stop upgrade bar fill sound in destroy:", error);
+                }
             }
         }
         

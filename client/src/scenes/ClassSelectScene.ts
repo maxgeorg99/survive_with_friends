@@ -5,15 +5,22 @@ import PlayerClass from '../autobindings/player_class_type';
 import { GameEvents } from '../constants/GameEvents';
 import MusicManager from '../managers/MusicManager';
 import OptionsUI from '../ui/OptionsUI';
+import { isMobileDevice } from '../utils/device';
 
 // Map player class to numeric class ID
-const CLASS_ID_MAP = {
+const CLASS_ID_MAP: { [key: string]: number } = {
     "Fighter": 0,
     "Rogue": 1,
     "Mage": 2,
     "Paladin": 3,
     "Valkyrie": 4,
-    "Priest": 5
+    "Priest": 5,
+    "Football": 6,
+    "Gambler": 7,
+    "Athlete": 8,
+    "Gourmand": 9,
+    "Volleyball": 10,
+    "Stoner": 11,
 };
 
 const CLASS_ICON_MAP : Record<string, string> = {
@@ -22,7 +29,13 @@ const CLASS_ICON_MAP : Record<string, string> = {
     "mage_icon": "attack_wand",
     "paladin_icon": "attack_shield",
     "valkyrie_icon": "attack_horn",
-    "priestess_icon": "attack_staff"
+    "priestess_icon": "attack_staff",
+    "football_icon": "attack_football",
+    "gambler_icon": "attack_cards",
+    "athlete_icon": "attack_dumbbell",
+    "gourmand_icon": "attack_garlic",
+    "volleyball_icon": "attack_volleyball",
+    "stoner_icon": "attack_joint",
 };
 
 // Constants for responsive design
@@ -54,6 +67,12 @@ export default class ClassSelectScene extends Phaser.Scene {
     private paladinButton!: HTMLButtonElement;
     private valkyrieButton!: HTMLButtonElement;
     private priestessButton!: HTMLButtonElement;
+    private footballButton!: HTMLButtonElement;
+    private gamblerButton!: HTMLButtonElement;
+    private athleteButton!: HTMLButtonElement;
+    private gourmandButton!: HTMLButtonElement;
+    private volleyballButton!: HTMLButtonElement;
+    private stonerButton!: HTMLButtonElement;
     private confirmButton!: HTMLButtonElement;
     private errorText!: Phaser.GameObjects.Text;
     private optionsUI!: OptionsUI;
@@ -84,6 +103,14 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.load.image('priestess_icon', '/assets/attack_staff.png');
         this.load.image('title_bg', '/assets/title_bg.png');
         
+        // Load new class icons
+        this.load.image('football_icon', '/assets/attack_football.png');
+        this.load.image('gambler_icon', '/assets/attack_cards.png');
+        this.load.image('athlete_icon', '/assets/attack_dumbbell.png');
+        this.load.image('gourmand_icon', '/assets/attack_garlic.png');
+        this.load.image('volleyball_icon', '/assets/attack_volleyball.png');
+        this.load.image('stoner_icon', '/assets/attack_joint.png');
+
         // Load new Valkyrie class sprite
         this.load.image('player_valkyrie', '/assets/class_valkyrie_1.png');
         
@@ -251,8 +278,8 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.classButtonsContainer.id = 'class-select-container';
         this.classButtonsContainer.style.position = 'absolute';
         this.classButtonsContainer.style.display = 'grid';
-        this.classButtonsContainer.style.gridTemplateColumns = '1fr 1fr'; // 2 columns
-        this.classButtonsContainer.style.gridGap = '20px';
+        this.classButtonsContainer.style.gridTemplateColumns = isMobileDevice() ? '1fr 1fr' : '1fr 1fr 1fr'; // 2 columns for mobile, 3 for desktop
+        this.classButtonsContainer.style.gridGap = isMobileDevice() ? '10px' : '20px';
         this.classButtonsContainer.style.justifyItems = 'center';
         this.classButtonsContainer.style.alignItems = 'center';
         document.body.appendChild(this.classButtonsContainer);
@@ -261,8 +288,9 @@ export default class ClassSelectScene extends Phaser.Scene {
             const button = document.createElement('button');
             button.className = 'class-select-button';
             button.style.position = 'relative';
-            button.style.width = '250px';
-            button.style.height = '70px';
+            const isMobile = isMobileDevice();
+            button.style.width = isMobile ? '150px' : '250px';
+            button.style.height = isMobile ? '60px' : '70px';
             button.style.padding = '10px';
             button.style.margin = '5px';
             button.style.backgroundColor = '#2c3e50';
@@ -271,7 +299,7 @@ export default class ClassSelectScene extends Phaser.Scene {
             button.style.borderRadius = '5px';
             button.style.cursor = 'pointer';
             button.style.fontFamily = 'Arial';
-            button.style.fontSize = '18px';
+            button.style.fontSize = isMobile ? '14px' : '18px';
             button.style.textAlign = 'center';
             button.style.transition = 'background-color 0.2s, border-color 0.2s';
             button.style.display = 'flex';
@@ -286,8 +314,8 @@ export default class ClassSelectScene extends Phaser.Scene {
                     // Wait a bit for texture to be fully processed
                     const leftIcon = document.createElement('img');
                     leftIcon.src = '/assets/' + iconTexture + '.png';
-                    leftIcon.style.width = '50px';
-                    leftIcon.style.height = '50px';
+                    leftIcon.style.width = isMobile ? '30px' : '50px';
+                    leftIcon.style.height = isMobile ? '30px' : '50px';
                     leftIcon.style.marginRight = '10px';
                     
                     // Add load event to ensure image displays
@@ -373,14 +401,26 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.paladinButton = createClassButton('Chris', PlayerClass.Paladin as PlayerClass, 'paladin_icon');
         this.valkyrieButton = createClassButton('Gwen', PlayerClass.Valkyrie as PlayerClass, 'valkyrie_icon');
         this.priestessButton = createClassButton('Enno', PlayerClass.Priest as PlayerClass, 'priestess_icon');
+        this.footballButton = createClassButton('Football Til', PlayerClass.Football as PlayerClass, 'football_icon');
+        this.gamblerButton = createClassButton('Yu-Gi-Oh Marc', PlayerClass.Gambler as PlayerClass, 'gambler_icon');
+        this.athleteButton = createClassButton('Gym Max', PlayerClass.Athlete as PlayerClass, 'athlete_icon');
+        this.gourmandButton = createClassButton('Chef Chris', PlayerClass.Gourmand as PlayerClass, 'gourmand_icon');
+        this.volleyballButton = createClassButton('Volleyball Gwen', PlayerClass.Volleyball as PlayerClass, 'volleyball_icon');
+        this.stonerButton = createClassButton('Stoner Enno', PlayerClass.Stoner as PlayerClass, 'stoner_icon');
         
-        // Add buttons to container in grid layout (2x3 grid)
+        // Add buttons to container in the desired order
         this.classButtonsContainer.appendChild(this.fighterButton);
+        this.classButtonsContainer.appendChild(this.footballButton);
         this.classButtonsContainer.appendChild(this.rogueButton);
+        this.classButtonsContainer.appendChild(this.gamblerButton);
         this.classButtonsContainer.appendChild(this.mageButton);
+        this.classButtonsContainer.appendChild(this.athleteButton);
         this.classButtonsContainer.appendChild(this.paladinButton);
+        this.classButtonsContainer.appendChild(this.gourmandButton);
         this.classButtonsContainer.appendChild(this.valkyrieButton);
+        this.classButtonsContainer.appendChild(this.volleyballButton);
         this.classButtonsContainer.appendChild(this.priestessButton);
+        this.classButtonsContainer.appendChild(this.stonerButton);
         
         // Create a separate container for the confirm button to keep it below the grid
         const confirmContainer = document.createElement('div');
@@ -422,7 +462,7 @@ export default class ClassSelectScene extends Phaser.Scene {
         confirmContainer.appendChild(this.confirmButton);
         this.classButtonsContainer.appendChild(confirmContainer);
         
-        console.log('ClassSelectScene: Class buttons created successfully with 2-column layout');
+        console.log(`ClassSelectScene: Class buttons created successfully with ${isMobileDevice() ? '2-column' : '3-column'} layout`);
     }
     
     private positionHTMLElements() {
@@ -435,8 +475,9 @@ export default class ClassSelectScene extends Phaser.Scene {
         const { width, height } = this.scale;
         
         // Position class select container - adjust for grid layout
-        this.classButtonsContainer.style.left = `${width / 2 - 275}px`; // Adjusted for 2-column width
-        this.classButtonsContainer.style.top = `${height / 2 - 120}px`; // Adjusted for more compact layout
+        const containerWidth = isMobileDevice() ? 320 : 810; // Width for 2 vs 3 columns
+        this.classButtonsContainer.style.left = `${width / 2 - containerWidth / 2}px`;
+        this.classButtonsContainer.style.top = `${height / 2 - (isMobileDevice() ? 200 : 120)}px`;
     }
     
     private handleResize() {
@@ -482,6 +523,11 @@ export default class ClassSelectScene extends Phaser.Scene {
             this.errorText.setPosition(width/2, height * 0.85);
         }
         
+        // Update class button layout if device type changes
+        if (this.classButtonsContainer) {
+            this.classButtonsContainer.style.gridTemplateColumns = isMobileDevice() ? '1fr 1fr' : '1fr 1fr 1fr';
+        }
+
         this.positionHTMLElements();
     }
     
@@ -525,7 +571,7 @@ export default class ClassSelectScene extends Phaser.Scene {
     
     private selectClass(classType: PlayerClass, button: HTMLButtonElement) {
         // Reset all button styles
-        [this.fighterButton, this.rogueButton, this.mageButton, this.paladinButton, this.valkyrieButton, this.priestessButton].forEach(btn => {
+        [this.fighterButton, this.rogueButton, this.mageButton, this.paladinButton, this.valkyrieButton, this.priestessButton, this.footballButton, this.gamblerButton, this.athleteButton, this.gourmandButton, this.volleyballButton, this.stonerButton].forEach(btn => {
             if (btn) {
                 btn.style.backgroundColor = '#2c3e50';
                 btn.style.borderColor = '#34495e';
@@ -584,7 +630,7 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.confirmButton.disabled = true;
         this.confirmButton.textContent = 'Creating...';
         
-        [this.fighterButton, this.rogueButton, this.mageButton, this.paladinButton, this.valkyrieButton, this.priestessButton].forEach(btn => {
+        [this.fighterButton, this.rogueButton, this.mageButton, this.paladinButton, this.valkyrieButton, this.priestessButton, this.footballButton, this.gamblerButton, this.athleteButton, this.gourmandButton, this.volleyballButton, this.stonerButton].forEach(btn => {
             if (btn) btn.disabled = true;
         });
         
@@ -649,7 +695,7 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.confirmButton.disabled = false;
         this.confirmButton.textContent = 'Confirm Selection';
         
-        [this.fighterButton, this.rogueButton, this.mageButton, this.paladinButton, this.valkyrieButton, this.priestessButton].forEach(btn => {
+        [this.fighterButton, this.rogueButton, this.mageButton, this.paladinButton, this.valkyrieButton, this.priestessButton, this.footballButton, this.gamblerButton, this.athleteButton, this.gourmandButton, this.volleyballButton, this.stonerButton].forEach(btn => {
             if (btn) btn.disabled = false;
         });
     }
@@ -684,6 +730,12 @@ export default class ClassSelectScene extends Phaser.Scene {
                     (el as HTMLElement).textContent?.includes('Paladin') ||
                     (el as HTMLElement).textContent?.includes('Valkyrie') ||
                     (el as HTMLElement).textContent?.includes('Priestess') ||
+                    (el as HTMLElement).textContent?.includes('Football') ||
+                    (el as HTMLElement).textContent?.includes('Gambler') ||
+                    (el as HTMLElement).textContent?.includes('Athlete') ||
+                    (el as HTMLElement).textContent?.includes('Gourmand') ||
+                    (el as HTMLElement).textContent?.includes('Volleyball') ||
+                    (el as HTMLElement).textContent?.includes('Stoner') ||
                     (el as HTMLElement).textContent?.includes('Confirm Selection')) {
                     if (el && el.parentNode) {
                         console.log("Removing class button:", (el as HTMLElement).textContent);
@@ -901,4 +953,4 @@ export default class ClassSelectScene extends Phaser.Scene {
         // Remove update callback
         this.events.off('update', this.updateStatus, this);
     }
-} 
+}

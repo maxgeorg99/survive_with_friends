@@ -64,6 +64,12 @@ pub enum PlayerClass {
     Paladin,
     Valkyrie,
     Priest,
+    Football,
+    Gambler,
+    Athlete,
+    Gourmand,
+    Volleyball,
+    Stoner
 }
 
 // Account state enum for player progression
@@ -85,6 +91,12 @@ pub enum AttackType {
     Shield,
     ThunderHorn,
     AngelStaff,
+    Football,
+    Cards,
+    Dumbbell,
+    Garlic,
+    Volleyball,
+    Joint
 }
 
 // Monster attack type enum
@@ -485,6 +497,12 @@ pub fn spawn_player(ctx: &ReducerContext, class_id: u32) {
         3 => PlayerClass::Paladin,
         4 => PlayerClass::Valkyrie,
         5 => PlayerClass::Priest,
+        6 => PlayerClass::Football,
+        7 => PlayerClass::Gambler,
+        8 => PlayerClass::Athlete,
+        9 => PlayerClass::Gourmand,
+        10 => PlayerClass::Volleyball,
+        11 => PlayerClass::Stoner,
         _ => panic!("SpawnPlayer: Invalid class ID provided by {}: {}. Valid class IDs are 0-5 (Fighter, Rogue, Mage, Paladin, Valkyrie, Priest).", identity, class_id),
     };
     

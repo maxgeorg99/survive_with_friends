@@ -267,6 +267,24 @@ export class AttackManager {
             case 'AngelStaff':
                 spriteKey = 'attack_staff';
                 break;
+            case 'Football':
+                spriteKey = 'attack_football';
+                break;
+            case 'Gambler':
+                spriteKey = 'attack_cards';
+                break;
+            case 'Athlete':
+                spriteKey = 'attack_dumbbell';
+                break;
+            case 'Gourmand':
+                spriteKey = 'attack_garlic';
+                break;
+            case 'Volleyball':
+                spriteKey = 'attack_volleyball';
+                break;
+            case 'Stoner':
+                spriteKey = 'attack_joint';
+                break;
             default:
                 console.error(`Unknown attack type: ${attackType}`);
                 return null;
@@ -467,67 +485,18 @@ export class AttackManager {
 
         // Update the sprite position and rotation - always visible regardless of debug mode
         if (attackGraphicData.sprite) {
-            const sprite = attackGraphicData.sprite;
-            
-            // Position sprite at predicted position
-            sprite.x = attackGraphicData.predictedPosition.x;
-            sprite.y = attackGraphicData.predictedPosition.y;
-            
-            // Apply alpha transparency based on PvP status (except Thunder Horn and Angel Staff which stay at 0)
-            if (attackGraphicData.attackType !== 'ThunderHorn' && attackGraphicData.attackType !== 'AngelStaff') {
-                sprite.setAlpha(attackGraphicData.alpha);
-            }
-            
-            // Calculate scale based on radius compared to base radius
-            // Only apply if baseRadius is not zero to avoid division by zero
-            if (attackGraphicData.baseRadius > 0) {
-                const scale = attackGraphicData.radius / attackGraphicData.baseRadius;
-                sprite.setScale(scale);
-            }
-            
-            // Handle different attack types
             switch (attackGraphicData.attackType) {
-                case 'Sword':
-                    // Mirror horizontally if moving left
-                    if (attackGraphicData.direction.x < 0) {
-                        sprite.setFlipX(true);
-                    } else {
-                        sprite.setFlipX(false);
-                    }
-                    sprite.setRotation(0); // Reset rotation
-                    break;
-                    
-                case 'Wand':
-                case 'Knives':
-                    // Rotate to point in the direction of motion
-                    if (attackGraphicData.direction.length() > 0) {
-                        sprite.setRotation(Math.atan2(attackGraphicData.direction.y, attackGraphicData.direction.x));
-                    }
-                    sprite.setFlipX(false); // Reset flip
-                    break;
-                    
-                case 'Shield':
-                    // Shield just draws normally
-                    sprite.setRotation(0); // Reset rotation
-                    sprite.setFlipX(false); // Reset flip
-                    break;
-                    
-                case 'ThunderHorn':
-                    // Thunder Horn stays at position, no rotation needed
-                    sprite.setRotation(0);
-                    sprite.setFlipX(false);
-                    break;
-                    
-                case 'AngelStaff':
-                    // Angel Staff stays at position, no rotation needed
-                    sprite.setRotation(0);
-                    sprite.setFlipX(false);
+                case 'Football':
+                case 'Gambler':
+                case 'Athlete':
+                case 'Gourmand':
+                case 'Volleyball':
+                case 'Stoner':
+                    // These attacks follow the default projectile behavior
                     break;
                     
                 default:
-                    // Default handling
-                    sprite.setRotation(0);
-                    sprite.setFlipX(false);
+
             }
         }
     }
@@ -654,4 +623,4 @@ export class AttackManager {
             this.updateAttackGraphic(attackGraphicData);
         }
     }
-} 
+}

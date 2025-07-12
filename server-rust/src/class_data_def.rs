@@ -100,5 +100,64 @@ pub fn initialize_class_data(ctx: &ReducerContext) {
         starting_attack_type: AttackType::AngelStaff,
     });
     
+    // Insert Football class data
+    ctx.db.class_data().insert(ClassData {
+        class_id: PlayerClass::Football as u32,
+        player_class: PlayerClass::Football,
+        max_hp: 130,
+        armor: 3,
+        speed: 210.0,
+        starting_attack_type: AttackType::Football,
+    });
+
+    // Insert Gambler class data
+    ctx.db.class_data().insert(ClassData {
+        class_id: PlayerClass::Gambler as u32,
+        player_class: PlayerClass::Gambler,
+        max_hp: 90,
+        armor: 0,
+        speed: 220.0,
+        starting_attack_type: AttackType::Cards,
+    });
+
+    // Insert Athlete class data
+    ctx.db.class_data().insert(ClassData {
+        class_id: PlayerClass::Athlete as u32,
+        player_class: PlayerClass::Athlete,
+        max_hp: 110,
+        armor: 1,
+        speed: 200.0,
+        starting_attack_type: AttackType::Dumbbell,
+    });
+
+    // Insert Gourmand class data
+    ctx.db.class_data().insert(ClassData {
+        class_id: PlayerClass::Gourmand as u32,
+        player_class: PlayerClass::Gourmand,
+        max_hp: 120,
+        armor: 2,
+        speed: 160.0,
+        starting_attack_type: AttackType::Garlic,
+    });
+
+    // Insert Volleyball class data
+    ctx.db.class_data().insert(ClassData {
+        class_id: PlayerClass::Volleyball as u32,
+        player_class: PlayerClass::Volleyball,
+        max_hp: 100,
+        armor: 0,
+        speed: 230.0,
+        starting_attack_type: AttackType::Volleyball,
+    });
+    
+    ctx.db.class_data().insert(ClassData {
+        class_id: PlayerClass::Stoner as u32,
+        player_class: PlayerClass::Stoner,
+        max_hp: 100,
+        armor: 0,
+        speed: 200.0,
+        starting_attack_type: AttackType::Joint,
+    });
+
     log::info!("Class data initialization complete.");
 }

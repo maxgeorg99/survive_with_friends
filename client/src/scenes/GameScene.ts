@@ -198,6 +198,12 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('player_paladin', '/assets/class_paladin_1.png');
         this.load.image('player_valkyrie', '/assets/class_valkyrie_1.png');
         this.load.image('player_priest', '/assets/class_priest_1.png');
+        this.load.image('player_football', 'assets/class_football_1.png');
+        this.load.image('player_gambler', 'assets/class_gambler_1.png');
+        this.load.image('player_athlete', 'assets/class_athlete_1.png');
+        this.load.image('player_chef', 'assets/class_chef_1.png');
+        this.load.image('player_volleyball', 'assets/class_volleyball_1.png');
+        this.load.image('player_stoner', 'assets/class_stoner_1.png');
         this.load.image(GRASS_ASSET_KEY, '/assets/grass.png');
         this.load.image(SHADOW_ASSET_KEY, '/assets/shadow.png');
         
@@ -240,7 +246,13 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('attack_horn', '/assets/attack_horn.png');
         this.load.image('attack_staff', '/assets/attack_staff.png');
         this.load.image('attack_lightning', '/assets/attack_lightning.png');
-        
+        this.load.image('attack_football', '/assets/attack_football.png');
+        this.load.image('attack_cards', '/assets/attack_cards.png');
+        this.load.image('attack_dumbbell', '/assets/attack_dumbbell.png');
+        this.load.image('attack_garlic', '/assets/attack_garlic.png');
+        this.load.image('attack_volleyball', '/assets/attack_volleyball.png');
+        this.load.image('attack_joint', '/assets/attack_joint.png');
+
         // Load monster attack assets
         this.load.image('monster_attack_firebolt', '/assets/monster_attack_firebolt.png');
         this.load.image('void_scythe', '/assets/void_scythe.png');
@@ -256,7 +268,13 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('paladin_icon', '/assets/attack_shield.png');
         this.load.image('valkyrie_icon', '/assets/attack_horn.png');
         this.load.image('priestess_icon', '/assets/attack_staff.png');
-        
+        this.load.image('football_icon', '/assets/attack_football.png');
+        this.load.image('gambler_icon', '/assets/attack_cards.png');
+        this.load.image('athlete_icon', '/assets/attack_dumbbell.png');
+        this.load.image('gourmand_icon', '/assets/attack_garlic.png');
+        this.load.image('volleyball_icon', '/assets/attack_volleyball.png');
+        this.load.image('stoner_icon', '/assets/attack_joint.png');
+
         // Load upgrade assets
         this.load.image('card_blank', '/assets/card_blank.png');
         this.load.image('upgrade_maxHP', '/assets/upgrade_maxHP.png');
@@ -526,13 +544,6 @@ export default class GameScene extends Phaser.Scene {
 
         // Initialize Options UI for settings
         this.optionsUI = new GameplayOptionsUI(this);
-
-        // Add key listener for toggling monster counter UI
-        this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.D).on('down', () => {
-            if (this.monsterCounterUI) {
-                this.monsterCounterUI.toggleVisible();
-            }
-        });
 
         // Add key listener for toggling options menu
         this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.O).on('down', () => {

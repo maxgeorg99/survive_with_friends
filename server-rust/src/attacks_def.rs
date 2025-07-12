@@ -209,6 +209,102 @@ pub fn init_attack_data(ctx: &ReducerContext) {
         armor_piercing: 5,       // Some armor penetration
     });
 
+    // Football - projectile with knockback
+    ctx.db.attack_data().insert(AttackData {
+        attack_id: 7,
+        attack_type: AttackType::Football,
+        name: "Football Shot".to_string(),
+        cooldown: 800,
+        duration: 2500,
+        projectiles: 1,
+        fire_delay: 200,
+        speed: 600.0,
+        piercing: false,
+        radius: 24.0,
+        damage: 3,
+        armor_piercing: 2,
+    });
+
+    // Cards - spread attack
+    ctx.db.attack_data().insert(AttackData {
+        attack_id: 8,
+        attack_type: AttackType::Cards,
+        name: "Card Throw".to_string(),
+        cooldown: 600,
+        duration: 800,
+        projectiles: 3,
+        fire_delay: 50,
+        speed: 700.0,
+        piercing: false,
+        radius: 16.0,
+        damage: 2,
+        armor_piercing: 2,
+    });
+
+    // Dumbbell - falling aerial attack
+    ctx.db.attack_data().insert(AttackData {
+        attack_id: 9,
+        attack_type: AttackType::Dumbbell,
+        name: "Dumbbell Drop".to_string(),
+        cooldown: 1200,
+        duration: 1000,
+        projectiles: 1,
+        fire_delay: 200,
+        speed: 800.0,
+        piercing: true,
+        radius: 40.0,
+        damage: 8,
+        armor_piercing: 4,
+    });
+
+    // Garlic - aura attack
+    ctx.db.attack_data().insert(AttackData {
+        attack_id: 10,
+        attack_type: AttackType::Garlic,
+        name: "Garlic Aura".to_string(),
+        cooldown: 800,
+        duration: 800,
+        projectiles: 1,
+        fire_delay: 0,
+        speed: 0.0,
+        piercing: true,
+        radius: 100.0,
+        damage: 2,
+        armor_piercing: 1,
+    });
+
+    // Volleyball - blunt force attack
+    ctx.db.attack_data().insert(AttackData {
+        attack_id: 11,
+        attack_type: AttackType::Volleyball,
+        name: "Volleyball Smash".to_string(),
+        cooldown: 1200,
+        duration: 800,
+        projectiles: 1,
+        fire_delay: 0,
+        speed: 700.0,
+        piercing: true,
+        radius: 35.0,
+        damage: 1.5,
+        armor_piercing: 5,
+    });
+
+    // Joint - special attack
+    ctx.db.attack_data().insert(AttackData {
+        attack_id: 12,
+        attack_type: AttackType::Joint,
+        name: "Joint".to_string(),
+        cooldown: 1000,          // Moderate cooldown
+        duration: 500,           // Short duration
+        projectiles: 1,          // Single projectile
+        fire_delay: 0,           // Instant strike
+        speed: 900.0,            // Fast projectile speed
+        piercing: true,          // Pierces through enemies
+        radius: 30.0,            // Moderate radius
+        damage: 10,              // Decent damage
+        armor_piercing: 5,       // Some armor penetration
+    });
+
     log::info!("Attack data initialized successfully.");
 }
 
