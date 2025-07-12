@@ -1,6 +1,6 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, ScheduleAt, SpacetimeType};
 use crate::{DbVector2, AttackType, Entity, DELTA_TIME, get_world_cell_from_position, spatial_hash_collision_checker,
-           WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT, entity, monster_damage};
+           WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT, entity, monster_damage, monsters_boid};
 use std::f64::consts::PI;
 use std::time::Duration;
 
@@ -693,8 +693,6 @@ pub fn process_attack_movements(ctx: &ReducerContext) {
     
     // Process each active attack
     for active_attack in ctx.db.active_attacks().iter() {
-
-        
         let mut updated_active_attack = active_attack;
         updated_active_attack.ticks_elapsed += 1; 
 
@@ -752,6 +750,137 @@ pub fn process_attack_movements(ctx: &ReducerContext) {
         } else if updated_active_attack.attack_type == AttackType::ThunderHorn {
             // Thunder Horn stays at its initial position (0 speed instant strike)
             // No position updates needed - it just stays where it was placed
+        } else if updated_active_attack.attack_type == AttackType::Garlic {
+            // Garlic aura stays with player
+            let player_cache_idx = match cache.player.player_id_to_cache_index.get(&updated_active_attack.player_id) {
+                Some(&idx) => idx as usize,
+                None => continue,
+            };
+            
+            let player_x = cache.player.pos_x_player[player_cache_idx];
+            let player_y = cache.player.pos_y_player[player_cache_idx];
+            
+            // Update garlic aura position to player position
+            updated_entity.position = DbVector2::new(player_x, player_y);
+            
+            // Apply knockback to nearby monsters
+            let garlic_radius_sq = updated_entity.radius * updated_entity.radius;
+            for mid in 0..cache.monster.cached_count_monsters as usize {
+                let monster_x = cache.monster.pos_x_monster[mid];
+                let monster_y = cache.monster.pos_y_monster[mid];
+                let monster_radius = cache.monster.radius_monster[mid];
+                
+                // Calculate distance to monster
+                let dx = monster_x - player_x;
+                let dy = monster_y - player_y;
+                let distance_squared = dx * dx + dy * dy;
+                let radius_sum = updated_entity.radius + monster_radius;
+                
+                // If monster is within garlic radius
+                if distance_squared <= radius_sum * radius_sum {
+                    // Calculate normalized direction for knockback
+                    let distance = distance_squared.sqrt();
+                    if distance > 0.0 {
+                        let knockback_direction = DbVector2::new(dx / distance, dy / distance);
+                        
+                        // Apply knockback
+                        let knockback_strength = 3.0;
+                        let monster_id = cache.monster.keys_monster[mid];
+                        
+                        // Update monster position in boids table
+                        if let Some(mut boid) = ctx.db.monsters_boid().monster_id().find(&monster_id) {
+                            let knockback_pos = boid.position + (knockback_direction * knockback_strength);
+                            boid.position = knockback_pos;
+                            ctx.db.monsters_boid().monster_id().update(boid);
+                        }
+                    }
+                }
+            }
+        } else if updated_active_attack.attack_type == AttackType::Volleyball {
+            // Volleyball bouncing behavior
+            let move_speed = attack_data.speed;
+            let move_distance = move_speed * DELTA_TIME;
+            let move_offset = updated_entity.direction * move_distance;
+            
+            // Max number of bounces the volleyball can perform
+            const MAX_BOUNCES: u32 = 2;
+            
+            // Update entity with new position
+            updated_entity.position = updated_entity.position + move_offset;
+            
+            // Apply world boundary clamping
+            let world_size = crate::WORLD_SIZE as f32;
+            updated_entity.position.x = updated_entity.position.x.clamp(
+                updated_entity.radius, 
+                world_size - updated_entity.radius
+            );
+            updated_entity.position.y = updated_entity.position.y.clamp(
+                updated_entity.radius, 
+                world_size - updated_entity.radius
+            );
+            
+            // Check if the volleyball has reached its maximum number of bounces
+            if updated_active_attack.parameter_u >= MAX_BOUNCES {
+                // If reached max bounces, continue movement but don't bounce anymore
+                
+                // Check if hitting world boundary
+                let hit_boundary = 
+                    updated_entity.position.x <= updated_entity.radius ||
+                    updated_entity.position.x >= world_size - updated_entity.radius ||
+                    updated_entity.position.y <= updated_entity.radius ||
+                    updated_entity.position.y >= world_size - updated_entity.radius;
+                
+                if hit_boundary {
+                    // Delete attack entity and active attack record
+                    ctx.db.entity().entity_id().delete(&updated_entity.entity_id);
+                    ctx.db.active_attacks().active_attack_id().delete(&updated_active_attack.active_attack_id);
+                    cleanup_attack_damage_records(ctx, updated_entity.entity_id);
+                    continue;
+                }
+            } else {
+                // Find a new target enemy to bounce to
+                let mut best_target_pos: Option<DbVector2> = None;
+                let mut best_target_distance = f32::MAX;
+                
+                for mid in 0..cache.monster.cached_count_monsters as usize {
+                    let monster_x = cache.monster.pos_x_monster[mid];
+                    let monster_y = cache.monster.pos_y_monster[mid];
+                    let monster_radius = cache.monster.radius_monster[mid];
+                    
+                    // Skip if this monster is too close (we've just hit it)
+                    let dx = monster_x - updated_entity.position.x;
+                    let dy = monster_y - updated_entity.position.y;
+                    let distance_squared = dx * dx + dy * dy;
+                    
+                    // Skip monsters that are too close (we've just hit them)
+                    let min_distance = (updated_entity.radius + monster_radius) * 2.0;
+                    if distance_squared < min_distance * min_distance {
+                        continue;
+                    }
+                    
+                    // Find the closest valid target
+                    if distance_squared < best_target_distance {
+                        best_target_distance = distance_squared;
+                        best_target_pos = Some(DbVector2::new(monster_x, monster_y));
+                    }
+                }
+                
+                // If found a valid target, bounce to it
+                if let Some(target_pos) = best_target_pos {
+                    // Calculate direction to the new target
+                    let dx = target_pos.x - updated_entity.position.x;
+                    let dy = target_pos.y - updated_entity.position.y;
+                    let length = (dx * dx + dy * dy).sqrt();
+                    
+                    if length > 0.0 {
+                        // Update direction to point at the new target
+                        updated_entity.direction = DbVector2::new(dx / length, dy / length);
+                        
+                        // Increment bounce counter
+                        updated_active_attack.parameter_u += 1;
+                    }
+                }
+            }
         } else {
             // Regular projectile movement based on direction and speed
             let move_speed = attack_data.speed;
@@ -761,8 +890,37 @@ pub fn process_attack_movements(ctx: &ReducerContext) {
             let move_offset = updated_entity.direction * move_distance;
             
             // Update entity with new position
-            
             updated_entity.position = updated_entity.position + move_offset;
+            
+            // Handle Football knockback on collision
+            if updated_active_attack.attack_type == AttackType::Football {
+                let football_radius_sq = updated_entity.radius * updated_entity.radius;
+                for mid in 0..cache.monster.cached_count_monsters as usize {
+                    let monster_x = cache.monster.pos_x_monster[mid];
+                    let monster_y = cache.monster.pos_y_monster[mid];
+                    let monster_radius = cache.monster.radius_monster[mid];
+                    
+                    // Calculate distance to monster
+                    let dx = monster_x - updated_entity.position.x;
+                    let dy = monster_y - updated_entity.position.y;
+                    let distance_squared = dx * dx + dy * dy;
+                    let radius_sum = updated_entity.radius + monster_radius;
+                    
+                    // If monster is hit by football
+                    if distance_squared <= radius_sum * radius_sum {
+                        // Apply knockback in the football's direction
+                        let knockback_strength = 10.0;
+                        let monster_id = cache.monster.keys_monster[mid];
+                        
+                        // Update monster position in boids table
+                        if let Some(mut boid) = ctx.db.monsters_boid().monster_id().find(&monster_id) {
+                            let knockback_pos = boid.position + (updated_entity.direction * knockback_strength);
+                            boid.position = knockback_pos;
+                            ctx.db.monsters_boid().monster_id().update(boid);
+                        }
+                    }
+                }
+            }
         }
 
         // Get the attacking player's PvP status from the cache
