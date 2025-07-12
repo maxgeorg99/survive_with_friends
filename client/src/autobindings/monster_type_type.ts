@@ -49,6 +49,8 @@ export namespace MonsterType {
   export type BossEnderPhase2 = { tag: "BossEnderPhase2" };
   export type BossAgnaPhase1 = { tag: "BossAgnaPhase1" };
   export type BossAgnaPhase2 = { tag: "BossAgnaPhase2" };
+  export type BossSimonPhase1 = { tag: "BossSimonPhase1" };
+  export type BossSimonPhase2 = { tag: "BossSimonPhase2" };
   export type AgnaCandle = { tag: "AgnaCandle" };
   export type Crate = { tag: "Crate" };
   export type Tree = { tag: "Tree" };
@@ -72,6 +74,8 @@ export namespace MonsterType {
   export const BossEnderPhase2 = { tag: "BossEnderPhase2" };
   export const BossAgnaPhase1 = { tag: "BossAgnaPhase1" };
   export const BossAgnaPhase2 = { tag: "BossAgnaPhase2" };
+  export const BossSimonPhase1 = { tag: "BossSimonPhase1" };
+  export const BossSimonPhase2 = { tag: "BossSimonPhase2" };
   export const AgnaCandle = { tag: "AgnaCandle" };
   export const Crate = { tag: "Crate" };
   export const Tree = { tag: "Tree" };
@@ -91,6 +95,8 @@ export namespace MonsterType {
       new SumTypeVariant("BossEnderPhase2", AlgebraicType.createProductType([])),
       new SumTypeVariant("BossAgnaPhase1", AlgebraicType.createProductType([])),
       new SumTypeVariant("BossAgnaPhase2", AlgebraicType.createProductType([])),
+      new SumTypeVariant("BossSimonPhase1", AlgebraicType.createProductType([])),
+      new SumTypeVariant("BossSimonPhase2", AlgebraicType.createProductType([])),
       new SumTypeVariant("AgnaCandle", AlgebraicType.createProductType([])),
       new SumTypeVariant("Crate", AlgebraicType.createProductType([])),
       new SumTypeVariant("Tree", AlgebraicType.createProductType([])),
@@ -109,7 +115,7 @@ export namespace MonsterType {
 }
 
 // The tagged union or sum type for the algebraic type `MonsterType`.
-export type MonsterType = MonsterType.Rat | MonsterType.Slime | MonsterType.Bat | MonsterType.Orc | MonsterType.Imp | MonsterType.Zombie | MonsterType.VoidChest | MonsterType.EnderClaw | MonsterType.BossEnderPhase1 | MonsterType.BossEnderPhase2 | MonsterType.BossAgnaPhase1 | MonsterType.BossAgnaPhase2 | MonsterType.AgnaCandle | MonsterType.Crate | MonsterType.Tree | MonsterType.Statue;
+export type MonsterType = MonsterType.Rat | MonsterType.Slime | MonsterType.Bat | MonsterType.Orc | MonsterType.Imp | MonsterType.Zombie | MonsterType.VoidChest | MonsterType.EnderClaw | MonsterType.BossEnderPhase1 | MonsterType.BossEnderPhase2 | MonsterType.BossAgnaPhase1 | MonsterType.BossAgnaPhase2 | MonsterType.BossSimonPhase1 | MonsterType.BossSimonPhase2 | MonsterType.AgnaCandle | MonsterType.Crate | MonsterType.Tree | MonsterType.Statue;
 
 export default MonsterType;
 

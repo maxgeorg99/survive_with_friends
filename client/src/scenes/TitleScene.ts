@@ -103,6 +103,10 @@ export default class TitleScene extends Phaser.Scene {
         this.load.image('monster_spawn_indicator', '/assets/monster_spawn_indicator.png');
         
         // Preload boss assets for end-game experience
+        this.load.image('final_boss_simon_phase_1', '/assets/final_boss_simon_phase_1.png');
+        this.load.image('final_boss_simon_phase_2', '/assets/final_boss_simon_phase_2.png');
+        this.load.image('attack_boss_simon', '/assets/attack_boss_simon.png');
+        this.load.image('attack_boss_toxicbolt', '/assets/attack_boss_toxicbolt.png');
         this.load.image('final_boss_phase1', '/assets/final_boss_phase_1.png');
         this.load.image('final_boss_phase2', '/assets/final_boss_phase_2.png');
         this.load.image('boss_agna_1', '/assets/boss_agna_1.png');

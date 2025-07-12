@@ -169,6 +169,28 @@ pub fn init_bestiary(ctx: &ReducerContext) {
         radius: 32.0,      // Medium radius for collision
     });
 
+    // Insert Boss Simon Phase 1 stats - Chemical warfare boss
+    ctx.db.bestiary().insert(Bestiary {
+        bestiary_id: MonsterType::BossSimonPhase1 as u32,
+        monster_type: MonsterType::BossSimonPhase1,
+        tier: 5,
+        max_hp: 500,       // Same HP as other Phase 1 bosses
+        speed: 95.0,       // Slightly slower than Ender Phase 1
+        atk: 8.0,          // Moderate attack (chemical warfare focus)
+        radius: 90.0,      // Similar size to other Phase 1 bosses
+    });
+    
+    // Insert Boss Simon Phase 2 stats - Enhanced chemical warfare
+    ctx.db.bestiary().insert(Bestiary {
+        bestiary_id: MonsterType::BossSimonPhase2 as u32,
+        monster_type: MonsterType::BossSimonPhase2,
+        tier: 5,
+        max_hp: 500,       
+        speed: 115.0,      // Faster in Phase 2
+        atk: 11.0,         // Higher attack with chemical enhancement
+        radius: 128.0,     // Same size as other Phase 2 bosses
+    });
+
     // Insert Crate stats - common breakable structure
     ctx.db.bestiary().insert(Bestiary {
         bestiary_id: MonsterType::Crate as u32,
@@ -203,4 +225,4 @@ pub fn init_bestiary(ctx: &ReducerContext) {
     });
 
     log::info!("Bestiary initialization complete");
-} 
+}

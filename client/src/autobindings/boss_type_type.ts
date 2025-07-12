@@ -39,6 +39,7 @@ export namespace BossType {
   // the tagged union.
   export type Ender = { tag: "Ender" };
   export type Agna = { tag: "Agna" };
+  export type Simon = { tag: "Simon" };
 
   // Helper functions for constructing each variant of the tagged union.
   // ```
@@ -48,11 +49,13 @@ export namespace BossType {
   // ```
   export const Ender = { tag: "Ender" };
   export const Agna = { tag: "Agna" };
+  export const Simon = { tag: "Simon" };
 
   export function getTypeScriptAlgebraicType(): AlgebraicType {
     return AlgebraicType.createSumType([
       new SumTypeVariant("Ender", AlgebraicType.createProductType([])),
       new SumTypeVariant("Agna", AlgebraicType.createProductType([])),
+      new SumTypeVariant("Simon", AlgebraicType.createProductType([])),
     ]);
   }
 
@@ -67,7 +70,7 @@ export namespace BossType {
 }
 
 // The tagged union or sum type for the algebraic type `BossType`.
-export type BossType = BossType.Ender | BossType.Agna;
+export type BossType = BossType.Ender | BossType.Agna | BossType.Simon;
 
 export default BossType;
 

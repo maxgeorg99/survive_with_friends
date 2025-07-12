@@ -100,6 +100,8 @@ import { SpawnBossPhaseTwoDelayed } from "./spawn_boss_phase_two_delayed_reducer
 export { SpawnBossPhaseTwoDelayed };
 import { SpawnBot } from "./spawn_bot_reducer.ts";
 export { SpawnBot };
+import { SpawnChemicalZombieWave } from "./spawn_chemical_zombie_wave_reducer.ts";
+export { SpawnChemicalZombieWave };
 import { SpawnDebugLootCapsule } from "./spawn_debug_loot_capsule_reducer.ts";
 export { SpawnDebugLootCapsule };
 import { SpawnDebugLoreScroll } from "./spawn_debug_lore_scroll_reducer.ts";
@@ -142,10 +144,16 @@ import { TriggerBossTargetSwitch } from "./trigger_boss_target_switch_reducer.ts
 export { TriggerBossTargetSwitch };
 import { TriggerChaosBallAttack } from "./trigger_chaos_ball_attack_reducer.ts";
 export { TriggerChaosBallAttack };
+import { TriggerChemicalBolt } from "./trigger_chemical_bolt_reducer.ts";
+export { TriggerChemicalBolt };
 import { TriggerEnderBoltAttack } from "./trigger_ender_bolt_attack_reducer.ts";
 export { TriggerEnderBoltAttack };
 import { TriggerImpAttack } from "./trigger_imp_attack_reducer.ts";
 export { TriggerImpAttack };
+import { TriggerToxicSpray } from "./trigger_toxic_spray_reducer.ts";
+export { TriggerToxicSpray };
+import { TriggerToxicZone } from "./trigger_toxic_zone_reducer.ts";
+export { TriggerToxicZone };
 import { TriggerVoidZoneAttack } from "./trigger_void_zone_attack_reducer.ts";
 export { TriggerVoidZoneAttack };
 import { UpdateLastLogin } from "./update_last_login_reducer.ts";
@@ -202,6 +210,10 @@ import { BossTargetSwitchSchedulerTableHandle } from "./boss_target_switch_sched
 export { BossTargetSwitchSchedulerTableHandle };
 import { ChaosBallSchedulerTableHandle } from "./chaos_ball_scheduler_table.ts";
 export { ChaosBallSchedulerTableHandle };
+import { ChemicalBoltSchedulerTableHandle } from "./chemical_bolt_scheduler_table.ts";
+export { ChemicalBoltSchedulerTableHandle };
+import { ChemicalZombieSpawnerTableHandle } from "./chemical_zombie_spawner_table.ts";
+export { ChemicalZombieSpawnerTableHandle };
 import { ChosenUpgradesTableHandle } from "./chosen_upgrades_table.ts";
 export { ChosenUpgradesTableHandle };
 import { ClassDataTableHandle } from "./class_data_table.ts";
@@ -264,6 +276,10 @@ import { SavedAttacksTableHandle } from "./saved_attacks_table.ts";
 export { SavedAttacksTableHandle };
 import { SavedBuildTableHandle } from "./saved_build_table.ts";
 export { SavedBuildTableHandle };
+import { ToxicSpraySchedulerTableHandle } from "./toxic_spray_scheduler_table.ts";
+export { ToxicSpraySchedulerTableHandle };
+import { ToxicZoneSchedulerTableHandle } from "./toxic_zone_scheduler_table.ts";
+export { ToxicZoneSchedulerTableHandle };
 import { UpgradeOptionsTableHandle } from "./upgrade_options_table.ts";
 export { UpgradeOptionsTableHandle };
 import { VoidZoneSchedulerTableHandle } from "./void_zone_scheduler_table.ts";
@@ -332,6 +348,10 @@ import { BossType } from "./boss_type_type.ts";
 export { BossType };
 import { ChaosBallScheduler } from "./chaos_ball_scheduler_type.ts";
 export { ChaosBallScheduler };
+import { ChemicalBoltScheduler } from "./chemical_bolt_scheduler_type.ts";
+export { ChemicalBoltScheduler };
+import { ChemicalZombieSpawner } from "./chemical_zombie_spawner_type.ts";
+export { ChemicalZombieSpawner };
 import { ChosenUpgradeData } from "./chosen_upgrade_data_type.ts";
 export { ChosenUpgradeData };
 import { ClassData } from "./class_data_type.ts";
@@ -406,6 +426,10 @@ import { SavedAttack } from "./saved_attack_type.ts";
 export { SavedAttack };
 import { SavedBuild } from "./saved_build_type.ts";
 export { SavedBuild };
+import { ToxicSprayScheduler } from "./toxic_spray_scheduler_type.ts";
+export { ToxicSprayScheduler };
+import { ToxicZoneScheduler } from "./toxic_zone_scheduler_type.ts";
+export { ToxicZoneScheduler };
 import { UpgradeOptionData } from "./upgrade_option_data_type.ts";
 export { UpgradeOptionData };
 import { UpgradeType } from "./upgrade_type_type.ts";
@@ -642,6 +666,24 @@ const REMOTE_MODULE = {
       primaryKeyInfo: {
         colName: "scheduledId",
         colType: ChaosBallScheduler.getTypeScriptAlgebraicType().product.elements[0].algebraicType,
+      },
+    },
+    chemical_bolt_scheduler: {
+      tableName: "chemical_bolt_scheduler",
+      rowType: ChemicalBoltScheduler.getTypeScriptAlgebraicType(),
+      primaryKey: "scheduledId",
+      primaryKeyInfo: {
+        colName: "scheduledId",
+        colType: ChemicalBoltScheduler.getTypeScriptAlgebraicType().product.elements[0].algebraicType,
+      },
+    },
+    chemical_zombie_spawner: {
+      tableName: "chemical_zombie_spawner",
+      rowType: ChemicalZombieSpawner.getTypeScriptAlgebraicType(),
+      primaryKey: "scheduledId",
+      primaryKeyInfo: {
+        colName: "scheduledId",
+        colType: ChemicalZombieSpawner.getTypeScriptAlgebraicType().product.elements[0].algebraicType,
       },
     },
     chosen_upgrades: {
@@ -923,6 +965,24 @@ const REMOTE_MODULE = {
         colType: SavedBuild.getTypeScriptAlgebraicType().product.elements[0].algebraicType,
       },
     },
+    toxic_spray_scheduler: {
+      tableName: "toxic_spray_scheduler",
+      rowType: ToxicSprayScheduler.getTypeScriptAlgebraicType(),
+      primaryKey: "scheduledId",
+      primaryKeyInfo: {
+        colName: "scheduledId",
+        colType: ToxicSprayScheduler.getTypeScriptAlgebraicType().product.elements[0].algebraicType,
+      },
+    },
+    toxic_zone_scheduler: {
+      tableName: "toxic_zone_scheduler",
+      rowType: ToxicZoneScheduler.getTypeScriptAlgebraicType(),
+      primaryKey: "scheduledId",
+      primaryKeyInfo: {
+        colName: "scheduledId",
+        colType: ToxicZoneScheduler.getTypeScriptAlgebraicType().product.elements[0].algebraicType,
+      },
+    },
     upgrade_options: {
       tableName: "upgrade_options",
       rowType: UpgradeOptionData.getTypeScriptAlgebraicType(),
@@ -1093,6 +1153,10 @@ const REMOTE_MODULE = {
       reducerName: "spawn_bot",
       argsType: SpawnBot.getTypeScriptAlgebraicType(),
     },
+    spawn_chemical_zombie_wave: {
+      reducerName: "spawn_chemical_zombie_wave",
+      argsType: SpawnChemicalZombieWave.getTypeScriptAlgebraicType(),
+    },
     spawn_debug_loot_capsule: {
       reducerName: "spawn_debug_loot_capsule",
       argsType: SpawnDebugLootCapsule.getTypeScriptAlgebraicType(),
@@ -1177,6 +1241,10 @@ const REMOTE_MODULE = {
       reducerName: "trigger_chaos_ball_attack",
       argsType: TriggerChaosBallAttack.getTypeScriptAlgebraicType(),
     },
+    trigger_chemical_bolt: {
+      reducerName: "trigger_chemical_bolt",
+      argsType: TriggerChemicalBolt.getTypeScriptAlgebraicType(),
+    },
     trigger_ender_bolt_attack: {
       reducerName: "trigger_ender_bolt_attack",
       argsType: TriggerEnderBoltAttack.getTypeScriptAlgebraicType(),
@@ -1184,6 +1252,14 @@ const REMOTE_MODULE = {
     trigger_imp_attack: {
       reducerName: "trigger_imp_attack",
       argsType: TriggerImpAttack.getTypeScriptAlgebraicType(),
+    },
+    trigger_toxic_spray: {
+      reducerName: "trigger_toxic_spray",
+      argsType: TriggerToxicSpray.getTypeScriptAlgebraicType(),
+    },
+    trigger_toxic_zone: {
+      reducerName: "trigger_toxic_zone",
+      argsType: TriggerToxicZone.getTypeScriptAlgebraicType(),
     },
     trigger_void_zone_attack: {
       reducerName: "trigger_void_zone_attack",
@@ -1256,6 +1332,7 @@ export type Reducer = never
 | { name: "SpawnBossPhaseOne", args: SpawnBossPhaseOne }
 | { name: "SpawnBossPhaseTwoDelayed", args: SpawnBossPhaseTwoDelayed }
 | { name: "SpawnBot", args: SpawnBot }
+| { name: "SpawnChemicalZombieWave", args: SpawnChemicalZombieWave }
 | { name: "SpawnDebugLootCapsule", args: SpawnDebugLootCapsule }
 | { name: "SpawnDebugLoreScroll", args: SpawnDebugLoreScroll }
 | { name: "SpawnDebugSpecialGem", args: SpawnDebugSpecialGem }
@@ -1277,8 +1354,11 @@ export type Reducer = never
 | { name: "TriggerAgnaTargetSwitch", args: TriggerAgnaTargetSwitch }
 | { name: "TriggerBossTargetSwitch", args: TriggerBossTargetSwitch }
 | { name: "TriggerChaosBallAttack", args: TriggerChaosBallAttack }
+| { name: "TriggerChemicalBolt", args: TriggerChemicalBolt }
 | { name: "TriggerEnderBoltAttack", args: TriggerEnderBoltAttack }
 | { name: "TriggerImpAttack", args: TriggerImpAttack }
+| { name: "TriggerToxicSpray", args: TriggerToxicSpray }
+| { name: "TriggerToxicZone", args: TriggerToxicZone }
 | { name: "TriggerVoidZoneAttack", args: TriggerVoidZoneAttack }
 | { name: "UpdateLastLogin", args: UpdateLastLogin }
 ;
@@ -1762,6 +1842,22 @@ export class RemoteReducers {
     this.connection.offReducer("spawn_bot", callback);
   }
 
+  spawnChemicalZombieWave(spawner: ChemicalZombieSpawner) {
+    const __args = { spawner };
+    let __writer = new BinaryWriter(1024);
+    SpawnChemicalZombieWave.getTypeScriptAlgebraicType().serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("spawn_chemical_zombie_wave", __argsBuffer, this.setCallReducerFlags.spawnChemicalZombieWaveFlags);
+  }
+
+  onSpawnChemicalZombieWave(callback: (ctx: ReducerEventContext, spawner: ChemicalZombieSpawner) => void) {
+    this.connection.onReducer("spawn_chemical_zombie_wave", callback);
+  }
+
+  removeOnSpawnChemicalZombieWave(callback: (ctx: ReducerEventContext, spawner: ChemicalZombieSpawner) => void) {
+    this.connection.offReducer("spawn_chemical_zombie_wave", callback);
+  }
+
   spawnDebugLootCapsule() {
     this.connection.callReducer("spawn_debug_loot_capsule", new Uint8Array(0), this.setCallReducerFlags.spawnDebugLootCapsuleFlags);
   }
@@ -2082,6 +2178,22 @@ export class RemoteReducers {
     this.connection.offReducer("trigger_chaos_ball_attack", callback);
   }
 
+  triggerChemicalBolt(scheduler: ChemicalBoltScheduler) {
+    const __args = { scheduler };
+    let __writer = new BinaryWriter(1024);
+    TriggerChemicalBolt.getTypeScriptAlgebraicType().serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("trigger_chemical_bolt", __argsBuffer, this.setCallReducerFlags.triggerChemicalBoltFlags);
+  }
+
+  onTriggerChemicalBolt(callback: (ctx: ReducerEventContext, scheduler: ChemicalBoltScheduler) => void) {
+    this.connection.onReducer("trigger_chemical_bolt", callback);
+  }
+
+  removeOnTriggerChemicalBolt(callback: (ctx: ReducerEventContext, scheduler: ChemicalBoltScheduler) => void) {
+    this.connection.offReducer("trigger_chemical_bolt", callback);
+  }
+
   triggerEnderBoltAttack(scheduler: EnderBoltScheduler) {
     const __args = { scheduler };
     let __writer = new BinaryWriter(1024);
@@ -2112,6 +2224,38 @@ export class RemoteReducers {
 
   removeOnTriggerImpAttack(callback: (ctx: ReducerEventContext, scheduler: ImpAttackScheduler) => void) {
     this.connection.offReducer("trigger_imp_attack", callback);
+  }
+
+  triggerToxicSpray(scheduler: ToxicSprayScheduler) {
+    const __args = { scheduler };
+    let __writer = new BinaryWriter(1024);
+    TriggerToxicSpray.getTypeScriptAlgebraicType().serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("trigger_toxic_spray", __argsBuffer, this.setCallReducerFlags.triggerToxicSprayFlags);
+  }
+
+  onTriggerToxicSpray(callback: (ctx: ReducerEventContext, scheduler: ToxicSprayScheduler) => void) {
+    this.connection.onReducer("trigger_toxic_spray", callback);
+  }
+
+  removeOnTriggerToxicSpray(callback: (ctx: ReducerEventContext, scheduler: ToxicSprayScheduler) => void) {
+    this.connection.offReducer("trigger_toxic_spray", callback);
+  }
+
+  triggerToxicZone(scheduler: ToxicZoneScheduler) {
+    const __args = { scheduler };
+    let __writer = new BinaryWriter(1024);
+    TriggerToxicZone.getTypeScriptAlgebraicType().serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("trigger_toxic_zone", __argsBuffer, this.setCallReducerFlags.triggerToxicZoneFlags);
+  }
+
+  onTriggerToxicZone(callback: (ctx: ReducerEventContext, scheduler: ToxicZoneScheduler) => void) {
+    this.connection.onReducer("trigger_toxic_zone", callback);
+  }
+
+  removeOnTriggerToxicZone(callback: (ctx: ReducerEventContext, scheduler: ToxicZoneScheduler) => void) {
+    this.connection.offReducer("trigger_toxic_zone", callback);
   }
 
   triggerVoidZoneAttack(scheduler: VoidZoneScheduler) {
@@ -2305,6 +2449,11 @@ export class SetReducerFlags {
     this.spawnBotFlags = flags;
   }
 
+  spawnChemicalZombieWaveFlags: CallReducerFlags = 'FullUpdate';
+  spawnChemicalZombieWave(flags: CallReducerFlags) {
+    this.spawnChemicalZombieWaveFlags = flags;
+  }
+
   spawnDebugLootCapsuleFlags: CallReducerFlags = 'FullUpdate';
   spawnDebugLootCapsule(flags: CallReducerFlags) {
     this.spawnDebugLootCapsuleFlags = flags;
@@ -2410,6 +2559,11 @@ export class SetReducerFlags {
     this.triggerChaosBallAttackFlags = flags;
   }
 
+  triggerChemicalBoltFlags: CallReducerFlags = 'FullUpdate';
+  triggerChemicalBolt(flags: CallReducerFlags) {
+    this.triggerChemicalBoltFlags = flags;
+  }
+
   triggerEnderBoltAttackFlags: CallReducerFlags = 'FullUpdate';
   triggerEnderBoltAttack(flags: CallReducerFlags) {
     this.triggerEnderBoltAttackFlags = flags;
@@ -2418,6 +2572,16 @@ export class SetReducerFlags {
   triggerImpAttackFlags: CallReducerFlags = 'FullUpdate';
   triggerImpAttack(flags: CallReducerFlags) {
     this.triggerImpAttackFlags = flags;
+  }
+
+  triggerToxicSprayFlags: CallReducerFlags = 'FullUpdate';
+  triggerToxicSpray(flags: CallReducerFlags) {
+    this.triggerToxicSprayFlags = flags;
+  }
+
+  triggerToxicZoneFlags: CallReducerFlags = 'FullUpdate';
+  triggerToxicZone(flags: CallReducerFlags) {
+    this.triggerToxicZoneFlags = flags;
   }
 
   triggerVoidZoneAttackFlags: CallReducerFlags = 'FullUpdate';
@@ -2533,6 +2697,14 @@ export class RemoteTables {
 
   get chaosBallScheduler(): ChaosBallSchedulerTableHandle {
     return new ChaosBallSchedulerTableHandle(this.connection.clientCache.getOrCreateTable<ChaosBallScheduler>(REMOTE_MODULE.tables.chaos_ball_scheduler));
+  }
+
+  get chemicalBoltScheduler(): ChemicalBoltSchedulerTableHandle {
+    return new ChemicalBoltSchedulerTableHandle(this.connection.clientCache.getOrCreateTable<ChemicalBoltScheduler>(REMOTE_MODULE.tables.chemical_bolt_scheduler));
+  }
+
+  get chemicalZombieSpawner(): ChemicalZombieSpawnerTableHandle {
+    return new ChemicalZombieSpawnerTableHandle(this.connection.clientCache.getOrCreateTable<ChemicalZombieSpawner>(REMOTE_MODULE.tables.chemical_zombie_spawner));
   }
 
   get chosenUpgrades(): ChosenUpgradesTableHandle {
@@ -2657,6 +2829,14 @@ export class RemoteTables {
 
   get savedBuild(): SavedBuildTableHandle {
     return new SavedBuildTableHandle(this.connection.clientCache.getOrCreateTable<SavedBuild>(REMOTE_MODULE.tables.saved_build));
+  }
+
+  get toxicSprayScheduler(): ToxicSpraySchedulerTableHandle {
+    return new ToxicSpraySchedulerTableHandle(this.connection.clientCache.getOrCreateTable<ToxicSprayScheduler>(REMOTE_MODULE.tables.toxic_spray_scheduler));
+  }
+
+  get toxicZoneScheduler(): ToxicZoneSchedulerTableHandle {
+    return new ToxicZoneSchedulerTableHandle(this.connection.clientCache.getOrCreateTable<ToxicZoneScheduler>(REMOTE_MODULE.tables.toxic_zone_scheduler));
   }
 
   get upgradeOptions(): UpgradeOptionsTableHandle {

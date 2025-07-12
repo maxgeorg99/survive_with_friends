@@ -12,6 +12,8 @@ export const MONSTER_ASSET_KEYS: Record<string, string> = {
     "BossEnderPhase2": 'final_boss_phase2',
     "BossAgnaPhase1": 'boss_agna_1',
     "BossAgnaPhase2": 'boss_agna_2',
+    "BossSimonPhase1": 'boss_simon_phase1',
+    "BossSimonPhase2": 'boss_simon_phase2',
     "AgnaCandle": 'agna_candle',
     "VoidChest": 'treasure_chest',
     "EnderClaw": 'monster_void_claw',

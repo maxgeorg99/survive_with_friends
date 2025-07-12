@@ -49,6 +49,9 @@ export namespace MonsterAttackType {
   export type AgnaCandleBolt = { tag: "AgnaCandleBolt" };
   export type AgnaPhase2FlameJet = { tag: "AgnaPhase2FlameJet" };
   export type AgnaGroundFlame = { tag: "AgnaGroundFlame" };
+  export type SimonChemicalBolt = { tag: "SimonChemicalBolt" };
+  export type SimonToxicZone = { tag: "SimonToxicZone" };
+  export type SimonToxicSpray = { tag: "SimonToxicSpray" };
 
   // Helper functions for constructing each variant of the tagged union.
   // ```
@@ -68,6 +71,9 @@ export namespace MonsterAttackType {
   export const AgnaCandleBolt = { tag: "AgnaCandleBolt" };
   export const AgnaPhase2FlameJet = { tag: "AgnaPhase2FlameJet" };
   export const AgnaGroundFlame = { tag: "AgnaGroundFlame" };
+  export const SimonChemicalBolt = { tag: "SimonChemicalBolt" };
+  export const SimonToxicZone = { tag: "SimonToxicZone" };
+  export const SimonToxicSpray = { tag: "SimonToxicSpray" };
 
   export function getTypeScriptAlgebraicType(): AlgebraicType {
     return AlgebraicType.createSumType([
@@ -83,6 +89,9 @@ export namespace MonsterAttackType {
       new SumTypeVariant("AgnaCandleBolt", AlgebraicType.createProductType([])),
       new SumTypeVariant("AgnaPhase2FlameJet", AlgebraicType.createProductType([])),
       new SumTypeVariant("AgnaGroundFlame", AlgebraicType.createProductType([])),
+      new SumTypeVariant("SimonChemicalBolt", AlgebraicType.createProductType([])),
+      new SumTypeVariant("SimonToxicZone", AlgebraicType.createProductType([])),
+      new SumTypeVariant("SimonToxicSpray", AlgebraicType.createProductType([])),
     ]);
   }
 
@@ -97,7 +106,7 @@ export namespace MonsterAttackType {
 }
 
 // The tagged union or sum type for the algebraic type `MonsterAttackType`.
-export type MonsterAttackType = MonsterAttackType.ImpBolt | MonsterAttackType.EnderBolt | MonsterAttackType.EnderScytheSpawn | MonsterAttackType.EnderScythe | MonsterAttackType.ChaosBall | MonsterAttackType.VoidZone | MonsterAttackType.AgnaFlamethrowerJet | MonsterAttackType.AgnaOrbSpawn | MonsterAttackType.AgnaFireOrb | MonsterAttackType.AgnaCandleBolt | MonsterAttackType.AgnaPhase2FlameJet | MonsterAttackType.AgnaGroundFlame;
+export type MonsterAttackType = MonsterAttackType.ImpBolt | MonsterAttackType.EnderBolt | MonsterAttackType.EnderScytheSpawn | MonsterAttackType.EnderScythe | MonsterAttackType.ChaosBall | MonsterAttackType.VoidZone | MonsterAttackType.AgnaFlamethrowerJet | MonsterAttackType.AgnaOrbSpawn | MonsterAttackType.AgnaFireOrb | MonsterAttackType.AgnaCandleBolt | MonsterAttackType.AgnaPhase2FlameJet | MonsterAttackType.AgnaGroundFlame | MonsterAttackType.SimonChemicalBolt | MonsterAttackType.SimonToxicZone | MonsterAttackType.SimonToxicSpray;
 
 export default MonsterAttackType;
 

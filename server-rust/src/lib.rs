@@ -17,6 +17,7 @@ pub mod loot_capsule_defs;
 pub mod boss_system;
 pub mod boss_ender_defs;
 pub mod boss_agna_defs;
+pub mod boss_simon_defs;
 pub mod monsters_def;
 pub mod monster_ai_defs;
 pub mod monster_spawn_defs;
@@ -44,6 +45,7 @@ pub use loot_capsule_defs::*;
 pub use boss_system::*;
 pub use boss_ender_defs::*;
 pub use boss_agna_defs::*;
+pub use boss_simon_defs::*;
 pub use monsters_def::*;
 pub use monster_ai_defs::*;
 pub use monster_spawn_defs::*;
@@ -114,6 +116,9 @@ pub enum MonsterAttackType {
     AgnaCandleBolt,
     AgnaPhase2FlameJet,
     AgnaGroundFlame,
+    SimonChemicalBolt,
+    SimonToxicZone,
+    SimonToxicSpray,
 }
 
 // Monster variant enum for shiny monsters

@@ -53,6 +53,13 @@ export namespace AiState {
   export type BossAgnaRitualWick = { tag: "BossAgnaRitualWick" };
   export type BossAgnaRitualFailed = { tag: "BossAgnaRitualFailed" };
   export type BossAgnaRitualComplete = { tag: "BossAgnaRitualComplete" };
+  export type BossSimonIdle = { tag: "BossSimonIdle" };
+  export type BossSimonToxicSpray = { tag: "BossSimonToxicSpray" };
+  export type BossSimonZombieWave = { tag: "BossSimonZombieWave" };
+  export type BossSimonTransform = { tag: "BossSimonTransform" };
+  export type BossSimonChemicalBoltPattern = { tag: "BossSimonChemicalBoltPattern" };
+  export type BossSimonToxicZonePattern = { tag: "BossSimonToxicZonePattern" };
+  export type BossSimonPhase2Transform = { tag: "BossSimonPhase2Transform" };
 
   // Helper functions for constructing each variant of the tagged union.
   // ```
@@ -76,6 +83,13 @@ export namespace AiState {
   export const BossAgnaRitualWick = { tag: "BossAgnaRitualWick" };
   export const BossAgnaRitualFailed = { tag: "BossAgnaRitualFailed" };
   export const BossAgnaRitualComplete = { tag: "BossAgnaRitualComplete" };
+  export const BossSimonIdle = { tag: "BossSimonIdle" };
+  export const BossSimonToxicSpray = { tag: "BossSimonToxicSpray" };
+  export const BossSimonZombieWave = { tag: "BossSimonZombieWave" };
+  export const BossSimonTransform = { tag: "BossSimonTransform" };
+  export const BossSimonChemicalBoltPattern = { tag: "BossSimonChemicalBoltPattern" };
+  export const BossSimonToxicZonePattern = { tag: "BossSimonToxicZonePattern" };
+  export const BossSimonPhase2Transform = { tag: "BossSimonPhase2Transform" };
 
   export function getTypeScriptAlgebraicType(): AlgebraicType {
     return AlgebraicType.createSumType([
@@ -95,6 +109,13 @@ export namespace AiState {
       new SumTypeVariant("BossAgnaRitualWick", AlgebraicType.createProductType([])),
       new SumTypeVariant("BossAgnaRitualFailed", AlgebraicType.createProductType([])),
       new SumTypeVariant("BossAgnaRitualComplete", AlgebraicType.createProductType([])),
+      new SumTypeVariant("BossSimonIdle", AlgebraicType.createProductType([])),
+      new SumTypeVariant("BossSimonToxicSpray", AlgebraicType.createProductType([])),
+      new SumTypeVariant("BossSimonZombieWave", AlgebraicType.createProductType([])),
+      new SumTypeVariant("BossSimonTransform", AlgebraicType.createProductType([])),
+      new SumTypeVariant("BossSimonChemicalBoltPattern", AlgebraicType.createProductType([])),
+      new SumTypeVariant("BossSimonToxicZonePattern", AlgebraicType.createProductType([])),
+      new SumTypeVariant("BossSimonPhase2Transform", AlgebraicType.createProductType([])),
     ]);
   }
 
@@ -109,7 +130,7 @@ export namespace AiState {
 }
 
 // The tagged union or sum type for the algebraic type `AiState`.
-export type AiState = AiState.Default | AiState.BossEnderIdle | AiState.BossEnderChase | AiState.BossEnderDance | AiState.BossEnderVanish | AiState.BossEnderLurk | AiState.BossEnderTeleport | AiState.BossEnderTransform | AiState.Stationary | AiState.BossAgnaIdle | AiState.BossAgnaFlamethrower | AiState.BossAgnaMagicCircle | AiState.BossAgnaRitualMatch | AiState.BossAgnaRitualWick | AiState.BossAgnaRitualFailed | AiState.BossAgnaRitualComplete;
+export type AiState = AiState.Default | AiState.BossEnderIdle | AiState.BossEnderChase | AiState.BossEnderDance | AiState.BossEnderVanish | AiState.BossEnderLurk | AiState.BossEnderTeleport | AiState.BossEnderTransform | AiState.Stationary | AiState.BossAgnaIdle | AiState.BossAgnaFlamethrower | AiState.BossAgnaMagicCircle | AiState.BossAgnaRitualMatch | AiState.BossAgnaRitualWick | AiState.BossAgnaRitualFailed | AiState.BossAgnaRitualComplete | AiState.BossSimonIdle | AiState.BossSimonToxicSpray | AiState.BossSimonZombieWave | AiState.BossSimonTransform | AiState.BossSimonChemicalBoltPattern | AiState.BossSimonToxicZonePattern | AiState.BossSimonPhase2Transform;
 
 export default AiState;
 

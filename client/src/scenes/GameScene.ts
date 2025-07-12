@@ -178,7 +178,8 @@ export default class GameScene extends Phaser.Scene {
     // Helper functions for boss type checking
     private isBoss(monsterType: string): boolean {
         return monsterType === 'BossEnderPhase1' || monsterType === 'BossEnderPhase2' ||
-               monsterType === 'BossAgnaPhase1' || monsterType === 'BossAgnaPhase2';
+               monsterType === 'BossAgnaPhase1' || monsterType === 'BossAgnaPhase2' ||
+               monsterType === 'BossSimonPhase1' || monsterType === 'BossSimonPhase2';
     }
 
     private isBossPhase1(monsterType: string): boolean {
@@ -218,6 +219,10 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('monster_spawn_indicator', '/assets/monster_spawn_indicator.png');
         
         // Load boss monster assets
+        this.load.image('final_boss_simon_phase_1', '/assets/final_boss_simon_phase_1.png');
+        this.load.image('final_boss_simon_phase_2', '/assets/final_boss_simon_phase_2.png');
+        this.load.image('attack_boss_simon', '/assets/attack_boss_simon.png');
+        this.load.image('attack_boss_toxicbolt', '/assets/attack_boss_toxicbolt.png');
         this.load.image('final_boss_phase1', '/assets/final_boss_phase_1.png');
         this.load.image('final_boss_phase2', '/assets/final_boss_phase_2.png');
         this.load.image('boss_agna_1', '/assets/boss_agna_1.png');

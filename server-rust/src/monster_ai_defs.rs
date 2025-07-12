@@ -21,6 +21,13 @@ pub enum AIState {
     BossAgnaRitualWick = 13,
     BossAgnaRitualFailed = 14,
     BossAgnaRitualComplete = 15,
+    BossSimonIdle = 16,
+    BossSimonToxicSpray = 17,
+    BossSimonZombieWave = 18,
+    BossSimonTransform = 19,
+    BossSimonChemicalBoltPattern = 20,
+    BossSimonToxicZonePattern = 21,
+    BossSimonPhase2Transform = 22,
 }
 
 // Scheduled table for changing monster AI states
@@ -170,6 +177,55 @@ fn execute_state_entry_behavior(ctx: &ReducerContext, monster: &crate::Monsters,
             crate::boss_agna_defs::execute_boss_agna_ritual_complete_behavior(ctx, monster);
         },
         
+        AIState::BossSimonIdle => {
+            log::info!("Monster {} entering BossSimonIdle state", monster.monster_id);
+            
+            // Delegate to boss_simon_defs for Simon boss specific behavior
+            crate::boss_simon_defs::execute_boss_simon_idle_behavior(ctx, monster);
+        },
+        
+        AIState::BossSimonToxicSpray => {
+            log::info!("Monster {} entering BossSimonToxicSpray state", monster.monster_id);
+            
+            // Delegate to boss_simon_defs for Simon boss specific behavior
+            crate::boss_simon_defs::execute_boss_simon_toxic_spray_behavior(ctx, monster);
+        },
+        
+        AIState::BossSimonZombieWave => {
+            log::info!("Monster {} entering BossSimonZombieWave state", monster.monster_id);
+            
+            // Delegate to boss_simon_defs for Simon boss specific behavior
+            crate::boss_simon_defs::execute_boss_simon_zombie_wave_behavior(ctx, monster);
+        },
+        
+        AIState::BossSimonTransform => {
+            log::info!("Monster {} entering BossSimonTransform state", monster.monster_id);
+            
+            // Delegate to boss_simon_defs for Simon boss specific behavior
+            crate::boss_simon_defs::execute_boss_simon_transform_behavior(ctx, monster);
+        },
+        
+        AIState::BossSimonChemicalBoltPattern => {
+            log::info!("Monster {} entering BossSimonChemicalBoltPattern state", monster.monster_id);
+            
+            // Delegate to boss_simon_defs for Simon boss specific behavior
+            crate::boss_simon_defs::execute_boss_simon_chemical_bolt_pattern(ctx, monster);
+        },
+        
+        AIState::BossSimonToxicZonePattern => {
+            log::info!("Monster {} entering BossSimonToxicZonePattern state", monster.monster_id);
+            
+            // Delegate to boss_simon_defs for Simon boss specific behavior
+            crate::boss_simon_defs::execute_boss_simon_toxic_zone_pattern(ctx, monster);
+        },
+        
+        AIState::BossSimonPhase2Transform => {
+            log::info!("Monster {} entering BossSimonPhase2Transform state", monster.monster_id);
+            
+            // Delegate to boss_simon_defs for Simon boss specific behavior
+            crate::boss_simon_defs::execute_boss_simon_phase2_transform(ctx, monster);
+        },
+        
         AIState::Default => {
             log::info!("Monster {} entering Default state", monster.monster_id);
             // No special behavior for default state
@@ -212,6 +268,9 @@ fn cancel_scheduled_state_changes(ctx: &ReducerContext, monster_id: u32) {
     
     // Also cleanup any pending Agna attacks for this boss
     crate::boss_agna_defs::cleanup_agna_ai_schedules(ctx, monster_id);
+    
+    // Also cleanup any pending Simon attacks for this boss
+    crate::boss_simon_defs::cleanup_simon_ai_schedules(ctx, monster_id);
 }
 
 // Public function to cleanup all AI schedules for a monster (used during boss transitions)
@@ -252,6 +311,11 @@ pub fn initialize_boss_ai(ctx: &ReducerContext, monster_id: u32) {
             // Delegate to boss_agna_defs for Agna boss specific initialization
             crate::boss_agna_defs::initialize_boss_agna_ai(ctx, monster_id);
         },
+        MonsterType::BossSimonPhase1 | MonsterType::BossSimonPhase2 => {
+            log::info!("Initializing Simon boss AI for monster {}", monster_id);
+            // Delegate to boss_simon_defs for Simon boss specific initialization
+            crate::boss_simon_defs::initialize_simon_boss_ai(ctx, monster_id);
+        },
         _ => {
             log::warn!("initialize_boss_ai called for non-boss monster {} of type {:?}", monster_id, monster.bestiary_id);
         }
@@ -280,6 +344,11 @@ pub fn initialize_phase2_boss_ai(ctx: &ReducerContext, monster_id: u32) {
             // Delegate to boss_agna_defs for Agna boss specific initialization
             crate::boss_agna_defs::initialize_phase2_boss_agna_ai(ctx, monster_id);
         },
+        MonsterType::BossSimonPhase2 => {
+            log::info!("Initializing Phase 2 Simon boss AI for monster {}", monster_id);
+            // Delegate to boss_simon_defs for Simon boss specific initialization
+            crate::boss_simon_defs::initialize_phase2_boss_simon_ai(ctx, monster_id);
+        },
         _ => {
             log::warn!("initialize_phase2_boss_ai called for non-phase-2-boss monster {} of type {:?}", monster_id, monster.bestiary_id);
         }
@@ -304,6 +373,13 @@ pub fn get_movement_behavior_for_state(state: &AIState) -> MovementBehavior {
         AIState::BossAgnaRitualWick => MovementBehavior::StandStill, // Agna stands still during ritual
         AIState::BossAgnaRitualFailed => MovementBehavior::StandStill, // Agna stands still when vulnerable
         AIState::BossAgnaRitualComplete => MovementBehavior::StandStill, // Agna stands still during completion
+        AIState::BossSimonIdle => MovementBehavior::Normal,
+        AIState::BossSimonToxicSpray => MovementBehavior::Normal, // Simon moves while spraying
+        AIState::BossSimonZombieWave => MovementBehavior::StandStill, // Simon stands still during zombie wave
+        AIState::BossSimonTransform => MovementBehavior::StandStill, // Simon stands still during transformation
+        AIState::BossSimonChemicalBoltPattern => MovementBehavior::Normal, // Simon moves during bolt pattern
+        AIState::BossSimonToxicZonePattern => MovementBehavior::Normal, // Simon moves during zone pattern
+        AIState::BossSimonPhase2Transform => MovementBehavior::StandStill, // Simon stands still during phase 2 transform
         AIState::Stationary => MovementBehavior::StandStill,
     }
 }
@@ -377,6 +453,13 @@ pub fn can_monster_deal_damage(state: &AIState) -> bool {
         AIState::BossAgnaRitualWick => false, // Invulnerable during ritual wick
         AIState::BossAgnaRitualFailed => true, // Vulnerable when ritual failed
         AIState::BossAgnaRitualComplete => false, // Invulnerable during completion
+        AIState::BossSimonIdle => true,
+        AIState::BossSimonToxicSpray => true,
+        AIState::BossSimonZombieWave => false, // Invulnerable during zombie wave
+        AIState::BossSimonTransform => true,
+        AIState::BossSimonChemicalBoltPattern => true, // Can deal damage during bolt pattern
+        AIState::BossSimonToxicZonePattern => true, // Can deal damage during zone pattern
+        AIState::BossSimonPhase2Transform => true, // Can deal damage during phase 2 transform
         AIState::Stationary => true,
     }
 }
@@ -399,6 +482,13 @@ pub fn can_monster_receive_damage(state: &AIState) -> bool {
         AIState::BossAgnaRitualWick => false,  // Immune during ritual wick
         AIState::BossAgnaRitualFailed => true, // Vulnerable when ritual failed
         AIState::BossAgnaRitualComplete => false, // Immune during completion
+        AIState::BossSimonIdle => true,
+        AIState::BossSimonToxicSpray => true,
+        AIState::BossSimonZombieWave => false, // Invulnerable during zombie wave
+        AIState::BossSimonTransform => true,
+        AIState::BossSimonChemicalBoltPattern => true, // Can deal damage during bolt pattern
+        AIState::BossSimonToxicZonePattern => true, // Can deal damage during zone pattern
+        AIState::BossSimonPhase2Transform => true, // 
         AIState::Stationary => true,
     }
 }
