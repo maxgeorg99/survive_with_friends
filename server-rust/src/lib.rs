@@ -123,7 +123,7 @@ pub enum MonsterVariant {
     Shiny,
 }
 
-#[derive(SpacetimeType, Clone, Copy, Debug, PartialEq)]
+#[derive(SpacetimeType, Clone, Debug, PartialEq, Copy)]
 pub struct DbVector2 {
     pub x: f32,
     pub y: f32,
@@ -149,6 +149,10 @@ impl DbVector2 {
     pub fn magnitude(&self) -> f32 {
         (self.x * self.x + self.y * self.y).sqrt()
     }
+
+    pub fn length_sq(&self) -> f32 {
+        self.x * self.x + self.y * self.y
+    }
 }
 
 impl std::ops::Add for DbVector2 {
@@ -156,6 +160,17 @@ impl std::ops::Add for DbVector2 {
     
     fn add(self, other: DbVector2) -> DbVector2 {
         DbVector2::new(self.x + other.x, self.y + other.y)
+    }
+}
+
+impl std::ops::Sub for DbVector2 {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self::Output {
+        Self {
+            x: self.x - other.x,
+            y: self.y - other.y,
+        }
     }
 }
 

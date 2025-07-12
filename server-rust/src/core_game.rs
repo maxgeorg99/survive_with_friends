@@ -1,11 +1,30 @@
-use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, ScheduleAt, SpacetimeType};
-use crate::{DbVector2, GameTickTimer, DeadPlayer, MonsterType, monsters_def, gems_def, boss_system, reset_world, 
-    monster_damage, monsters, monsters_boid, player, attack_utils, game_state, dead_players, active_attacks,
-    attack_burst_cooldowns, player_scheduled_attacks, active_attack_cleanup, entity, config, class_data, world,
-    game_tick_timer, loot_capsule_defs, monster_attacks_def, account};
+use spacetimedb::{reducer, ReducerContext, ScheduleAt, Table};
 use std::time::Duration;
+use crate::{game_tick_timer, GameTickTimer, DeadPlayer, MonsterType, monsters_def, monster_damage, monsters, monsters_boid, player, game_state, dead_players, active_attacks, attack_burst_cooldowns, player_scheduled_attacks, active_attack_cleanup, entity, config, world, loot_capsule_defs, account};
 
-static mut ERROR_FLAG: bool = false;
+// Health regen system table
+#[spacetimedb::table(name = health_regen_timer, scheduled(process_health_regen_reducer), public)]
+pub struct HealthRegenTimer {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    pub scheduled_at: ScheduleAt,
+}
+
+// Reducer to process health regeneration
+#[reducer]
+pub fn process_health_regen_reducer(ctx: &ReducerContext, _timer: HealthRegenTimer) {
+    // Iterate over all players and apply health regeneration
+    for player in ctx.db.player().iter() {
+        // Calculate the new health value with regeneration
+        let new_hp = (player.hp + player.max_hp * 0.01).min(player.max_hp);
+        
+        // Update the player's health in the database
+        let mut updated_player = player;
+        updated_player.hp = new_hp;
+        ctx.db.player().player_id().update(updated_player);
+    }
+}
 
 // Helper function to remove all damage records for a given attack entity
 fn cleanup_attack_damage_records(ctx: &ReducerContext, attack_entity_id: u32) {
@@ -256,7 +275,7 @@ pub fn damage_player(ctx: &ReducerContext, player_id: u32, damage_amount: f32) -
         }
         
         // Store the player in the dead_players table before removing them
-        let _dead_player_opt = ctx.db.dead_players().insert(DeadPlayer {
+        let _dead_player_opt = ctx.db.dead_players().try_insert(DeadPlayer {
             player_id: player.player_id,
             name: player.name.clone(),
             is_true_survivor: false,
@@ -280,7 +299,7 @@ pub fn damage_player(ctx: &ReducerContext, player_id: u32, damage_amount: f32) -
         ctx.db.player().player_id().delete(&player_id);
         
         // Check if all players are now dead
-        if ctx.db.player().count() == 0 {
+        if ctx.db.player().iter().count() == 0 {
             log::info!("Last player has died! Resetting the game world...");
             crate::reset_world::reset_world(ctx);
         }
@@ -417,6 +436,9 @@ fn process_player_monster_collisions_spatial_hash(ctx: &ReducerContext) {
 
 fn process_player_attack_monster_collisions_spatial_hash(ctx: &ReducerContext) {
     crate::monsters_def::process_player_attack_monster_collisions_spatial_hash(ctx);
+    
+    // After processing collisions, commit the damage
+    crate::monsters_def::commit_monster_damage(ctx);
 }
 
 fn process_monster_attack_collisions_spatial_hash(ctx: &ReducerContext) {
@@ -452,13 +474,68 @@ pub fn game_tick(ctx: &ReducerContext, _timer: GameTickTimer) {
         tick_rate = config.game_tick_rate;
     }
 
+    // Check if there are any players online
+    let player_count = ctx.db.player().iter().count();
+    
+    if player_count == 0 {
+        // Log server idle state every 200 ticks
+        if let Some(world) = ctx.db.world().world_id().find(&0) {
+            if world.tick_count % 200 == 0 {
+                log::info!("Server idle - no players online (tick {})", world.tick_count);
+            }
+        }
+    } else {
+        // Process game logic when players are online
+        
+        // Clear collision cache for this frame
+        clear_collision_cache_for_frame();
+        
+        // Process player movement and populate collision cache
+        process_player_movement(ctx, tick_rate);
+        
+        // Process monster movements
+        process_monster_movements(ctx);
+        
+        // Process attack movements
+        process_attack_movements(ctx);
+        
+        // Process monster attack movements
+        process_monster_attack_movements(ctx);
+        
+        // Maintain gems (spawning, despawning, etc.)
+        maintain_gems(ctx);
+        
+        // Process collisions using spatial hashing
+        process_player_monster_collisions_spatial_hash(ctx);
+        process_player_attack_monster_collisions_spatial_hash(ctx);
+        process_monster_attack_collisions_spatial_hash(ctx);
+        process_player_attack_collisions_spatial_hash(ctx);
+        process_gem_collisions_spatial_hash(ctx);
+        
+        // Commit any pending damage to players
+        commit_player_damage(ctx);
+        
+        log::info!("Game tick processed with {} players online", player_count);
+    }
+
     if let Some(world) = ctx.db.world().world_id().find(&0) {
         let mut world = world;
         world.tick_count += 1;
         
         // Calculate time since last tick using Timestamp
-        let mut time_since_last_tick_ms = tick_rate as f64; // Default to config tick rate
+        let time_since_last_tick_ms = if let Some(duration) = ctx.timestamp.duration_since(world.last_tick_time) {
+            duration.as_millis() as f64
+        } else {
+            // Fallback if timestamp calculation fails
+            1000.0 / tick_rate as f64
+        };
         
+        // Check for long tick intervals
+        if time_since_last_tick_ms > 100.0 {
+            log::warn!("Long tick detected: {} ms", time_since_last_tick_ms);
+        }
+        
+        // Update timing stats
         if world.timing_samples_collected > 0 {
             // Get the last tick timestamp from world data
             let last_tick_timestamp = world.last_tick_time;
@@ -466,7 +543,7 @@ pub fn game_tick(ctx: &ReducerContext, _timer: GameTickTimer) {
             // Calculate time difference using SpacetimeDB's duration_since method
             if let Some(time_duration) = current_timestamp.duration_since(last_tick_timestamp) {
                 // Convert microseconds to milliseconds
-                time_since_last_tick_ms = time_duration.as_millis() as f64;
+                let time_since_last_tick_ms = time_duration.as_millis() as f64;
                 
                 // Update timing stats
                 if world.timing_samples_collected == 1 {
@@ -491,78 +568,33 @@ pub fn game_tick(ctx: &ReducerContext, _timer: GameTickTimer) {
                 // duration_since returned None, meaning current_timestamp is before last_tick_timestamp
                 // This shouldn't normally happen, but if it does, use the configured tick rate
                 log::warn!("Clock went backwards! Using configured tick rate as fallback.");
-                time_since_last_tick_ms = tick_rate as f64;
             }
         }
 
-        if(time_since_last_tick_ms > 100.0) {
-            log::warn!("Game tick took too long! {}ms", time_since_last_tick_ms);
-        }
-        
         // Update timestamp for next tick
         world.last_tick_time = current_timestamp;
         world.timing_samples_collected += 1;
         
-        // Log timing information every 200 ticks
-        if world.tick_count % 200 == 0 {
-            log::info!("Game tick: {} | Avg: {:.2}ms | Current: {:.2}ms | Min: {:.2}ms | Max: {:.2}ms", 
-                     world.tick_count, world.average_tick_ms, time_since_last_tick_ms, 
+        // Log timing information every 200 ticks (only when players are online)
+        if player_count > 0 && world.tick_count % 200 == 0 {
+            log::info!("Game tick: {} | Avg: {:.2}ms | Min: {:.2}ms | Max: {:.2}ms", 
+                     world.tick_count, world.average_tick_ms, 
                      world.min_tick_ms, world.max_tick_ms);
         }
         
         ctx.db.world().world_id().update(world);
     }
     
-    // Schedule the next game tick as a one-off event
-    ctx.db.game_tick_timer().insert(GameTickTimer {
+    // Schedule the next game tick
+    let game_tick_rate = if let Some(config) = ctx.db.config().id().find(&0) {
+        config.game_tick_rate
+    } else {
+        50
+    };
+    let _ = ctx.db.game_tick_timer().try_insert(GameTickTimer {
         scheduled_id: 0,
-        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(tick_rate as u64)),
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(game_tick_rate as u64)),
     });
+}
 
-    // Early return if no players are online - skip all expensive game logic
-    let player_count = ctx.db.player().count();
-    if player_count == 0 {
-        // Log occasionally to show the server is still running but idle
-        if let Some(world) = ctx.db.world().world_id().find(&0) {
-            if world.tick_count % 1200 == 0 { // Every minute (1200 ticks at 20Hz)
-                log::info!("Server idle - no players online (tick {})", world.tick_count);
-            }
-        }
-        return;
-    }
-
-    clear_collision_cache_for_frame();
-
-    process_player_movement(ctx, tick_rate);
-
-    process_monster_movements(ctx);
-
-    process_attack_movements(ctx);
-
-    // Update Agna magic circles - only if Agna boss is active
-    if let Some(game_state) = ctx.db.game_state().id().find(&0) {
-        if game_state.boss_active && game_state.boss_type == crate::BossType::Agna {
-            let collision_cache = crate::monsters_def::get_collision_cache();
-            crate::boss_agna_defs::update_agna_magic_circles(ctx, collision_cache);
-            crate::boss_agna_defs::process_agna_ritual_complete_damage(ctx);
-        }
-    }
-
-    process_monster_attack_movements(ctx);
-
-    maintain_gems(ctx);
-
-    process_player_monster_collisions_spatial_hash(ctx);
-
-    process_player_attack_monster_collisions_spatial_hash(ctx);
-
-    process_monster_attack_collisions_spatial_hash(ctx);
-
-    process_player_attack_collisions_spatial_hash(ctx);
-
-    crate::monsters_def::commit_monster_damage(ctx);
-
-    commit_player_damage(ctx);
-
-    process_gem_collisions_spatial_hash(ctx);
-} 
+// Reducer to initialize the health regen system

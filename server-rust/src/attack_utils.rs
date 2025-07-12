@@ -1,11 +1,11 @@
-use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, rand::Rng};
-use crate::{AttackType, DbVector2, PlayerScheduledAttack, MonsterBoid, attacks_def::find_attack_data_by_type, monsters_boid, player};
+use spacetimedb::{ReducerContext, Table, rand::{Rng, RngCore}};
+use crate::{DbVector2, AttackType, PlayerScheduledAttack, monsters_def::{monsters, monsters_boid}};
 use std::f64::consts::PI;
 
 // Thunder Horn attack configuration constants
 pub const THUNDER_HORN_TARGET_RADIUS: f32 = 700.0;  // Maximum range for Thunder Horn targeting
 
-// Helper function to get parameter_u for an attack
+// Get parameter_u for an attack
 pub fn get_parameter_u(ctx: &ReducerContext, attack: &PlayerScheduledAttack) -> u32 {
     let attack_type = &attack.attack_type;
 
@@ -48,7 +48,11 @@ pub fn get_parameter_u(ctx: &ReducerContext, attack: &PlayerScheduledAttack) -> 
         }
         AttackType::Volleyball => {
             // For Volleyball, parameter_u stores the bounce count
-            3 // Start with 0 bounces
+            if attack.parameter_u == 0 {
+                1
+            } else {
+                0
+            }
         }
         AttackType::Garlic => {
             // Garlic has no direction, so no parameter needed
@@ -65,17 +69,35 @@ pub fn determine_attack_direction(
     attack_type: &AttackType,
     id_within_burst: u32,
     parameter_u: u32,
-    parameter_i: i32,
-    projectiles: u32, // Use the upgraded projectiles count instead of base attack data
+    _parameter_i: i32,
+    num_projectiles: u32,
 ) -> DbVector2 {
-    // Get the player
-    let player = ctx.db.player().player_id().find(&player_id)
-        .expect(&format!("DetermineAttackDirection: Player {} not found", player_id));
+    // Get player entity from collision cache
+    let cache = crate::monsters_def::get_collision_cache();
+    let player_cache_idx = match cache.player.player_id_to_cache_index.get(&player_id) {
+        Some(&idx) => idx as usize,
+        None => {
+            log::error!("Player {} not found in collision cache for attack direction", player_id);
+            return DbVector2::new(1.0, 0.0); // Fallback direction
+        }
+    };
+    let player_pos = DbVector2::new(cache.player.pos_x_player[player_cache_idx], cache.player.pos_y_player[player_cache_idx]);
+    
+    // Since dir_x and dir_y don't exist in the cache, we'll use a fallback direction
+    // or calculate direction based on player's last movement or target
+    let player_dir = DbVector2::new(1.0, 0.0); // Default direction (right)
 
-    // Handle different attack types
     match attack_type {
-        AttackType::Sword => {
-            // Sword attacks swing Right then Left
+        AttackType::Sword | AttackType::Joint => {
+            // Sword and Joint attacks target the nearest enemy for better kiting
+            if let Some(nearest_enemy_pos) = find_nearest_enemy(ctx, player_pos, player_id) {
+                let dir = (nearest_enemy_pos - player_pos).normalize();
+                if dir.length_sq() > 0.0 {
+                    return dir;
+                }
+            }
+            
+            // If no enemies, fall back to alternating left/right pattern
             let count_param = parameter_u + id_within_burst;
             if count_param % 2 == 0 {
                 DbVector2::new(1.0, 0.0)
@@ -83,117 +105,97 @@ pub fn determine_attack_direction(
                 DbVector2::new(-1.0, 0.0)
             }
         }
-        AttackType::Wand => {
-            // Wands shoot at the nearest enemy (monster or player)
-            if let Some(target_position) = find_nearest_target(ctx, player.position, player_id) {
-                // Calculate direction vector to the target
-                let dx = target_position.x - player.position.x;
-                let dy = target_position.y - player.position.y;
-                DbVector2::new(dx, dy).normalize()
-            } else {
-                // If no target, use player's direction
-                let waypoint = player.waypoint;
-                let wdx = waypoint.x - player.position.x;
-                let wdy = waypoint.y - player.position.y;
-                DbVector2::new(wdx, wdy).normalize()
+        AttackType::Wand | AttackType::Football => {
+            // Wands and Footballs shoot at the nearest enemy
+            if let Some(nearest_enemy_pos) = find_nearest_enemy(ctx, player_pos, player_id) {
+                let dir = (nearest_enemy_pos - player_pos).normalize();
+                if dir.length_sq() > 0.0 {
+                    return dir;
+                }
             }
+            
+            // If no enemies or calculation issue, use player's direction
+            get_normalized_direction(player_dir)
         }
         AttackType::Knives => {
-            // Knives attack in a circle around the player starting at the angle specified in the parameter_u
-            // The angle is in degrees, so we need to convert it to radians
-            // Use the upgraded projectiles count for proper spacing
-            let start_angle = (parameter_u as f64) * PI / 180.0;
-            let angle_step = 360.0 / (projectiles as f64) * PI / 180.0;
-            let attack_angle = start_angle + (angle_step * (id_within_burst as f64));
+            // Knives attack in a circle around the player starting at the angle specified in parameter_u
+            let start_angle = parameter_u as f64 * PI / 180.0;
+            let angle_step = 360.0 / num_projectiles as f64;
+            let attack_angle = start_angle + (angle_step * id_within_burst as f64);
             DbVector2::new(attack_angle.cos() as f32, attack_angle.sin() as f32)
         }
-        AttackType::Shield => {
-            // Shield attacks have rotation motion
+        AttackType::Cards => {
+            // Find the nearest enemy for card targeting
+            if let Some(nearest_enemy_pos) = find_nearest_enemy(ctx, player_pos, player_id) {
+                let base_dir = (nearest_enemy_pos - player_pos).normalize();
+                if base_dir.length_sq() > 0.0 {
+                    // For multiple cards, spread them in a fan pattern toward the enemy
+                    let fan_angle_range = 45.0; // degrees total spread
+                    
+                    let fan_angle = if num_projectiles > 1 {
+                        -fan_angle_range / 2.0 + (fan_angle_range * id_within_burst as f64 / (num_projectiles - 1) as f64)
+                    } else {
+                        0.0
+                    };
+                    
+                    let fan_angle_rad = fan_angle * PI / 180.0;
+                    
+                    // Rotate the base vector by the fan angle
+                    let rotated_x = base_dir.x as f64 * fan_angle_rad.cos() - base_dir.y as f64 * fan_angle_rad.sin();
+                    let rotated_y = base_dir.x as f64 * fan_angle_rad.sin() + base_dir.y as f64 * fan_angle_rad.cos();
+                    
+                    return DbVector2::new(rotated_x as f32, rotated_y as f32);
+                }
+            }
+            
+            // If no enemies found, fall back to the circular pattern like knives
+            let start_angle = parameter_u as f64 * PI / 180.0;
+            let angle_step = 360.0 / num_projectiles as f64;
+            let attack_angle = start_angle + (angle_step * id_within_burst as f64);
+            DbVector2::new(attack_angle.cos() as f32, attack_angle.sin() as f32)
+        }
+        AttackType::Dumbbell => {
+            // Dumbbells start with a strong upward motion
+            let mut rng = ctx.rng();
+            let y_offset = -4.0;
+            let x_offset = (rng.gen::<f64>() - 0.5) * 1.0; // gen::<f64>() returns num in [0.0, 1.0)
+            DbVector2::new(x_offset as f32, y_offset as f32).normalize()
+        }
+        AttackType::Shield | AttackType::Garlic => {
+            // These attacks have special movement, not a fixed direction
             DbVector2::new(0.0, 0.0)
         }
         AttackType::ThunderHorn => {
-            // Thunder Horn targets a random enemy within a large radius
-            if let Some(target_position) = find_random_target_in_radius(ctx, player.position, player_id, THUNDER_HORN_TARGET_RADIUS) {
-                // For instant attacks, we don't need a direction - the entity position will be set directly to target
-                // But we still need to return a normalized direction vector
-                let dx = target_position.x - player.position.x;
-                let dy = target_position.y - player.position.y;
-                DbVector2::new(dx, dy).normalize()
-            } else {
-                // If no target found, default direction
-                DbVector2::new(1.0, 0.0)
+            // Direction is not used for placement, but can be used for graphics
+            if let Some(nearest_enemy_pos) = find_nearest_enemy(ctx, player_pos, player_id) {
+                let dir = (nearest_enemy_pos - player_pos).normalize();
+                if dir.length_sq() > 0.0 {
+                    return dir;
+                }
             }
+            get_normalized_direction(player_dir)
         }
         AttackType::AngelStaff => {
-            // Angel Staff is an area effect at player position - direction doesn't matter
+            // No direction needed for area effect
             DbVector2::new(0.0, 0.0)
-        }
-        AttackType::Football | AttackType::Dumbbell => {
-            // Simple pattern: Target nearest enemy. If none, use player's direction.
-            if let Some(target_position) = find_nearest_target(ctx, player.position, player_id) {
-                let dx = target_position.x - player.position.x;
-                let dy = target_position.y - player.position.y;
-                DbVector2::new(dx, dy).normalize()
-            } else {
-                let waypoint = player.waypoint;
-                let wdx = waypoint.x - player.position.x;
-                let wdy = waypoint.y - player.position.y;
-                DbVector2::new(wdx, wdy).normalize()
-            }
         }
         AttackType::Volleyball => {
-            // Volleyball initially targets nearest enemy, then bounces to others
-            if let Some(target_position) = find_nearest_target(ctx, player.position, player_id) {
-                let dx = target_position.x - player.position.x;
-                let dy = target_position.y - player.position.y;
-                DbVector2::new(dx, dy).normalize()
-            } else {
-                let waypoint = player.waypoint;
-                let wdx = waypoint.x - player.position.x;
-                let wdy = waypoint.y - player.position.y;
-                DbVector2::new(wdx, wdy).normalize()
+            // Volleyballs shoot at the nearest enemy
+            if let Some(nearest_enemy_pos) = find_nearest_enemy(ctx, player_pos, player_id) {
+                let dir = (nearest_enemy_pos - player_pos).normalize();
+                if dir.length_sq() > 0.0 {
+                    return dir;
+                }
             }
-        }
-        AttackType::Cards => {
-            // Shoots a fan of cards towards the nearest enemy.
-            if let Some(target_position) = find_nearest_target(ctx, player.position, player_id) {
-                let dx = target_position.x - player.position.x;
-                let dy = target_position.y - player.position.y;
-                let base_dir = DbVector2::new(dx, dy).normalize();
-
-                let fan_angle_range = 45.0; // degrees
-                let fan_angle = if projectiles > 1 {
-                    -fan_angle_range / 2.0 + (fan_angle_range * id_within_burst as f64 / (projectiles - 1) as f64)
-                } else {
-                    0.0
-                };
-
-                let fan_angle_rad = fan_angle * PI / 180.0;
-                let cos_a = fan_angle_rad.cos() as f32;
-                let sin_a = fan_angle_rad.sin() as f32;
-
-                DbVector2::new(
-                    base_dir.x * cos_a - base_dir.y * sin_a,
-                    base_dir.x * sin_a + base_dir.y * cos_a,
-                )
-            } else {
-                // Fallback to circular pattern if no enemy
-                let start_angle = (parameter_u as f64) * PI / 180.0;
-                let angle_step = 360.0 / (projectiles as f64) * PI / 180.0;
-                let attack_angle = start_angle + (angle_step * (id_within_burst as f64));
-                DbVector2::new(attack_angle.cos() as f32, attack_angle.sin() as f32)
-            }
-        }
-        AttackType::Garlic | AttackType::Joint => {
-            // Garlic aura has no direction.
-            DbVector2::new(0.0, 0.0)
+            // If no enemies or calculation issue, use player's direction
+            get_normalized_direction(player_dir)
         }
     }
 }
 
-// Find the nearest enemy to a player entity
-pub fn find_nearest_enemy(ctx: &ReducerContext, position: DbVector2) -> Option<MonsterBoid> {
-    let mut nearest_enemy: Option<MonsterBoid> = None;
+// Find the nearest enemy to a given position
+pub fn find_nearest_enemy(ctx: &ReducerContext, position: DbVector2, player_id: u32) -> Option<DbVector2> {
+    let mut nearest_enemy: Option<DbVector2> = None;
     let mut nearest_distance_squared = f32::MAX;
 
     // Iterate through all monsters in the game
@@ -204,73 +206,51 @@ pub fn find_nearest_enemy(ctx: &ReducerContext, position: DbVector2) -> Option<M
         let dy = boid.position.y - position.y;
         let distance_squared = dx * dx + dy * dy;
 
-        // If this monster is closer than the current nearest, update nearest
+        // Check if this monster is closer than the current nearest
         if distance_squared < nearest_distance_squared {
             nearest_distance_squared = distance_squared;
-            nearest_enemy = Some(boid);
+            nearest_enemy = Some(boid.position);
         }
     }
 
     nearest_enemy
 }
 
-// Find the nearest target (monster or player) to attack - used for Wand targeting
-pub fn find_nearest_target(ctx: &ReducerContext, attacker_position: DbVector2, attacker_player_id: u32) -> Option<DbVector2> {
-    let mut nearest_target_position: Option<DbVector2> = None;
-    let mut nearest_distance_squared = f32::MAX;
+// Find the nearest enemy to a given position and return its entity ID
+pub fn find_nearest_enemy_entity_id(ctx: &ReducerContext, position: DbVector2, _player_id: u32) -> Option<u32> {
+    let mut nearest_enemy_id: Option<u32> = None;
+    let mut min_dist_sq = f32::MAX;
 
-    // Check all monsters
+    // Iterate over all monsters in the boid cache
     for boid in ctx.db.monsters_boid().iter() {
-        let dx = boid.position.x - attacker_position.x;
-        let dy = boid.position.y - attacker_position.y;
-        let distance_squared = dx * dx + dy * dy;
-
-        if distance_squared < nearest_distance_squared {
-            nearest_distance_squared = distance_squared;
-            nearest_target_position = Some(boid.position);
+        // Skip monsters that are owned by the player (removed owner_id check since field doesn't exist)
+        
+        let dist_sq = (boid.position.x - position.x).powi(2) + (boid.position.y - position.y).powi(2);
+        if dist_sq < min_dist_sq {
+            min_dist_sq = dist_sq;
+            nearest_enemy_id = Some(boid.monster_id);
         }
     }
-
-    // Get the collision cache to access cached player data
-    let cache = crate::monsters_def::get_collision_cache();
     
-    // Get the attacking player's PvP status from cache
-    let attacker_pvp_enabled = if let Some(&cache_idx) = cache.player.player_id_to_cache_index.get(&attacker_player_id) {
-        cache.player.pvp_player[cache_idx as usize]
-    } else {
-        false // Default to false if player not found in cache
-    };
-
-    // Check all other cached players (excluding the attacker) - only if attacking player has PvP enabled
-    if attacker_pvp_enabled {
-        for pid in 0..cache.player.cached_count_players as usize {
-            let player_id = cache.player.keys_player[pid];
-            
-            // Skip the attacking player
-            if player_id == attacker_player_id {
-                continue;
-            }
-            
-            // PvP-enabled players can target any other player (regardless of target's PvP status)
-
-            let player_x = cache.player.pos_x_player[pid];
-            let player_y = cache.player.pos_y_player[pid];
-            let dx = player_x - attacker_position.x;
-            let dy = player_y - attacker_position.y;
-            let distance_squared = dx * dx + dy * dy;
-
-            if distance_squared < nearest_distance_squared {
-                nearest_distance_squared = distance_squared;
-                nearest_target_position = Some(DbVector2::new(player_x, player_y));
+    // Also check non-boid monsters
+    for monster in ctx.db.monsters().iter() {
+        // Skip monsters that are owned by the player (removed owner_id check since field doesn't exist)
+        
+        // Get monster position from boid data
+        if let Some(boid) = ctx.db.monsters_boid().monster_id().find(&monster.monster_id) {
+            let dist_sq = (boid.position.x - position.x).powi(2) + (boid.position.y - position.y).powi(2);
+            if dist_sq < min_dist_sq {
+                min_dist_sq = dist_sq;
+                nearest_enemy_id = Some(monster.monster_id);
             }
         }
     }
 
-    nearest_target_position
+    nearest_enemy_id
 }
 
-// Find a random target (monster or player) within a given radius - used for Thunder Horn targeting
-pub fn find_random_target_in_radius(ctx: &ReducerContext, attacker_position: DbVector2, attacker_player_id: u32, max_radius: f32) -> Option<DbVector2> {
+// Find a random enemy within a certain radius
+pub fn find_random_target_in_radius(ctx: &ReducerContext, attacker_position: DbVector2, _attacker_player_id: u32, max_radius: f32) -> Option<DbVector2> {
     let mut targets_in_range: Vec<DbVector2> = Vec::new();
     let max_radius_squared = max_radius * max_radius;
 
@@ -285,45 +265,21 @@ pub fn find_random_target_in_radius(ctx: &ReducerContext, attacker_position: DbV
         }
     }
 
-    // Get the collision cache to access cached player data
-    let cache = crate::monsters_def::get_collision_cache();
-    
-    // Get the attacking player's PvP status from cache
-    let attacker_pvp_enabled = if let Some(&cache_idx) = cache.player.player_id_to_cache_index.get(&attacker_player_id) {
-        cache.player.pvp_player[cache_idx as usize]
-    } else {
-        false // Default to false if player not found in cache
-    };
-
-    // Check all other cached players (excluding the attacker) within radius - only if attacking player has PvP enabled
-    if attacker_pvp_enabled {
-        for pid in 0..cache.player.cached_count_players as usize {
-            let player_id = cache.player.keys_player[pid];
-            
-            // Skip the attacking player
-            if player_id == attacker_player_id {
-                continue;
-            }
-
-            let player_x = cache.player.pos_x_player[pid];
-            let player_y = cache.player.pos_y_player[pid];
-            let dx = player_x - attacker_position.x;
-            let dy = player_y - attacker_position.y;
-            let distance_squared = dx * dx + dy * dy;
-
-            if distance_squared <= max_radius_squared {
-                targets_in_range.push(DbVector2::new(player_x, player_y));
-            }
-        }
-    }
-
-    // If no targets found, return None
+    // Choose a random target from the list
+    let mut rng = ctx.rng();
     if targets_in_range.is_empty() {
         return None;
     }
-
-    // Choose a random target from the list
-    let mut rng = ctx.rng();
     let random_index = rng.gen_range(0..targets_in_range.len());
     Some(targets_in_range[random_index])
+}
+
+// Helper function to get a normalized direction vector, handling the zero-vector case
+pub fn get_normalized_direction(direction: DbVector2) -> DbVector2 {
+    if direction.x == 0.0 && direction.y == 0.0 {
+        // If direction is zero, default to a standard direction (e.g., right)
+        DbVector2::new(1.0, 0.0)
+    } else {
+        direction.normalize()
+    }
 }

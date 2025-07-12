@@ -270,19 +270,19 @@ export class AttackManager {
             case 'Football':
                 spriteKey = 'attack_football';
                 break;
-            case 'Gambler':
+            case 'Cards':
                 spriteKey = 'attack_cards';
                 break;
-            case 'Athlete':
+            case 'Dumbbell':
                 spriteKey = 'attack_dumbbell';
                 break;
-            case 'Gourmand':
+            case 'Garlic':
                 spriteKey = 'attack_garlic';
                 break;
             case 'Volleyball':
                 spriteKey = 'attack_volleyball';
                 break;
-            case 'Stoner':
+            case 'Joint':
                 spriteKey = 'attack_joint';
                 break;
             default:
@@ -461,44 +461,130 @@ export class AttackManager {
     }
 
     private updateAttackGraphic(attackGraphicData: AttackGraphicData) {
-        // Clear previous drawing
-        attackGraphicData.graphic.clear();
+        const { graphic, sprite, radius, alpha, predictedPosition, serverPosition, direction, speed, ticksElapsed } = attackGraphicData;
 
-        // Only draw the circle if debug mode is enabled
-        if (this.debugCirclesEnabled) {
-            // Draw the attack as a light gray transparent circle
-            attackGraphicData.graphic.fillStyle(ATTACK_CIRCLE_COLOR, ATTACK_CIRCLE_ALPHA);
-            attackGraphicData.graphic.fillCircle(
-                attackGraphicData.predictedPosition.x, 
-                attackGraphicData.predictedPosition.y, 
-                attackGraphicData.radius
-            );
+        // Clear previous graphics
+        graphic.clear();
+
+        // Draw the attack circle
+        if (this.debugCirclesEnabled || attackGraphicData.attackType === 'Garlic') {
+            graphic.lineStyle(1, 0xffffff, alpha * 0.4);
+            graphic.strokeCircle(0, 0, radius);
             
-            // Add a thin border for better visibility
-            attackGraphicData.graphic.lineStyle(ATTACK_CIRCLE_BORDER_WIDTH, ATTACK_CIRCLE_COLOR, ATTACK_CIRCLE_BORDER_ALPHA);
-            attackGraphicData.graphic.strokeCircle(
-                attackGraphicData.predictedPosition.x, 
-                attackGraphicData.predictedPosition.y, 
-                attackGraphicData.radius
-            );
-        }
-
-        // Update the sprite position and rotation - always visible regardless of debug mode
-        if (attackGraphicData.sprite) {
-            switch (attackGraphicData.attackType) {
-                case 'Football':
-                case 'Gambler':
-                case 'Athlete':
-                case 'Gourmand':
-                case 'Volleyball':
-                case 'Stoner':
-                    // These attacks follow the default projectile behavior
-                    break;
-                    
-                default:
-
+            if (attackGraphicData.attackType === 'Garlic') {
+                // Add pulsing effect for garlic
+                const pulseScale = 1 + Math.sin(ticksElapsed * 0.2) * 0.2;
+                graphic.scale = pulseScale;
+                
+                // Add particle effects for garlic
+                this.createGarlicParticles(predictedPosition.x, predictedPosition.y);
             }
         }
+
+        // Special handling for Dumbbell
+        if (attackGraphicData.attackType === 'Dumbbell') {
+            // Add shadow effect for dumbbell
+            if (sprite) {
+                const shadowAlpha = Math.max(0.1, 1 - (ticksElapsed * 0.1));
+                graphic.fillStyle(0x000000, shadowAlpha);
+                graphic.fillCircle(0, radius, radius * 0.5);
+            }
+        }
+
+        // Update position with interpolation
+        graphic.setPosition(predictedPosition.x, predictedPosition.y);
+        if (sprite) {
+            sprite.setPosition(predictedPosition.x, predictedPosition.y);
+
+            // Handle rotations for different attack types
+            if (attackGraphicData.attackType === 'Dumbbell') {
+                // Dumbbell maintains fixed horizontal orientation
+                return;
+            } else if (!attackGraphicData.isShield) {
+                // For regular projectiles and boss attacks, rotate based on movement direction
+                if (direction.length() > 0) {
+                    const angle = Math.atan2(direction.y, direction.x);
+                    
+                    // Fix upside-down issue for all projectiles moving left
+                    if (attackGraphicData.attackType === 'Sword' || 
+                        attackGraphicData.attackType === 'Knives' || 
+                        attackGraphicData.attackType === 'Cards' || 
+                        attackGraphicData.attackType === 'Joint' || 
+                        attackGraphicData.attackType === 'Football') {
+                        // For weapons that look wrong when flipped upside down
+                        if (Math.abs(angle) > Math.PI/2) {
+                            // Left-facing: set a base angle of 0 and flip the sprite horizontally
+                            sprite.setRotation(0);
+                            sprite.setFlipX(true);
+                            sprite.setFlipY(false);
+                        } else {
+                            // Right-facing: use normal rotation without flipping
+                            sprite.setRotation(angle);
+                            sprite.setFlipX(false);
+                            sprite.setFlipY(false);
+                        }
+                    } else {
+                        // For other attack types, use standard rotation
+                        sprite.setRotation(angle);
+                    }
+                }
+            } else {
+                // For shields, rotate based on orbital position around player
+                const playerPos = this.getPlayerPosition(attackGraphicData.playerId || 0);
+                if (playerPos) {
+                    const dx = predictedPosition.x - playerPos.x;
+                    const dy = predictedPosition.y - playerPos.y;
+                    const angle = Math.atan2(dy, dx);
+                    sprite.setRotation(angle);
+                }
+            }
+        }
+    }
+
+    private createGarlicParticles(x: number, y: number) {
+        if (!this.scene) return;
+
+        // Get attack data to scale particles
+        const attackGraphicData = Array.from(this.attackGraphics.values())
+            .find(data => data.attackType === 'Garlic');
+        
+        if (!attackGraphicData) return;
+        
+        // Create particles less frequently based on radius
+        if (Math.random() > 0.1 * (attackGraphicData.radius / attackGraphicData.baseRadius)) return;
+
+        // Scale particle properties based on attack radius
+        const radiusScale = attackGraphicData.radius / attackGraphicData.baseRadius;
+        const baseScale = 0.3 * radiusScale;
+        const speedScale = Math.min(radiusScale * 30, 100);
+
+        // Create the emission zone
+        const emitCircle = new Phaser.Geom.Circle(0, 0, attackGraphicData.radius * 0.8);
+        
+        const particles = this.scene.add.particles(x, y, 'white_pixel', {
+            speed: { min: speedScale * 0.5, max: speedScale },
+            angle: { min: 0, max: 360 },
+            scale: { start: baseScale, end: 0 },
+            lifespan: 800,
+            tint: [0xccffcc, 0x99ff99, 0x66ff66], // Multiple green tints for variety
+            blendMode: 'ADD',
+            gravityY: -20 * radiusScale,
+            quantity: Math.ceil(radiusScale), // More particles for larger radius
+            rotate: { min: -180, max: 180 }, // Random rotation
+            alpha: { start: 0.6, end: 0 },
+            frequency: 50, // Emit every 50ms while active
+            emitZone: { 
+                type: 'random',
+                source: emitCircle,
+                quantity: Math.ceil(radiusScale),
+                stepRate: 50
+            }
+        });
+
+        // Auto-destroy after animation
+        this.scene.time.delayedCall(800, () => {
+            particles.destroy();
+        });
     }
 
     private findAttackDataByType(ctx: EventContext, attackType: AttackType): AttackData | undefined {

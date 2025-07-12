@@ -261,19 +261,19 @@ pub fn init_attack_data(ctx: &ReducerContext) {
     ctx.db.attack_data().insert(AttackData {
         attack_id: 10,
         attack_type: AttackType::Garlic,
-        name: "Garlic Aura".to_string(),
-        cooldown: 800,
-        duration: 800,
+        name: "Garlic".to_string(),
+        cooldown: 400,
+        duration: 100,
         projectiles: 1,
         fire_delay: 0,
         speed: 0.0,
         piercing: true,
-        radius: 100.0,
-        damage: 2,
+        radius: 65.0,
+        damage: 1,
         armor_piercing: 1,
     });
 
-    // Volleyball - blunt force attack
+    // Volleyball - bouncing projectile
     ctx.db.attack_data().insert(AttackData {
         attack_id: 11,
         attack_type: AttackType::Volleyball,
@@ -285,24 +285,24 @@ pub fn init_attack_data(ctx: &ReducerContext) {
         speed: 700.0,
         piercing: true,
         radius: 35.0,
-        damage: 1.5,
+        damage: 2,
         armor_piercing: 5,
     });
 
-    // Joint - special attack
+    // Joint - simple melee attack
     ctx.db.attack_data().insert(AttackData {
         attack_id: 12,
         attack_type: AttackType::Joint,
         name: "Joint".to_string(),
-        cooldown: 1000,          // Moderate cooldown
-        duration: 500,           // Short duration
-        projectiles: 1,          // Single projectile
-        fire_delay: 0,           // Instant strike
-        speed: 900.0,            // Fast projectile speed
-        piercing: true,          // Pierces through enemies
-        radius: 30.0,            // Moderate radius
-        damage: 10,              // Decent damage
-        armor_piercing: 5,       // Some armor penetration
+        cooldown: 800,
+        duration: 600,
+        projectiles: 1,
+        fire_delay: 100,
+        speed: 600.0,
+        piercing: false,
+        radius: 16.0,
+        damage: 3,
+        armor_piercing: 1,
     });
 
     log::info!("Attack data initialized successfully.");
@@ -891,4 +891,4 @@ pub fn cleanup_attack_damage_records(ctx: &ReducerContext, entity_id: u32) {
     for damage_record in damage_records {
         ctx.db.monster_damage().damage_id().delete(&damage_record.damage_id);
     }
-} 
+}

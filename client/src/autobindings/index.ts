@@ -72,6 +72,8 @@ import { PreSpawnMonsterWave } from "./pre_spawn_monster_wave_reducer.ts";
 export { PreSpawnMonsterWave };
 import { ProcessHealthRegen } from "./process_health_regen_reducer.ts";
 export { ProcessHealthRegen };
+import { ProcessHealthRegenReducer } from "./process_health_regen_reducer_reducer.ts";
+export { ProcessHealthRegenReducer };
 import { RerollUpgrades } from "./reroll_upgrades_reducer.ts";
 export { RerollUpgrades };
 import { ResetWorld } from "./reset_world_reducer.ts";
@@ -234,6 +236,8 @@ import { GuaranteedVoidChestSpawnsTableHandle } from "./guaranteed_void_chest_sp
 export { GuaranteedVoidChestSpawnsTableHandle };
 import { HealthRegenSchedulerTableHandle } from "./health_regen_scheduler_table.ts";
 export { HealthRegenSchedulerTableHandle };
+import { HealthRegenTimerTableHandle } from "./health_regen_timer_table.ts";
+export { HealthRegenTimerTableHandle };
 import { ImpAttackSchedulerTableHandle } from "./imp_attack_scheduler_table.ts";
 export { ImpAttackSchedulerTableHandle };
 import { LootCapsulesTableHandle } from "./loot_capsules_table.ts";
@@ -366,6 +370,8 @@ import { GuaranteedVoidChestSpawn } from "./guaranteed_void_chest_spawn_type.ts"
 export { GuaranteedVoidChestSpawn };
 import { HealthRegenScheduler } from "./health_regen_scheduler_type.ts";
 export { HealthRegenScheduler };
+import { HealthRegenTimer } from "./health_regen_timer_type.ts";
+export { HealthRegenTimer };
 import { ImpAttackScheduler } from "./imp_attack_scheduler_type.ts";
 export { ImpAttackScheduler };
 import { LootCapsules } from "./loot_capsules_type.ts";
@@ -791,6 +797,15 @@ const REMOTE_MODULE = {
         colType: HealthRegenScheduler.getTypeScriptAlgebraicType().product.elements[0].algebraicType,
       },
     },
+    health_regen_timer: {
+      tableName: "health_regen_timer",
+      rowType: HealthRegenTimer.getTypeScriptAlgebraicType(),
+      primaryKey: "scheduledId",
+      primaryKeyInfo: {
+        colName: "scheduledId",
+        colType: HealthRegenTimer.getTypeScriptAlgebraicType().product.elements[0].algebraicType,
+      },
+    },
     imp_attack_scheduler: {
       tableName: "imp_attack_scheduler",
       rowType: ImpAttackScheduler.getTypeScriptAlgebraicType(),
@@ -1022,6 +1037,10 @@ const REMOTE_MODULE = {
       reducerName: "process_health_regen",
       argsType: ProcessHealthRegen.getTypeScriptAlgebraicType(),
     },
+    process_health_regen_reducer: {
+      reducerName: "process_health_regen_reducer",
+      argsType: ProcessHealthRegenReducer.getTypeScriptAlgebraicType(),
+    },
     reroll_upgrades: {
       reducerName: "reroll_upgrades",
       argsType: RerollUpgrades.getTypeScriptAlgebraicType(),
@@ -1223,6 +1242,7 @@ export type Reducer = never
 | { name: "LoadBuild", args: LoadBuild }
 | { name: "PreSpawnMonsterWave", args: PreSpawnMonsterWave }
 | { name: "ProcessHealthRegen", args: ProcessHealthRegen }
+| { name: "ProcessHealthRegenReducer", args: ProcessHealthRegenReducer }
 | { name: "RerollUpgrades", args: RerollUpgrades }
 | { name: "ResetWorld", args: ResetWorld }
 | { name: "SaveBuild", args: SaveBuild }
@@ -1532,6 +1552,22 @@ export class RemoteReducers {
 
   removeOnProcessHealthRegen(callback: (ctx: ReducerEventContext, scheduler: HealthRegenScheduler) => void) {
     this.connection.offReducer("process_health_regen", callback);
+  }
+
+  processHealthRegenReducer(timer: HealthRegenTimer) {
+    const __args = { timer };
+    let __writer = new BinaryWriter(1024);
+    ProcessHealthRegenReducer.getTypeScriptAlgebraicType().serialize(__writer, __args);
+    let __argsBuffer = __writer.getBuffer();
+    this.connection.callReducer("process_health_regen_reducer", __argsBuffer, this.setCallReducerFlags.processHealthRegenReducerFlags);
+  }
+
+  onProcessHealthRegenReducer(callback: (ctx: ReducerEventContext, timer: HealthRegenTimer) => void) {
+    this.connection.onReducer("process_health_regen_reducer", callback);
+  }
+
+  removeOnProcessHealthRegenReducer(callback: (ctx: ReducerEventContext, timer: HealthRegenTimer) => void) {
+    this.connection.offReducer("process_health_regen_reducer", callback);
   }
 
   rerollUpgrades(playerId: number) {
@@ -2199,6 +2235,11 @@ export class SetReducerFlags {
     this.processHealthRegenFlags = flags;
   }
 
+  processHealthRegenReducerFlags: CallReducerFlags = 'FullUpdate';
+  processHealthRegenReducer(flags: CallReducerFlags) {
+    this.processHealthRegenReducerFlags = flags;
+  }
+
   rerollUpgradesFlags: CallReducerFlags = 'FullUpdate';
   rerollUpgrades(flags: CallReducerFlags) {
     this.rerollUpgradesFlags = flags;
@@ -2560,6 +2601,10 @@ export class RemoteTables {
 
   get healthRegenScheduler(): HealthRegenSchedulerTableHandle {
     return new HealthRegenSchedulerTableHandle(this.connection.clientCache.getOrCreateTable<HealthRegenScheduler>(REMOTE_MODULE.tables.health_regen_scheduler));
+  }
+
+  get healthRegenTimer(): HealthRegenTimerTableHandle {
+    return new HealthRegenTimerTableHandle(this.connection.clientCache.getOrCreateTable<HealthRegenTimer>(REMOTE_MODULE.tables.health_regen_timer));
   }
 
   get impAttackScheduler(): ImpAttackSchedulerTableHandle {
