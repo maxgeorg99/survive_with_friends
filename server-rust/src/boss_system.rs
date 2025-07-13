@@ -99,7 +99,8 @@ pub fn schedule_boss_spawn(ctx: &ReducerContext) {
     
     // Randomly select boss type when first scheduling the boss spawn
     let mut rng = ctx.rng();
-    let selected_boss_type = if rng.gen_bool(0.33) { BossType::Ender } else if rng.gen_bool(0.5) { BossType::Agna } else { BossType::Simon };
+    //let selected_boss_type = if rng.gen_bool(0.33) { BossType::Ender } else if rng.gen_bool(0.5) { BossType::Agna } else { BossType::Simon };
+    let selected_boss_type = if rng.gen_bool(0.5) { BossType::Ender } else { BossType::Agna }; // For now, only Ender and Agna are available
     let boss_name = match selected_boss_type {
         BossType::Ender => "Ender",
         BossType::Agna => "Agna",
