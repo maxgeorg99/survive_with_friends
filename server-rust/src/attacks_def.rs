@@ -268,7 +268,7 @@ pub fn init_attack_data(ctx: &ReducerContext) {
         fire_delay: 0,
         speed: 0.0,
         piercing: true,
-        radius: 65.0,
+        radius: 100.0,
         damage: 1,
         armor_piercing: 1,
     });

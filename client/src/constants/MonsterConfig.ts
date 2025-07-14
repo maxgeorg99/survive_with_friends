@@ -127,6 +127,8 @@ export const MONSTER_SHADOW_SCALE: Record<string, number> = {
     "BossEnderPhase2": 6.5,
     "BossAgnaPhase1": 1.9,   // Slightly smaller than Ender Phase 1
     "BossAgnaPhase2": 6.2,   // Slightly smaller than Ender Phase 2
+    "BossSimonPhase1": 2.0, // Placeholder for Simon Phase 1
+    "BossSimonPhase2": 6.5, // Placeholder for Simon Phase 2
     "AgnaCandle": 1.0,    // Normal scale for medium candle
     "VoidChest": 2.75,
     "EnderClaw": 1.1,  // Slightly larger shadow for aggressive creature

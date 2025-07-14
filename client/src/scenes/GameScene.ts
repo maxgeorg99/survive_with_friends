@@ -23,6 +23,7 @@ import { DebugManager } from '../managers/DebugManager'; // Added import for Deb
 import GameplayOptionsUI from '../ui/GameplayOptionsUI';
 import { getSoundVolume } from '../managers/VolumeSettings';
 import { getPlayerShadowConfig, getPlayerClassName } from '../constants/PlayerCharacterConfig';
+import StatsUpgradesUI from '../ui/StatsUi';
 
 // Constants
 const PLAYER_SPEED = 200;
@@ -164,6 +165,9 @@ export default class GameScene extends Phaser.Scene {
 
     // Add Options UI for settings
     private optionsUI: GameplayOptionsUI | null = null;
+
+    // Add Options UI for settings
+    private statsUI: StatsUpgradesUI | null = null;
 
     // Track if player damage sound is currently playing
     private isPlayerDamageSoundPlaying: boolean = false;
@@ -549,6 +553,7 @@ export default class GameScene extends Phaser.Scene {
 
         // Initialize Options UI for settings
         this.optionsUI = new GameplayOptionsUI(this);
+        //this.statsUI = new StatsUpgradesUI(this);
 
         // Add key listener for toggling options menu
         this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.O).on('down', () => {
@@ -2233,6 +2238,11 @@ export default class GameScene extends Phaser.Scene {
         if (this.optionsUI) {
             this.optionsUI.destroy();
             this.optionsUI = null;
+        }
+
+        if (this.statsUI) {
+            this.statsUI.destroy();
+            this.statsUI = null;
         }
         
         // DEFENSIVE CLEANUP: Remove any lingering game objects that might persist between scenes

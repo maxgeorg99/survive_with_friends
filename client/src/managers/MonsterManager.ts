@@ -104,7 +104,8 @@ export default class MonsterManager {
     // Helper functions for boss type checking
     private isBoss(monsterType: string): boolean {
         return monsterType === 'BossEnderPhase1' || monsterType === 'BossEnderPhase2' ||
-               monsterType === 'BossAgnaPhase1' || monsterType === 'BossAgnaPhase2';
+               monsterType === 'BossAgnaPhase1' || monsterType === 'BossAgnaPhase2' || 
+               monsterType === 'BossSimonPhase1' || monsterType === 'BossSimonPhase2';
     }
 
     private isBossPhase1(monsterType: string): boolean {
@@ -862,10 +863,12 @@ export default class MonsterManager {
             case 9: return "BossEnderPhase2";
             case 10: return "BossAgnaPhase1";
             case 11: return "BossAgnaPhase2";
-            case 12: return "AgnaCandle";
-            case 13: return "Crate";
-            case 14: return "Tree";
-            case 15: return "Statue";
+            case 12: return "BossSimonPhase1";
+            case 13: return "BossSimonPhase2";
+            case 14: return "AgnaCandle";
+            case 15: return "Crate";
+            case 16: return "Tree";
+            case 17: return "Statue";
             default: 
                 console.warn(`Unknown monster type: ${bestiaryId}`);
                 return "Unknown";
