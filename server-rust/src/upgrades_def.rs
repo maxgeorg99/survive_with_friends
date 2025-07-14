@@ -1,5 +1,5 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, ScheduleAt, SpacetimeType, rand::Rng};
-use crate::{AttackType, Player, account, attack_data, active_attacks, entity, game_state, monsters, monsters_boid, gems, monster_spawners, boss_spawn_timer, monster_spawn_timer, monster_hit_cleanup, active_attack_cleanup, attack_burst_cooldowns, player_scheduled_attacks, monster_damage, player, WORLD_CELL_SIZE};
+use crate::{AttackType, Player, account, attack_data, active_attacks, entity, game_state, monsters, monsters_boid, gems, monster_spawners, boss_spawn_timer, monster_spawn_timer, monster_hit_cleanup, active_attack_cleanup, attack_burst_cooldowns, player_scheduled_attacks, monster_damage, player, WORLD_CELL_SIZE, PlayerClass};
 use std::time::Duration;
 
 // Maximum radius limit to prevent breaking spatial hash collision system
@@ -18,6 +18,12 @@ pub enum UpgradeType {
     AttackShield,
     AttackThunderHorn,
     AttackAngelStaff,
+    AttackFootball,
+    AttackCards,
+    AttackDumbbell,
+    AttackGarlic,
+    AttackVolleyball,
+    AttackJoint,
 }
 
 // Attack stat enum for upgrades
@@ -90,7 +96,7 @@ pub fn draw_upgrade_options(ctx: &ReducerContext, player_id: u32) {
     }
 
     // Create a list of all upgrade types
-    let all_upgrade_types = vec![
+    let mut all_upgrade_types = vec![
         UpgradeType::MaxHp,
         UpgradeType::HpRegen,
         UpgradeType::Speed,
@@ -102,6 +108,23 @@ pub fn draw_upgrade_options(ctx: &ReducerContext, player_id: u32) {
         UpgradeType::AttackThunderHorn,
         UpgradeType::AttackAngelStaff,
     ];
+
+    let player_class = ctx.db.player()
+        .player_id()
+        .find(&player_id)
+        .map(|p| p.player_class);
+
+    if let Some(class) = player_class {
+        match class {
+            PlayerClass::Football => all_upgrade_types.push(UpgradeType::AttackFootball),
+            PlayerClass::Gambler => all_upgrade_types.push(UpgradeType::AttackCards),
+            PlayerClass::Athlete => all_upgrade_types.push(UpgradeType::AttackDumbbell),
+            PlayerClass::Gourmand => all_upgrade_types.push(UpgradeType::AttackGarlic),
+            PlayerClass::Volleyball => all_upgrade_types.push(UpgradeType::AttackVolleyball),
+            PlayerClass::Stoner => all_upgrade_types.push(UpgradeType::AttackJoint),
+            _ => {}
+        }
+    }
     
     // Shuffle the list randomly using Fisher-Yates algorithm
     let mut rng = ctx.rng();
@@ -134,7 +157,10 @@ fn create_upgrade_option_data(ctx: &ReducerContext, upgrade_type: UpgradeType, p
     let is_attack_upgrade = match upgrade_type {
         UpgradeType::AttackSword | UpgradeType::AttackWand | 
         UpgradeType::AttackKnives | UpgradeType::AttackShield |
-        UpgradeType::AttackThunderHorn | UpgradeType::AttackAngelStaff => true,
+        UpgradeType::AttackThunderHorn | UpgradeType::AttackAngelStaff |
+        UpgradeType::AttackFootball | UpgradeType::AttackCards |
+        UpgradeType::AttackDumbbell | UpgradeType::AttackGarlic |
+        UpgradeType::AttackVolleyball | UpgradeType::AttackJoint => true, 
         _ => false,
     };
 
@@ -304,6 +330,71 @@ fn create_upgrade_option_data(ctx: &ReducerContext, upgrade_type: UpgradeType, p
                 (AttackStat::Radius, 48),            // Good radius increase since it can exceed limits
             ];
             generate_attack_upgrade(ctx, player_id, 6, possible_stats, upgrade_type)
+        }
+        UpgradeType::AttackFootball => {
+            // Generate football-specific stat upgrade
+            let possible_stats = vec![
+                (AttackStat::Damage, 3),
+                (AttackStat::CooldownReduction, 20),
+                (AttackStat::Speed, 150),
+                (AttackStat::Radius, 5)
+            ];
+            generate_attack_upgrade(ctx, player_id, 5, possible_stats, upgrade_type)
+        }
+        
+        UpgradeType::AttackCards => {
+            // Generate cards-specific stat upgrade
+            let possible_stats = vec![
+                (AttackStat::Damage, 2),
+                (AttackStat::CooldownReduction, 15),
+                (AttackStat::Projectiles, 3),
+                (AttackStat::Speed, 120)
+            ];
+            generate_attack_upgrade(ctx, player_id, 6, possible_stats, upgrade_type)
+        }
+        
+        UpgradeType::AttackDumbbell => {
+            // Generate dumbbell-specific stat upgrade
+            let possible_stats = vec![
+                (AttackStat::Damage, 4),
+                (AttackStat::CooldownReduction, 25),
+                (AttackStat::Radius, 6),
+                (AttackStat::Speed, 80)
+            ];
+            generate_attack_upgrade(ctx, player_id, 7, possible_stats, upgrade_type)
+        }
+        
+        UpgradeType::AttackGarlic => {
+            // Generate garlic-specific stat upgrade
+            let possible_stats = vec![
+                (AttackStat::Damage, 2),
+                (AttackStat::CooldownReduction, 20),
+                (AttackStat::Radius, 8),
+                (AttackStat::Speed, 60)
+            ];
+            generate_attack_upgrade(ctx, player_id, 8, possible_stats, upgrade_type)
+        }
+        
+        UpgradeType::AttackVolleyball => {
+            // Generate volleyball-specific stat upgrade
+            let possible_stats = vec![
+                (AttackStat::Damage, 3),
+                (AttackStat::CooldownReduction, 18),
+                (AttackStat::Speed, 200),
+                (AttackStat::Projectiles, 2)
+            ];
+            generate_attack_upgrade(ctx, player_id, 9, possible_stats, upgrade_type)
+        }
+        
+        UpgradeType::AttackJoint => {
+            // Generate joint-specific stat upgrade
+            let possible_stats = vec![
+                (AttackStat::Damage, 2),
+                (AttackStat::CooldownReduction, 30),
+                (AttackStat::Radius, 10),
+                (AttackStat::Speed, 40)
+            ];
+            generate_attack_upgrade(ctx, player_id, 10, possible_stats, upgrade_type)
         }
     }
 }
@@ -744,6 +835,12 @@ fn get_attack_type_from_upgrade(upgrade_type: &UpgradeType) -> AttackType {
         UpgradeType::AttackShield => AttackType::Shield,
         UpgradeType::AttackThunderHorn => AttackType::ThunderHorn,
         UpgradeType::AttackAngelStaff => AttackType::AngelStaff,
+        UpgradeType::AttackFootball => AttackType::Football,
+        UpgradeType::AttackCards => AttackType::Cards,
+        UpgradeType::AttackDumbbell => AttackType::Dumbbell,
+        UpgradeType::AttackGarlic => AttackType::Garlic,
+        UpgradeType::AttackVolleyball => AttackType::Volleyball,
+        UpgradeType::AttackJoint => AttackType::Joint,
         _ => panic!("Cannot convert upgrade type {:?} to attack type", upgrade_type),
     }
 }

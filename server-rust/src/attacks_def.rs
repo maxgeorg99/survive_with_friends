@@ -882,6 +882,14 @@ pub fn process_attack_movements(ctx: &ReducerContext) {
                 }
             }
         } else {
+            if updated_active_attack.attack_type == AttackType::Dumbbell {
+                let gravity = 4.0f32; // Even lighter gravity for slower fall
+                // Apply gravity to the vertical component of direction
+                updated_entity.direction = DbVector2::new(
+                    updated_entity.direction.x,
+                    updated_entity.direction.y + (gravity * DELTA_TIME)
+                );
+            }
             // Regular projectile movement based on direction and speed
             let move_speed = attack_data.speed;
             
@@ -909,7 +917,7 @@ pub fn process_attack_movements(ctx: &ReducerContext) {
                     // If monster is hit by football
                     if distance_squared <= radius_sum * radius_sum {
                         // Apply knockback in the football's direction
-                        let knockback_strength = 10.0;
+                        let knockback_strength = 2.0;
                         let monster_id = cache.monster.keys_monster[mid];
                         
                         // Update monster position in boids table

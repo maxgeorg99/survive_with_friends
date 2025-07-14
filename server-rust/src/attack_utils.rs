@@ -158,7 +158,7 @@ pub fn determine_attack_direction(
             // Dumbbells start with a strong upward motion
             let mut rng = ctx.rng();
             let y_offset = -4.0;
-            let x_offset = (rng.gen::<f64>() - 0.5) * 1.0; // gen::<f64>() returns num in [0.0, 1.0)
+            let x_offset = (rng.gen::<f64>() - 0.5) * 1.0;
             DbVector2::new(x_offset as f32, y_offset as f32).normalize()
         }
         AttackType::Shield | AttackType::Garlic => {
