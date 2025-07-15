@@ -21,6 +21,7 @@ import Minimap, { MinimapElements } from '../ui/Minimap';
 import MusicManager from '../managers/MusicManager';
 import { DebugManager } from '../managers/DebugManager'; // Added import for DebugManager
 import GameplayOptionsUI from '../ui/GameplayOptionsUI';
+import CurseUI from '../ui/CurseUI';
 import { getSoundVolume } from '../managers/VolumeSettings';
 import { getPlayerShadowConfig, getPlayerClassName } from '../constants/PlayerCharacterConfig';
 import StatsUpgradesUI from '../ui/StatsUI';
@@ -165,6 +166,9 @@ export default class GameScene extends Phaser.Scene {
 
     // Add Options UI for settings
     private optionsUI: GameplayOptionsUI | null = null;
+
+    // Add Curse UI for curse display and management
+    private curseUI: CurseUI | null = null;
 
     // Add Options UI for settings
     private statsUI: StatsUpgradesUI | null = null;
@@ -312,7 +316,11 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('void_arrow', '/assets/void_arrow.png');
         
         // Load Soul UI assets
+        this.load.audio('movement_command', '/assets/sounds/move_command.mp3');
         this.load.image('soul_arrow', '/assets/soul_arrow.png');
+        
+        // Load Curse UI assets
+        this.load.image('curse_card', '/assets/curse_card.png');
         
         // Load a white pixel for particle effects
         this.load.image('white_pixel', '/assets/white_pixel.png');
@@ -556,6 +564,9 @@ export default class GameScene extends Phaser.Scene {
 
         // Initialize Options UI for settings
         this.optionsUI = new GameplayOptionsUI(this);
+
+        // Initialize Curse UI for curse display and management
+        this.curseUI = new CurseUI(this, this.spacetimeDBClient);
         //this.statsUI = new StatsUpgradesUI(this);
 
         // Add key listener for toggling options menu
@@ -1244,8 +1255,12 @@ export default class GameScene extends Phaser.Scene {
                 if (currentHp !== undefined && player.hp < currentHp) {
                     createPlayerDamageEffect(this.localPlayerSprite);
                     
-                    // Play player damage sound (only if not already playing)
-                    if (!this.isPlayerDamageSoundPlaying) {
+                    // Calculate damage amount to check if it's from negative health regen
+                    const damageAmount = currentHp - player.hp;
+                    const isNegativeRegenDamage = Math.abs(damageAmount - 4.953) < 0.01; // Allow small floating point tolerance
+                    
+                    // Play player damage sound (only if not already playing and not from negative regen)
+                    if (!this.isPlayerDamageSoundPlaying && !isNegativeRegenDamage) {
                         this.isPlayerDamageSoundPlaying = true;
                         
                         // Use SoundManager for consistent volume control
@@ -2242,6 +2257,12 @@ export default class GameScene extends Phaser.Scene {
             this.optionsUI.destroy();
             this.optionsUI = null;
         }
+        
+        // Clean up Curse UI
+        if (this.curseUI) {
+            this.curseUI.destroy();
+            this.curseUI = null;
+        }
 
         if (this.statsUI) {
             this.statsUI.destroy();
@@ -2885,6 +2906,11 @@ export default class GameScene extends Phaser.Scene {
         // Update MonsterCounterUI position when screen resizes
         if (this.monsterCounterUI) {
             this.monsterCounterUI.updatePosition();
+        }
+        
+        // Update CurseUI position when screen resizes
+        if (this.curseUI) {
+            this.curseUI.updatePosition();
         }
     }
 

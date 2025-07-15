@@ -1,6 +1,9 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, ScheduleAt, SpacetimeType};
 use crate::{DbVector2, AttackType, Entity, DELTA_TIME, get_world_cell_from_position, spatial_hash_collision_checker,
            WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT, entity, monster_damage, monsters_boid};
+use crate::player_def::player;
+use crate::monsters_def::monsters;
+use crate::monsters_def::monsters_boid;
 use std::f64::consts::PI;
 use std::time::Duration;
 
@@ -337,78 +340,23 @@ fn trigger_attack_projectile(ctx: &ReducerContext, player_id: u32, attack_type: 
         }
     };
 
-    // Get player position from collision cache
-    let cache = crate::monsters_def::get_collision_cache();
-    let player_cache_idx = match cache.player.player_id_to_cache_index.get(&player_id) {
-        Some(&idx) => idx as usize,
+    // Get player data directly from database (reused for entity lookup and PvP status)
+    let player_data = match ctx.db.player().player_id().find(&player_id) {
+        Some(player) => player,
         None => {
-            log::error!("Player {} not found in collision cache", player_id);
+            log::error!("Player {} not found in database", player_id);
             return;
         }
     };
     
-    let player_x = cache.player.pos_x_player[player_cache_idx];
-    let player_y = cache.player.pos_y_player[player_cache_idx];
+    let player_x = player_data.position.x;
+    let player_y = player_data.position.y;
     
     // Special handling for Angel Staff - instant area damage without projectiles
     if attack_type == AttackType::AngelStaff {
-        
-        // Apply instant damage to all enemies within radius
-        let player_position = DbVector2::new(player_x, player_y);
+        // Apply instant damage to all monsters within radius
+        let player_position = player_data.position;
         let damage_radius_squared = scheduled_attack.radius * scheduled_attack.radius;
-        
-        // Count enemies hit for logging
-        let mut enemies_hit = 0;
-        
-        // Get the collision cache to access cached monster data
-        let cache = crate::monsters_def::get_collision_cache();
-        
-        // Check all cached monsters within radius and apply damage directly
-        for mid in 0..cache.monster.cached_count_monsters as usize {
-            let monster_x = cache.monster.pos_x_monster[mid];
-            let monster_y = cache.monster.pos_y_monster[mid];
-            let dx = monster_x - player_position.x;
-            let dy = monster_y - player_position.y;
-            let distance_squared = dx * dx + dy * dy;
-            
-            if distance_squared <= damage_radius_squared {
-                let monster_id = cache.monster.keys_monster[mid];
-                // Apply damage directly since we're outside the main update loop
-                crate::core_game::damage_monster(ctx, monster_id, scheduled_attack.damage);
-                enemies_hit += 1;
-            }
-        }
-        
-        // Get the attacking player's PvP status from cache
-        let attacker_pvp_enabled = if let Some(&cache_idx) = cache.player.player_id_to_cache_index.get(&player_id) {
-            cache.player.pvp_player[cache_idx as usize]
-        } else {
-            false
-        };
-        
-        // Check all other players within radius if PvP is enabled
-        if attacker_pvp_enabled {
-            for pid in 0..cache.player.cached_count_players as usize {
-                let target_player_id = cache.player.keys_player[pid];
-                
-                // Skip the attacking player
-                if target_player_id == player_id {
-                    continue;
-                }
-                
-                let target_x = cache.player.pos_x_player[pid];
-                let target_y = cache.player.pos_y_player[pid];
-                let dx = target_x - player_position.x;
-                let dy = target_y - player_position.y;
-                let distance_squared = dx * dx + dy * dy;
-                
-                if distance_squared <= damage_radius_squared {
-                    // Apply damage directly since we're outside the main update loop
-                    crate::core_game::damage_player(ctx, target_player_id, scheduled_attack.damage as f32);
-                    enemies_hit += 1;
-                }
-            }
-        }
         
         // Create a temporary visual effect entity for the client to display
         let visual_entity = ctx.db.entity().insert(Entity {
@@ -440,6 +388,53 @@ fn trigger_attack_projectile(ctx: &ReducerContext, player_id: u32, attack_type: 
             active_attack_id: active_attack.active_attack_id,
             scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(scheduled_attack.duration as u64)),
         });
+
+        // Apply damage to other players if PvP is enabled
+        let attacker_pvp_enabled = player_data.pvp;
+        if attacker_pvp_enabled {
+            for target_player in ctx.db.player().iter() {
+                // Skip self
+                if target_player.player_id == player_id {
+                    continue;
+                }
+                
+                let target_position = target_player.position;
+                
+                // Calculate distance squared
+                let dx = player_position.x - target_position.x;
+                let dy = player_position.y - target_position.y;
+                let distance_squared = dx * dx + dy * dy;
+                
+                // If target is within damage radius, apply damage
+                if distance_squared <= damage_radius_squared {
+                    crate::core_game::damage_player(ctx, target_player.player_id, scheduled_attack.damage as f32);
+                }
+            }
+        }
+
+        //Evaluate last in case the boss is dying!
+        for monster in ctx.db.monsters().iter() {
+            // Get monster position from boid data, fallback to spawn position
+            let monster_position = if let Some(boid) = ctx.db.monsters_boid().monster_id().find(&monster.monster_id) {
+                boid.position
+            } else {
+                monster.spawn_position
+            };
+            
+            // Calculate distance squared
+            let dx = player_position.x - monster_position.x;
+            let dy = player_position.y - monster_position.y;
+            let distance_squared = dx * dx + dy * dy;
+            
+            // If monster is within damage radius, apply damage
+            if distance_squared <= damage_radius_squared {
+                let boss_defeated = crate::core_game::damage_monster(ctx, monster.monster_id, scheduled_attack.damage);
+                if boss_defeated {
+                    log::info!("Boss defeated by angel staff");
+                    return;
+                }
+            }
+        }
         
         return; // Early return - don't create normal projectile
     }
@@ -604,8 +599,10 @@ pub fn server_trigger_attack(ctx: &ReducerContext, mut attack: PlayerScheduledAt
         trigger_attack_projectile(ctx, player_id, attack.attack_type.clone(), 0, attack.parameter_u, attack.parameter_i);
     }
 
-    // Update the scheduled attack in the database
-    ctx.db.player_scheduled_attacks().scheduled_id().update(attack);
+    // Update the scheduled attack in the database (if it still exists)
+    if ctx.db.player_scheduled_attacks().scheduled_id().find(&attack.scheduled_id).is_some() {
+        ctx.db.player_scheduled_attacks().scheduled_id().update(attack);
+    }
 }
 
 // Helper method to schedule attacks for a player

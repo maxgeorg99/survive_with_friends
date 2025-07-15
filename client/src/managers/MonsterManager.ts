@@ -28,6 +28,14 @@ const SHINY_PARTICLE_SCALE = { start: 0.4, end: 0 };
 const SHINY_PARTICLE_COLORS = [0xffffff, 0xcccccc, 0x999999]; // White to light gray gradient
 const SHINY_COLOR_SHIFT = 0xffffff; // White tint for shiny monsters
 
+// Constants for cursed monster effects
+const CURSED_PARTICLE_LIFESPAN = 800;
+const CURSED_PARTICLE_SPEED = { min: 15, max: 40 };
+const CURSED_PARTICLE_SCALE = { start: 0.3, end: 0 };
+const CURSED_COLOR_SHIFT = 0x8E24AA; // Medium purple tint for cursed monsters (lighter than before)
+const CURSED_PARTICLE_COLORS = [0x6A1B9A, 0x8E24AA, 0xAB47BC]; // Medium purple gradient
+const CURSED_FLAME_COLORS = [0x4A148C, 0x6A1B9A, 0x8E24AA]; // Medium purple flame colors
+
 // Base monster sizes from bestiary for shiny scaling
 const MONSTER_BASE_SIZES: { [key: string]: number } = {
     "Rat": 24.0,
@@ -354,6 +362,96 @@ export default class MonsterManager {
                 }
             }
             
+            // If this is a cursed monster, add dark purple visual effects
+            if (monsterData.variant.tag === 'Cursed') {
+                console.log(`Creating cursed monster effects for ${monsterTypeName} (ID: ${monsterData.monsterId})`);
+                
+                // Add dark purple tint and slightly enhanced visibility
+                sprite.setTint(CURSED_COLOR_SHIFT); // Dark purple base
+                sprite.setAlpha(1.1); // Slightly more visible than normal
+                
+                // Create dark flame particle emitter for cursed effect
+                // Calculate particle area based on monster radius
+                const particleRadius = Math.max(monsterData.radius * 0.8, 20); // Use 80% of monster radius, min 20px
+                
+                const cursedParticles = this.scene.add.particles(0, 0, 'white_pixel', {
+                    speed: CURSED_PARTICLE_SPEED,
+                    scale: CURSED_PARTICLE_SCALE,
+                    blendMode: Phaser.BlendModes.ADD, // Changed from MULTIPLY to make particles visible
+                    lifespan: CURSED_PARTICLE_LIFESPAN,
+                    tint: CURSED_FLAME_COLORS,
+                    quantity: 2, // Increase quantity for better visibility  
+                    frequency: 120, // Slightly more frequent
+                    emitting: true,
+                    gravityY: -25, // Stronger upward flame movement
+                    alpha: { start: 0.8, end: 0.2 }, // Better alpha fade for visibility
+                    x: { min: -particleRadius, max: particleRadius }, // Spread particles horizontally
+                    y: { min: -particleRadius, max: particleRadius }  // Spread particles vertically
+                });
+                cursedParticles.setDepth(0.1); // Just above the sprite
+                container.add(cursedParticles);
+                
+                // Store the particle emitter for cleanup
+                container.setData('cursedParticles', cursedParticles);
+                
+                // Add a dark aura effect using a second sprite
+                const auraSprite = this.scene.add.sprite(0, 0, sprite.texture.key);
+                auraSprite.setTint(0x2E0854); // Darker purple for aura
+                auraSprite.setAlpha(0.15);
+                auraSprite.setScale(sprite.scaleX * 1.15, sprite.scaleY * 1.15); // Slightly larger for aura
+                auraSprite.setBlendMode(Phaser.BlendModes.MULTIPLY);
+                auraSprite.setDepth(sprite.depth - 1);
+                container.add(auraSprite);
+                
+                // Store the aura sprite for cleanup
+                container.setData('cursedAura', auraSprite);
+                
+                // Create a pulsing dark aura effect
+                const auraTween = this.scene.tweens.add({
+                    targets: auraSprite,
+                    alpha: 0.25,
+                    scaleX: auraSprite.scaleX * 0.95,
+                    scaleY: auraSprite.scaleY * 0.95,
+                    duration: 800,
+                    ease: 'Sine.easeInOut',
+                    yoyo: true,
+                    repeat: -1
+                });
+                
+                // Store the tween for cleanup
+                container.setData('cursedAuraTween', auraTween);
+                
+                // Get base radius from hardcoded values for cursed scaling
+                const baseRadius = MONSTER_BASE_SIZES[monsterTypeName];
+                if (baseRadius) {
+                    // Calculate scale based on ratio of current radius to base radius
+                    const scaleRatio = monsterData.radius / baseRadius;
+                    console.log(`Cursed monster ${monsterData.monsterId} (${monsterTypeName})`);
+                    console.log(`- Current radius: ${monsterData.radius}`);
+                    console.log(`- Base radius: ${baseRadius}`);
+                    console.log(`- Scale ratio: ${scaleRatio}`);
+                    
+                    // Apply scale to both sprite and shadow
+                    sprite.setScale(scaleRatio);
+                    shadow.setScale((MONSTER_SHADOW_SCALE[monsterTypeName] || 1.0) * scaleRatio);
+                    
+                    // Adjust shadow position to account for scaling and sprite offset
+                    const scaledShadowX = ((MONSTER_SHADOW_OFFSETS_X[monsterTypeName] || 0) + spriteOffsetX) * scaleRatio;
+                    const scaledShadowY = ((MONSTER_SHADOW_OFFSETS_Y[monsterTypeName] || 0) + spriteOffsetY) * scaleRatio;
+                    shadow.setPosition(scaledShadowX, scaledShadowY);
+                    
+                    // Update aura sprite scale to match
+                    auraSprite.setScale(scaleRatio * 1.15);
+                    
+                    // Log the final scale values
+                    console.log(`- Sprite scale: ${sprite.scaleX}`);
+                    console.log(`- Shadow scale: ${shadow.scaleX}`);
+                    console.log(`- Aura scale: ${auraSprite.scaleX}`);
+                } else {
+                    console.warn(`No base radius found for cursed monster type: ${monsterTypeName}`);
+                }
+            }
+            
             // Pre-calculate health bar position to avoid repeated calculations
             const healthBarY = -sprite.height/2 - MONSTER_HEALTH_BAR_OFFSET_Y;
             
@@ -532,6 +630,23 @@ export default class MonsterManager {
         if (glowTween) {
             glowTween.stop();
             glowTween.destroy();
+        }
+        
+        // Clean up cursed effects if present
+        const cursedParticles = monsterContainer.getData('cursedParticles');
+        if (cursedParticles) {
+            cursedParticles.destroy();
+        }
+        
+        const cursedAura = monsterContainer.getData('cursedAura');
+        if (cursedAura) {
+            cursedAura.destroy();
+        }
+        
+        const cursedAuraTween = monsterContainer.getData('cursedAuraTween');
+        if (cursedAuraTween) {
+            cursedAuraTween.stop();
+            cursedAuraTween.destroy();
         }
 
         // Destroy the container and remove from map

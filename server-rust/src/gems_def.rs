@@ -87,9 +87,41 @@ pub fn create_gem(ctx: &ReducerContext, position: DbVector2, level: GemLevel) ->
 
     let config = config.unwrap();
     let gem_radius = config.gem_radius;
+    
+    // Apply curse restrictions - convert special gems to normal gems when curses are active
+    let actual_level = match level {
+        GemLevel::Dice if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::NoDiceDrops) => {
+            // Convert dice to random normal gem
+            match ctx.rng().gen_range(0..4) {
+                0 => GemLevel::Small,
+                1 => GemLevel::Medium,
+                2 => GemLevel::Large,
+                _ => GemLevel::Huge,
+            }
+        },
+        GemLevel::Fries if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::NoFoodDrops) => {
+            // Convert food to random normal gem
+            match ctx.rng().gen_range(0..4) {
+                0 => GemLevel::Small,
+                1 => GemLevel::Medium,
+                2 => GemLevel::Large,
+                _ => GemLevel::Huge,
+            }
+        },
+        GemLevel::BoosterPack if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::NoBoosterPackDrops) => {
+            // Convert booster pack to random normal gem
+            match ctx.rng().gen_range(0..4) {
+                0 => GemLevel::Small,
+                1 => GemLevel::Medium,
+                2 => GemLevel::Large,
+                _ => GemLevel::Huge,
+            }
+        },
+        _ => level, // No curse active or not a restricted gem type
+    };
 
     // Calculate the gem value based on level
-    let gem_value = match level {
+    let gem_value = match actual_level {
         GemLevel::Small => config.exp_small_gem,
         GemLevel::Medium => config.exp_medium_gem,
         GemLevel::Large => config.exp_large_gem,
@@ -117,7 +149,7 @@ pub fn create_gem(ctx: &ReducerContext, position: DbVector2, level: GemLevel) ->
     let gem_opt = ctx.db.gems().insert(Gem {
         gem_id: 0,
         entity_id: gem_entity.entity_id,
-        level,
+        level: actual_level, // Use the curse-modified level
         value: gem_value,
     });
 
@@ -247,7 +279,12 @@ pub fn spawn_gem_on_monster_death(ctx: &ReducerContext, monster_id: u32, positio
     let bestiary_entry = bestiary_entry_opt.unwrap();
     let monster_tier = bestiary_entry.tier;
 
-    let drop_chance = 1.0; // Default 100% drop chance for now
+    // Check for MonstersDropFewerGems curse - reduces drop chance by 10%
+    let drop_chance = if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::MonstersDropFewerGems) {
+        0.9 // 90% drop chance when curse is active (10% chance of no drop)
+    } else {
+        1.0 // Default 100% drop chance
+    };
 
     // Roll for gem drop
     let mut rng = ctx.rng();
@@ -399,9 +436,11 @@ pub fn give_player_exp(ctx: &ReducerContext, player_id: u32, exp_amount: u32) {
         // Grant an unspent upgrade point for each level gained
         player.unspent_upgrades += levels_gained;
         
-        // Heal player to max HP when leveling up
+        // Heal player to max HP when leveling up (unless NoHealOnLevelUp curse is active)
         let old_hp = player.hp;
-        player.hp = player.max_hp;
+        if !crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::NoHealOnLevelUp) {
+            player.hp = player.max_hp;
+        }
 
         if prev_unspent_upgrades == 0 {
             // Draw upgrade options for the player

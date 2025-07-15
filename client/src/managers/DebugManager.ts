@@ -25,7 +25,7 @@ export class DebugManager {
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.T).on('down', this.triggerBossSpawnerTest, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.G).on('down', this.spawnDebugSpecialGem, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.V).on('down', this.spawnDebugVoidChest, this);
-            this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C).on('down', this.spawnDebugLootCapsule, this);
+            this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C).on('down', this.addRandomCurse, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E).on('down', this.spawnDebugLoreScroll, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P).on('down', this.enableBotPvp, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR).on('down', this.setBossTypeEnder, this);
@@ -34,6 +34,8 @@ export class DebugManager {
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.H).on('down', this.setSuperHealth, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S).on('down', this.saveBuild, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.L).on('down', this.loadBuild, this);
+            this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X).on('down', this.clearAllCurses, this);
+            this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Z).on('down', this.addDebugCurse, this);
             console.log("DebugManager: Debug keys initialized.");
         } else {
             console.warn("DebugManager: Keyboard input not available on scene. Debug keys not initialized.");
@@ -55,6 +57,8 @@ export class DebugManager {
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.H);
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.S);
             this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.L);
+            this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.X);
+            this.scene.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.Z);
         }
     }
 
@@ -100,12 +104,21 @@ export class DebugManager {
         }
     }
 
-    private spawnDebugLootCapsule(): void {
+    private addRandomCurse(): void {
         if (this.spacetimedb && this.spacetimedb.sdkConnection) {
-            console.log("DebugManager: Spawning debug LootCapsule near player...");
-            this.spacetimedb.sdkConnection.reducers.spawnDebugLootCapsule();
+            console.log("DebugManager: Adding random curse for testing...");
+            this.spacetimedb.sdkConnection.reducers.adminAddCurse();
         } else {
-            console.warn("DebugManager: SpacetimeDB connection or player position not available for spawning debug loot capsule.");
+            console.warn("DebugManager: SpacetimeDB connection not available for adding curse.");
+        }
+    }
+
+    private clearAllCurses(): void {
+        if (this.spacetimedb && this.spacetimedb.sdkConnection) {
+            console.log("DebugManager: Clearing all curses...");
+            this.spacetimedb.sdkConnection.reducers.adminClearCurses();
+        } else {
+            console.warn("DebugManager: SpacetimeDB connection not available for clearing curses.");
         }
     }
 
@@ -178,6 +191,15 @@ export class DebugManager {
             this.spacetimedb.sdkConnection.reducers.loadBuild();
         } else {
             console.warn("DebugManager: SpacetimeDB connection not available for loading build.");
+        }
+    }
+
+    private addDebugCurse(): void {
+        if (this.spacetimedb && this.spacetimedb.sdkConnection) {
+            console.log("DebugManager: Adding debug curse from test list...");
+            this.spacetimedb.sdkConnection.reducers.adminAddDebugCurse();
+        } else {
+            console.warn("DebugManager: SpacetimeDB connection not available for adding debug curse.");
         }
     }
 } 

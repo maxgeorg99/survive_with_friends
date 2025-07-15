@@ -158,7 +158,7 @@ export default class BossAgnaManager {
             return;
         }
         
-        //console.log("Magic circle updated:", oldCircle, "->", newCircle);
+        console.log("Magic circle updated:", oldCircle, "->", newCircle);
         this.updateMagicCirclePosition(newCircle);
     }
 

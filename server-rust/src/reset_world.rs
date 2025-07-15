@@ -2,7 +2,7 @@ use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp};
 use crate::{entity, monsters, monsters_boid, gems, monster_spawners, boss_spawn_timer, boss_phase_two_timer, game_state, monster_spawn_timer, monster_hit_cleanup, active_attack_cleanup, attack_burst_cooldowns, player_scheduled_attacks, monster_damage, player, upgrade_options, active_attacks, loot_capsule_defs, winner_transition_timer, dead_player_transition_timer, void_zone_scheduler, chaos_ball_scheduler, active_monster_attacks, agna_magic_circles, agna_fire_orb_scheduler, agna_delayed_orb_scheduler, agna_flamethrower_scheduler, agna_candle_spawns, agna_candle_scheduler, agna_candle_bolt_scheduler, agna_ritual_completion_check, agna_summoning_circle_spawner, agna_target_switch_scheduler, agna_phase2_flamethrower_scheduler, boss_agna_last_patterns};
 
 // ResetWorld reducer - clears all monsters, gems, monster spawners, and resets boss state
-// This should be called when the last player dies
+// This is called both when all players die (defeat) AND after victory cleanup
 #[reducer]
 pub fn reset_world(ctx: &ReducerContext) {
     log::info!("ResetWorld: Resetting game world after all players died");
@@ -297,8 +297,9 @@ pub fn reset_world(ctx: &ReducerContext) {
     // 17. Clean up lore scroll pickup records
     crate::lorescrolls_defs::clear_lore_scroll_pickups(ctx);
     
+    // Note: Curse clearing is handled separately - only on defeat (in damage_player), not on victory
     // Note: Monster spawning will be rescheduled when the first player joins
     // This ensures spawning only occurs when players are present
     
     log::info!("ResetWorld: Game world reset completed successfully");
-} 
+}

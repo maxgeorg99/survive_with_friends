@@ -187,26 +187,32 @@ pub fn trigger_structure_death_loot(ctx: &ReducerContext, monster: &crate::Monst
         }
     };
     
-    log::info!("{:?} destroyed! Spawning {} loot capsules at position ({:.1}, {:.1})", 
-              monster.bestiary_id, loot_count, structure_position.x, structure_position.y);
-    
-    // Spawn the loot capsules
-    for i in 0..loot_count {
-        // Use public function from loot_capsule_defs with appropriate radius
-        let gem_type = crate::loot_capsule_defs::select_weighted_gem_type(&mut ctx.rng());
+    // Check if NoStructureLoot curse is active
+    if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::NoStructureLoot) {
+        log::info!("{:?} destroyed! NoStructureLoot curse active - no loot capsules spawned at position ({:.1}, {:.1})", 
+                  monster.bestiary_id, structure_position.x, structure_position.y);
+    } else {
+        log::info!("{:?} destroyed! Spawning {} loot capsules at position ({:.1}, {:.1})", 
+                  monster.bestiary_id, loot_count, structure_position.x, structure_position.y);
         
-        if i == 0 {
-            log::debug!("First structure loot capsule: {:?} gem", gem_type);
+        // Spawn the loot capsules
+        for i in 0..loot_count {
+            // Use public function from loot_capsule_defs with appropriate radius
+            let gem_type = crate::loot_capsule_defs::select_weighted_gem_type(&mut ctx.rng());
+            
+            if i == 0 {
+                log::debug!("First structure loot capsule: {:?} gem", gem_type);
+            }
+            
+            // Use smaller radius for structure loot to keep it close
+            crate::loot_capsule_defs::spawn_loot_capsule_in_radius(
+                ctx, 
+                structure_position, 
+                32.0,  // Min radius - close to structure
+                96.0,  // Max radius - moderate spread
+                gem_type
+            );
         }
-        
-        // Use smaller radius for structure loot to keep it close
-        crate::loot_capsule_defs::spawn_loot_capsule_in_radius(
-            ctx, 
-            structure_position, 
-            32.0,  // Min radius - close to structure
-            96.0,  // Max radius - moderate spread
-            gem_type
-        );
     }
     
     // Special handling for Statue structures - also spawn a lore scroll

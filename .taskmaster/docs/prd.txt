@@ -1,0 +1,258 @@
+# Vibe Survivors - Product Requirements Document
+
+## Project Overview
+
+**Game Title:** Vibe Survivors  
+**Genre:** Real-time Multiplayer Survival Action  
+**Platform:** Web Browser (TypeScript/Phaser client, Rust/SpacetimeDB server)  
+**Target Audience:** Fans of Vampire Survivors-style games, multiplayer survival games  
+**Current Status:** Core mechanics implemented, seeking expansion and enhancement  
+
+## Executive Summary
+
+Vibe Survivors is a real-time multiplayer survival game where players choose from multiple character classes, survive increasingly difficult waves of monsters, level up through experience collection, upgrade their abilities, and face challenging boss encounters. The game features both cooperative PvE and optional PvP gameplay modes with a polished progression system.
+
+## Core Game Loop
+
+1. **Character Creation**: Players enter their name and select from 6 available classes
+2. **Survival Phase**: Players move around the game world, automatically attacking nearby enemies
+3. **Progression**: Defeat monsters to gain experience gems, level up, and choose upgrades
+4. **Boss Encounters**: Periodic boss fights with unique mechanics and multiple phases
+5. **Victory/Defeat**: Players either defeat the final boss (victory) or are overwhelmed (death)
+
+## Current Game Systems
+
+### Character Classes
+- **Fighter**: Sword-based melee combat, AOE with high base damage, and scalable range. Attacks Horizontally.
+- **Rogue**: Knife-throwing assassin. Attacks with piercing projectiles around them.
+- **Mage**: Wand-wielding spellcaster with homing magical attacks.
+- **Paladin**: Shield-based tank with High Damage, Slow AOE at a target radius around them.
+- **Valkyrie**: Thunder Horn user with area-of-effect lightning attacks
+- **Priest**: Angel Staff user that does constant low-damage to nearby enemies.
+
+### Monster System
+**Tier-Based Spawning**: Monsters increase in difficulty over time through tier progression
+- **Tier 1 (Early)**: Rat, Slime, Bat
+- **Tier 2 (Mid)**: Bat, Orc, Imp, Zombie  
+- **Tier 3+ (Late)**: Imp, Zombie
+
+**Monster Types**:
+- Rat: Basic fast enemy
+- Slime: Slow but durable
+- Orc: Balanced threat
+- Imp: Ranged attacker with fireball abilities
+- Zombie: High health melee
+- Bat: Flying unit with hovering patterns
+- Void Claw: Special spawned by Ender boss
+- Various structure objects (Crates, Trees, Statues)
+
+**Monster Variants**:
+- Shiny: Rare spawns with huge stats, but bonus drops.
+- Cursed: Spawns with deadlier stats.
+
+### Boss System
+**Two Major Bosses** with multi-phase encounters:
+
+**Ender Boss**:
+- Phase 1: Chase, Bullet Hell Dance, and Teleport "nothin personel" attack.
+- Phase 2: Void Claw spawning, Chaos Ball attacks, Void Zones, target switching
+
+**Agna Boss**:
+- Phase 1: Fire-based attacks: Flamethrower, Flame Circle, and Deadly Candle Ritual
+- Phase 2: Flamethrower, Spawns Imps, spreading ground fire.
+
+**Boss Features**:
+- Timed spawning (every 5 minutes)
+- Dynamic AI with multiple attack patterns
+- Special visual effects and audio cues
+- World state changes during boss fights
+
+### Attack & Upgrade System
+**Weapon Types**:
+- Sword: High damage melee attacks. Horizontal. AOE.
+- Wand: Magical projectiles. Homing. Single Target.
+- Knives: Multi-projectile throwing weapons. Piercing. Circular.
+- Shield: Defensive spinning attacks. AOE.
+- Thunder Horn: Lightning area-of-effect. AOE.
+- Angel Staff: Chip damage to all nearby enemies. AOE.
+
+**Upgrade Categories**:
+- **Base Stats**: Max HP, HP Regeneration, Speed, Armor
+- **Attack Stats**: Damage, Cooldown Reduction, Projectile Count, Speed, Radius
+- **New Attacks**: Players can acquire additional weapon types
+
+### Progression System
+**Experience & Leveling**:
+- Gem collection system (Small, Medium, Large, Huge gems)
+- Level-based progression with exponential XP requirements
+- Upgrade points awarded per level
+
+**Special Items**:
+- Soul Gems: Created from player deaths, high XP value
+- Fries: Instant 100 HP healing
+- Dice: Extra reroll for upgrades
+- Booster Pack: Immediate upgrade point
+- Lore Scrolls: Instant level up (12 different types)
+
+### Multiplayer Features
+**Cooperative Play**:
+- Real-time multiplayer with shared world
+- Collaborative monster fighting
+- Shared boss encounters
+
+**PvP System**:
+- Optional player vs player combat
+- PvP indicator circles around players
+- Only PvP-enabled players can damage others
+- Minimap indicators for nearby PvP players
+
+### User Interface
+**Core UI Elements**:
+- Player HUD (health, experience, level)
+- Upgrade selection interface with hold-to-select mechanics
+- Boss timer display
+- Monster counter
+- Minimap with player/monster indicators
+- Void Chest directional guidance
+- Soul recovery assistance
+- Curse display system
+- Audio/video options menu
+
+### Technical Architecture
+**Client (TypeScript/Phaser)**:
+- Scene management (Title, Name Select, Class Select, Game, Dead, Victory)
+- Real-time rendering and animation
+- Input handling (keyboard, mouse, touch)
+- UI management and responsive design
+- Audio system with music and sound effects
+
+**Server (Rust/SpacetimeDB)**:
+- Real-time database with automatic synchronization
+- Server-authoritative game logic
+- Monster AI and behavior systems
+- Attack processing and collision detection
+- Boss mechanics and scheduling
+- Player progression and persistence
+
+## Current Features Status
+
+### ✅ Fully Implemented
+- 6 Character classes with unique abilities
+- Complete monster spawning and AI system
+- Two-phase boss encounters (Ender & Agna)
+- Experience and leveling system
+- Upgrade system with multiple stat types
+- Real-time multiplayer with SpacetimeDB
+- PvP toggle system
+- Complete UI suite
+- Audio system with music and effects
+- Responsive design for multiple screen sizes
+- Touch/mobile support
+
+### 🔄 Partially Implemented
+- Boss variety (2 bosses implemented, room for more)
+- Special item variety (basic set implemented)
+- Monster attack patterns (basic patterns implemented)
+- Curse system (framework exists)
+
+### ❌ Potential Expansion Areas
+- Additional character classes
+- More boss types with unique mechanics
+- Enhanced monster AI and behaviors
+- Guild/team systems
+- Leaderboards and statistics
+- Seasonal events or content
+- Item/equipment system beyond upgrades
+- Map varieties or biomes
+- Achievement system
+- Spectator mode
+- Tournament/competitive modes
+
+## Success Metrics
+
+### Player Engagement
+- Average session duration
+- Player retention rates (1-day, 7-day, 30-day)
+- Concurrent player count during peak hours
+- Boss encounter completion rates
+
+### Progression Metrics
+- Average level reached per session
+- Most popular character classes
+- Upgrade selection patterns
+- PvP participation rates
+
+### Technical Performance
+- Server response times and reliability
+- Client frame rate consistency
+- Network synchronization accuracy
+- Mobile device compatibility
+
+## Monetization Considerations (Future)
+- Cosmetic character skins
+- Seasonal battle passes
+- Additional character classes as DLC
+- Premium upgrade themes
+- Server hosting options for private groups
+
+## Development Priorities
+
+### Phase 1: Enhancement & Polish
+- Balance existing systems based on player feedback
+- Add more boss variety and mechanics
+- Expand curse system functionality
+- Improve mobile experience
+
+### Phase 2: Content Expansion  
+- New character classes and abilities
+- Additional monster types and behaviors
+- Map variety and environmental hazards
+- Guild/team features
+
+### Phase 3: Competitive Features
+- Ranked gameplay modes
+- Tournament systems
+- Advanced leaderboards
+- Spectator capabilities
+
+## Technical Requirements
+
+### Performance Targets
+- 60 FPS on desktop browsers
+- 30+ FPS on mobile devices
+- <100ms server response time
+- Support for 20+ concurrent players per instance
+
+### Browser Compatibility
+- Chrome, Firefox, Safari, Edge (latest 2 versions)
+- Mobile Safari and Chrome
+- WebGL support required
+
+### Server Infrastructure
+- SpacetimeDB hosting and scaling
+- Auto-scaling for player count
+- Data persistence and backup
+- Regional server support
+
+## Risk Assessment
+
+### Technical Risks
+- SpacetimeDB scaling limitations
+- Browser performance on older devices
+- Network synchronization challenges with high player counts
+
+### Design Risks  
+- Balancing PvP and PvE experiences
+- Progression pacing and player retention
+- Boss encounter difficulty tuning
+
+### Market Risks
+- Competition from established survival games
+- Player preference shifts in the genre
+- Mobile market adaptation challenges
+
+## Conclusion
+
+Vibe Survivors represents a solid foundation for a multiplayer survival game with strong technical architecture and engaging core mechanics. The current implementation provides an excellent baseline for expansion into additional content, competitive features, and platform optimization. The modular design and real-time multiplayer capabilities position the game well for both casual and competitive player bases.
+
+The next phase of development should focus on content expansion and player retention features while maintaining the smooth, responsive gameplay that characterizes the current experience. 

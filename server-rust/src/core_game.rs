@@ -47,7 +47,7 @@ fn cleanup_monster_damage_records(ctx: &ReducerContext, monster_id: u32) {
 }
 
 // Helper function to damage a monster
-// Returns true if the monster died, false otherwise
+// Returns true if the monster died was the final boss, false otherwise
 pub fn damage_monster(ctx: &ReducerContext, monster_id: u32, damage_amount: u32) -> bool {
     // Find the monster
     let monster_opt = ctx.db.monsters().monster_id().find(&monster_id);
@@ -154,7 +154,7 @@ pub fn damage_monster(ctx: &ReducerContext, monster_id: u32, damage_amount: u32)
                         log::info!("ERROR: Game state still shows phase 1 after transition!");
                     }
 
-                    return true;
+                    return false;
                 } else if game_state.boss_phase == 2 {
                     // Phase 2 boss defeated - VICTORY!
                     log::info!("BOSS PHASE 2 DEFEATED! GAME COMPLETE!");
@@ -175,6 +175,7 @@ pub fn damage_monster(ctx: &ReducerContext, monster_id: u32, damage_amount: u32)
                     // Handle boss defeated (true victory!)
                     crate::boss_system::handle_boss_defeated(ctx);
                     
+                    //Return true to signal that the boss was defeated
                     return true;
                 } else {
                     log::info!("WARNING: Boss killed but phase is unexpected: {}", game_state.boss_phase);
@@ -200,7 +201,7 @@ pub fn damage_monster(ctx: &ReducerContext, monster_id: u32, damage_amount: u32)
             ctx.db.monsters_boid().monster_id().delete(&monster_id);
         }
         
-        true
+        false
     } else {
         // Monster is still alive, update with reduced HP
         monster.hp -= damage_amount;
@@ -213,6 +214,20 @@ pub fn damage_monster(ctx: &ReducerContext, monster_id: u32, damage_amount: u32)
         
         false
     }
+}
+
+// Helper function to handle the scenario when all players have been defeated
+// This triggers the defeat condition and clears curses for a fresh start
+pub fn handle_all_players_defeated(ctx: &ReducerContext) {
+    log::info!("All players have been defeated! Triggering defeat condition...");
+    
+    // Clear all curses on defeat (fresh start for next run)
+    crate::curses_defs::clear_all_curses(ctx);
+    
+    // Reset the game world (cleanup monsters, gems, spawners, etc.)
+    crate::reset_world::reset_world(ctx);
+    
+    log::info!("World reset complete after all players defeated.");
 }
 
 //Helper function to damage a player
@@ -299,9 +314,8 @@ pub fn damage_player(ctx: &ReducerContext, player_id: u32, damage_amount: f32) -
         ctx.db.player().player_id().delete(&player_id);
         
         // Check if all players are now dead
-        if ctx.db.player().iter().count() == 0 {
-            log::info!("Last player has died! Resetting the game world...");
-            crate::reset_world::reset_world(ctx);
+        if ctx.db.player().count() == 0 {
+            handle_all_players_defeated(ctx);
         }
 
         true
@@ -595,6 +609,58 @@ pub fn game_tick(ctx: &ReducerContext, _timer: GameTickTimer) {
         scheduled_id: 0,
         scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(game_tick_rate as u64)),
     });
-}
 
-// Reducer to initialize the health regen system
+    // Early return if no players are online - skip all expensive game logic
+    let player_count = ctx.db.player().count();
+    if player_count == 0 {
+        // Log occasionally to show the server is still running but idle
+        if let Some(world) = ctx.db.world().world_id().find(&0) {
+            if world.tick_count % 1200 == 0 { // Every minute (1200 ticks at 20Hz)
+                log::info!("Server idle - no players online (tick {})", world.tick_count);
+            }
+        }
+        return;
+    }
+
+    clear_collision_cache_for_frame();
+
+    process_player_movement(ctx, tick_rate);
+
+    process_monster_movements(ctx);
+
+    process_attack_movements(ctx);
+
+    // Update Agna magic circles - only if Agna boss is active
+    if let Some(game_state) = ctx.db.game_state().id().find(&0) {
+        if game_state.boss_active && game_state.boss_type == crate::BossType::Agna {
+            let collision_cache = crate::monsters_def::get_collision_cache();
+            crate::boss_agna_defs::update_agna_magic_circles(ctx, collision_cache);
+            crate::boss_agna_defs::process_agna_ritual_complete_damage(ctx);
+        }
+    }
+
+    process_monster_attack_movements(ctx);
+
+    maintain_gems(ctx);
+
+    process_player_monster_collisions_spatial_hash(ctx);
+
+    process_player_attack_monster_collisions_spatial_hash(ctx);
+
+    process_monster_attack_collisions_spatial_hash(ctx);
+
+    process_player_attack_collisions_spatial_hash(ctx);
+
+    let _boss_defeated = crate::monsters_def::commit_monster_damage(ctx);
+    if _boss_defeated {
+        return;
+    }
+
+    // Apply negative health regeneration damage if curse is active
+    let mut collision_cache = crate::monsters_def::get_collision_cache();
+    crate::player_def::apply_negative_health_regen_damage(ctx, collision_cache);
+
+    commit_player_damage(ctx);
+
+    process_gem_collisions_spatial_hash(ctx);
+} 

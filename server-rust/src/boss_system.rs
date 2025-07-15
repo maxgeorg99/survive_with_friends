@@ -91,11 +91,17 @@ pub fn init_boss_selection(_ctx: &ReducerContext) {
     // It will be randomly selected in schedule_boss_spawn when the first player joins
 }
 
-// Schedule the boss to spawn after 5 minutes
+// Schedule the boss to spawn after 5 minutes (or 4.5 minutes with BossAppearsSooner curse)
 pub fn schedule_boss_spawn(ctx: &ReducerContext) {
-    const BOSS_SPAWN_DELAY_MS: u64 = 300_000; // 5 minutes in milliseconds
+    // Check for BossAppearsSooner curse to reduce boss spawn delay
+    let boss_spawn_delay_ms = if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::BossAppearsSooner) {
+        270_000 // 4.5 minutes when curse is active
+    } else {
+        300_000 // Normal 5 minutes
+    };
     
-    log::info!("Scheduling boss spawn in 5 minutes...");
+    let delay_minutes = boss_spawn_delay_ms as f32 / 60_000.0;
+    log::info!("Scheduling boss spawn in {:.1} minutes...", delay_minutes);
     
     // Randomly select boss type when first scheduling the boss spawn
     let mut rng = ctx.rng();
@@ -127,7 +133,7 @@ pub fn schedule_boss_spawn(ctx: &ReducerContext) {
     // Schedule the boss spawn timer
     ctx.db.boss_spawn_timer().insert(BossSpawnTimer {
         scheduled_id: 0,
-        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(BOSS_SPAWN_DELAY_MS)),
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(boss_spawn_delay_ms)),
         session_start_time: ctx.timestamp,
     });
     
@@ -168,6 +174,10 @@ pub fn spawn_boss_phase_one(ctx: &ReducerContext, _timer: BossSpawnTimer) {
     game_state.boss_active = true;
     game_state.boss_phase = 1;
     game_state.normal_spawning_paused = true;
+    let boss_type = ctx.db.boss_selection().id().find(&0)
+        .map(|selection| selection.boss_type)
+        .unwrap_or(BossType::Ender);
+    game_state.boss_type = boss_type;
     ctx.db.game_state().id().update(game_state);
     
     // Calculate position at center of map
@@ -252,15 +262,39 @@ pub fn spawn_boss_phase_two(ctx: &ReducerContext, position: DbVector2) {
     // Find the closest player to target
     let closest_player_id = crate::monsters_def::get_closest_player(ctx, &position);
     
+    // Apply boss stat modification curses for Phase 2 bosses
+    let mut final_hp = bestiary_entry.max_hp;
+    let mut final_max_hp = bestiary_entry.max_hp;
+    let mut final_atk = bestiary_entry.atk;
+    let mut final_speed = bestiary_entry.speed;
+    
+    // Apply DeadlierBosses curse modifications
+    if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::DeadlierBosses) {
+        final_hp = (final_hp as f32 * 2.0) as u32; // 2x HP
+        final_max_hp = (final_max_hp as f32 * 2.0) as u32; // 2x max HP
+        final_atk *= 1.5; // 1.5x damage
+        final_speed *= 1.2; // 1.2x speed
+        log::info!("DeadlierBosses curse applied to Phase 2 boss - HP: {}, ATK: {:.1}, Speed: {:.1}", final_hp, final_atk, final_speed);
+    }
+    
+    // Apply DeadlierBossesTwo curse modifications (stacks with first curse)
+    if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::DeadlierBossesTwo) {
+        final_hp = (final_hp as f32 * 2.0) as u32; // Additional 2x HP
+        final_max_hp = (final_max_hp as f32 * 2.0) as u32; // Additional 2x max HP
+        final_atk *= 1.5; // Additional 1.5x damage
+        final_speed *= 1.2; // Additional 1.2x speed
+        log::info!("DeadlierBossesTwo curse applied to Phase 2 boss - HP: {}, ATK: {:.1}, Speed: {:.1}", final_hp, final_atk, final_speed);
+    }
+    
     // Create the phase 2 boss monster
     let monster_opt = ctx.db.monsters().insert(crate::Monsters {
         monster_id: 0,
         bestiary_id: boss_monster_type,
         variant: crate::MonsterVariant::Default,
-        hp: bestiary_entry.max_hp,
-        max_hp: bestiary_entry.max_hp,
-        atk: bestiary_entry.atk,
-        speed: bestiary_entry.speed,
+        hp: final_hp,
+        max_hp: final_max_hp,
+        atk: final_atk,
+        speed: final_speed,
         target_player_id: closest_player_id,
         radius: bestiary_entry.radius,
         spawn_position: position.clone(),
@@ -374,6 +408,9 @@ pub fn handle_boss_defeated(ctx: &ReducerContext) {
     }
     
     log::info!("{} players marked as True Survivors and transitioned to Winner state!", true_survivors_count);
+    
+    // Add a new curse for increased difficulty in future runs
+    crate::curses_defs::add_random_curse(ctx);
     
     // Now that all players have been removed, call reset_world to clean up everything else
     // This will clean up all monsters, gems, spawners, attacks, cooldowns, etc.

@@ -270,6 +270,11 @@ export default class LoadingScene extends Phaser.Scene {
                     this.scene.start('VictoryScene');
                     break;
                     
+                case 'CurseCutscene':
+                    console.log("LoadingScene: Starting CurseVictoryScene");
+                    this.scene.start('CurseVictoryScene');
+                    break;
+                    
                 default:
                     console.warn("LoadingScene: Unknown account state:", accountState.tag);
                     // Default to title scene if state is unrecognized

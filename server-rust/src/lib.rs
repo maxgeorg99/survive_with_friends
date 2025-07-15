@@ -28,6 +28,7 @@ pub mod upgrades_def;
 pub mod structure_defs;
 pub mod lorescrolls_defs;
 pub mod cheats_def;
+pub mod curses_defs;
 
 // Re-export public items from modules
 pub use config_def::*;
@@ -56,6 +57,7 @@ pub use upgrades_def::*;
 pub use structure_defs::*;
 pub use lorescrolls_defs::*;
 pub use cheats_def::*;
+pub use curses_defs::*;
 
 // --- Types ---
 #[derive(SpacetimeType, Clone, Debug, PartialEq)]
@@ -82,6 +84,7 @@ pub enum AccountState {
     Playing,
     Dead,
     Winner,
+    CurseCutscene,
 }
 
 // Attack type enum
@@ -126,6 +129,7 @@ pub enum MonsterAttackType {
 pub enum MonsterVariant {
     Default,
     Shiny,
+    Cursed,
 }
 
 #[derive(SpacetimeType, Clone, Debug, PartialEq, Copy)]
@@ -226,8 +230,18 @@ pub struct DeadPlayerTransitionTimer {
 }
 
 // Timer for transitioning winner players back to character select  
-#[table(name = winner_transition_timer, scheduled(transition_winner_to_choosing_class))]
+#[table(name = winner_transition_timer, scheduled(transition_winner_to_curse_cutscene))]
 pub struct WinnerTransitionTimer {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    pub scheduled_at: ScheduleAt,
+    pub identity: Identity,  // Which player this timer is for
+}
+
+// Timer for transitioning from curse cutscene back to character select
+#[table(name = curse_transition_timer, scheduled(transition_curse_to_choosing_class))]
+pub struct CurseTransitionTimer {
     #[primary_key]
     #[auto_inc]
     pub scheduled_id: u64,
@@ -398,6 +412,9 @@ pub fn client_connected(ctx: &ReducerContext) {
             },
             AccountState::Winner => {
                 log::info!("Account {} reconnected in Winner state", identity);
+            },
+            AccountState::CurseCutscene => {
+                log::info!("Account {} reconnected in CurseCutscene state", identity);
             },
         }
     } else {
@@ -604,12 +621,25 @@ pub fn create_new_player_with_position(ctx: &ReducerContext, name: &str, player_
     let class_data = ctx.db.class_data().class_id().find(&(player_class.clone() as u32));
     
     // Define default stats in case class data isn't found
-    let (max_hp, armor, speed, starting_attack_type) = if let Some(class_data) = class_data {
+    let (base_max_hp, armor, base_speed, starting_attack_type) = if let Some(class_data) = class_data {
         (class_data.max_hp as f32, class_data.armor, class_data.speed, class_data.starting_attack_type)
     } else {
         log::error!("CreateNewPlayerWithPosition: No class data found for {:?}", player_class.clone());
         // Fall back to default values if class data not found
         (100.0, 0, PLAYER_SPEED, AttackType::Sword)
+    };
+    
+    // Apply curse modifications to starting stats
+    let max_hp = if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::PlayersStartLessHp) {
+        base_max_hp * 0.5 // 50% of normal HP when curse is active
+    } else {
+        base_max_hp // Normal HP from class data
+    };
+    
+    let speed = if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::PlayersStartLessSpeed) {
+        (base_speed as f32 * 0.9) as u32 // 90% of normal speed (10% reduction) when curse is active
+    } else {
+        base_speed as u32 // Normal speed from class data
     };
 
     let shield_count = if starting_attack_type == AttackType::Shield { 2 } else { 0 };
@@ -634,10 +664,14 @@ pub fn create_new_player_with_position(ctx: &ReducerContext, name: &str, player_
         max_hp,
         hp: max_hp,
         hp_regen: 0,
-        speed,
+        speed: speed as f32,
         armor: armor as u32,
         unspent_upgrades: 0,
-        rerolls: 1,
+        rerolls: if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::NoFreeReroll) {
+            0 // No free reroll when curse is active
+        } else {
+            1 // Normal starting reroll
+        },
         shield_count,
         pvp: false,  // PvP is disabled by default
         position,
@@ -681,28 +715,64 @@ pub fn transition_dead_to_choosing_class(ctx: &ReducerContext, timer: DeadPlayer
     }
 }
 
-// Scheduled reducer to transition winner players back to choosing class
+// Scheduled reducer to transition winner players to curse cutscene
 #[reducer]
-pub fn transition_winner_to_choosing_class(ctx: &ReducerContext, timer: WinnerTransitionTimer) {
+pub fn transition_winner_to_curse_cutscene(ctx: &ReducerContext, timer: WinnerTransitionTimer) {
     if ctx.sender != ctx.identity() {
-        panic!("TransitionWinnerToChoosingClass may not be invoked by clients, only via scheduling.");
+        panic!("TransitionWinnerToCurseCutscene may not be invoked by clients, only via scheduling.");
     }
 
     let identity = timer.identity;
-    log::info!("Transitioning winner player {} back to choosing class", identity);
+    log::info!("Transitioning winner player {} to curse cutscene", identity);
 
     // Find the account
     if let Some(mut account) = ctx.db.account().identity().find(&identity) {
         if account.state == AccountState::Winner {
-            account.state = AccountState::ChoosingClass;
+            account.state = AccountState::CurseCutscene;
             account.current_player_id = 0;  // Reset player ID
             ctx.db.account().identity().update(account);
-            log::info!("Account {} transitioned from Winner to ChoosingClass", identity);
+            log::info!("Account {} transitioned from Winner to CurseCutscene", identity);
+            
+            // Schedule transition from curse cutscene to choosing class
+            const CURSE_CUTSCENE_DURATION_MS: u64 = 7300; // a few seconds for curse cutscene
+            
+            ctx.db.curse_transition_timer().insert(CurseTransitionTimer {
+                scheduled_id: 0,
+                scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(CURSE_CUTSCENE_DURATION_MS)),
+                identity,
+            });
+            
+            log::info!("Scheduled transition from CurseCutscene to ChoosingClass for account {} in {} ms", identity, CURSE_CUTSCENE_DURATION_MS);
         } else {
             log::warn!("Account {} was not in Winner state when transition timer fired. Current state: {:?}", identity, account.state);
         }
     } else {
         log::warn!("Account {} not found when winner transition timer fired", identity);
+    }
+}
+
+// Scheduled reducer to transition from curse cutscene back to choosing class
+#[reducer]
+pub fn transition_curse_to_choosing_class(ctx: &ReducerContext, timer: CurseTransitionTimer) {
+    if ctx.sender != ctx.identity() {
+        panic!("TransitionCurseToChoosingClass may not be invoked by clients, only via scheduling.");
+    }
+
+    let identity = timer.identity;
+    log::info!("Transitioning player {} from curse cutscene back to choosing class", identity);
+
+    // Find the account
+    if let Some(mut account) = ctx.db.account().identity().find(&identity) {
+        if account.state == AccountState::CurseCutscene {
+            account.state = AccountState::ChoosingClass;
+            account.current_player_id = 0;  // Ensure player ID is reset
+            ctx.db.account().identity().update(account);
+            log::info!("Account {} transitioned from CurseCutscene to ChoosingClass", identity);
+        } else {
+            log::warn!("Account {} was not in CurseCutscene state when transition timer fired. Current state: {:?}", identity, account.state);
+        }
+    } else {
+        log::warn!("Account {} not found when curse transition timer fired", identity);
     }
 }
 
@@ -765,8 +835,8 @@ pub fn transition_player_to_winner_state(ctx: &ReducerContext, player_id: u32) {
         
         log::info!("Account {} transitioned to Winner state and reset player ID to 0", identity);
         
-        // Schedule transition back to choosing class after a few seconds
-        const WINNER_TRANSITION_DELAY_MS: u64 = 10000; // 10 seconds to celebrate
+        // Schedule transition to next scene after a few seconds
+        const WINNER_TRANSITION_DELAY_MS: u64 = 7000; // 7 seconds to celebrate
         
         ctx.db.winner_transition_timer().insert(WinnerTransitionTimer {
             scheduled_id: 0,

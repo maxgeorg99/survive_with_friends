@@ -5,6 +5,7 @@ import PlayerClass from '../autobindings/player_class_type';
 import { GameEvents } from '../constants/GameEvents';
 import MusicManager from '../managers/MusicManager';
 import OptionsUI from '../ui/OptionsUI';
+import CurseUI from '../ui/CurseUI';
 import { isMobileDevice } from '../utils/device';
 
 // Map player class to numeric class ID
@@ -76,6 +77,7 @@ export default class ClassSelectScene extends Phaser.Scene {
     private confirmButton!: HTMLButtonElement;
     private errorText!: Phaser.GameObjects.Text;
     private optionsUI!: OptionsUI;
+    private curseUI!: CurseUI;
     
     // Add status text for game state
     private statusText!: Phaser.GameObjects.Text;
@@ -127,6 +129,9 @@ export default class ClassSelectScene extends Phaser.Scene {
         // Load assets for options menu
         this.load.image('icon_music', '/assets/icon_music.png');
         this.load.image('icon_sound', '/assets/icon_sound.png');
+        
+        // Load Curse UI assets
+        this.load.image('curse_card', '/assets/curse_card.png');
         
         // Add load completion listener to ensure assets are ready
         this.load.on('complete', () => {
@@ -257,9 +262,36 @@ export default class ClassSelectScene extends Phaser.Scene {
         // Initialize options UI
         this.optionsUI = new OptionsUI(this);
         
+        // Initialize Curse UI for curse display and management
+        this.curseUI = new CurseUI(this, this.spacetimeDBClient);
+        
         // Handle options toggle key
         this.input.keyboard?.on('keydown-O', () => {
             this.optionsUI.toggle();
+        });
+        
+        // Handle debug key to test curse victory screen (C key)
+        // Note: This allows testing the curse screen without beating a boss
+        this.input.keyboard?.on('keydown-C', () => {
+            this.launchCurseVictoryScreenDebug();
+        });
+
+        // Handle debug key to add random curse (X key)
+        // Note: This calls the admin command to add a random curse for testing
+        this.input.keyboard?.on('keydown-X', () => {
+            this.addRandomCurseDebug();
+        });
+
+        // Handle debug key to clear all curses (Z key)
+        // Note: This calls the admin command to clear all curses for testing
+        this.input.keyboard?.on('keydown-Z', () => {
+            this.clearAllCursesDebug();
+        });
+
+        // Handle debug key to add debug curse (V key)
+        // Note: This calls the admin command to add a debug curse for testing
+        this.input.keyboard?.on('keydown-V', () => {
+            this.addDebugCurseDebug();
         });
         
         // Only clean up when the scene is actually shut down, not at scene start
@@ -926,12 +958,96 @@ export default class ClassSelectScene extends Phaser.Scene {
         }
     }
 
+    private launchCurseVictoryScreenDebug() {
+        console.log("ClassSelectScene: Debug command - launching CurseVictoryScene for testing");
+        
+        // Start the CurseVictoryScene for testing
+        this.scene.start('CurseVictoryScene');
+    }
+
+    private addRandomCurseDebug() {
+        console.log("ClassSelectScene: Debug command - adding random curse via admin reducer");
+        
+        try {
+            if (this.spacetimeDBClient.sdkConnection?.reducers) {
+                console.log("ClassSelectScene: Calling adminAddCurse reducer");
+                this.spacetimeDBClient.sdkConnection.reducers.adminAddCurse();
+                console.log("ClassSelectScene: adminAddCurse reducer call completed successfully");
+                
+                // Play a sound effect to confirm the command was executed
+                const soundManager = (window as any).soundManager;
+                if (soundManager) {
+                    soundManager.playSound('curse_created', 0.8);
+                }
+            } else {
+                console.error("ClassSelectScene: Cannot add curse - no reducers available");
+                this.showError('Cannot add curse: Server connection not available');
+            }
+        } catch (error) {
+            console.error('ClassSelectScene: Error calling adminAddCurse reducer:', error);
+            this.showError('Error adding curse: ' + (error as Error).message);
+        }
+    }
+
+    private clearAllCursesDebug() {
+        console.log("ClassSelectScene: Debug command - clearing all curses via admin reducer");
+        
+        try {
+            if (this.spacetimeDBClient.sdkConnection?.reducers) {
+                console.log("ClassSelectScene: Calling adminClearCurses reducer");
+                this.spacetimeDBClient.sdkConnection.reducers.adminClearCurses();
+                console.log("ClassSelectScene: adminClearCurses reducer call completed successfully");
+                
+                // Play a different sound effect to confirm curses were cleared
+                const soundManager = (window as any).soundManager;
+                if (soundManager) {
+                    soundManager.playSound('spell_cast', 0.8);
+                }
+            } else {
+                console.error("ClassSelectScene: Cannot clear curses - no reducers available");
+                this.showError('Cannot clear curses: Server connection not available');
+            }
+        } catch (error) {
+            console.error('ClassSelectScene: Error calling adminClearCurses reducer:', error);
+            this.showError('Error clearing curses: ' + (error as Error).message);
+        }
+    }
+
+    private addDebugCurseDebug() {
+        console.log("ClassSelectScene: Debug command - adding debug curse via admin reducer");
+        
+        try {
+            if (this.spacetimeDBClient.sdkConnection?.reducers) {
+                console.log("ClassSelectScene: Calling adminAddDebugCurse reducer");
+                this.spacetimeDBClient.sdkConnection.reducers.adminAddDebugCurse();
+                console.log("ClassSelectScene: adminAddDebugCurse reducer call completed successfully");
+                
+                // Play a sound effect to confirm the command was executed
+                const soundManager = (window as any).soundManager;
+                if (soundManager) {
+                    soundManager.playSound('curse_created', 0.8);
+                }
+            } else {
+                console.error("ClassSelectScene: Cannot add debug curse - no reducers available");
+                this.showError('Cannot add debug curse: Server connection not available');
+            }
+        } catch (error) {
+            console.error('ClassSelectScene: Error calling adminAddDebugCurse reducer:', error);
+            this.showError('Error adding debug curse: ' + (error as Error).message);
+        }
+    }
+
     shutdown() {
         console.log("ClassSelectScene shutdown called");
         
         // Cleanup options UI
         if (this.optionsUI) {
             this.optionsUI.destroy();
+        }
+        
+        // Cleanup curse UI
+        if (this.curseUI) {
+            this.curseUI.destroy();
         }
         
         // Cleanup music manager
@@ -943,6 +1059,15 @@ export default class ClassSelectScene extends Phaser.Scene {
         this.events.off("shutdown", this.shutdown, this);
         this.gameEvents.off(GameEvents.ACCOUNT_UPDATED, this.handleAccountUpdated, this);
         this.gameEvents.off(GameEvents.CONNECTION_LOST, this.handleConnectionLost, this);
+        
+        // Remove keyboard listeners
+        if (this.input.keyboard) {
+            this.input.keyboard.off('keydown-O'); // Options toggle key
+            this.input.keyboard.off('keydown-C'); // Debug curse victory screen key
+            this.input.keyboard.off('keydown-X'); // Debug add curse key
+            this.input.keyboard.off('keydown-Z'); // Debug clear curses key
+            this.input.keyboard.off('keydown-V'); // Debug add debug curse key
+        }
         
         // Use our dedicated cleanup method
         this.cleanupHTMLElements();

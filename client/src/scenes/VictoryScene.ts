@@ -45,6 +45,14 @@ export default class VictoryScene extends Phaser.Scene {
     preload() {
         // Load assets needed for the victory screen
         this.load.image('victory_screen', '/assets/victory_screen.png');
+
+        // PreLoad assets needed for the curse victory screen
+        this.load.image('curse_bg', '/assets/curse_bg.png');
+        this.load.image('curse_card', '/assets/curse_card.png');
+        
+        // Load curse-related sound effects
+        this.load.audio('curse_incant', '/assets/sounds/curse_incant.mp3');
+        this.load.audio('curse_created', '/assets/sounds/curse_created.mp3');
         
         // Preload class icons to keep them cached for ClassSelectScene transition
         this.load.image('fighter_icon', '/assets/attack_sword.png');
@@ -276,11 +284,18 @@ export default class VictoryScene extends Phaser.Scene {
                 console.log("Account state changed from Winner to", newAccount.state.tag);
                 this.statusText.setText('State changed, transitioning...');
                 
-                // Transition to LoadingScene which will evaluate the new state
-                this.scene.start('LoadingScene', { 
-                    message: 'Evaluating account state...', 
-                    waitingFor: 'account_evaluation'
-                });
+                // Direct transition to CurseCutscene for smooth curse victory flow
+                if (newAccount.state.tag === 'CurseCutscene') {
+                    console.log("VictoryScene: Direct transition to CurseVictoryScene");
+                    this.scene.start('CurseVictoryScene');
+                } else {
+                    // For all other states, use LoadingScene which will evaluate the new state
+                    console.log("VictoryScene: Transition to LoadingScene for state:", newAccount.state.tag);
+                    this.scene.start('LoadingScene', { 
+                        message: 'Evaluating account state...', 
+                        waitingFor: 'account_evaluation'
+                    });
+                }
             }
         }
     }

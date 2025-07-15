@@ -4,19 +4,19 @@ globs:
 alwaysApply: true
 ---
 
-# Your rule content
+# Rules
 When developing code for the Client keep in mind we are using Typescript and Phaser. 
 Avoid using DOM manipulation or React for visuals. Use Phaser.
-For server we are using SpacetimeDB in C#
+For server we are using SpacetimeDB in Rust.
 The client code for communicating with the server will be done via autobindings that must be generated
 by a command before they are available to the client. So the order is:
-Change C# spacetime server code
+Change Rust spacetime server code
 Build it
 Generate the autogen typescript bindings
 Update the client typescript.
 
 Do NOT start the server yourself. I already have it running.
-You may build and publish the server, 
+You may build the server with cargo check.
 You may build the autobindings
 You may build client
 do not RUN the client
@@ -24,5 +24,6 @@ do not RUN the client
 When you want to test if something is working on the server or cient by checking logs,
 please ask me to test for you and report back.
 
-- You can @ files here
-- You can use markdown but dont have to
+When developing the server make sure it compiles using cargo check, and resolve compilations.
+Remember to import needed types from other files.
+
