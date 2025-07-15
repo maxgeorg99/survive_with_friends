@@ -3,7 +3,6 @@ use crate::{DbVector2, AttackType, Entity, DELTA_TIME, get_world_cell_from_posit
            WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT, entity, monster_damage, monsters_boid};
 use crate::player_def::player;
 use crate::monsters_def::monsters;
-use crate::monsters_def::monsters_boid;
 use std::f64::consts::PI;
 use std::time::Duration;
 
