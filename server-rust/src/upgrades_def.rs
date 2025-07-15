@@ -339,7 +339,7 @@ fn create_upgrade_option_data(ctx: &ReducerContext, upgrade_type: UpgradeType, p
                 (AttackStat::Speed, 150),
                 (AttackStat::Radius, 5)
             ];
-            generate_attack_upgrade(ctx, player_id, 5, possible_stats, upgrade_type)
+            generate_attack_upgrade(ctx, player_id, 7, possible_stats, upgrade_type)
         }
         
         UpgradeType::AttackCards => {
@@ -350,7 +350,7 @@ fn create_upgrade_option_data(ctx: &ReducerContext, upgrade_type: UpgradeType, p
                 (AttackStat::Projectiles, 3),
                 (AttackStat::Speed, 120)
             ];
-            generate_attack_upgrade(ctx, player_id, 6, possible_stats, upgrade_type)
+            generate_attack_upgrade(ctx, player_id, 8, possible_stats, upgrade_type)
         }
         
         UpgradeType::AttackDumbbell => {
@@ -361,7 +361,7 @@ fn create_upgrade_option_data(ctx: &ReducerContext, upgrade_type: UpgradeType, p
                 (AttackStat::Radius, 6),
                 (AttackStat::Speed, 80)
             ];
-            generate_attack_upgrade(ctx, player_id, 7, possible_stats, upgrade_type)
+            generate_attack_upgrade(ctx, player_id, 9, possible_stats, upgrade_type)
         }
         
         UpgradeType::AttackGarlic => {
@@ -372,7 +372,7 @@ fn create_upgrade_option_data(ctx: &ReducerContext, upgrade_type: UpgradeType, p
                 (AttackStat::Radius, 8),
                 (AttackStat::Speed, 60)
             ];
-            generate_attack_upgrade(ctx, player_id, 8, possible_stats, upgrade_type)
+            generate_attack_upgrade(ctx, player_id, 10, possible_stats, upgrade_type)
         }
         
         UpgradeType::AttackVolleyball => {
@@ -383,7 +383,7 @@ fn create_upgrade_option_data(ctx: &ReducerContext, upgrade_type: UpgradeType, p
                 (AttackStat::Speed, 200),
                 (AttackStat::Projectiles, 2)
             ];
-            generate_attack_upgrade(ctx, player_id, 9, possible_stats, upgrade_type)
+            generate_attack_upgrade(ctx, player_id, 11, possible_stats, upgrade_type)
         }
         
         UpgradeType::AttackJoint => {
@@ -394,7 +394,7 @@ fn create_upgrade_option_data(ctx: &ReducerContext, upgrade_type: UpgradeType, p
                 (AttackStat::Radius, 10),
                 (AttackStat::Speed, 40)
             ];
-            generate_attack_upgrade(ctx, player_id, 10, possible_stats, upgrade_type)
+            generate_attack_upgrade(ctx, player_id, 12, possible_stats, upgrade_type)
         }
     }
 }
@@ -409,6 +409,12 @@ fn generate_attack_upgrade(ctx: &ReducerContext, player_id: u32, attack_type: u3
         4 => AttackType::Shield,
         5 => AttackType::ThunderHorn,
         6 => AttackType::AngelStaff,
+        7 => AttackType::Football,
+        8 => AttackType::Cards,
+        9 => AttackType::Dumbbell,
+        10 => AttackType::Garlic,
+        11 => AttackType::Volleyball,
+        12 => AttackType::Joint,
         _ => panic!("Invalid attack type: {}", attack_type),
     };
     

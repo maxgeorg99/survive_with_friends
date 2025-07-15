@@ -23,7 +23,7 @@ import { DebugManager } from '../managers/DebugManager'; // Added import for Deb
 import GameplayOptionsUI from '../ui/GameplayOptionsUI';
 import { getSoundVolume } from '../managers/VolumeSettings';
 import { getPlayerShadowConfig, getPlayerClassName } from '../constants/PlayerCharacterConfig';
-import StatsUpgradesUI from '../ui/StatsUi';
+import StatsUpgradesUI from '../ui/StatsUI';
 
 // Constants
 const PLAYER_SPEED = 200;
@@ -45,7 +45,7 @@ const PLAYER_NAME_STYLE: Phaser.Types.GameObjects.Text.TextStyle = {
 // Health bar configuration
 const HEALTH_BAR_WIDTH = 50;
 const HEALTH_BAR_HEIGHT = 6;
-const HEALTH_BAR_OFFSET_Y = 18; // Position health bar above the exp bar
+const HEALTH_BAR_OFFSET_Y = 18 // Position health bar above the exp bar
 // EXP bar configuration
 const EXP_BAR_WIDTH = 50;
 const EXP_BAR_HEIGHT = 4;
@@ -187,11 +187,13 @@ export default class GameScene extends Phaser.Scene {
     }
 
     private isBossPhase1(monsterType: string): boolean {
-        return monsterType === 'BossEnderPhase1' || monsterType === 'BossAgnaPhase1';
+        return monsterType === 'BossEnderPhase1' || monsterType === 'BossAgnaPhase1' ||
+               monsterType === 'BossSimonPhase1';
     }
 
     private isBossPhase2(monsterType: string): boolean {
-        return monsterType === 'BossEnderPhase2' || monsterType === 'BossAgnaPhase2';
+        return monsterType === 'BossEnderPhase2' || monsterType === 'BossAgnaPhase2' ||
+               monsterType === 'BossSimonPhase2';
     }
 
     preload() {
@@ -227,6 +229,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('final_boss_simon_phase_2', '/assets/final_boss_simon_phase_2.png');
         this.load.image('attack_boss_simon', '/assets/attack_boss_simon.png');
         this.load.image('attack_boss_toxicbolt', '/assets/attack_boss_toxicbolt.png');
+        this.load.image('attack_toxic_zone', '/assets/attack_toxic_zone.png');
         this.load.image('final_boss_phase1', '/assets/final_boss_phase_1.png');
         this.load.image('final_boss_phase2', '/assets/final_boss_phase_2.png');
         this.load.image('boss_agna_1', '/assets/boss_agna_1.png');
@@ -1629,24 +1632,24 @@ export default class GameScene extends Phaser.Scene {
                 yoyo: true,
                 repeat: -1,
                 duration: 500,
-                                                        onUpdate: () => {
-                                            // Check if sprite still exists before accessing it
-                                            if (!sprite || !sprite.active) {
-                                                return;
-                                            }
-                                            
-                                            // Create cycling colors for visible effect
-                                            const t = Math.sin(this.time.now / 200) * 0.5 + 0.5;
-                                            const color1 = new Phaser.Display.Color(255, 255, 255);
-                                            const color2 = new Phaser.Display.Color(200, 200, 200);
-                                            const color = Phaser.Display.Color.Interpolate.ColorWithColor(
-                                                color1,
-                                                color2,
-                                                100,
-                                                Math.floor(t * 100)
-                                            );
-                                            sprite.setTint(Phaser.Display.Color.GetColor(color.r, color.g, color.b));
-                                        }
+                onUpdate: () => {
+                    // Check if sprite still exists before accessing it
+                    if (!sprite || !sprite.active) {
+                        return;
+                    }
+                    
+                    // Create cycling colors for visible effect
+                    const t = Math.sin(this.time.now / 200) * 0.5 + 0.5;
+                    const color1 = new Phaser.Display.Color(255, 255, 255);
+                    const color2 = new Phaser.Display.Color(200, 200, 200);
+                    const color = Phaser.Display.Color.Interpolate.ColorWithColor(
+                        color1,
+                        color2,
+                        100,
+                        Math.floor(t * 100)
+                    );
+                    sprite.setTint(Phaser.Display.Color.GetColor(color.r, color.g, color.b));
+                }
             });
             container.setData('graceTween', graceTween);
             console.log(`Player ${playerData.name} has grace period: ${playerData.spawnGracePeriodRemaining}`);

@@ -37,6 +37,8 @@ const MONSTER_BASE_SIZES: { [key: string]: number } = {
     "BossEnderPhase2": 128.0,
     "BossAgnaPhase1": 88.0,
     "BossAgnaPhase2": 120.0,
+    "BossSimonPhase1": 90.0,  // Similar to other phase 1 bosses
+    "BossSimonPhase2": 124.0,  // Similar to other phase 2 bosses
     "AgnaCandle": 32.0,
     "VoidChest": 82.0,
     "Imp": 34.0,
@@ -109,18 +111,23 @@ export default class MonsterManager {
     }
 
     private isBossPhase1(monsterType: string): boolean {
-        return monsterType === 'BossEnderPhase1' || monsterType === 'BossAgnaPhase1';
+        return monsterType === 'BossEnderPhase1' || monsterType === 'BossAgnaPhase1' ||
+               monsterType === 'BossSimonPhase1';
     }
 
     private isBossPhase2(monsterType: string): boolean {
-        return monsterType === 'BossEnderPhase2' || monsterType === 'BossAgnaPhase2';
+        return monsterType === 'BossEnderPhase2' || monsterType === 'BossAgnaPhase2' || monsterType === 'BossSimonPhase2';
+    }
+
+    private isSimonBoss(monsterType: string): boolean {
+        return monsterType === 'BossSimonPhase1' || monsterType === 'BossSimonPhase2';
     }
 
     private isEnderBoss(monsterType: string): boolean {
         return monsterType === 'BossEnderPhase1' || monsterType === 'BossEnderPhase2';
     }
 
-        private isAgnaBoss(monsterType: string): boolean {
+    private isAgnaBoss(monsterType: string): boolean {
         return monsterType === 'BossAgnaPhase1' || monsterType === 'BossAgnaPhase2';
     }
 
@@ -1399,4 +1406,4 @@ export default class MonsterManager {
         
         console.log(`Created hovering animation for Bat monster ID: ${monsterId}`);
     }
-} 
+}

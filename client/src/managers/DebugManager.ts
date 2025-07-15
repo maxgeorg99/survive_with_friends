@@ -30,6 +30,7 @@ export class DebugManager {
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P).on('down', this.enableBotPvp, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR).on('down', this.setBossTypeEnder, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FIVE).on('down', this.setBossTypeAgna, this);
+            this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SIX).on('down', this.setBossTypeSimon, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.H).on('down', this.setSuperHealth, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S).on('down', this.saveBuild, this);
             this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.L).on('down', this.loadBuild, this);
@@ -141,6 +142,15 @@ export class DebugManager {
             this.spacetimedb.sdkConnection.reducers.debugSetBossType(5);
         } else {
             console.warn("DebugManager: SpacetimeDB connection not available for setting boss type to Agna.");
+        }
+    }
+
+    private setBossTypeSimon(): void {
+        if (this.spacetimedb && this.spacetimedb.sdkConnection) {
+            console.log("DebugManager: Setting boss type to Agna (client key 6)...");
+            this.spacetimedb.sdkConnection.reducers.debugSetBossType(6);
+        } else {
+            console.warn("DebugManager: SpacetimeDB connection not available for setting boss type to Simon.");
         }
     }
 
