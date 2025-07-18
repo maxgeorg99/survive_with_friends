@@ -31,10 +31,10 @@ import {
   deepEqual,
 } from "@clockworklabs/spacetimedb-sdk";
 
-import { ChemicalZombieSpawner as __ChemicalZombieSpawner } from "./chemical_zombie_spawner_type";
+import { SimonZombieWaveScheduler as __SimonZombieWaveScheduler } from "./simon_zombie_wave_scheduler_type";
 
 export type SpawnChemicalZombieWave = {
-  spawner: __ChemicalZombieSpawner,
+  spawner: __SimonZombieWaveScheduler,
 };
 
 /**
@@ -47,7 +47,7 @@ export namespace SpawnChemicalZombieWave {
   */
   export function getTypeScriptAlgebraicType(): AlgebraicType {
     return AlgebraicType.createProductType([
-      new ProductTypeElement("spawner", __ChemicalZombieSpawner.getTypeScriptAlgebraicType()),
+      new ProductTypeElement("spawner", __SimonZombieWaveScheduler.getTypeScriptAlgebraicType()),
     ]);
   }
 

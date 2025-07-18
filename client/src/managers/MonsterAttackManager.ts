@@ -200,6 +200,12 @@ export class MonsterAttackManager {
             spriteKey = 'agna_circle_orb';
         } else if (attackType === 'AgnaCandleBolt') {
             spriteKey = 'monster_attack_firebolt';
+        } else if (attackType === 'SimonChemicalBolt') {
+            spriteKey = 'attack_boss_toxicbolt';
+        } else if (attackType === 'SimonToxicZone') {
+            spriteKey = 'attack_toxic_zone';
+        } else if (attackType === 'SimonToxicSpray') {
+            spriteKey = 'attack_boss_toxicbolt'; // Reuse toxic bolt sprite but with different behavior
         }
         
         // Verify the texture exists
@@ -241,6 +247,44 @@ export class MonsterAttackManager {
         
         // Handle rotation based on attack type
         switch (attackGraphicData.attackType) {
+            case 'SimonChemicalBolt':
+                // Chemical bolt rotates in direction of motion
+                if (attackGraphicData.direction.length() > 0) {
+                    sprite.setRotation(Math.atan2(attackGraphicData.direction.y, attackGraphicData.direction.x));
+                }
+                break;
+                
+            case 'SimonToxicZone':
+                // Toxic zone is stationary and pulses
+                sprite.setRotation(0);
+                
+                // Create pulsing effect
+                const zonePulseMs = 1000; // 1 second pulse cycle
+                const zoneElapsedMs = attackGraphicData.ticksElapsed * 50;
+                const pulsePhase = (zoneElapsedMs % zonePulseMs) / zonePulseMs;
+                const pulseAlpha = 0.6 + 0.2 * Math.sin(pulsePhase * Math.PI * 2);
+                sprite.setAlpha(pulseAlpha);
+                break;
+                
+            case 'SimonToxicSpray':
+                // Toxic spray rotates based on parameter_f (spray angle)
+                sprite.setRotation(attackGraphicData.parameterF);
+                
+                // Handle scale and alpha over lifetime
+                const sprayLifespanMs = 1500; // From TOXIC_SPRAY_DURATION_MS
+                const sprayElapsedMs = attackGraphicData.ticksElapsed * 50;
+                const sprayProgress = Math.min(sprayElapsedMs / sprayLifespanMs, 1.0);
+                
+                // Scale grows slightly as spray travels
+                const sprayScale = 0.8 + (0.4 * sprayProgress);
+                sprite.setScale(sprayScale);
+                
+                // Alpha fades out at end of lifetime
+                const sprayAlpha = sprayProgress > 0.7 ? 
+                    1.0 - ((sprayProgress - 0.7) / 0.3) : 1.0;
+                sprite.setAlpha(sprayAlpha);
+                break;
+
             case 'ImpBolt':
                 // ImpBolt should be rotated to face its direction using parameterF
                 sprite.setRotation(attackGraphicData.parameterF);
@@ -420,4 +464,4 @@ export class MonsterAttackManager {
         // Remove event listeners
         this.unregisterMonsterAttackListeners();
     }
-} 
+}

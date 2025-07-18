@@ -212,6 +212,8 @@ import { BossPhaseTwoTimerTableHandle } from "./boss_phase_two_timer_table.ts";
 export { BossPhaseTwoTimerTableHandle };
 import { BossSelectionTableHandle } from "./boss_selection_table.ts";
 export { BossSelectionTableHandle };
+import { BossSimonLastPatternsTableHandle } from "./boss_simon_last_patterns_table.ts";
+export { BossSimonLastPatternsTableHandle };
 import { BossSpawnTimerTableHandle } from "./boss_spawn_timer_table.ts";
 export { BossSpawnTimerTableHandle };
 import { BossTargetSwitchSchedulerTableHandle } from "./boss_target_switch_scheduler_table.ts";
@@ -220,8 +222,6 @@ import { ChaosBallSchedulerTableHandle } from "./chaos_ball_scheduler_table.ts";
 export { ChaosBallSchedulerTableHandle };
 import { ChemicalBoltSchedulerTableHandle } from "./chemical_bolt_scheduler_table.ts";
 export { ChemicalBoltSchedulerTableHandle };
-import { ChemicalZombieSpawnerTableHandle } from "./chemical_zombie_spawner_table.ts";
-export { ChemicalZombieSpawnerTableHandle };
 import { ChosenUpgradesTableHandle } from "./chosen_upgrades_table.ts";
 export { ChosenUpgradesTableHandle };
 import { ClassDataTableHandle } from "./class_data_table.ts";
@@ -290,6 +290,8 @@ import { SavedAttacksTableHandle } from "./saved_attacks_table.ts";
 export { SavedAttacksTableHandle };
 import { SavedBuildTableHandle } from "./saved_build_table.ts";
 export { SavedBuildTableHandle };
+import { SimonZombieWaveSchedulerTableHandle } from "./simon_zombie_wave_scheduler_table.ts";
+export { SimonZombieWaveSchedulerTableHandle };
 import { ToxicSpraySchedulerTableHandle } from "./toxic_spray_scheduler_table.ts";
 export { ToxicSpraySchedulerTableHandle };
 import { ToxicZoneSchedulerTableHandle } from "./toxic_zone_scheduler_table.ts";
@@ -354,6 +356,8 @@ import { BossPhase2Timer } from "./boss_phase_2_timer_type.ts";
 export { BossPhase2Timer };
 import { BossSelection } from "./boss_selection_type.ts";
 export { BossSelection };
+import { BossSimonLastPattern } from "./boss_simon_last_pattern_type.ts";
+export { BossSimonLastPattern };
 import { BossSpawnTimer } from "./boss_spawn_timer_type.ts";
 export { BossSpawnTimer };
 import { BossTargetSwitchScheduler } from "./boss_target_switch_scheduler_type.ts";
@@ -364,8 +368,6 @@ import { ChaosBallScheduler } from "./chaos_ball_scheduler_type.ts";
 export { ChaosBallScheduler };
 import { ChemicalBoltScheduler } from "./chemical_bolt_scheduler_type.ts";
 export { ChemicalBoltScheduler };
-import { ChemicalZombieSpawner } from "./chemical_zombie_spawner_type.ts";
-export { ChemicalZombieSpawner };
 import { ChosenUpgradeData } from "./chosen_upgrade_data_type.ts";
 export { ChosenUpgradeData };
 import { ClassData } from "./class_data_type.ts";
@@ -448,6 +450,8 @@ import { SavedAttack } from "./saved_attack_type.ts";
 export { SavedAttack };
 import { SavedBuild } from "./saved_build_type.ts";
 export { SavedBuild };
+import { SimonZombieWaveScheduler } from "./simon_zombie_wave_scheduler_type.ts";
+export { SimonZombieWaveScheduler };
 import { ToxicSprayScheduler } from "./toxic_spray_scheduler_type.ts";
 export { ToxicSprayScheduler };
 import { ToxicZoneScheduler } from "./toxic_zone_scheduler_type.ts";
@@ -575,6 +579,11 @@ const REMOTE_MODULE = {
       rowType: BossSelection.getTypeScriptAlgebraicType(),
       primaryKey: "id",
     },
+    boss_simon_last_patterns: {
+      tableName: "boss_simon_last_patterns",
+      rowType: BossSimonLastPattern.getTypeScriptAlgebraicType(),
+      primaryKey: "monsterId",
+    },
     boss_spawn_timer: {
       tableName: "boss_spawn_timer",
       rowType: BossSpawnTimer.getTypeScriptAlgebraicType(),
@@ -593,11 +602,6 @@ const REMOTE_MODULE = {
     chemical_bolt_scheduler: {
       tableName: "chemical_bolt_scheduler",
       rowType: ChemicalBoltScheduler.getTypeScriptAlgebraicType(),
-      primaryKey: "scheduledId",
-    },
-    chemical_zombie_spawner: {
-      tableName: "chemical_zombie_spawner",
-      rowType: ChemicalZombieSpawner.getTypeScriptAlgebraicType(),
       primaryKey: "scheduledId",
     },
     chosen_upgrades: {
@@ -769,6 +773,11 @@ const REMOTE_MODULE = {
       tableName: "saved_build",
       rowType: SavedBuild.getTypeScriptAlgebraicType(),
       primaryKey: "buildId",
+    },
+    simon_zombie_wave_scheduler: {
+      tableName: "simon_zombie_wave_scheduler",
+      rowType: SimonZombieWaveScheduler.getTypeScriptAlgebraicType(),
+      primaryKey: "scheduledId",
     },
     toxic_spray_scheduler: {
       tableName: "toxic_spray_scheduler",
@@ -1697,7 +1706,7 @@ export class RemoteReducers {
     this.connection.offReducer("spawn_bot", callback);
   }
 
-  spawnChemicalZombieWave(spawner: ChemicalZombieSpawner) {
+  spawnChemicalZombieWave(spawner: SimonZombieWaveScheduler) {
     const __args = { spawner };
     let __writer = new BinaryWriter(1024);
     SpawnChemicalZombieWave.getTypeScriptAlgebraicType().serialize(__writer, __args);
@@ -1705,11 +1714,11 @@ export class RemoteReducers {
     this.connection.callReducer("spawn_chemical_zombie_wave", __argsBuffer, this.setCallReducerFlags.spawnChemicalZombieWaveFlags);
   }
 
-  onSpawnChemicalZombieWave(callback: (ctx: ReducerEventContext, spawner: ChemicalZombieSpawner) => void) {
+  onSpawnChemicalZombieWave(callback: (ctx: ReducerEventContext, spawner: SimonZombieWaveScheduler) => void) {
     this.connection.onReducer("spawn_chemical_zombie_wave", callback);
   }
 
-  removeOnSpawnChemicalZombieWave(callback: (ctx: ReducerEventContext, spawner: ChemicalZombieSpawner) => void) {
+  removeOnSpawnChemicalZombieWave(callback: (ctx: ReducerEventContext, spawner: SimonZombieWaveScheduler) => void) {
     this.connection.offReducer("spawn_chemical_zombie_wave", callback);
   }
 
@@ -2583,6 +2592,10 @@ export class RemoteTables {
     return new BossSelectionTableHandle(this.connection.clientCache.getOrCreateTable<BossSelection>(REMOTE_MODULE.tables.boss_selection));
   }
 
+  get bossSimonLastPatterns(): BossSimonLastPatternsTableHandle {
+    return new BossSimonLastPatternsTableHandle(this.connection.clientCache.getOrCreateTable<BossSimonLastPattern>(REMOTE_MODULE.tables.boss_simon_last_patterns));
+  }
+
   get bossSpawnTimer(): BossSpawnTimerTableHandle {
     return new BossSpawnTimerTableHandle(this.connection.clientCache.getOrCreateTable<BossSpawnTimer>(REMOTE_MODULE.tables.boss_spawn_timer));
   }
@@ -2597,10 +2610,6 @@ export class RemoteTables {
 
   get chemicalBoltScheduler(): ChemicalBoltSchedulerTableHandle {
     return new ChemicalBoltSchedulerTableHandle(this.connection.clientCache.getOrCreateTable<ChemicalBoltScheduler>(REMOTE_MODULE.tables.chemical_bolt_scheduler));
-  }
-
-  get chemicalZombieSpawner(): ChemicalZombieSpawnerTableHandle {
-    return new ChemicalZombieSpawnerTableHandle(this.connection.clientCache.getOrCreateTable<ChemicalZombieSpawner>(REMOTE_MODULE.tables.chemical_zombie_spawner));
   }
 
   get chosenUpgrades(): ChosenUpgradesTableHandle {
@@ -2737,6 +2746,10 @@ export class RemoteTables {
 
   get savedBuild(): SavedBuildTableHandle {
     return new SavedBuildTableHandle(this.connection.clientCache.getOrCreateTable<SavedBuild>(REMOTE_MODULE.tables.saved_build));
+  }
+
+  get simonZombieWaveScheduler(): SimonZombieWaveSchedulerTableHandle {
+    return new SimonZombieWaveSchedulerTableHandle(this.connection.clientCache.getOrCreateTable<SimonZombieWaveScheduler>(REMOTE_MODULE.tables.simon_zombie_wave_scheduler));
   }
 
   get toxicSprayScheduler(): ToxicSpraySchedulerTableHandle {

@@ -105,8 +105,11 @@ pub fn schedule_boss_spawn(ctx: &ReducerContext) {
     
     // Randomly select boss type when first scheduling the boss spawn
     let mut rng = ctx.rng();
-    let selected_boss_type = if rng.gen_bool(0.5) { BossType::Ender } else { BossType::Agna };
-    //let selected_boss_type = if rng.gen_bool(0.33) { BossType::Ender } else if rng.gen_bool(0.5) { BossType::Agna } else { BossType::Simon };
+    let selected_boss_type = match rng.gen_range(0..3) {
+        0 => BossType::Ender,
+        1 => BossType::Agna,
+        _ => BossType::Simon,
+    };
     let boss_name = match selected_boss_type {
         BossType::Ender => "Ender",
         BossType::Agna => "Agna",
@@ -244,7 +247,7 @@ pub fn spawn_boss_phase_two(ctx: &ReducerContext, position: DbVector2) {
     let (boss_monster_type, ai_state) = match boss_selection.boss_type {
         BossType::Ender => (MonsterType::BossEnderPhase2, crate::monster_ai_defs::AIState::BossEnderIdle),
         BossType::Agna => (MonsterType::BossAgnaPhase2, crate::monster_ai_defs::AIState::BossAgnaIdle),
-        BossType::Simon => (MonsterType::BossSimonPhase2, crate::monster_ai_defs::AIState::BossSimonIdle),
+        BossType::Simon => (MonsterType::BossSimonPhase2, crate::monster_ai_defs::AIState::BossSimonPhase2Transform),
     };
     
     let boss_name = match boss_selection.boss_type {
@@ -271,15 +274,6 @@ pub fn spawn_boss_phase_two(ctx: &ReducerContext, position: DbVector2) {
     // Apply DeadlierBosses curse modifications
     if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::DeadlierBosses) {
         final_hp = (final_hp as f32 * 2.0) as u32; // 2x HP
-        final_max_hp = (final_max_hp as f32 * 2.0) as u32; // 2x max HP
-        final_atk *= 1.5; // 1.5x damage
-        final_speed *= 1.2; // 1.2x speed
-        log::info!("DeadlierBosses curse applied to Phase 2 boss - HP: {}, ATK: {:.1}, Speed: {:.1}", final_hp, final_atk, final_speed);
-    }
-    
-    // Apply DeadlierBossesTwo curse modifications (stacks with first curse)
-    if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::DeadlierBossesTwo) {
-        final_hp = (final_hp as f32 * 2.0) as u32; // Additional 2x HP
         final_max_hp = (final_max_hp as f32 * 2.0) as u32; // Additional 2x max HP
         final_atk *= 1.5; // Additional 1.5x damage
         final_speed *= 1.2; // Additional 1.2x speed
@@ -343,8 +337,8 @@ pub fn spawn_boss_phase_two(ctx: &ReducerContext, position: DbVector2) {
             
             // Start Simon's special attacks and behaviors
             log::info!("Starting Simon's special attacks for Phase 2 boss {}", monster.monster_id);
-            crate::boss_simon_defs::start_toxic_spray_pattern(ctx, monster.monster_id);
-            crate::boss_simon_defs::schedule_next_zombie_wave(ctx, monster.monster_id);
+            // Note: These will be activated after transform state completes
+            crate::boss_simon_defs::initialize_phase2_boss_simon_ai(ctx, monster.monster_id);
         },
     }
 }
@@ -373,6 +367,7 @@ pub fn handle_boss_defeated(ctx: &ReducerContext) {
         crate::boss_agna_defs::cleanup_agna_ai_schedules(ctx, game_state.boss_monster_id);
         // Clean up Simon boss attack schedules (lightning, fire, etc.)
         crate::boss_simon_defs::cleanup_simon_ai_schedules(ctx, game_state.boss_monster_id);
+        //Also remove zombies toxic zones...
     }
     
     // Reset game state

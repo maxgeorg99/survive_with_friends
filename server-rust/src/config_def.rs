@@ -29,7 +29,7 @@ pub fn init_game_config(ctx: &ReducerContext) {
     ctx.db.config().insert(Config {
         id: 0,
         world_size: super::WORLD_SIZE, // Default world size in pixels (10x larger)
-        game_tick_rate: 50, // Default game tick rate in milliseconds
+        game_tick_rate: 40, // Default game tick rate in milliseconds
         max_monsters: 1000,  // Default maximum monsters
         player_spawn_grace_period: 5000, // Default player spawn grace period in milliseconds
         monster_hit_cleanup_delay: 500, // Default monster hit cleanup delay in milliseconds

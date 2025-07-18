@@ -30,17 +30,16 @@ import {
   Timestamp,
   deepEqual,
 } from "@clockworklabs/spacetimedb-sdk";
-export type ChemicalBoltScheduler = {
+export type SimonZombieWaveScheduler = {
   scheduledId: bigint,
   bossMonsterId: number,
-  targetPlayerId: number,
   scheduledAt: { tag: "Interval", value: TimeDuration } | { tag: "Time", value: Timestamp },
 };
 
 /**
  * A namespace for generated helper functions.
  */
-export namespace ChemicalBoltScheduler {
+export namespace SimonZombieWaveScheduler {
   /**
   * A function which returns this type represented as an AlgebraicType.
   * This function is derived from the AlgebraicType used to generate this type.
@@ -49,17 +48,16 @@ export namespace ChemicalBoltScheduler {
     return AlgebraicType.createProductType([
       new ProductTypeElement("scheduledId", AlgebraicType.createU64Type()),
       new ProductTypeElement("bossMonsterId", AlgebraicType.createU32Type()),
-      new ProductTypeElement("targetPlayerId", AlgebraicType.createU32Type()),
       new ProductTypeElement("scheduledAt", AlgebraicType.createScheduleAtType()),
     ]);
   }
 
-  export function serialize(writer: BinaryWriter, value: ChemicalBoltScheduler): void {
-    ChemicalBoltScheduler.getTypeScriptAlgebraicType().serialize(writer, value);
+  export function serialize(writer: BinaryWriter, value: SimonZombieWaveScheduler): void {
+    SimonZombieWaveScheduler.getTypeScriptAlgebraicType().serialize(writer, value);
   }
 
-  export function deserialize(reader: BinaryReader): ChemicalBoltScheduler {
-    return ChemicalBoltScheduler.getTypeScriptAlgebraicType().deserialize(reader);
+  export function deserialize(reader: BinaryReader): SimonZombieWaveScheduler {
+    return SimonZombieWaveScheduler.getTypeScriptAlgebraicType().deserialize(reader);
   }
 
 }

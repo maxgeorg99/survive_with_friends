@@ -498,39 +498,7 @@ pub fn game_tick(ctx: &ReducerContext, _timer: GameTickTimer) {
                 log::info!("Server idle - no players online (tick {})", world.tick_count);
             }
         }
-    } else {
-        // Process game logic when players are online
-        
-        // Clear collision cache for this frame
-        clear_collision_cache_for_frame();
-        
-        // Process player movement and populate collision cache
-        process_player_movement(ctx, tick_rate);
-        
-        // Process monster movements
-        process_monster_movements(ctx);
-        
-        // Process attack movements
-        process_attack_movements(ctx);
-        
-        // Process monster attack movements
-        process_monster_attack_movements(ctx);
-        
-        // Maintain gems (spawning, despawning, etc.)
-        maintain_gems(ctx);
-        
-        // Process collisions using spatial hashing
-        process_player_monster_collisions_spatial_hash(ctx);
-        process_player_attack_monster_collisions_spatial_hash(ctx);
-        process_monster_attack_collisions_spatial_hash(ctx);
-        process_player_attack_collisions_spatial_hash(ctx);
-        process_gem_collisions_spatial_hash(ctx);
-        
-        // Commit any pending damage to players
-        commit_player_damage(ctx);
-        
-        log::info!("Game tick processed with {} players online", player_count);
-    }
+    } 
 
     if let Some(world) = ctx.db.world().world_id().find(&0) {
         let mut world = world;

@@ -1,5 +1,5 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, ScheduleAt, SpacetimeType, rand::Rng};
-use crate::{DbVector2, MonsterType, MonsterAttackType, config, player, bestiary, monsters, monsters_boid};
+use crate::{DbVector2, MonsterType, MonsterAttackType, config, player, bestiary, monsters, monsters_boid, Player};
 use crate::monster_attacks_def::active_monster_attacks;
 use crate::monster_ai_defs::monster_state_changes;
 use std::time::Duration;
@@ -44,13 +44,22 @@ const PHASE2_SPEED_MULTIPLIER: f32 = 1.3;            // Increased speed
 const PHASE2_DOT_DAMAGE: u32 = 10;                   // Chemical damage over time
 const PHASE2_DOT_INTERVAL_MS: u64 = 1000;            // Tick interval for DoT
 
+// Table to track the last chosen pattern for each Simon boss to avoid repetition
+#[table(name = boss_simon_last_patterns, public)]
+pub struct BossSimonLastPattern {
+    #[primary_key]
+    pub monster_id: u32,
+
+    pub last_pattern: crate::monster_ai_defs::AIState,
+}
+
 // Table for Chemical Zombie spawning during Phase 2
-#[table(name = chemical_zombie_spawner, scheduled(spawn_chemical_zombie_wave), public)]
-pub struct ChemicalZombieSpawner {
+#[table(name = simon_zombie_wave_scheduler, scheduled(spawn_chemical_zombie_wave), public)]
+pub struct SimonZombieWaveScheduler {
     #[primary_key]
     #[auto_inc]
     pub scheduled_id: u64,
-    
+
     #[index(btree)]
     pub boss_monster_id: u32,     // The boss monster ID
     pub scheduled_at: ScheduleAt, // When to spawn zombies
@@ -74,9 +83,9 @@ pub struct ChemicalBoltScheduler {
     #[primary_key]
     #[auto_inc]
     pub scheduled_id: u64,
-    
     #[index(btree)]
     pub boss_monster_id: u32,     // The boss monster ID
+    pub target_player_id: u32,
     pub scheduled_at: ScheduleAt, // When to fire bolt
 }
 
@@ -95,7 +104,7 @@ pub struct ToxicSprayScheduler {
 
 // Reducer for spawning chemical zombies
 #[reducer]
-pub fn spawn_chemical_zombie_wave(ctx: &ReducerContext, spawner: ChemicalZombieSpawner) {
+pub fn spawn_chemical_zombie_wave(ctx: &ReducerContext, spawner: SimonZombieWaveScheduler) {
     if ctx.sender != ctx.identity() {
         panic!("spawn_chemical_zombie_wave may not be invoked by clients.");
     }
@@ -223,7 +232,7 @@ pub fn trigger_chemical_bolt(ctx: &ReducerContext, scheduler: ChemicalBoltSchedu
         from_shiny_monster: false,
     });
 
-    schedule_next_chemical_bolt(ctx, scheduler.boss_monster_id);
+    schedule_next_chemical_bolt(ctx, scheduler.boss_monster_id, target_player.player_id);
 }
 
 // Reducer for toxic spray attacks (Phase 2)
@@ -278,7 +287,7 @@ pub fn trigger_toxic_spray(ctx: &ReducerContext, scheduler: ToxicSprayScheduler)
 
 // Helper functions for scheduling next attacks
 pub fn schedule_next_zombie_wave(ctx: &ReducerContext, boss_monster_id: u32) {
-    ctx.db.chemical_zombie_spawner().insert(ChemicalZombieSpawner {
+    ctx.db.simon_zombie_wave_scheduler().insert(SimonZombieWaveScheduler {
         scheduled_id: 0,
         boss_monster_id,
         scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(ZOMBIE_SPAWN_INTERVAL_MS)),
@@ -293,10 +302,11 @@ pub fn schedule_next_toxic_zone(ctx: &ReducerContext, boss_monster_id: u32) {
     });
 }
 
-pub fn schedule_next_chemical_bolt(ctx: &ReducerContext, boss_monster_id: u32) {
+pub fn schedule_next_chemical_bolt(ctx: &ReducerContext, boss_monster_id: u32, target_player_id: u32) {
     ctx.db.chemical_bolt_scheduler().insert(ChemicalBoltScheduler {
         scheduled_id: 0,
         boss_monster_id,
+        target_player_id,
         scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(CHEMICAL_BOLT_INTERVAL_MS)),
     });
 }
@@ -312,14 +322,14 @@ pub fn start_toxic_spray_pattern(ctx: &ReducerContext, boss_monster_id: u32) {
 
 // Cleanup functions for each attack type
 pub fn cleanup_chemical_zombie_spawning(ctx: &ReducerContext, boss_monster_id: u32) {
-    let spawners: Vec<u64> = ctx.db.chemical_zombie_spawner()
+    let spawners: Vec<u64> = ctx.db.simon_zombie_wave_scheduler()
         .boss_monster_id()
         .filter(&boss_monster_id)
         .map(|s| s.scheduled_id)
         .collect();
         
     for id in spawners {
-        ctx.db.chemical_zombie_spawner().scheduled_id().delete(&id);
+        ctx.db.simon_zombie_wave_scheduler().scheduled_id().delete(&id);
     }
 }
 
@@ -437,9 +447,31 @@ pub fn execute_boss_simon_transform_behavior(ctx: &ReducerContext, monster: &cra
     // This could trigger phase transition or special effects
 }
 
+// Find a random player for targeting
+fn find_random_player(ctx: &ReducerContext) -> Option<u32> {
+    let players: Vec<_> = ctx.db.player().iter().collect();
+
+    if players.is_empty() {
+        return None;
+    }
+
+    let mut rng = ctx.rng();
+    let random_index = rng.gen_range(0..players.len());
+    Some(players[random_index].player_id)
+}
+
+
 pub fn execute_boss_simon_chemical_bolt_pattern(ctx: &ReducerContext, monster: &crate::Monsters) {
+    let target_player_id = match find_random_player(ctx) {
+        Some(player_id) => player_id,
+        None => {
+            log::info!("No players available for targeting, returning to idle");
+            schedule_state_change(ctx, monster.monster_id, crate::monster_ai_defs::AIState::BossAgnaIdle, 1000);
+            return;
+        }
+    };
     // Start chemical bolt attack pattern
-    schedule_next_chemical_bolt(ctx, monster.monster_id);
+    schedule_next_chemical_bolt(ctx, monster.monster_id, target_player_id);
     
     // Schedule return to idle after pattern duration
     schedule_state_change(ctx, monster.monster_id, 
@@ -458,19 +490,34 @@ pub fn execute_boss_simon_toxic_zone_pattern(ctx: &ReducerContext, monster: &cra
 }
 
 pub fn execute_boss_simon_phase2_transform(ctx: &ReducerContext, monster: &crate::Monsters) {
-    // Apply phase 2 enhancements
-    let mut updated_monster = monster.clone();
-    apply_chemical_enhancement(ctx, &mut updated_monster);
-    ctx.db.monsters().monster_id().update(updated_monster);
+    log::info!("Boss Simon {} entering Phase 2 transform", monster.monster_id);
     
-    // Start phase 2 attack patterns
-    start_toxic_spray_pattern(ctx, monster.monster_id);
-    schedule_next_zombie_wave(ctx, monster.monster_id);
-    
-    // Schedule return to idle
+    // Schedule the actual state transition to occur after transform animation
     schedule_state_change(ctx, monster.monster_id,
-        crate::monster_ai_defs::AIState::BossSimonIdle,
+        crate::monster_ai_defs::AIState::BossSimonPhase2Transform,
         3000); // 3 second transform animation
+
+    // Schedule phase 2 mechanics to start after the transform
+    ctx.db.monster_state_changes().insert(crate::monster_ai_defs::MonsterStateChange {
+        scheduled_id: 0,
+        target_monster_id: monster.monster_id,
+        target_state: crate::monster_ai_defs::AIState::BossSimonChemicalBoltPattern,
+        scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(3500)), // Start first pattern 0.5s after transform
+    });
+
+    // Get monster stats from bestiary for phase 2
+    let bestiary_entry = ctx.db.bestiary().bestiary_id().find(&(MonsterType::BossSimonPhase2 as u32))
+        .expect("Could not find Simon Phase 2 bestiary entry!");
+
+    // Apply phase 2 enhancements
+    let mut enhanced_monster = monster.clone();
+    enhanced_monster.speed = bestiary_entry.speed * PHASE2_SPEED_MULTIPLIER;
+    enhanced_monster.atk = bestiary_entry.atk * PHASE2_DAMAGE_MULTIPLIER;
+    enhanced_monster.max_hp = bestiary_entry.max_hp;
+    enhanced_monster.hp = enhanced_monster.max_hp; // Full heal for phase 2
+    
+    // Update monster with phase 2 stats
+    ctx.db.monsters().monster_id().update(enhanced_monster);
 }
 
 fn schedule_random_simon_pattern(ctx: &ReducerContext, monster_id: u32) {
@@ -545,17 +592,11 @@ pub fn initialize_phase2_boss_simon_ai(ctx: &ReducerContext, monster_id: u32) {
     
     let mut monster = monster_opt.unwrap();
     
-    // Set initial state to idle
-    monster.ai_state = crate::monster_ai_defs::AIState::BossSimonIdle;
+    // Start with transform state
+    monster.ai_state = crate::monster_ai_defs::AIState::BossSimonPhase2Transform;
     ctx.db.monsters().monster_id().update(monster);
     
-    // Apply chemical enhancement for Phase 2
-    let mut enhanced_monster = ctx.db.monsters().monster_id().find(&monster_id).unwrap();
-    apply_chemical_enhancement(ctx, &mut enhanced_monster);
-    ctx.db.monsters().monster_id().update(enhanced_monster);
-    
-    // Schedule first attack pattern with enhanced abilities
-    schedule_random_simon_pattern(ctx, monster_id);
+    log::info!("Phase 2 Simon boss {} initialized in transform state - waiting for transform to complete", monster_id);
 }
 
 // Transition to Phase 2

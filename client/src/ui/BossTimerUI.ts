@@ -123,7 +123,6 @@ export default class BossTimerUI {
         
         // Track boss state
         this.bossActive = true;
-        this.currentBossType = bossName.includes("Scion") ? "phase1" : "phase2";
         
         // Position closer to top of screen
         const camera = this.scene.cameras.main;
@@ -641,24 +640,29 @@ export default class BossTimerUI {
     // Helper functions for boss type checking
     private isBoss(monsterType: string): boolean {
         return monsterType === 'BossEnderPhase1' || monsterType === 'BossEnderPhase2' ||
-               monsterType === 'BossAgnaPhase1' || monsterType === 'BossAgnaPhase2';
+               monsterType === 'BossAgnaPhase1' || monsterType === 'BossAgnaPhase2' ||
+               monsterType === 'BossSimonPhase1' || monsterType === 'BossSimonPhase2';
     }
 
     private isBossPhase1(monsterType: string): boolean {
-        return monsterType === 'BossEnderPhase1' || monsterType === 'BossAgnaPhase1';
+        return monsterType === 'BossEnderPhase1' || monsterType === 'BossAgnaPhase1' || 
+               monsterType === 'BossSimonPhase1';
     }
 
     private isBossPhase2(monsterType: string): boolean {
-        return monsterType === 'BossEnderPhase2' || monsterType === 'BossAgnaPhase2';
+        return monsterType === 'BossEnderPhase2' || monsterType === 'BossAgnaPhase2' || 
+               monsterType === 'BossSimonPhase2';
     }
 
     private getBossName(monsterType: string): string {
         switch (monsterType) {
-            case 'BossEnderPhase1': return "Björn, Scion of Ruin";
-            case 'BossEnderPhase2': return "Björn, Host of Oblivion";
-            case 'BossAgnaPhase1': return "Claudia, the Seething Calamity";
-            case 'BossAgnaPhase2': return "Claudia, Purified by Flame";
+            case 'BossEnderPhase1': return "The Void's Scion";
+            case 'BossEnderPhase2': return "The Void Ascendant";
+            case 'BossAgnaPhase1': return "Flame's Scion";
+            case 'BossAgnaPhase2': return "The Infernal Ascendant";
+            case 'BossSimonPhase1': return "The Mad Scientist";
+            case 'BossSimonPhase2': return "The Chemical Horror";
             default: return "Unknown Boss";
         }
     }
-} 
+}

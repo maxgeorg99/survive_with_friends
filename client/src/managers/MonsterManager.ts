@@ -111,32 +111,39 @@ export default class MonsterManager {
         this.registerMonsterListeners();
     }
 
+    // Helper method to get monster type name from bestiary ID
+    private getMonsterTypeName(bestiaryId: any): string {
+        return bestiaryId?.tag || 'Unknown';
+    }
+
     // Helper functions for boss type checking
     private isBoss(monsterType: string): boolean {
-        return monsterType === 'BossEnderPhase1' || monsterType === 'BossEnderPhase2' ||
-               monsterType === 'BossAgnaPhase1' || monsterType === 'BossAgnaPhase2' || 
-               monsterType === 'BossSimonPhase1' || monsterType === 'BossSimonPhase2';
+        return this.isBossPhase1(monsterType) || this.isBossPhase2(monsterType);
     }
 
     private isBossPhase1(monsterType: string): boolean {
-        return monsterType === 'BossEnderPhase1' || monsterType === 'BossAgnaPhase1' ||
-               monsterType === 'BossSimonPhase1';
+        const type = typeof monsterType === 'object' ? this.getMonsterTypeName(monsterType) : monsterType;
+        return type === 'BossEnderPhase1' || type === 'BossAgnaPhase1' || type === 'BossSimonPhase1';
     }
 
     private isBossPhase2(monsterType: string): boolean {
-        return monsterType === 'BossEnderPhase2' || monsterType === 'BossAgnaPhase2' || monsterType === 'BossSimonPhase2';
+        const type = typeof monsterType === 'object' ? this.getMonsterTypeName(monsterType) : monsterType;
+        return type === 'BossEnderPhase2' || type === 'BossAgnaPhase2' || type === 'BossSimonPhase2';
     }
 
     private isSimonBoss(monsterType: string): boolean {
-        return monsterType === 'BossSimonPhase1' || monsterType === 'BossSimonPhase2';
+        const type = typeof monsterType === 'object' ? this.getMonsterTypeName(monsterType) : monsterType;
+        return type === 'BossSimonPhase1' || type === 'BossSimonPhase2';
     }
 
     private isEnderBoss(monsterType: string): boolean {
-        return monsterType === 'BossEnderPhase1' || monsterType === 'BossEnderPhase2';
+        const type = typeof monsterType === 'object' ? this.getMonsterTypeName(monsterType) : monsterType;
+        return type === 'BossEnderPhase1' || type === 'BossEnderPhase2';
     }
 
     private isAgnaBoss(monsterType: string): boolean {
-        return monsterType === 'BossAgnaPhase1' || monsterType === 'BossAgnaPhase2';
+        const type = typeof monsterType === 'object' ? this.getMonsterTypeName(monsterType) : monsterType;
+        return type === 'BossAgnaPhase1' || type === 'BossAgnaPhase2';
     }
 
     // Helper method to check if the game is over (prevents boss effects during cleanup)
@@ -719,40 +726,16 @@ export default class MonsterManager {
     
     // Add a method to check for boss AI state changes
     private checkBossAiStateChange(oldMonster: Monsters, newMonster: Monsters) {
-        // Only check boss monsters
-        const monsterTypeName = this.getMonsterTypeName(newMonster.bestiaryId);
-        if (!this.isBoss(monsterTypeName)) {
+        if (!this.isBoss(this.getMonsterTypeName(newMonster.bestiaryId))) {
             return;
         }
 
-        // Get the AI state tags
-        const oldStateTag = oldMonster.aiState.tag;
-        const newStateTag = newMonster.aiState.tag;
-        
-        // Only log AI states when they actually change
-        if (oldStateTag !== newStateTag) {
-            console.log(`*** Boss ${newMonster.monsterId} (${monsterTypeName}) AI state changed: ${oldStateTag} -> ${newStateTag} ***`);
-        }
-        
-        // Always check current state (not just changes) for chase mode tracking
-        if (newStateTag === 'BossEnderChase') {
-            if (!this.bossesInChaseMode.has(newMonster.monsterId)) {
-                this.bossesInChaseMode.add(newMonster.monsterId);
-                console.log(`Boss ${newMonster.monsterId} entered chase mode - after images activated`);
-            }
-        } else {
-            if (this.bossesInChaseMode.has(newMonster.monsterId)) {
-                this.bossesInChaseMode.delete(newMonster.monsterId);
-                console.log(`Boss ${newMonster.monsterId} left chase mode - after images deactivated`);
-            }
-        }
-        
-        // Only play sounds/effects on actual state changes
-        if (oldStateTag === newStateTag) {
+        const newStateTag = (newMonster.aiState as any)?.tag;
+        const oldStateTag = (oldMonster.aiState as any)?.tag;
+        if (newStateTag === oldStateTag) {
             return;
         }
 
-        // Get the boss container for visual effects
         const bossContainer = this.monsters.get(newMonster.monsterId);
         const bossSprite = bossContainer?.list.find(child => child instanceof Phaser.GameObjects.Sprite) as Phaser.GameObjects.Sprite;
 
@@ -779,9 +762,15 @@ export default class MonsterManager {
                 }
                 break;
             case 'BossEnderTransform':
+            case 'BossAgnaTransform':
+            case 'BossSimonPhase2Transform':
                 // Detect boss type from the monster data
                 const transformBossType = this.getMonsterTypeName(newMonster.bestiaryId);
                 this.soundManager.playBossTransformSound(transformBossType);
+                // Add chemical enhancement VFX for Simon
+                if (transformBossType === 'BossSimonPhase2' && bossContainer) {
+                    this.createChemicalTransformEffect(bossContainer);
+                }
                 break;
             case 'BossAgnaFlamethrower':
                 // Play Agna flamethrower sound
@@ -794,206 +783,38 @@ export default class MonsterManager {
                 this.soundManager.playSound('agna_closing_in', 0.4);
                 break;
             default:
-                // No sound for other states (BossIdle, Default, Stationary)
+                // No sound for other states
                 break;
         }
     }
 
-    // Add a method to check for boss target changes
-    private checkBossTargetChange(oldMonster: Monsters, newMonster: Monsters) {
-        // Only check Phase 2 boss monsters
-        const monsterTypeName = this.getMonsterTypeName(newMonster.bestiaryId);
-        if (!this.isBossPhase2(monsterTypeName)) {
-            return;
-        }
-
-        // Get the current and previous target player IDs
-        const oldTargetId = oldMonster.targetPlayerId;
-        const newTargetId = newMonster.targetPlayerId;
+    // Create chemical transform effect for Simon boss
+    private createChemicalTransformEffect(bossContainer: Phaser.GameObjects.Container): void {
+        // Create toxic particles around the boss
+        const particles = this.scene.add.particles(bossContainer.x, bossContainer.y, 'toxic_particle', {
+            lifespan: 2000,
+            speed: { min: 50, max: 150 },
+            scale: { start: 0.5, end: 0 },
+            alpha: { start: 0.6, end: 0 },
+            blendMode: 'ADD',
+            emitting: true,
+            frequency: 50,
+            quantity: 2
+        });
         
-        // Only process if the target actually changed
-        if (oldTargetId !== newTargetId) {
-            console.log(`*** Boss ${newMonster.monsterId} switched target from player ${oldTargetId} to player ${newTargetId} ***`);
-            
-            // Play boss roar sound quietly when target changes
-            if (this.soundManager) {
-                this.soundManager.playSound('boss_roar', 0.6); // Medium volume for target change
-            }
-            
-            // Update our tracking
-            this.bossTargets.set(newMonster.monsterId, newTargetId);
-        }
-    }
-
-    // Handles when a monster is created
-    handleMonsterCreated(ctx: EventContext, monster: Monsters) {
-        const monsterTypeName = this.getMonsterTypeName(monster.bestiaryId);
-        
-        // Only log creation for bosses, special monsters, or when debugging
-        if (this.isBoss(monsterTypeName) || monsterTypeName === "VoidChest") {
-            //console.log(`Monster created: ${monster.monsterId}, type: ${monsterTypeName}`);
-        }
-        
-        // Special handling for boss monsters - create immediately (no queue)
-        if (this.isBoss(monsterTypeName)) {
-            console.log(`BOSS SPAWNED: ${monsterTypeName}`);
-            console.log(`- Monster ID: ${monster.monsterId}`);
-            console.log(`- HP: ${monster.hp}/${monster.maxHp}`);
-            console.log(`- Asset key: ${MONSTER_ASSET_KEYS[monsterTypeName]}`);
-            console.log(`- Texture exists: ${this.scene.textures.exists(MONSTER_ASSET_KEYS[monsterTypeName])}`);
-            console.log(`- Position: (${monster.spawnPosition.x}, ${monster.spawnPosition.y})`);
-            
-            // Play boss spawn sound for first form (both Ender and Agna Phase 1)
-            if (this.isBossPhase1(monsterTypeName)) {
-                const bossName = this.isEnderBoss(monsterTypeName) ? "ENDER" : "AGNA";
-                console.log(`*** ${bossName} PHASE 1 SPAWNED! Playing voice cue... ***`);
-                this.soundManager.playBossSpawnSound(monsterTypeName);
-            }
-            
-            // If this is phase 2, it means phase 1 was defeated
-            if (this.isBossPhase2(monsterTypeName)) {
-                const bossName = this.isEnderBoss(monsterTypeName) ? "ENDER" : "AGNA";
-                console.log(`*** ${bossName} PHASE 2 HAS BEGUN! ***`);
-                
-                // Play transformation sound sequence
-                this.soundManager.playBossTransformSound(monsterTypeName);
-                
-                // Reset phase 1 tracking variables since phase 2 has spawned
-                if (this.bossPhase1Killed) {
-                    const transitionTime = Date.now() - this.timeOfBossPhase1Death;
-                    console.log(`Phase transition took ${transitionTime}ms from phase 1 death to phase 2 spawn`);
-                    this.bossPhase1Killed = false;
-                    this.bossPreTransformActive = false; // Reset pre-transform flag for Phase 2
+        // Tint effect for chemical enhancement
+        const sprite = bossContainer.list.find(child => child instanceof Phaser.GameObjects.Sprite) as Phaser.GameObjects.Sprite;
+        if (sprite) {
+            this.scene.tweens.add({
+                targets: sprite,
+                duration: 2000,
+                tint: 0x00ff00,
+                yoyo: true,
+                repeat: 1,
+                onComplete: () => {
+                    particles.destroy();
                 }
-                
-                // Play the dark transformation effect
-                this.createBossTransformationEffect(monster.spawnPosition.x, monster.spawnPosition.y);
-            }
-            
-            // Create boss monsters immediately (bypassing queue)
-            this.createOrUpdateMonster(monster);
-            
-            // Additional check after creation
-            const bossContainer = this.monsters.get(monster.monsterId);
-            if (bossContainer) {
-                console.log(`Boss container after creation: visible=${bossContainer.visible}, alpha=${bossContainer.alpha}`);
-            } else {
-                console.error(`Failed to find boss container after creation!`);
-            }
-        } else if (monsterTypeName === "EnderClaw") {
-            // Special handling for EnderClaw - play spawn sound and create immediately
-            console.log(`EnderClaw spawned: ${monster.monsterId}`);
-            
-            // Play boss_appear sound at reduced volume
-            const soundManager = (window as any).soundManager;
-            if (soundManager) {
-                soundManager.playSound('boss_appear', 0.4); // Quieter volume as requested
-            }
-            
-            // Create EnderClaw immediately (bypassing queue)
-            this.createOrUpdateMonster(monster);
-        } else {
-            // For regular monsters, add to creation queue for smooth spawning
-            this.addToCreationQueue(monster);
-        }
-    }
-    
-    // Add monster to creation queue
-    private addToCreationQueue(monster: Monsters) {
-        this.creationQueue.push(monster);
-        // Only log queue size if it's getting large (potential performance issue)
-        if (this.creationQueue.length > 5) {
-            console.log(`Monster creation queue getting large: ${this.creationQueue.length} monsters queued`);
-        }
-        
-        // Start processing queue if not already processing
-        if (!this.isProcessingQueue) {
-            this.startQueueProcessing();
-        }
-    }
-    
-    // Start processing the creation queue
-    private startQueueProcessing() {
-        if (this.isProcessingQueue) return;
-        
-        this.isProcessingQueue = true;
-        // Reduce logging frequency for performance
-        if (this.creationQueue.length > 3) {
-            console.log(`Started monster creation queue processing (${this.creationQueue.length} monsters)`);
-        }
-        this.processCreationQueue();
-    }
-    
-    // Process monsters from creation queue (spread across frames)
-    private processCreationQueue() {
-        if (this.creationQueue.length === 0) {
-            this.isProcessingQueue = false;
-            // Only log completion if we processed a significant number
-            return;
-        }
-        
-        // Create up to maxMonstersPerFrame monsters this frame
-        const monstersToCreate = Math.min(this.maxMonstersPerFrame, this.creationQueue.length);
-        
-        for (let i = 0; i < monstersToCreate; i++) {
-            const monster = this.creationQueue.shift();
-            if (monster) {
-                this.createOrUpdateMonster(monster);
-            }
-        }
-        
-        // Continue processing on next frame if there are more monsters
-        if (this.creationQueue.length > 0) {
-            this.scene.time.delayedCall(16, () => { // ~60fps delay
-                this.processCreationQueue();
             });
-        } else {
-            this.isProcessingQueue = false;
-            //console.log("Monster creation queue processing complete");
-        }
-    }
-    
-    // Clear the creation queue (called during cleanup)
-    private clearCreationQueue() {
-        this.creationQueue.length = 0;
-        this.isProcessingQueue = false;
-        //console.log("Monster creation queue cleared");
-    }
-    
-    // Helper to get monster type name from bestiary ID
-    private getMonsterTypeName(bestiaryId: any): string {
-        // Check if bestiaryId is an object with a tag property (from autobindings)
-        if (bestiaryId && typeof bestiaryId === 'object' && 'tag' in bestiaryId) {
-            // Only log unknown types or bosses for debugging
-            if (bestiaryId.tag.includes("Boss") || bestiaryId.tag === "Unknown") {
-                console.log(`Getting monster type from tag: ${bestiaryId.tag}`);
-            }
-            return bestiaryId.tag;
-        }
-        
-        // Fall back to numeric mapping for backward compatibility
-        switch(bestiaryId) {
-            case 0: return "Rat";
-            case 1: return "Slime";
-            case 2: return "Bat";
-            case 3: return "Orc";
-            case 4: return "Imp";
-            case 5: return "Zombie";
-            case 6: return "VoidChest";
-            case 7: return "EnderClaw";
-            case 8: return "BossEnderPhase1";
-            case 9: return "BossEnderPhase2";
-            case 10: return "BossAgnaPhase1";
-            case 11: return "BossAgnaPhase2";
-            case 12: return "BossSimonPhase1";
-            case 13: return "BossSimonPhase2";
-            case 14: return "AgnaCandle";
-            case 15: return "Crate";
-            case 16: return "Tree";
-            case 17: return "Statue";
-            default: 
-                console.warn(`Unknown monster type: ${bestiaryId}`);
-                return "Unknown";
         }
     }
     
@@ -1520,5 +1341,30 @@ export default class MonsterManager {
         this.hoveringTweens.set(monsterId, hoveringTween);
         
         console.log(`Created hovering animation for Bat monster ID: ${monsterId}`);
+    }
+
+    // Handle monster creation event
+    private handleMonsterCreated(ctx: EventContext, monster: Monsters) {
+        this.createOrUpdateMonster(monster);
+    }
+
+    // Check for boss target changes
+    private checkBossTargetChange(oldMonster: Monsters, newMonster: Monsters) {
+        if (!this.isBoss(this.getMonsterTypeName(newMonster.bestiaryId))) {
+            return;
+        }
+
+        // Check if target has changed
+        if (oldMonster.targetPlayerId !== newMonster.targetPlayerId) {
+            // Update target tracking
+            this.bossTargets.set(newMonster.monsterId, newMonster.targetPlayerId);
+            console.log(`Boss ${newMonster.monsterId} target changed from ${oldMonster.targetPlayerId} to ${newMonster.targetPlayerId}`);
+        }
+    }
+
+    // Clear pending monster creations
+    private clearCreationQueue() {
+        this.creationQueue = [];
+        this.isProcessingQueue = false;
     }
 }

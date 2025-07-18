@@ -286,6 +286,9 @@ pub fn spawn_monster(ctx: &ReducerContext, spawner: MonsterSpawners) {
     } else if spawner.monster_type == MonsterType::BossAgnaPhase1 ||
               spawner.monster_type == MonsterType::BossAgnaPhase2 {
         AIState::BossAgnaIdle
+    } else if spawner.monster_type == MonsterType::BossSimonPhase1 ||
+              spawner.monster_type == MonsterType::BossSimonPhase2 {
+        AIState::BossSimonIdle
     } else if spawner.monster_type == MonsterType::VoidChest {
         AIState::Stationary
     } else if spawner.monster_type == MonsterType::EnderClaw {
@@ -408,7 +411,9 @@ pub fn spawn_monster(ctx: &ReducerContext, spawner: MonsterSpawners) {
     if spawner.monster_type.clone() == MonsterType::BossEnderPhase1 || 
        spawner.monster_type.clone() == MonsterType::BossEnderPhase2 ||
        spawner.monster_type.clone() == MonsterType::BossAgnaPhase1 ||
-       spawner.monster_type.clone() == MonsterType::BossAgnaPhase2 {
+       spawner.monster_type.clone() == MonsterType::BossAgnaPhase2 ||
+       spawner.monster_type.clone() == MonsterType::BossSimonPhase1 ||
+       spawner.monster_type.clone() == MonsterType::BossSimonPhase2 {
         log::info!("Boss monster of type {:?} created with ID {}", spawner.monster_type, monster.monster_id);
         crate::boss_system::update_boss_monster_id(ctx, monster.monster_id);
         

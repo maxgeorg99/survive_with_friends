@@ -30,34 +30,34 @@ import {
   Timestamp,
   deepEqual,
 } from "@clockworklabs/spacetimedb-sdk";
-export type ChemicalZombieSpawner = {
-  scheduledId: bigint,
-  bossMonsterId: number,
-  scheduledAt: { tag: "Interval", value: TimeDuration } | { tag: "Time", value: Timestamp },
+import { AiState as __AiState } from "./ai_state_type";
+
+export type BossSimonLastPattern = {
+  monsterId: number,
+  lastPattern: __AiState,
 };
 
 /**
  * A namespace for generated helper functions.
  */
-export namespace ChemicalZombieSpawner {
+export namespace BossSimonLastPattern {
   /**
   * A function which returns this type represented as an AlgebraicType.
   * This function is derived from the AlgebraicType used to generate this type.
   */
   export function getTypeScriptAlgebraicType(): AlgebraicType {
     return AlgebraicType.createProductType([
-      new ProductTypeElement("scheduledId", AlgebraicType.createU64Type()),
-      new ProductTypeElement("bossMonsterId", AlgebraicType.createU32Type()),
-      new ProductTypeElement("scheduledAt", AlgebraicType.createScheduleAtType()),
+      new ProductTypeElement("monsterId", AlgebraicType.createU32Type()),
+      new ProductTypeElement("lastPattern", __AiState.getTypeScriptAlgebraicType()),
     ]);
   }
 
-  export function serialize(writer: BinaryWriter, value: ChemicalZombieSpawner): void {
-    ChemicalZombieSpawner.getTypeScriptAlgebraicType().serialize(writer, value);
+  export function serialize(writer: BinaryWriter, value: BossSimonLastPattern): void {
+    BossSimonLastPattern.getTypeScriptAlgebraicType().serialize(writer, value);
   }
 
-  export function deserialize(reader: BinaryReader): ChemicalZombieSpawner {
-    return ChemicalZombieSpawner.getTypeScriptAlgebraicType().deserialize(reader);
+  export function deserialize(reader: BinaryReader): BossSimonLastPattern {
+    return BossSimonLastPattern.getTypeScriptAlgebraicType().deserialize(reader);
   }
 
 }

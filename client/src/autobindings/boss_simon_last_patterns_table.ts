@@ -30,23 +30,25 @@ import {
   Timestamp,
   deepEqual,
 } from "@clockworklabs/spacetimedb-sdk";
-import { ChemicalZombieSpawner } from "./chemical_zombie_spawner_type";
+import { BossSimonLastPattern } from "./boss_simon_last_pattern_type";
+import { AiState as __AiState } from "./ai_state_type";
+
 import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
 
 /**
- * Table handle for the table `chemical_zombie_spawner`.
+ * Table handle for the table `boss_simon_last_patterns`.
  *
- * Obtain a handle from the [`chemicalZombieSpawner`] property on [`RemoteTables`],
- * like `ctx.db.chemicalZombieSpawner`.
+ * Obtain a handle from the [`bossSimonLastPatterns`] property on [`RemoteTables`],
+ * like `ctx.db.bossSimonLastPatterns`.
  *
  * Users are encouraged not to explicitly reference this type,
  * but to directly chain method calls,
- * like `ctx.db.chemicalZombieSpawner.on_insert(...)`.
+ * like `ctx.db.bossSimonLastPatterns.on_insert(...)`.
  */
-export class ChemicalZombieSpawnerTableHandle {
-  tableCache: TableCache<ChemicalZombieSpawner>;
+export class BossSimonLastPatternsTableHandle {
+  tableCache: TableCache<BossSimonLastPattern>;
 
-  constructor(tableCache: TableCache<ChemicalZombieSpawner>) {
+  constructor(tableCache: TableCache<BossSimonLastPattern>) {
     this.tableCache = tableCache;
   }
 
@@ -54,53 +56,53 @@ export class ChemicalZombieSpawnerTableHandle {
     return this.tableCache.count();
   }
 
-  iter(): Iterable<ChemicalZombieSpawner> {
+  iter(): Iterable<BossSimonLastPattern> {
     return this.tableCache.iter();
   }
   /**
-   * Access to the `scheduledId` unique index on the table `chemical_zombie_spawner`,
+   * Access to the `monsterId` unique index on the table `boss_simon_last_patterns`,
    * which allows point queries on the field of the same name
-   * via the [`ChemicalZombieSpawnerScheduledIdUnique.find`] method.
+   * via the [`BossSimonLastPatternsMonsterIdUnique.find`] method.
    *
    * Users are encouraged not to explicitly reference this type,
    * but to directly chain method calls,
-   * like `ctx.db.chemicalZombieSpawner.scheduledId().find(...)`.
+   * like `ctx.db.bossSimonLastPatterns.monsterId().find(...)`.
    *
-   * Get a handle on the `scheduledId` unique index on the table `chemical_zombie_spawner`.
+   * Get a handle on the `monsterId` unique index on the table `boss_simon_last_patterns`.
    */
-  scheduledId = {
-    // Find the subscribed row whose `scheduledId` column value is equal to `col_val`,
+  monsterId = {
+    // Find the subscribed row whose `monsterId` column value is equal to `col_val`,
     // if such a row is present in the client cache.
-    find: (col_val: bigint): ChemicalZombieSpawner | undefined => {
+    find: (col_val: number): BossSimonLastPattern | undefined => {
       for (let row of this.tableCache.iter()) {
-        if (deepEqual(row.scheduledId, col_val)) {
+        if (deepEqual(row.monsterId, col_val)) {
           return row;
         }
       }
     },
   };
 
-  onInsert = (cb: (ctx: EventContext, row: ChemicalZombieSpawner) => void) => {
+  onInsert = (cb: (ctx: EventContext, row: BossSimonLastPattern) => void) => {
     return this.tableCache.onInsert(cb);
   }
 
-  removeOnInsert = (cb: (ctx: EventContext, row: ChemicalZombieSpawner) => void) => {
+  removeOnInsert = (cb: (ctx: EventContext, row: BossSimonLastPattern) => void) => {
     return this.tableCache.removeOnInsert(cb);
   }
 
-  onDelete = (cb: (ctx: EventContext, row: ChemicalZombieSpawner) => void) => {
+  onDelete = (cb: (ctx: EventContext, row: BossSimonLastPattern) => void) => {
     return this.tableCache.onDelete(cb);
   }
 
-  removeOnDelete = (cb: (ctx: EventContext, row: ChemicalZombieSpawner) => void) => {
+  removeOnDelete = (cb: (ctx: EventContext, row: BossSimonLastPattern) => void) => {
     return this.tableCache.removeOnDelete(cb);
   }
 
   // Updates are only defined for tables with primary keys.
-  onUpdate = (cb: (ctx: EventContext, oldRow: ChemicalZombieSpawner, newRow: ChemicalZombieSpawner) => void) => {
+  onUpdate = (cb: (ctx: EventContext, oldRow: BossSimonLastPattern, newRow: BossSimonLastPattern) => void) => {
     return this.tableCache.onUpdate(cb);
   }
 
-  removeOnUpdate = (cb: (ctx: EventContext, onRow: ChemicalZombieSpawner, newRow: ChemicalZombieSpawner) => void) => {
+  removeOnUpdate = (cb: (ctx: EventContext, onRow: BossSimonLastPattern, newRow: BossSimonLastPattern) => void) => {
     return this.tableCache.removeOnUpdate(cb);
   }}

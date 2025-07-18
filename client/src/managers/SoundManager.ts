@@ -239,13 +239,18 @@ export default class SoundManager {
         if (bossType === 'BossAgnaPhase2') {
             this.playSoundsSequence([
                 { key: 'boss_transform', volume: 0.9 },
-                { key: 'voice_agna_2', delay: 1500, volume: 0.4 } // Reduced volume for Agna narrator
+                { key: 'voice_agna_2', delay: 1500, volume: 0.4 }
             ]);
-        } else {
-            // Default to Ender voices (original behavior)
+        } else if (bossType === 'BossSimonPhase2') {
             this.playSoundsSequence([
                 { key: 'boss_transform', volume: 0.9 },
-                { key: 'voice_boss_2', delay: 1500, volume: 1.0 } // 1.5 second delay
+                { key: 'voice_simon_2', delay: 1500, volume: 0.5 }
+            ]);
+        } else {
+            // Default to Ender voices
+            this.playSoundsSequence([
+                { key: 'boss_transform', volume: 0.9 },
+                { key: 'voice_boss_2', delay: 1500, volume: 1.0 }
             ]);
         }
     }
@@ -388,4 +393,4 @@ export default class SoundManager {
         this.frameThrottledSounds.delete(soundKey);
         //console.log(`SoundManager: Removed '${soundKey}' from frame-throttled sounds`);
     }
-} 
+}
