@@ -18,7 +18,7 @@ const CHEMICAL_BOLT_INTERVAL_MS: u64 = 1200;         // Time between shots (ever
 const CHEMICAL_BOLT_PATTERN_DURATION_MS: u64 = 8000; // Duration of bolt attack pattern
 
 // Phase 1 Toxic Zone attack constants
-const TOXIC_ZONE_DAMAGE: u32 = 20;                   // Damage per tick
+const TOXIC_ZONE_DAMAGE: u32 = 10;                   // Reduced damage per tick (from 20)
 const TOXIC_ZONE_RADIUS: f32 = 96.0;                 // Large area of effect
 const TOXIC_ZONE_DURATION_MS: u64 = 6000;            // Zone lasts 6 seconds
 const TOXIC_ZONE_INTERVAL_MS: u64 = 4000;            // Time between zones (every 4 seconds)
@@ -437,8 +437,7 @@ pub fn execute_boss_simon_idle_behavior(ctx: &ReducerContext, monster: &crate::M
             start_chemical_bolt_attacks(ctx, monster.monster_id);
         },
         SimonBossPhase::Phase2 => {
-            // Maintain all Phase 2 attacks
-            start_chemical_bolt_attacks(ctx, monster.monster_id);
+            // Only maintain Phase 2 attacks (no chemical bolts)
             start_toxic_zone_attacks(ctx, monster.monster_id);
             start_toxic_spray_pattern(ctx, monster.monster_id);
         }
@@ -446,11 +445,9 @@ pub fn execute_boss_simon_idle_behavior(ctx: &ReducerContext, monster: &crate::M
 
     // Schedule next attack pattern
     let next_state = schedule_random_simon_pattern(ctx, monster.monster_id);
-    
-    // Apply next state immediately
-    let mut monster = monster.clone();
-    monster.ai_state = next_state;
-    ctx.db.monsters().monster_id().update(monster);
+    let mut updated_monster = monster.clone();
+    updated_monster.ai_state = next_state;
+    ctx.db.monsters().monster_id().update(updated_monster);
 }
 
 // Execute pattern behaviors
@@ -862,15 +859,13 @@ fn schedule_random_simon_pattern(ctx: &ReducerContext, monster_id: u32) -> crate
     // Select pattern based on phase
     let next_state = match phase {
         SimonBossPhase::Phase1 => {
-            // Ensure Simon shoots chemical bolts in Phase 1
+            // Only chemical bolts in Phase 1
             crate::monster_ai_defs::AIState::BossSimonChemicalBoltPattern
         },
         SimonBossPhase::Phase2 => {
-            // In phase 2, mix in toxic spray and toxic zone attacks
+            // Phase 2: Only toxic spray and toxic zone attacks
             let random_value = rng.gen::<f32>();
-            if random_value < 0.4 {
-                crate::monster_ai_defs::AIState::BossSimonChemicalBoltPattern
-            } else if random_value < 0.8 {
+            if random_value < 0.5 {
                 crate::monster_ai_defs::AIState::BossSimonToxicZonePattern
             } else {
                 crate::monster_ai_defs::AIState::BossSimonToxicSpray

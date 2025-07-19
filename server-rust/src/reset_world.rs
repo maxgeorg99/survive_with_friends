@@ -1,5 +1,16 @@
 use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp};
-use crate::{entity, monsters, monsters_boid, gems, monster_spawners, boss_spawn_timer, boss_phase_two_timer, game_state, monster_spawn_timer, monster_hit_cleanup, active_attack_cleanup, attack_burst_cooldowns, player_scheduled_attacks, monster_damage, player, upgrade_options, active_attacks, loot_capsule_defs, winner_transition_timer, dead_player_transition_timer, void_zone_scheduler, chaos_ball_scheduler, active_monster_attacks, agna_magic_circles, agna_fire_orb_scheduler, agna_delayed_orb_scheduler, agna_flamethrower_scheduler, agna_candle_spawns, agna_candle_scheduler, agna_candle_bolt_scheduler, agna_ritual_completion_check, agna_summoning_circle_spawner, agna_target_switch_scheduler, agna_phase2_flamethrower_scheduler, boss_agna_last_patterns};
+use crate::{entity, monsters, monsters_boid, gems, monster_spawners, boss_spawn_timer, 
+    boss_phase_two_timer, game_state, monster_spawn_timer, monster_hit_cleanup, 
+    active_attack_cleanup, attack_burst_cooldowns, player_scheduled_attacks, monster_damage, 
+    player, upgrade_options, active_attacks, void_zone_scheduler, chaos_ball_scheduler, 
+    active_monster_attacks, agna_magic_circles, agna_fire_orb_scheduler, 
+    agna_delayed_orb_scheduler, agna_flamethrower_scheduler, agna_candle_spawns, 
+    agna_candle_scheduler, agna_candle_bolt_scheduler, agna_ritual_completion_check, 
+    agna_summoning_circle_spawner, agna_target_switch_scheduler, 
+    agna_phase2_flamethrower_scheduler, boss_agna_last_patterns};
+
+use crate::boss_ender_defs::boss_ender_last_patterns;
+use crate::boss_simon_defs::boss_simon_last_patterns;
 
 // ResetWorld reducer - clears all monsters, gems, monster spawners, and resets boss state
 // This is called both when all players die (defeat) AND after victory cleanup
@@ -302,4 +313,54 @@ pub fn reset_world(ctx: &ReducerContext) {
     // This ensures spawning only occurs when players are present
     
     log::info!("ResetWorld: Game world reset completed successfully");
+}
+
+// Clean up game state - called on victory AND defeat
+#[reducer]
+pub fn cleanup_game_state(ctx: &ReducerContext) {
+    // Clean up all monster states
+    let monster_ids: Vec<u32> = ctx.db.monsters().iter()
+        .map(|m| m.monster_id)
+        .collect();
+    
+    for monster_id in monster_ids {
+        // Clean up AI schedules
+        crate::monster_ai_defs::cleanup_monster_ai_schedules(ctx, monster_id);
+        
+        // Clean up boss specific attacks/states
+        crate::boss_ender_defs::cleanup_ender_scythe_schedules(ctx, monster_id);
+        crate::boss_agna_defs::cleanup_agna_ai_schedules(ctx, monster_id);
+        crate::boss_simon_defs::cleanup_simon_ai_schedules(ctx, monster_id);
+
+        // Also cleanup Phase 2 specific attacks
+        crate::boss_simon_defs::cleanup_simon_phase2_schedules(ctx, monster_id);
+    }
+
+    // Clean up all active attacks
+    let active_attack_ids: Vec<u64> = ctx.db.active_monster_attacks().iter()
+        .map(|a| a.active_monster_attack_id)
+        .collect();
+
+    for attack_id in active_attack_ids {
+        ctx.db.active_monster_attacks().active_monster_attack_id().delete(&attack_id);
+    }
+
+    // Clean up monster spawners (including zombies)
+    let spawner_ids: Vec<u64> = ctx.db.monster_spawners().iter()
+        .map(|s| s.scheduled_id)
+        .collect();
+
+    for spawner_id in spawner_ids {
+        ctx.db.monster_spawners().scheduled_id().delete(&spawner_id);
+    }
+
+    // Clean up boss pattern states
+    ctx.db.boss_ender_last_patterns().iter()
+        .for_each(|p| { ctx.db.boss_ender_last_patterns().monster_id().delete(&p.monster_id); });
+    ctx.db.boss_simon_last_patterns().iter()
+        .for_each(|p| { ctx.db.boss_simon_last_patterns().monster_id().delete(&p.monster_id); });
+    ctx.db.boss_agna_last_patterns().iter()
+        .for_each(|p| { ctx.db.boss_agna_last_patterns().monster_id().delete(&p.monster_id); });
+        
+    log::info!("Cleaned up all monster states and attacks");
 }
