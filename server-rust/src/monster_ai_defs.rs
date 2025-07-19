@@ -179,53 +179,39 @@ fn execute_state_entry_behavior(ctx: &ReducerContext, monster: &crate::Monsters,
         
         AIState::BossSimonIdle => {
             log::info!("Monster {} entering BossSimonIdle state", monster.monster_id);
-            
             // Delegate to boss_simon_defs for Simon boss specific behavior
             crate::boss_simon_defs::execute_boss_simon_idle_behavior(ctx, monster);
         },
-        
         AIState::BossSimonToxicSpray => {
             log::info!("Monster {} entering BossSimonToxicSpray state", monster.monster_id);
-            
             // Delegate to boss_simon_defs for Simon boss specific behavior
             crate::boss_simon_defs::execute_boss_simon_toxic_spray_behavior(ctx, monster);
         },
-        
-        AIState::BossSimonZombieWave => {
-            log::info!("Monster {} entering BossSimonZombieWave state", monster.monster_id);
-            
-            // Delegate to boss_simon_defs for Simon boss specific behavior
-            crate::boss_simon_defs::execute_boss_simon_zombie_wave_behavior(ctx, monster);
-        },
-        
-        AIState::BossSimonTransform => {
-            log::info!("Monster {} entering BossSimonTransform state", monster.monster_id);
-            
-            // Delegate to boss_simon_defs for Simon boss specific behavior
-            crate::boss_simon_defs::execute_boss_simon_transform_behavior(ctx, monster);
-        },
-        
         AIState::BossSimonChemicalBoltPattern => {
             log::info!("Monster {} entering BossSimonChemicalBoltPattern state", monster.monster_id);
-            
             // Delegate to boss_simon_defs for Simon boss specific behavior
             crate::boss_simon_defs::execute_boss_simon_chemical_bolt_pattern(ctx, monster);
         },
-        
         AIState::BossSimonToxicZonePattern => {
             log::info!("Monster {} entering BossSimonToxicZonePattern state", monster.monster_id);
-            
             // Delegate to boss_simon_defs for Simon boss specific behavior
             crate::boss_simon_defs::execute_boss_simon_toxic_zone_pattern(ctx, monster);
         },
-        
+        AIState::BossSimonZombieWave => {
+            log::info!("Monster {} entering BossSimonZombieWave state", monster.monster_id);
+            // Delegate to boss_simon_defs for Simon boss specific behavior
+            crate::boss_simon_defs::execute_boss_simon_zombie_wave_behavior(ctx, monster);
+        },
+        AIState::BossSimonTransform => {
+            log::info!("Monster {} entering BossSimonTransform state", monster.monster_id);
+            // Delegate to boss_simon_defs for Simon boss specific behavior
+            crate::boss_simon_defs::execute_boss_simon_transform_behavior(ctx, monster);
+        },
         AIState::BossSimonPhase2Transform => {
             log::info!("Monster {} entering BossSimonPhase2Transform state", monster.monster_id);
-            
             // Delegate to boss_simon_defs for Simon boss specific behavior
             crate::boss_simon_defs::execute_boss_simon_phase2_transform(ctx, monster);
         },
-        
         AIState::Default => {
             log::info!("Monster {} entering Default state", monster.monster_id);
             // No special behavior for default state
@@ -375,11 +361,11 @@ pub fn get_movement_behavior_for_state(state: &AIState) -> MovementBehavior {
         AIState::BossAgnaRitualComplete => MovementBehavior::StandStill, // Agna stands still during completion
         AIState::BossSimonIdle => MovementBehavior::Normal,
         AIState::BossSimonToxicSpray => MovementBehavior::Normal, // Simon moves while spraying
-        AIState::BossSimonZombieWave => MovementBehavior::StandStill, // Simon stands still during zombie wave
-        AIState::BossSimonTransform => MovementBehavior::StandStill, // Simon stands still during transformation
+        AIState::BossSimonZombieWave => MovementBehavior::Normal, // Simon stands still during zombie wave
+        AIState::BossSimonTransform => MovementBehavior::StandStill, // Stand still during transform
         AIState::BossSimonChemicalBoltPattern => MovementBehavior::Normal, // Simon moves during bolt pattern
         AIState::BossSimonToxicZonePattern => MovementBehavior::Normal, // Simon moves during zone pattern
-        AIState::BossSimonPhase2Transform => MovementBehavior::StandStill, // Simon stands still during phase 2 transform
+        AIState::BossSimonPhase2Transform => MovementBehavior::Normal, // Simon stands still during phase 2 transform
         AIState::Stationary => MovementBehavior::StandStill,
     }
 }

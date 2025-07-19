@@ -205,7 +205,7 @@ export class MonsterAttackManager {
         } else if (attackType === 'SimonToxicZone') {
             spriteKey = 'attack_toxic_zone';
         } else if (attackType === 'SimonToxicSpray') {
-            spriteKey = 'attack_boss_toxicbolt'; // Reuse toxic bolt sprite but with different behavior
+            spriteKey = 'attack_toxic_spray'; // Reuse toxic bolt sprite but with different behavior
         }
         
         // Verify the texture exists

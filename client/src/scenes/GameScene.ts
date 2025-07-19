@@ -234,6 +234,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('attack_boss_simon', '/assets/attack_boss_simon.png');
         this.load.image('attack_boss_toxicbolt', '/assets/attack_boss_toxicbolt.png');
         this.load.image('attack_toxic_zone', '/assets/attack_toxic_zone.png');
+        this.load.image('attack_toxic_spray', '/assets/attack_toxic_spray.png');
         this.load.image('final_boss_phase1', '/assets/final_boss_phase_1.png');
         this.load.image('final_boss_phase2', '/assets/final_boss_phase_2.png');
         this.load.image('boss_agna_1', '/assets/boss_agna_1.png');

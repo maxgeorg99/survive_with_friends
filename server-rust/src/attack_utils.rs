@@ -283,3 +283,36 @@ pub fn get_normalized_direction(direction: DbVector2) -> DbVector2 {
         direction.normalize()
     }
 }
+
+pub fn find_safe_ability_position(ctx: &ReducerContext, position: DbVector2, _player_id: u32) -> Option<DbVector2> {
+    let mut targets_in_range: Vec<DbVector2> = Vec::new();
+    let safe_radius = 300.0; // Example safe radius
+    let max_distance_squared = safe_radius * safe_radius;
+
+    // Check all monsters to find a safe position
+    for boid in ctx.db.monsters_boid().iter() {
+        let dx = boid.position.x - position.x;
+        let dy = boid.position.y - position.y;
+        let distance_squared = dx * dx + dy * dy;
+
+        // If this monster is within the safe radius, we need to find a new position
+        if distance_squared <= max_distance_squared {
+            // Calculate a direction away from the monster
+            let direction_away = DbVector2::new(-dx, -dy).normalize();
+
+            // Calculate a potential safe position
+            let safe_position = position + direction_away * safe_radius;
+
+            // Add the safe position to the list of potential targets
+            targets_in_range.push(safe_position);
+        }
+    }
+
+    // Choose a random safe position from the list
+    let mut rng = ctx.rng();
+    if targets_in_range.is_empty() {
+        return None;
+    }
+    let random_index = rng.gen_range(0..targets_in_range.len());
+    Some(targets_in_range[random_index])
+}

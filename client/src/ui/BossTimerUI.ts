@@ -656,12 +656,12 @@ export default class BossTimerUI {
 
     private getBossName(monsterType: string): string {
         switch (monsterType) {
-            case 'BossEnderPhase1': return "The Void's Scion";
-            case 'BossEnderPhase2': return "The Void Ascendant";
-            case 'BossAgnaPhase1': return "Flame's Scion";
-            case 'BossAgnaPhase2': return "The Infernal Ascendant";
-            case 'BossSimonPhase1': return "The Mad Scientist";
-            case 'BossSimonPhase2': return "The Chemical Horror";
+            case 'BossEnderPhase1': return "Björn, The Void's Scion";
+            case 'BossEnderPhase2': return "Björn, The Void Ascendant";
+            case 'BossAgnaPhase1': return "Claudia, Flame's Scion";
+            case 'BossAgnaPhase2': return "Claudia, The Infernal Ascendant";
+            case 'BossSimonPhase1': return "Simon, The Mad Scientist";
+            case 'BossSimonPhase2': return "Simon, The Chemical Horror";
             default: return "Unknown Boss";
         }
     }

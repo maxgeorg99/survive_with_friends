@@ -51,6 +51,7 @@ pub struct Monsters {
 }
 
 // Monster position/boid table
+#[derive(Clone)]
 #[table(name = monsters_boid, public)]
 pub struct MonsterBoid {
     #[primary_key]

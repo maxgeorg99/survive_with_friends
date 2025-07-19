@@ -174,24 +174,15 @@ pub struct BossTargetSwitchScheduler {
 #[reducer]
 pub fn spawn_ender_claw_wave(ctx: &ReducerContext, spawner: EnderClawSpawner) {
     if ctx.sender != ctx.identity() {
-        panic!("spawn_ender_claw_wave may not be invoked by clients, only via scheduling.");
+        panic!("spawn_ender_claw_wave may not be invoked by clients.");
     }
 
     // Check if the Phase 2 boss still exists
     let boss_opt = ctx.db.monsters().monster_id().find(&spawner.boss_monster_id);
-    let boss = match boss_opt {
-        Some(monster) => monster,
-        None => {
-            log::info!("Phase 2 boss {} no longer exists, stopping EnderClaw spawning", spawner.boss_monster_id);
-            return;
-        }
+    let _boss = match boss_opt {
+        Some(b) => b,
+        None => return,
     };
-
-    // Verify this is actually a Phase 2 boss
-    if boss.bestiary_id != MonsterType::BossEnderPhase2 {
-        log::info!("Boss {} is not Phase 2, stopping EnderClaw spawning", spawner.boss_monster_id);
-        return;
-    }
 
     // Get all active players
     let players: Vec<_> = ctx.db.player().iter().collect();

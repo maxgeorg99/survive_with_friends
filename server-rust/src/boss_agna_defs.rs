@@ -239,7 +239,7 @@ pub struct AgnaPhase2FlamethrowerScheduler {
 
 
 // Handle movement for Agna's special attacks
-pub fn handle_agna_attack_movement(ctx: &ReducerContext, attack: &mut crate::ActiveMonsterAttack) {
+pub fn handle_agna_attack_movement(_ctx: &ReducerContext, attack: &mut crate::ActiveMonsterAttack) {
     match attack.monster_attack_type {
         MonsterAttackType::AgnaFlamethrowerJet => {
             // Regular projectile movement for flamethrower jets
@@ -1714,7 +1714,7 @@ pub fn trigger_agna_target_switch(ctx: &ReducerContext, scheduler: AgnaTargetSwi
     };
 
     // Verify this is a Phase 2 Agna boss
-    if boss.bestiary_id != crate::MonsterType::BossAgnaPhase2 {
+    if boss.bestiary_id != MonsterType::BossAgnaPhase2 {
         log::info!("Boss {} is not Agna Phase 2, stopping target switching", scheduler.boss_monster_id);
         return;
     }
@@ -1979,4 +1979,3 @@ pub fn cleanup_agna_phase2_schedules(ctx: &ReducerContext, boss_monster_id: u32)
     }
 }
 
- 

@@ -219,7 +219,7 @@ fn schedule_boss_spawning(ctx: &ReducerContext, position: DbVector2) {
     log::info!("Spawning {} boss (type {:?}) at position ({}, {})", boss_name, boss_selection.boss_type, position.x, position.y);
     
     // Create spawner for the boss
-    let spawner_opt = ctx.db.monster_spawners().insert(crate::MonsterSpawners {
+    let _spawner_opt = ctx.db.monster_spawners().insert(crate::MonsterSpawners {
         scheduled_id: 0,
         position,
         monster_type: boss_monster_type,
