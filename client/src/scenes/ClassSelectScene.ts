@@ -79,6 +79,10 @@ export default class ClassSelectScene extends Phaser.Scene {
     private optionsUI!: OptionsUI;
     private curseUI!: CurseUI;
     
+    // New UI elements for Bestiary and Achievements
+    private bestiaryButton!: HTMLButtonElement;
+    //private achievementsButton!: HTMLButtonElement;
+
     // Add status text for game state
     private statusText!: Phaser.GameObjects.Text;
     private statusBackground!: Phaser.GameObjects.Rectangle;
@@ -271,33 +275,29 @@ export default class ClassSelectScene extends Phaser.Scene {
         });
         
         // Handle debug key to test curse victory screen (C key)
-        // Note: This allows testing the curse screen without beating a boss
         this.input.keyboard?.on('keydown-C', () => {
             this.launchCurseVictoryScreenDebug();
         });
 
         // Handle debug key to add random curse (X key)
-        // Note: This calls the admin command to add a random curse for testing
         this.input.keyboard?.on('keydown-X', () => {
             this.addRandomCurseDebug();
         });
 
         // Handle debug key to clear all curses (Z key)
-        // Note: This calls the admin command to clear all curses for testing
         this.input.keyboard?.on('keydown-Z', () => {
             this.clearAllCursesDebug();
         });
 
         // Handle debug key to add debug curse (V key)
-        // Note: This calls the admin command to add a debug curse for testing
         this.input.keyboard?.on('keydown-V', () => {
             this.addDebugCurseDebug();
         });
         
-        // Only clean up when the scene is actually shut down, not at scene start
+        // Only clean up when the scene is actually shut down
         this.events.on('shutdown', this.shutdown, this);
         
-        console.log("ClassSelectScene create() completed - clean background established");
+        console.log("ClassSelectScene create() completed");
     }
     
     private createClassButtons() {
@@ -494,6 +494,44 @@ export default class ClassSelectScene extends Phaser.Scene {
         confirmContainer.appendChild(this.confirmButton);
         this.classButtonsContainer.appendChild(confirmContainer);
         
+        // Add bestiary button below quest button
+        const bestiaryButton = document.createElement('button');
+        bestiaryButton.style.position = 'absolute';
+        bestiaryButton.style.top = '110px'; // Position below quest button
+        bestiaryButton.style.right = '50px';
+        bestiaryButton.style.width = '180px';
+        bestiaryButton.style.height = '50px';
+        bestiaryButton.style.padding = '10px';
+        bestiaryButton.style.backgroundColor = '#2c3e50';
+        bestiaryButton.style.color = 'white';
+        bestiaryButton.style.border = '2px solid #34495e';
+        bestiaryButton.style.borderRadius = '5px';
+        bestiaryButton.style.cursor = 'pointer';
+        bestiaryButton.style.fontFamily = 'Arial';
+        bestiaryButton.style.fontSize = '18px';
+        bestiaryButton.style.transition = 'background-color 0.2s, border-color 0.2s';
+        bestiaryButton.style.display = 'flex';
+        bestiaryButton.style.alignItems = 'center';
+        bestiaryButton.style.justifyContent = 'center';
+        bestiaryButton.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+        bestiaryButton.textContent = '🐺 Bestiary';
+        
+        bestiaryButton.addEventListener('mouseover', () => {
+            bestiaryButton.style.backgroundColor = '#3498db';
+            bestiaryButton.style.borderColor = '#2980b9';
+        });
+        
+        bestiaryButton.addEventListener('mouseout', () => {
+            bestiaryButton.style.backgroundColor = '#2c3e50';
+            bestiaryButton.style.borderColor = '#34495e';
+        });
+        
+        bestiaryButton.addEventListener('click', () => {
+            this.showBestiary();
+        });
+        
+        document.body.appendChild(bestiaryButton);
+        this.bestiaryButton = bestiaryButton;
         console.log(`ClassSelectScene: Class buttons created successfully with ${isMobileDevice() ? '2-column' : '3-column'} layout`);
     }
     
@@ -642,6 +680,9 @@ export default class ClassSelectScene extends Phaser.Scene {
         
         // Hide any error message
         this.errorText.setVisible(false);
+        
+        // Show Bestiary and Achievements buttons
+        this.bestiaryButton.style.display = 'inline-block';
     }
     
     private spawnPlayer() {
@@ -665,6 +706,9 @@ export default class ClassSelectScene extends Phaser.Scene {
         [this.fighterButton, this.rogueButton, this.mageButton, this.paladinButton, this.valkyrieButton, this.priestessButton, this.footballButton, this.gamblerButton, this.athleteButton, this.gourmandButton, this.volleyballButton, this.stonerButton].forEach(btn => {
             if (btn) btn.disabled = true;
         });
+        
+        // Hide Bestiary and Achievements buttons during player spawn
+        this.bestiaryButton.style.display = 'none';
         
         // Add a small delay to let the sound start before scene transition
         this.time.delayedCall(200, () => {
@@ -754,6 +798,10 @@ export default class ClassSelectScene extends Phaser.Scene {
                 }
             });
             
+            if (this.bestiaryButton) {
+                this.bestiaryButton.remove();
+            }
+
             // Method 4: Look for any buttons that might be ours
             document.querySelectorAll('button').forEach(el => {
                 if ((el as HTMLElement).textContent?.includes('Fighter') || 
@@ -1077,5 +1125,14 @@ export default class ClassSelectScene extends Phaser.Scene {
         
         // Remove update callback
         this.events.off('update', this.updateStatus, this);
+    }
+
+    private showBestiary() {
+        // Play button click sound
+        const soundManager = (window as any).soundManager;
+        if (soundManager) {
+            soundManager.playSound('ui_click', 0.7);
+        }
+        this.scene.start('BestaryScene', { spacetimeDBClient: this.spacetimeDBClient });
     }
 }

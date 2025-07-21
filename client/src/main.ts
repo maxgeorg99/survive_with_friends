@@ -7,6 +7,7 @@ import DeadScene from './scenes/DeadScene';
 import VictoryScene from './scenes/VictoryScene';
 import CurseVictoryScene from './scenes/CurseVictoryScene';
 import LoadingScene from './scenes/LoadingScene';
+import BestaryScene from './scenes/BestaryScene';
 import { Identity } from '@clockworklabs/spacetimedb-sdk';
 import SpacetimeDBClient from './SpacetimeDBClient';
 import { DbConnection, ErrorContext, SubscriptionEventContext } from './autobindings';
@@ -98,7 +99,7 @@ const config: Phaser.Types.Core.GameConfig = {
             // debug: true // Set to true for physics debugging
         }
     },
-    scene: [TitleScene, NameSelectScene, ClassSelectScene, GameScene, DeadScene, VictoryScene, CurseVictoryScene, LoadingScene],
+    scene: [TitleScene, NameSelectScene, ClassSelectScene, GameScene, DeadScene, VictoryScene, CurseVictoryScene, LoadingScene, BestaryScene],
     scale: {
         mode: Phaser.Scale.RESIZE,
         autoCenter: Phaser.Scale.CENTER_BOTH
@@ -414,4 +415,4 @@ const spacetimeDBClient = new SpacetimeDBClient(onSubscriptionApplied, onConnect
 console.log("Main script finished loading.");
 
 // Start with TitleScene by default
-game.scene.start('TitleScene'); 
+game.scene.start('TitleScene');

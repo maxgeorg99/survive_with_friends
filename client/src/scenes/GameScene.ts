@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
 import SpacetimeDBClient from '../SpacetimeDBClient';
-import { Player, Entity, PlayerClass, Account, EventContext, ErrorContext, UpgradeOptionData } from "../autobindings";
-import MonsterManager from '../managers/MonsterManager';
-import MonsterSpawnerManager from '../managers/MonsterSpawnerManager';
 import { GameEvents } from '../constants/GameEvents';
-import { AttackManager } from '../managers/AttackManager';
-import { MonsterAttackManager } from '../managers/MonsterAttackManager';
+import { Player, Entity, PlayerClass, Account, EventContext, ErrorContext, UpgradeOptionData } from "../autobindings";
+import { getPlayerShadowConfig, getPlayerClassName } from '../constants/PlayerCharacterConfig';
+import MusicManager from '../managers/MusicManager';
+import MonsterManager from '../managers/MonsterManager';
+import {AttackManager} from '../managers/AttackManager';
+import {MonsterAttackManager} from '../managers/MonsterAttackManager';
 import GemManager from '../managers/GemManager';
 import LootCapsuleManager from '../managers/LootCapsuleManager';
 import BossAgnaManager from '../managers/BossAgnaManager';
@@ -17,14 +18,12 @@ import BossTimerUI from '../ui/BossTimerUI';
 import MonsterCounterUI from '../ui/MonsterCounterUI';
 import VoidChestUI from '../ui/VoidChestUI';
 import SoulUI from '../ui/SoulUI';
-import Minimap, { MinimapElements } from '../ui/Minimap';
-import MusicManager from '../managers/MusicManager';
-import { DebugManager } from '../managers/DebugManager'; // Added import for DebugManager
-import GameplayOptionsUI from '../ui/GameplayOptionsUI';
 import CurseUI from '../ui/CurseUI';
+import GameplayOptionsUI from '../ui/GameplayOptionsUI';
+import Minimap, { MinimapElements } from '../ui/Minimap';
+import { DebugManager } from '../managers/DebugManager'; // Added import for DebugManager
 import { getSoundVolume } from '../managers/VolumeSettings';
-import { getPlayerShadowConfig, getPlayerClassName } from '../constants/PlayerCharacterConfig';
-import StatsUpgradesUI from '../ui/StatsUI';
+import MonsterSpawnerManager from '../managers/MonsterSpawnerManager';
 
 // Constants
 const PLAYER_SPEED = 200;
@@ -169,9 +168,6 @@ export default class GameScene extends Phaser.Scene {
 
     // Add Curse UI for curse display and management
     private curseUI: CurseUI | null = null;
-
-    // Add Options UI for settings
-    private statsUI: StatsUpgradesUI | null = null;
 
     // Track if player damage sound is currently playing
     private isPlayerDamageSoundPlaying: boolean = false;
@@ -568,9 +564,8 @@ export default class GameScene extends Phaser.Scene {
 
         // Initialize Curse UI for curse display and management
         this.curseUI = new CurseUI(this, this.spacetimeDBClient);
-        //this.statsUI = new StatsUpgradesUI(this);
 
-        // Add key listener for toggling options menu
+        // Add key listeners for UI toggles
         this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.O).on('down', () => {
             if (this.optionsUI) {
                 this.optionsUI.toggle();
@@ -2263,11 +2258,6 @@ export default class GameScene extends Phaser.Scene {
         if (this.curseUI) {
             this.curseUI.destroy();
             this.curseUI = null;
-        }
-
-        if (this.statsUI) {
-            this.statsUI.destroy();
-            this.statsUI = null;
         }
         
         // DEFENSIVE CLEANUP: Remove any lingering game objects that might persist between scenes

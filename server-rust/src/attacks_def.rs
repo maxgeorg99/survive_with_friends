@@ -127,7 +127,7 @@ pub fn init_attack_data(ctx: &ReducerContext) {
         speed: 800.0,              
         piercing: true,         
         radius: 32.0,             
-        damage: 4,        
+        damage: 3,
         armor_piercing: 0,       
     });
 
@@ -223,7 +223,7 @@ pub fn init_attack_data(ctx: &ReducerContext) {
         speed: 600.0,
         piercing: false,
         radius: 24.0,
-        damage: 3,
+        damage: 2,
         armor_piercing: 2,
     });
 
@@ -239,7 +239,7 @@ pub fn init_attack_data(ctx: &ReducerContext) {
         speed: 700.0,
         piercing: false,
         radius: 16.0,
-        damage: 2,
+        damage: 1,
         armor_piercing: 2,
     });
 
@@ -288,7 +288,7 @@ pub fn init_attack_data(ctx: &ReducerContext) {
         piercing: true,
         radius: 35.0,
         damage: 2,
-        armor_piercing: 5,
+        armor_piercing: 2,
     });
 
     // Joint - simple melee attack

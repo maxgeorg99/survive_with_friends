@@ -46,6 +46,8 @@ import { ChooseUpgrade } from "./choose_upgrade_reducer.ts";
 export { ChooseUpgrade };
 import { CleanupActiveAttack } from "./cleanup_active_attack_reducer.ts";
 export { CleanupActiveAttack };
+import { CleanupGameState } from "./cleanup_game_state_reducer.ts";
+export { CleanupGameState };
 import { CleanupMonsterHitRecord } from "./cleanup_monster_hit_record_reducer.ts";
 export { CleanupMonsterHitRecord };
 import { ClientConnected } from "./client_connected_reducer.ts";
@@ -839,6 +841,10 @@ const REMOTE_MODULE = {
       reducerName: "cleanup_active_attack",
       argsType: CleanupActiveAttack.getTypeScriptAlgebraicType(),
     },
+    cleanup_game_state: {
+      reducerName: "cleanup_game_state",
+      argsType: CleanupGameState.getTypeScriptAlgebraicType(),
+    },
     cleanup_monster_hit_record: {
       reducerName: "cleanup_monster_hit_record",
       argsType: CleanupMonsterHitRecord.getTypeScriptAlgebraicType(),
@@ -1113,6 +1119,7 @@ export type Reducer = never
 | { name: "CheckAgnaRitualCompletion", args: CheckAgnaRitualCompletion }
 | { name: "ChooseUpgrade", args: ChooseUpgrade }
 | { name: "CleanupActiveAttack", args: CleanupActiveAttack }
+| { name: "CleanupGameState", args: CleanupGameState }
 | { name: "CleanupMonsterHitRecord", args: CleanupMonsterHitRecord }
 | { name: "ClientConnected", args: ClientConnected }
 | { name: "DebugCheckGemDrops", args: DebugCheckGemDrops }
@@ -1276,6 +1283,18 @@ export class RemoteReducers {
 
   removeOnCleanupActiveAttack(callback: (ctx: ReducerEventContext, cleanup: ActiveAttackCleanup) => void) {
     this.connection.offReducer("cleanup_active_attack", callback);
+  }
+
+  cleanupGameState() {
+    this.connection.callReducer("cleanup_game_state", new Uint8Array(0), this.setCallReducerFlags.cleanupGameStateFlags);
+  }
+
+  onCleanupGameState(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.onReducer("cleanup_game_state", callback);
+  }
+
+  removeOnCleanupGameState(callback: (ctx: ReducerEventContext) => void) {
+    this.connection.offReducer("cleanup_game_state", callback);
   }
 
   cleanupMonsterHitRecord(cleanup: MonsterHitCleanup) {
@@ -2202,6 +2221,11 @@ export class SetReducerFlags {
   cleanupActiveAttackFlags: CallReducerFlags = 'FullUpdate';
   cleanupActiveAttack(flags: CallReducerFlags) {
     this.cleanupActiveAttackFlags = flags;
+  }
+
+  cleanupGameStateFlags: CallReducerFlags = 'FullUpdate';
+  cleanupGameState(flags: CallReducerFlags) {
+    this.cleanupGameStateFlags = flags;
   }
 
   cleanupMonsterHitRecordFlags: CallReducerFlags = 'FullUpdate';

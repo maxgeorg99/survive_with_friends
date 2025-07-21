@@ -12,7 +12,7 @@ const LOCAL_SPACETIMEDB_URI : string = "ws://localhost:3000"; // Use wss for clo
 const REMOTE_SPACETIMEDB_URI : string = "wss://maincloud.spacetimedb.com";
 const PROXY_SPACETIMEDB_URI : string = "ws://localhost:3001";
 
-const URI_TO_USE = REMOTE_SPACETIMEDB_URI;
+const URI_TO_USE = LOCAL_SPACETIMEDB_URI;
 
 const TOKEN_TO_USE = (URI_TO_USE === REMOTE_SPACETIMEDB_URI) ? "space_token" : 'local_token';
 
@@ -86,6 +86,7 @@ class SpacetimeDBClient {
             .onError(this.handleSubscriptionError.bind(this))
             .subscribe([
                 "SELECT * FROM account",
+                "SELECT * FROM bestiary",
                 "SELECT * FROM world",
                 "SELECT * FROM player",
                 "SELECT * FROM dead_players",

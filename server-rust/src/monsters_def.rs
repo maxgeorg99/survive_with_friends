@@ -365,7 +365,19 @@ pub fn spawn_monster(ctx: &ReducerContext, spawner: MonsterSpawners) {
             log::info!("DeadlierBossesTwo curse applied to Phase 1 boss - HP: {}, ATK: {:.1}, Speed: {:.1}", final_hp, final_atk, final_speed);
         }
     }
-    
+
+    // Step scaling (discrete jumps)
+    let player_multiplier = match player_count {
+        1 => 1.0,
+        2 => 1.4,
+        3 => 1.7,
+        4 => 2.0,
+        _ => 2.0 + (player_count - 4) as f32 * 0.2,
+    };
+    final_hp = (final_hp as f32 * player_multiplier) as u32;
+    final_max_hp = (final_max_hp as f32 * player_multiplier) as u32;
+    final_atk *= player_multiplier;
+
     // Apply Scaling curse effects to all monsters (stacks for multiple Scaling curses)
     let scaling_curse_count = crate::curses_defs::count_scaling_curses(ctx);
     if scaling_curse_count > 0 {

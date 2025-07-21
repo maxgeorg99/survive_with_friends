@@ -2,6 +2,7 @@ use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, Sc
 use crate::{DbVector2, MonsterType, player, config, monster_spawners, bestiary, monsters, monsters_boid, entity, gems, dead_players, monster_spawn_timer,
     active_attacks, attack_burst_cooldowns, player_scheduled_attacks};
 use std::time::Duration;
+use spacetimedb::rand::seq::SliceRandom;
 
 // Boss type enum for selecting which boss to spawn
 #[derive(SpacetimeType, Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -102,14 +103,10 @@ pub fn schedule_boss_spawn(ctx: &ReducerContext) {
     
     let delay_minutes = boss_spawn_delay_ms as f32 / 60_000.0;
     log::info!("Scheduling boss spawn in {:.1} minutes...", delay_minutes);
-    
-    // Randomly select boss type when first scheduling the boss spawn
+
     let mut rng = ctx.rng();
-    let selected_boss_type = match rng.gen_range(0..3) {
-        0 => BossType::Ender,
-        1 => BossType::Agna,
-        _ => BossType::Simon,
-    };
+    let boss_types = [BossType::Ender, BossType::Agna, BossType::Simon];
+    let selected_boss_type = *boss_types.choose(&mut rng).unwrap();
     let boss_name = match selected_boss_type {
         BossType::Ender => "Ender",
         BossType::Agna => "Agna",

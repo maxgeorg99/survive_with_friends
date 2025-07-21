@@ -335,6 +335,7 @@ export default class Minimap {
     // Helper functions for boss type checking
     private isBoss(monsterType: string): boolean {
         return monsterType === 'BossEnderPhase1' || monsterType === 'BossEnderPhase2' ||
-               monsterType === 'BossAgnaPhase1' || monsterType === 'BossAgnaPhase2';
+               monsterType === 'BossAgnaPhase1' || monsterType === 'BossAgnaPhase2' ||
+               monsterType === 'BossSimonPhase1' || monsterType === 'BossSimonPhase2';
     }
 } 
