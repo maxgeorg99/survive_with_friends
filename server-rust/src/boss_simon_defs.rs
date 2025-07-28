@@ -18,7 +18,7 @@ const CHEMICAL_BOLT_INTERVAL_MS: u64 = 1200;         // Time between shots (ever
 const CHEMICAL_BOLT_PATTERN_DURATION_MS: u64 = 8000; // Duration of bolt attack pattern
 
 // Phase 1 Toxic Zone attack constants
-const TOXIC_ZONE_DAMAGE: u32 = 10;                   // Reduced damage per tick (from 20)
+const TOXIC_ZONE_DAMAGE: u32 = 3;                   // Reduced damage per tick (from 20)
 const TOXIC_ZONE_RADIUS: f32 = 96.0;                 // Large area of effect
 const TOXIC_ZONE_DURATION_MS: u64 = 6000;            // Zone lasts 6 seconds
 const TOXIC_ZONE_INTERVAL_MS: u64 = 4000;            // Time between zones (every 4 seconds)
@@ -337,16 +337,11 @@ pub fn cleanup_chemical_zombie_spawning(ctx: &ReducerContext, boss_monster_id: u
 
 pub fn cleanup_toxic_zones(ctx: &ReducerContext, boss_monster_id: u32) {
     // Cleanup schedulers
-    let schedulers: Vec<u64> = ctx.db.toxic_zone_scheduler()
-        .boss_monster_id()
-        .filter(&boss_monster_id)
-        .map(|s| s.scheduled_id)
-        .collect();
-        
-    for id in schedulers {
-        ctx.db.toxic_zone_scheduler().scheduled_id().delete(&id);
-    }
 
+    ctx.db.toxic_zone_scheduler()
+        .boss_monster_id()
+        .delete(&boss_monster_id);
+    
     // Cleanup active zones
     let active_zones: Vec<u64> = ctx.db.active_monster_attacks()
         .iter()
@@ -492,9 +487,6 @@ pub fn execute_boss_simon_chemical_bolt_pattern(ctx: &ReducerContext, monster: &
 // Implement toxic zone attack for Phase 2
 pub fn execute_boss_simon_toxic_zone_pattern(ctx: &ReducerContext, monster: &crate::Monsters) {
     log::info!("Boss Simon {} starting toxic zone pattern", monster.monster_id);
-
-    // Start continuous toxic zone spawning
-    start_toxic_zone_attacks(ctx, monster.monster_id);
 
     // Schedule return to idle after pattern duration
     schedule_state_change(ctx, monster.monster_id,
@@ -701,7 +693,6 @@ pub fn transition_to_phase2(ctx: &ReducerContext, monster_id: u32) {
         
         // Start all Phase 2 continuous patterns
         start_chemical_bolt_attacks(ctx, monster_id);
-        start_toxic_zone_attacks(ctx, monster_id);
         
         // Start continuous zombie spawning
         spawn_chemical_zombie_wave(ctx, SimonZombieWaveScheduler {
