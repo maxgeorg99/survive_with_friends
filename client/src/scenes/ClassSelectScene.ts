@@ -497,7 +497,7 @@ export default class ClassSelectScene extends Phaser.Scene {
         // Add bestiary button below quest button
         const bestiaryButton = document.createElement('button');
         bestiaryButton.style.position = 'absolute';
-        bestiaryButton.style.top = '110px'; // Position below quest button
+        bestiaryButton.style.top = '160px'; // Position below quest button
         bestiaryButton.style.right = '50px';
         bestiaryButton.style.width = '180px';
         bestiaryButton.style.height = '50px';
