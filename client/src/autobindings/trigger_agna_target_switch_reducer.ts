@@ -3,61 +3,62 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+  AlgebraicType as __AlgebraicTypeValue,
+  BinaryReader as __BinaryReader,
+  BinaryWriter as __BinaryWriter,
+  ClientCache as __ClientCache,
+  ConnectionId as __ConnectionId,
+  DbConnectionBuilder as __DbConnectionBuilder,
+  DbConnectionImpl as __DbConnectionImpl,
+  Identity as __Identity,
+  SubscriptionBuilderImpl as __SubscriptionBuilderImpl,
+  TableCache as __TableCache,
+  TimeDuration as __TimeDuration,
+  Timestamp as __Timestamp,
+  deepEqual as __deepEqual,
+  type AlgebraicType as __AlgebraicTypeType,
+  type AlgebraicTypeVariants as __AlgebraicTypeVariants,
+  type CallReducerFlags as __CallReducerFlags,
+  type ErrorContextInterface as __ErrorContextInterface,
+  type Event as __Event,
+  type EventContextInterface as __EventContextInterface,
+  type ReducerEventContextInterface as __ReducerEventContextInterface,
+  type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+} from "spacetimedb";
 
-import { AgnaTargetSwitchScheduler as __AgnaTargetSwitchScheduler } from "./agna_target_switch_scheduler_type";
+import { AgnaTargetSwitchScheduler } from "./agna_target_switch_scheduler_type";
+// Mark import as potentially unused
+declare type __keep_AgnaTargetSwitchScheduler = AgnaTargetSwitchScheduler;
 
 export type TriggerAgnaTargetSwitch = {
-  scheduler: __AgnaTargetSwitchScheduler,
+  scheduler: AgnaTargetSwitchScheduler,
 };
-
 /**
- * A namespace for generated helper functions.
+ * An object for generated helper functions.
  */
-export namespace TriggerAgnaTargetSwitch {
+export const TriggerAgnaTargetSwitch = {
   /**
   * A function which returns this type represented as an AlgebraicType.
   * This function is derived from the AlgebraicType used to generate this type.
   */
-  export function getTypeScriptAlgebraicType(): AlgebraicType {
-    return AlgebraicType.createProductType([
-      new ProductTypeElement("scheduler", __AgnaTargetSwitchScheduler.getTypeScriptAlgebraicType()),
-    ]);
-  }
+  getTypeScriptAlgebraicType(): __AlgebraicTypeType {
+    return __AlgebraicTypeValue.Product({
+      elements: [
+        { name: "scheduler", algebraicType: AgnaTargetSwitchScheduler.getTypeScriptAlgebraicType()},
+      ]
+    });
+  },
 
-  export function serialize(writer: BinaryWriter, value: TriggerAgnaTargetSwitch): void {
-    TriggerAgnaTargetSwitch.getTypeScriptAlgebraicType().serialize(writer, value);
-  }
+  serialize(writer: __BinaryWriter, value: TriggerAgnaTargetSwitch): void {
+    __AlgebraicTypeValue.serializeValue(writer, TriggerAgnaTargetSwitch.getTypeScriptAlgebraicType(), value);
+  },
 
-  export function deserialize(reader: BinaryReader): TriggerAgnaTargetSwitch {
-    return TriggerAgnaTargetSwitch.getTypeScriptAlgebraicType().deserialize(reader);
-  }
+  deserialize(reader: __BinaryReader): TriggerAgnaTargetSwitch {
+    return __AlgebraicTypeValue.deserializeValue(reader, TriggerAgnaTargetSwitch.getTypeScriptAlgebraicType());
+  },
 
 }
+
+export default TriggerAgnaTargetSwitch;
 

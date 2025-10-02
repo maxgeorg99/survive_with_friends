@@ -3,72 +3,68 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
-// A namespace for generated variants and helper functions.
-export namespace MonsterVariant {
-  // These are the generated variant types for each variant of the tagged union.
-  // One type is generated per variant and will be used in the `value` field of
-  // the tagged union.
-  export type Default = { tag: "Default" };
-  export type Shiny = { tag: "Shiny" };
-  export type Cursed = { tag: "Cursed" };
+  AlgebraicType as __AlgebraicTypeValue,
+  BinaryReader as __BinaryReader,
+  BinaryWriter as __BinaryWriter,
+  ClientCache as __ClientCache,
+  ConnectionId as __ConnectionId,
+  DbConnectionBuilder as __DbConnectionBuilder,
+  DbConnectionImpl as __DbConnectionImpl,
+  Identity as __Identity,
+  SubscriptionBuilderImpl as __SubscriptionBuilderImpl,
+  TableCache as __TableCache,
+  TimeDuration as __TimeDuration,
+  Timestamp as __Timestamp,
+  deepEqual as __deepEqual,
+  type AlgebraicType as __AlgebraicTypeType,
+  type AlgebraicTypeVariants as __AlgebraicTypeVariants,
+  type CallReducerFlags as __CallReducerFlags,
+  type ErrorContextInterface as __ErrorContextInterface,
+  type Event as __Event,
+  type EventContextInterface as __EventContextInterface,
+  type ReducerEventContextInterface as __ReducerEventContextInterface,
+  type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+} from "spacetimedb";
+import * as MonsterVariantVariants from './monster_variant_variants'
 
+// The tagged union or sum type for the algebraic type `MonsterVariant`.
+export type MonsterVariant = MonsterVariantVariants.Default |
+  MonsterVariantVariants.Shiny |
+  MonsterVariantVariants.Cursed;
+
+// A value with helper functions to construct the type.
+export const MonsterVariant = {
   // Helper functions for constructing each variant of the tagged union.
   // ```
   // const foo = Foo.A(42);
   // assert!(foo.tag === "A");
   // assert!(foo.value === 42);
   // ```
-  export const Default = { tag: "Default" };
-  export const Shiny = { tag: "Shiny" };
-  export const Cursed = { tag: "Cursed" };
+  Default: { tag: "Default" } as const,
+  Shiny: { tag: "Shiny" } as const,
+  Cursed: { tag: "Cursed" } as const,
 
-  export function getTypeScriptAlgebraicType(): AlgebraicType {
-    return AlgebraicType.createSumType([
-      new SumTypeVariant("Default", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Shiny", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Cursed", AlgebraicType.createProductType([])),
-    ]);
-  }
+  getTypeScriptAlgebraicType(): __AlgebraicTypeType {
+    return __AlgebraicTypeValue.Sum({
+      variants: [
+        { name: "Default", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Shiny", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Cursed", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+      ]
+    });
+  },
 
-  export function serialize(writer: BinaryWriter, value: MonsterVariant): void {
-      MonsterVariant.getTypeScriptAlgebraicType().serialize(writer, value);
-  }
+  serialize(writer: __BinaryWriter, value: MonsterVariant): void {
+      __AlgebraicTypeValue.serializeValue(writer, MonsterVariant.getTypeScriptAlgebraicType(), value);
+  },
 
-  export function deserialize(reader: BinaryReader): MonsterVariant {
-      return MonsterVariant.getTypeScriptAlgebraicType().deserialize(reader);
-  }
+  deserialize(reader: __BinaryReader): MonsterVariant {
+      return __AlgebraicTypeValue.deserializeValue(reader, MonsterVariant.getTypeScriptAlgebraicType());
+  },
 
 }
 
-// The tagged union or sum type for the algebraic type `MonsterVariant`.
-export type MonsterVariant = MonsterVariant.Default | MonsterVariant.Shiny | MonsterVariant.Cursed;
-
 export default MonsterVariant;
+
 

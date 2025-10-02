@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 import { ExpConfig } from "./exp_config_type";
 import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
 

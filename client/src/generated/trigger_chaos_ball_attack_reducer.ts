@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 
 import { ChaosBallScheduler as __ChaosBallScheduler } from "./chaos_ball_scheduler_type";
 

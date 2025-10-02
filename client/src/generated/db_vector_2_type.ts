@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 export type DbVector2 = {
   x: number,
   y: number,

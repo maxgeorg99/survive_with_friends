@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 
 import { MonsterSpawners as __MonsterSpawners } from "./monster_spawners_type";
 

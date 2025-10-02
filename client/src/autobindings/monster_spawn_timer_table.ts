@@ -3,35 +3,32 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+  AlgebraicType as __AlgebraicTypeValue,
+  BinaryReader as __BinaryReader,
+  BinaryWriter as __BinaryWriter,
+  ClientCache as __ClientCache,
+  ConnectionId as __ConnectionId,
+  DbConnectionBuilder as __DbConnectionBuilder,
+  DbConnectionImpl as __DbConnectionImpl,
+  Identity as __Identity,
+  SubscriptionBuilderImpl as __SubscriptionBuilderImpl,
+  TableCache as __TableCache,
+  TimeDuration as __TimeDuration,
+  Timestamp as __Timestamp,
+  deepEqual as __deepEqual,
+  type AlgebraicType as __AlgebraicTypeType,
+  type AlgebraicTypeVariants as __AlgebraicTypeVariants,
+  type CallReducerFlags as __CallReducerFlags,
+  type ErrorContextInterface as __ErrorContextInterface,
+  type Event as __Event,
+  type EventContextInterface as __EventContextInterface,
+  type ReducerEventContextInterface as __ReducerEventContextInterface,
+  type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+} from "spacetimedb";
 import { MonsterSpawnTimer } from "./monster_spawn_timer_type";
-import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
+import { type EventContext, type Reducer, RemoteReducers, RemoteTables } from ".";
+declare type __keep = [EventContext, Reducer, RemoteReducers, RemoteTables];
 
 /**
  * Table handle for the table `monster_spawn_timer`.
@@ -44,9 +41,9 @@ import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
  * like `ctx.db.monsterSpawnTimer.on_insert(...)`.
  */
 export class MonsterSpawnTimerTableHandle {
-  tableCache: TableCache<MonsterSpawnTimer>;
+  tableCache: __TableCache<MonsterSpawnTimer>;
 
-  constructor(tableCache: TableCache<MonsterSpawnTimer>) {
+  constructor(tableCache: __TableCache<MonsterSpawnTimer>) {
     this.tableCache = tableCache;
   }
 
@@ -73,7 +70,7 @@ export class MonsterSpawnTimerTableHandle {
     // if such a row is present in the client cache.
     find: (col_val: bigint): MonsterSpawnTimer | undefined => {
       for (let row of this.tableCache.iter()) {
-        if (deepEqual(row.scheduledId, col_val)) {
+        if (__deepEqual(row.scheduledId, col_val)) {
           return row;
         }
       }

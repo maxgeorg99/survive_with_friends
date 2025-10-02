@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 
 import { EnderScytheSpawnScheduler as __EnderScytheSpawnScheduler } from "./ender_scythe_spawn_scheduler_type";
 

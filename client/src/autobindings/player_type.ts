@@ -3,41 +3,42 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
-import { DbVector2 as __DbVector2 } from "./db_vector_2_type";
-import { PlayerClass as __PlayerClass } from "./player_class_type";
+  AlgebraicType as __AlgebraicTypeValue,
+  BinaryReader as __BinaryReader,
+  BinaryWriter as __BinaryWriter,
+  ClientCache as __ClientCache,
+  ConnectionId as __ConnectionId,
+  DbConnectionBuilder as __DbConnectionBuilder,
+  DbConnectionImpl as __DbConnectionImpl,
+  Identity as __Identity,
+  SubscriptionBuilderImpl as __SubscriptionBuilderImpl,
+  TableCache as __TableCache,
+  TimeDuration as __TimeDuration,
+  Timestamp as __Timestamp,
+  deepEqual as __deepEqual,
+  type AlgebraicType as __AlgebraicTypeType,
+  type AlgebraicTypeVariants as __AlgebraicTypeVariants,
+  type CallReducerFlags as __CallReducerFlags,
+  type ErrorContextInterface as __ErrorContextInterface,
+  type Event as __Event,
+  type EventContextInterface as __EventContextInterface,
+  type ReducerEventContextInterface as __ReducerEventContextInterface,
+  type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+} from "spacetimedb";
+import { DbVector2 } from "./db_vector_2_type";
+// Mark import as potentially unused
+declare type __keep_DbVector2 = DbVector2;
+import { PlayerClass } from "./player_class_type";
+// Mark import as potentially unused
+declare type __keep_PlayerClass = PlayerClass;
+
 
 export type Player = {
   playerId: number,
   name: string,
   spawnGracePeriodRemaining: number,
-  playerClass: __PlayerClass,
+  playerClass: PlayerClass,
   level: number,
   exp: number,
   expForNextLevel: number,
@@ -50,55 +51,58 @@ export type Player = {
   rerolls: number,
   shieldCount: number,
   pvp: boolean,
-  waypoint: __DbVector2,
+  waypoint: DbVector2,
   hasWaypoint: boolean,
-  position: __DbVector2,
+  position: DbVector2,
   radius: number,
   isBot: boolean,
 };
-
 /**
- * A namespace for generated helper functions.
+ * An object for generated helper functions.
  */
-export namespace Player {
+export const Player = {
   /**
   * A function which returns this type represented as an AlgebraicType.
   * This function is derived from the AlgebraicType used to generate this type.
   */
-  export function getTypeScriptAlgebraicType(): AlgebraicType {
-    return AlgebraicType.createProductType([
-      new ProductTypeElement("playerId", AlgebraicType.createU32Type()),
-      new ProductTypeElement("name", AlgebraicType.createStringType()),
-      new ProductTypeElement("spawnGracePeriodRemaining", AlgebraicType.createU32Type()),
-      new ProductTypeElement("playerClass", __PlayerClass.getTypeScriptAlgebraicType()),
-      new ProductTypeElement("level", AlgebraicType.createU32Type()),
-      new ProductTypeElement("exp", AlgebraicType.createU32Type()),
-      new ProductTypeElement("expForNextLevel", AlgebraicType.createU32Type()),
-      new ProductTypeElement("maxHp", AlgebraicType.createF32Type()),
-      new ProductTypeElement("hp", AlgebraicType.createF32Type()),
-      new ProductTypeElement("hpRegen", AlgebraicType.createU32Type()),
-      new ProductTypeElement("speed", AlgebraicType.createF32Type()),
-      new ProductTypeElement("armor", AlgebraicType.createU32Type()),
-      new ProductTypeElement("unspentUpgrades", AlgebraicType.createU32Type()),
-      new ProductTypeElement("rerolls", AlgebraicType.createU32Type()),
-      new ProductTypeElement("shieldCount", AlgebraicType.createU32Type()),
-      new ProductTypeElement("pvp", AlgebraicType.createBoolType()),
-      new ProductTypeElement("waypoint", __DbVector2.getTypeScriptAlgebraicType()),
-      new ProductTypeElement("hasWaypoint", AlgebraicType.createBoolType()),
-      new ProductTypeElement("position", __DbVector2.getTypeScriptAlgebraicType()),
-      new ProductTypeElement("radius", AlgebraicType.createF32Type()),
-      new ProductTypeElement("isBot", AlgebraicType.createBoolType()),
-    ]);
-  }
+  getTypeScriptAlgebraicType(): __AlgebraicTypeType {
+    return __AlgebraicTypeValue.Product({
+      elements: [
+        { name: "playerId", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "name", algebraicType: __AlgebraicTypeValue.String},
+        { name: "spawnGracePeriodRemaining", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "playerClass", algebraicType: PlayerClass.getTypeScriptAlgebraicType()},
+        { name: "level", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "exp", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "expForNextLevel", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "maxHp", algebraicType: __AlgebraicTypeValue.F32},
+        { name: "hp", algebraicType: __AlgebraicTypeValue.F32},
+        { name: "hpRegen", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "speed", algebraicType: __AlgebraicTypeValue.F32},
+        { name: "armor", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "unspentUpgrades", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "rerolls", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "shieldCount", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "pvp", algebraicType: __AlgebraicTypeValue.Bool},
+        { name: "waypoint", algebraicType: DbVector2.getTypeScriptAlgebraicType()},
+        { name: "hasWaypoint", algebraicType: __AlgebraicTypeValue.Bool},
+        { name: "position", algebraicType: DbVector2.getTypeScriptAlgebraicType()},
+        { name: "radius", algebraicType: __AlgebraicTypeValue.F32},
+        { name: "isBot", algebraicType: __AlgebraicTypeValue.Bool},
+      ]
+    });
+  },
 
-  export function serialize(writer: BinaryWriter, value: Player): void {
-    Player.getTypeScriptAlgebraicType().serialize(writer, value);
-  }
+  serialize(writer: __BinaryWriter, value: Player): void {
+    __AlgebraicTypeValue.serializeValue(writer, Player.getTypeScriptAlgebraicType(), value);
+  },
 
-  export function deserialize(reader: BinaryReader): Player {
-    return Player.getTypeScriptAlgebraicType().deserialize(reader);
-  }
+  deserialize(reader: __BinaryReader): Player {
+    return __AlgebraicTypeValue.deserializeValue(reader, Player.getTypeScriptAlgebraicType());
+  },
 
 }
+
+export default Player;
 
 

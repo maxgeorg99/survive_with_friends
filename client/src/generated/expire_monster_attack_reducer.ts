@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 
 import { ActiveMonsterAttack as __ActiveMonsterAttack } from "./active_monster_attack_type";
 

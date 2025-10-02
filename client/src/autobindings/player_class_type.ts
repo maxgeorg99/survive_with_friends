@@ -3,99 +3,95 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
-// A namespace for generated variants and helper functions.
-export namespace PlayerClass {
-  // These are the generated variant types for each variant of the tagged union.
-  // One type is generated per variant and will be used in the `value` field of
-  // the tagged union.
-  export type Fighter = { tag: "Fighter" };
-  export type Rogue = { tag: "Rogue" };
-  export type Mage = { tag: "Mage" };
-  export type Paladin = { tag: "Paladin" };
-  export type Valkyrie = { tag: "Valkyrie" };
-  export type Priest = { tag: "Priest" };
-  export type Football = { tag: "Football" };
-  export type Gambler = { tag: "Gambler" };
-  export type Athlete = { tag: "Athlete" };
-  export type Gourmand = { tag: "Gourmand" };
-  export type Volleyball = { tag: "Volleyball" };
-  export type Stoner = { tag: "Stoner" };
+  AlgebraicType as __AlgebraicTypeValue,
+  BinaryReader as __BinaryReader,
+  BinaryWriter as __BinaryWriter,
+  ClientCache as __ClientCache,
+  ConnectionId as __ConnectionId,
+  DbConnectionBuilder as __DbConnectionBuilder,
+  DbConnectionImpl as __DbConnectionImpl,
+  Identity as __Identity,
+  SubscriptionBuilderImpl as __SubscriptionBuilderImpl,
+  TableCache as __TableCache,
+  TimeDuration as __TimeDuration,
+  Timestamp as __Timestamp,
+  deepEqual as __deepEqual,
+  type AlgebraicType as __AlgebraicTypeType,
+  type AlgebraicTypeVariants as __AlgebraicTypeVariants,
+  type CallReducerFlags as __CallReducerFlags,
+  type ErrorContextInterface as __ErrorContextInterface,
+  type Event as __Event,
+  type EventContextInterface as __EventContextInterface,
+  type ReducerEventContextInterface as __ReducerEventContextInterface,
+  type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+} from "spacetimedb";
+import * as PlayerClassVariants from './player_class_variants'
 
+// The tagged union or sum type for the algebraic type `PlayerClass`.
+export type PlayerClass = PlayerClassVariants.Fighter |
+  PlayerClassVariants.Rogue |
+  PlayerClassVariants.Mage |
+  PlayerClassVariants.Paladin |
+  PlayerClassVariants.Valkyrie |
+  PlayerClassVariants.Priest |
+  PlayerClassVariants.Football |
+  PlayerClassVariants.Gambler |
+  PlayerClassVariants.Athlete |
+  PlayerClassVariants.Gourmand |
+  PlayerClassVariants.Volleyball |
+  PlayerClassVariants.Stoner;
+
+// A value with helper functions to construct the type.
+export const PlayerClass = {
   // Helper functions for constructing each variant of the tagged union.
   // ```
   // const foo = Foo.A(42);
   // assert!(foo.tag === "A");
   // assert!(foo.value === 42);
   // ```
-  export const Fighter = { tag: "Fighter" };
-  export const Rogue = { tag: "Rogue" };
-  export const Mage = { tag: "Mage" };
-  export const Paladin = { tag: "Paladin" };
-  export const Valkyrie = { tag: "Valkyrie" };
-  export const Priest = { tag: "Priest" };
-  export const Football = { tag: "Football" };
-  export const Gambler = { tag: "Gambler" };
-  export const Athlete = { tag: "Athlete" };
-  export const Gourmand = { tag: "Gourmand" };
-  export const Volleyball = { tag: "Volleyball" };
-  export const Stoner = { tag: "Stoner" };
+  Fighter: { tag: "Fighter" } as const,
+  Rogue: { tag: "Rogue" } as const,
+  Mage: { tag: "Mage" } as const,
+  Paladin: { tag: "Paladin" } as const,
+  Valkyrie: { tag: "Valkyrie" } as const,
+  Priest: { tag: "Priest" } as const,
+  Football: { tag: "Football" } as const,
+  Gambler: { tag: "Gambler" } as const,
+  Athlete: { tag: "Athlete" } as const,
+  Gourmand: { tag: "Gourmand" } as const,
+  Volleyball: { tag: "Volleyball" } as const,
+  Stoner: { tag: "Stoner" } as const,
 
-  export function getTypeScriptAlgebraicType(): AlgebraicType {
-    return AlgebraicType.createSumType([
-      new SumTypeVariant("Fighter", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Rogue", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Mage", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Paladin", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Valkyrie", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Priest", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Football", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Gambler", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Athlete", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Gourmand", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Volleyball", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Stoner", AlgebraicType.createProductType([])),
-    ]);
-  }
+  getTypeScriptAlgebraicType(): __AlgebraicTypeType {
+    return __AlgebraicTypeValue.Sum({
+      variants: [
+        { name: "Fighter", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Rogue", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Mage", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Paladin", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Valkyrie", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Priest", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Football", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Gambler", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Athlete", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Gourmand", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Volleyball", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Stoner", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+      ]
+    });
+  },
 
-  export function serialize(writer: BinaryWriter, value: PlayerClass): void {
-      PlayerClass.getTypeScriptAlgebraicType().serialize(writer, value);
-  }
+  serialize(writer: __BinaryWriter, value: PlayerClass): void {
+      __AlgebraicTypeValue.serializeValue(writer, PlayerClass.getTypeScriptAlgebraicType(), value);
+  },
 
-  export function deserialize(reader: BinaryReader): PlayerClass {
-      return PlayerClass.getTypeScriptAlgebraicType().deserialize(reader);
-  }
+  deserialize(reader: __BinaryReader): PlayerClass {
+      return __AlgebraicTypeValue.deserializeValue(reader, PlayerClass.getTypeScriptAlgebraicType());
+  },
 
 }
 
-// The tagged union or sum type for the algebraic type `PlayerClass`.
-export type PlayerClass = PlayerClass.Fighter | PlayerClass.Rogue | PlayerClass.Mage | PlayerClass.Paladin | PlayerClass.Valkyrie | PlayerClass.Priest | PlayerClass.Football | PlayerClass.Gambler | PlayerClass.Athlete | PlayerClass.Gourmand | PlayerClass.Volleyball | PlayerClass.Stoner;
-
 export default PlayerClass;
+
 

@@ -1,4 +1,4 @@
-import { Identity, ErrorContextInterface } from '@clockworklabs/spacetimedb-sdk';
+import { Identity, ErrorContextInterface } from 'spacetimedb';
 // Import generated classes, including the generated DbConnection
 import { RemoteReducers, SetReducerFlags, RemoteTables, DbConnection, ErrorContext, SubscriptionEventContext } from "./autobindings"; // Removed Reducer, EventContext import as they seem unused here
 import { GameEvents } from './constants/GameEvents';

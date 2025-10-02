@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 import { MonsterStateChange } from "./monster_state_change_type";
 import { AiState as __AiState } from "./ai_state_type";
 

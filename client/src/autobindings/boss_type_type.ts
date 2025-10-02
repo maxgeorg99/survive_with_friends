@@ -3,72 +3,68 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
-// A namespace for generated variants and helper functions.
-export namespace BossType {
-  // These are the generated variant types for each variant of the tagged union.
-  // One type is generated per variant and will be used in the `value` field of
-  // the tagged union.
-  export type Ender = { tag: "Ender" };
-  export type Agna = { tag: "Agna" };
-  export type Simon = { tag: "Simon" };
+  AlgebraicType as __AlgebraicTypeValue,
+  BinaryReader as __BinaryReader,
+  BinaryWriter as __BinaryWriter,
+  ClientCache as __ClientCache,
+  ConnectionId as __ConnectionId,
+  DbConnectionBuilder as __DbConnectionBuilder,
+  DbConnectionImpl as __DbConnectionImpl,
+  Identity as __Identity,
+  SubscriptionBuilderImpl as __SubscriptionBuilderImpl,
+  TableCache as __TableCache,
+  TimeDuration as __TimeDuration,
+  Timestamp as __Timestamp,
+  deepEqual as __deepEqual,
+  type AlgebraicType as __AlgebraicTypeType,
+  type AlgebraicTypeVariants as __AlgebraicTypeVariants,
+  type CallReducerFlags as __CallReducerFlags,
+  type ErrorContextInterface as __ErrorContextInterface,
+  type Event as __Event,
+  type EventContextInterface as __EventContextInterface,
+  type ReducerEventContextInterface as __ReducerEventContextInterface,
+  type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+} from "spacetimedb";
+import * as BossTypeVariants from './boss_type_variants'
 
+// The tagged union or sum type for the algebraic type `BossType`.
+export type BossType = BossTypeVariants.Ender |
+  BossTypeVariants.Agna |
+  BossTypeVariants.Simon;
+
+// A value with helper functions to construct the type.
+export const BossType = {
   // Helper functions for constructing each variant of the tagged union.
   // ```
   // const foo = Foo.A(42);
   // assert!(foo.tag === "A");
   // assert!(foo.value === 42);
   // ```
-  export const Ender = { tag: "Ender" };
-  export const Agna = { tag: "Agna" };
-  export const Simon = { tag: "Simon" };
+  Ender: { tag: "Ender" } as const,
+  Agna: { tag: "Agna" } as const,
+  Simon: { tag: "Simon" } as const,
 
-  export function getTypeScriptAlgebraicType(): AlgebraicType {
-    return AlgebraicType.createSumType([
-      new SumTypeVariant("Ender", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Agna", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Simon", AlgebraicType.createProductType([])),
-    ]);
-  }
+  getTypeScriptAlgebraicType(): __AlgebraicTypeType {
+    return __AlgebraicTypeValue.Sum({
+      variants: [
+        { name: "Ender", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Agna", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Simon", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+      ]
+    });
+  },
 
-  export function serialize(writer: BinaryWriter, value: BossType): void {
-      BossType.getTypeScriptAlgebraicType().serialize(writer, value);
-  }
+  serialize(writer: __BinaryWriter, value: BossType): void {
+      __AlgebraicTypeValue.serializeValue(writer, BossType.getTypeScriptAlgebraicType(), value);
+  },
 
-  export function deserialize(reader: BinaryReader): BossType {
-      return BossType.getTypeScriptAlgebraicType().deserialize(reader);
-  }
+  deserialize(reader: __BinaryReader): BossType {
+      return __AlgebraicTypeValue.deserializeValue(reader, BossType.getTypeScriptAlgebraicType());
+  },
 
 }
 
-// The tagged union or sum type for the algebraic type `BossType`.
-export type BossType = BossType.Ender | BossType.Agna | BossType.Simon;
-
 export default BossType;
+
 

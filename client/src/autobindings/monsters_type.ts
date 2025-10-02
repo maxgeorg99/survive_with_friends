@@ -3,84 +3,92 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
-import { DbVector2 as __DbVector2 } from "./db_vector_2_type";
-import { MonsterType as __MonsterType } from "./monster_type_type";
-import { AiState as __AiState } from "./ai_state_type";
-import { MonsterVariant as __MonsterVariant } from "./monster_variant_type";
+  AlgebraicType as __AlgebraicTypeValue,
+  BinaryReader as __BinaryReader,
+  BinaryWriter as __BinaryWriter,
+  ClientCache as __ClientCache,
+  ConnectionId as __ConnectionId,
+  DbConnectionBuilder as __DbConnectionBuilder,
+  DbConnectionImpl as __DbConnectionImpl,
+  Identity as __Identity,
+  SubscriptionBuilderImpl as __SubscriptionBuilderImpl,
+  TableCache as __TableCache,
+  TimeDuration as __TimeDuration,
+  Timestamp as __Timestamp,
+  deepEqual as __deepEqual,
+  type AlgebraicType as __AlgebraicTypeType,
+  type AlgebraicTypeVariants as __AlgebraicTypeVariants,
+  type CallReducerFlags as __CallReducerFlags,
+  type ErrorContextInterface as __ErrorContextInterface,
+  type Event as __Event,
+  type EventContextInterface as __EventContextInterface,
+  type ReducerEventContextInterface as __ReducerEventContextInterface,
+  type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+} from "spacetimedb";
+import { DbVector2 } from "./db_vector_2_type";
+// Mark import as potentially unused
+declare type __keep_DbVector2 = DbVector2;
+import { MonsterType } from "./monster_type_type";
+// Mark import as potentially unused
+declare type __keep_MonsterType = MonsterType;
+import { AiState } from "./ai_state_type";
+// Mark import as potentially unused
+declare type __keep_AiState = AiState;
+import { MonsterVariant } from "./monster_variant_type";
+// Mark import as potentially unused
+declare type __keep_MonsterVariant = MonsterVariant;
+
 
 export type Monsters = {
   monsterId: number,
-  bestiaryId: __MonsterType,
-  variant: __MonsterVariant,
+  bestiaryId: MonsterType,
+  variant: MonsterVariant,
   hp: number,
   maxHp: number,
   atk: number,
   speed: number,
   targetPlayerId: number,
-  aiState: __AiState,
+  aiState: AiState,
   radius: number,
-  spawnPosition: __DbVector2,
+  spawnPosition: DbVector2,
 };
-
 /**
- * A namespace for generated helper functions.
+ * An object for generated helper functions.
  */
-export namespace Monsters {
+export const Monsters = {
   /**
   * A function which returns this type represented as an AlgebraicType.
   * This function is derived from the AlgebraicType used to generate this type.
   */
-  export function getTypeScriptAlgebraicType(): AlgebraicType {
-    return AlgebraicType.createProductType([
-      new ProductTypeElement("monsterId", AlgebraicType.createU32Type()),
-      new ProductTypeElement("bestiaryId", __MonsterType.getTypeScriptAlgebraicType()),
-      new ProductTypeElement("variant", __MonsterVariant.getTypeScriptAlgebraicType()),
-      new ProductTypeElement("hp", AlgebraicType.createU32Type()),
-      new ProductTypeElement("maxHp", AlgebraicType.createU32Type()),
-      new ProductTypeElement("atk", AlgebraicType.createF32Type()),
-      new ProductTypeElement("speed", AlgebraicType.createF32Type()),
-      new ProductTypeElement("targetPlayerId", AlgebraicType.createU32Type()),
-      new ProductTypeElement("aiState", __AiState.getTypeScriptAlgebraicType()),
-      new ProductTypeElement("radius", AlgebraicType.createF32Type()),
-      new ProductTypeElement("spawnPosition", __DbVector2.getTypeScriptAlgebraicType()),
-    ]);
-  }
+  getTypeScriptAlgebraicType(): __AlgebraicTypeType {
+    return __AlgebraicTypeValue.Product({
+      elements: [
+        { name: "monsterId", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "bestiaryId", algebraicType: MonsterType.getTypeScriptAlgebraicType()},
+        { name: "variant", algebraicType: MonsterVariant.getTypeScriptAlgebraicType()},
+        { name: "hp", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "maxHp", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "atk", algebraicType: __AlgebraicTypeValue.F32},
+        { name: "speed", algebraicType: __AlgebraicTypeValue.F32},
+        { name: "targetPlayerId", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "aiState", algebraicType: AiState.getTypeScriptAlgebraicType()},
+        { name: "radius", algebraicType: __AlgebraicTypeValue.F32},
+        { name: "spawnPosition", algebraicType: DbVector2.getTypeScriptAlgebraicType()},
+      ]
+    });
+  },
 
-  export function serialize(writer: BinaryWriter, value: Monsters): void {
-    Monsters.getTypeScriptAlgebraicType().serialize(writer, value);
-  }
+  serialize(writer: __BinaryWriter, value: Monsters): void {
+    __AlgebraicTypeValue.serializeValue(writer, Monsters.getTypeScriptAlgebraicType(), value);
+  },
 
-  export function deserialize(reader: BinaryReader): Monsters {
-    return Monsters.getTypeScriptAlgebraicType().deserialize(reader);
-  }
+  deserialize(reader: __BinaryReader): Monsters {
+    return __AlgebraicTypeValue.deserializeValue(reader, Monsters.getTypeScriptAlgebraicType());
+  },
 
 }
+
+export default Monsters;
 
 

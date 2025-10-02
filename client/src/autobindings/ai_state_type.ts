@@ -3,132 +3,128 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
-// A namespace for generated variants and helper functions.
-export namespace AiState {
-  // These are the generated variant types for each variant of the tagged union.
-  // One type is generated per variant and will be used in the `value` field of
-  // the tagged union.
-  export type Default = { tag: "Default" };
-  export type BossEnderIdle = { tag: "BossEnderIdle" };
-  export type BossEnderChase = { tag: "BossEnderChase" };
-  export type BossEnderDance = { tag: "BossEnderDance" };
-  export type BossEnderVanish = { tag: "BossEnderVanish" };
-  export type BossEnderLurk = { tag: "BossEnderLurk" };
-  export type BossEnderTeleport = { tag: "BossEnderTeleport" };
-  export type BossEnderTransform = { tag: "BossEnderTransform" };
-  export type Stationary = { tag: "Stationary" };
-  export type BossAgnaIdle = { tag: "BossAgnaIdle" };
-  export type BossAgnaFlamethrower = { tag: "BossAgnaFlamethrower" };
-  export type BossAgnaMagicCircle = { tag: "BossAgnaMagicCircle" };
-  export type BossAgnaRitualMatch = { tag: "BossAgnaRitualMatch" };
-  export type BossAgnaRitualWick = { tag: "BossAgnaRitualWick" };
-  export type BossAgnaRitualFailed = { tag: "BossAgnaRitualFailed" };
-  export type BossAgnaRitualComplete = { tag: "BossAgnaRitualComplete" };
-  export type BossSimonIdle = { tag: "BossSimonIdle" };
-  export type BossSimonToxicSpray = { tag: "BossSimonToxicSpray" };
-  export type BossSimonZombieWave = { tag: "BossSimonZombieWave" };
-  export type BossSimonTransform = { tag: "BossSimonTransform" };
-  export type BossSimonChemicalBoltPattern = { tag: "BossSimonChemicalBoltPattern" };
-  export type BossSimonToxicZonePattern = { tag: "BossSimonToxicZonePattern" };
-  export type BossSimonPhase2Transform = { tag: "BossSimonPhase2Transform" };
+  AlgebraicType as __AlgebraicTypeValue,
+  BinaryReader as __BinaryReader,
+  BinaryWriter as __BinaryWriter,
+  ClientCache as __ClientCache,
+  ConnectionId as __ConnectionId,
+  DbConnectionBuilder as __DbConnectionBuilder,
+  DbConnectionImpl as __DbConnectionImpl,
+  Identity as __Identity,
+  SubscriptionBuilderImpl as __SubscriptionBuilderImpl,
+  TableCache as __TableCache,
+  TimeDuration as __TimeDuration,
+  Timestamp as __Timestamp,
+  deepEqual as __deepEqual,
+  type AlgebraicType as __AlgebraicTypeType,
+  type AlgebraicTypeVariants as __AlgebraicTypeVariants,
+  type CallReducerFlags as __CallReducerFlags,
+  type ErrorContextInterface as __ErrorContextInterface,
+  type Event as __Event,
+  type EventContextInterface as __EventContextInterface,
+  type ReducerEventContextInterface as __ReducerEventContextInterface,
+  type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+} from "spacetimedb";
+import * as AiStateVariants from './ai_state_variants'
 
+// The tagged union or sum type for the algebraic type `AiState`.
+export type AiState = AiStateVariants.Default |
+  AiStateVariants.BossEnderIdle |
+  AiStateVariants.BossEnderChase |
+  AiStateVariants.BossEnderDance |
+  AiStateVariants.BossEnderVanish |
+  AiStateVariants.BossEnderLurk |
+  AiStateVariants.BossEnderTeleport |
+  AiStateVariants.BossEnderTransform |
+  AiStateVariants.Stationary |
+  AiStateVariants.BossAgnaIdle |
+  AiStateVariants.BossAgnaFlamethrower |
+  AiStateVariants.BossAgnaMagicCircle |
+  AiStateVariants.BossAgnaRitualMatch |
+  AiStateVariants.BossAgnaRitualWick |
+  AiStateVariants.BossAgnaRitualFailed |
+  AiStateVariants.BossAgnaRitualComplete |
+  AiStateVariants.BossSimonIdle |
+  AiStateVariants.BossSimonToxicSpray |
+  AiStateVariants.BossSimonZombieWave |
+  AiStateVariants.BossSimonTransform |
+  AiStateVariants.BossSimonChemicalBoltPattern |
+  AiStateVariants.BossSimonToxicZonePattern |
+  AiStateVariants.BossSimonPhase2Transform;
+
+// A value with helper functions to construct the type.
+export const AiState = {
   // Helper functions for constructing each variant of the tagged union.
   // ```
   // const foo = Foo.A(42);
   // assert!(foo.tag === "A");
   // assert!(foo.value === 42);
   // ```
-  export const Default = { tag: "Default" };
-  export const BossEnderIdle = { tag: "BossEnderIdle" };
-  export const BossEnderChase = { tag: "BossEnderChase" };
-  export const BossEnderDance = { tag: "BossEnderDance" };
-  export const BossEnderVanish = { tag: "BossEnderVanish" };
-  export const BossEnderLurk = { tag: "BossEnderLurk" };
-  export const BossEnderTeleport = { tag: "BossEnderTeleport" };
-  export const BossEnderTransform = { tag: "BossEnderTransform" };
-  export const Stationary = { tag: "Stationary" };
-  export const BossAgnaIdle = { tag: "BossAgnaIdle" };
-  export const BossAgnaFlamethrower = { tag: "BossAgnaFlamethrower" };
-  export const BossAgnaMagicCircle = { tag: "BossAgnaMagicCircle" };
-  export const BossAgnaRitualMatch = { tag: "BossAgnaRitualMatch" };
-  export const BossAgnaRitualWick = { tag: "BossAgnaRitualWick" };
-  export const BossAgnaRitualFailed = { tag: "BossAgnaRitualFailed" };
-  export const BossAgnaRitualComplete = { tag: "BossAgnaRitualComplete" };
-  export const BossSimonIdle = { tag: "BossSimonIdle" };
-  export const BossSimonToxicSpray = { tag: "BossSimonToxicSpray" };
-  export const BossSimonZombieWave = { tag: "BossSimonZombieWave" };
-  export const BossSimonTransform = { tag: "BossSimonTransform" };
-  export const BossSimonChemicalBoltPattern = { tag: "BossSimonChemicalBoltPattern" };
-  export const BossSimonToxicZonePattern = { tag: "BossSimonToxicZonePattern" };
-  export const BossSimonPhase2Transform = { tag: "BossSimonPhase2Transform" };
+  Default: { tag: "Default" } as const,
+  BossEnderIdle: { tag: "BossEnderIdle" } as const,
+  BossEnderChase: { tag: "BossEnderChase" } as const,
+  BossEnderDance: { tag: "BossEnderDance" } as const,
+  BossEnderVanish: { tag: "BossEnderVanish" } as const,
+  BossEnderLurk: { tag: "BossEnderLurk" } as const,
+  BossEnderTeleport: { tag: "BossEnderTeleport" } as const,
+  BossEnderTransform: { tag: "BossEnderTransform" } as const,
+  Stationary: { tag: "Stationary" } as const,
+  BossAgnaIdle: { tag: "BossAgnaIdle" } as const,
+  BossAgnaFlamethrower: { tag: "BossAgnaFlamethrower" } as const,
+  BossAgnaMagicCircle: { tag: "BossAgnaMagicCircle" } as const,
+  BossAgnaRitualMatch: { tag: "BossAgnaRitualMatch" } as const,
+  BossAgnaRitualWick: { tag: "BossAgnaRitualWick" } as const,
+  BossAgnaRitualFailed: { tag: "BossAgnaRitualFailed" } as const,
+  BossAgnaRitualComplete: { tag: "BossAgnaRitualComplete" } as const,
+  BossSimonIdle: { tag: "BossSimonIdle" } as const,
+  BossSimonToxicSpray: { tag: "BossSimonToxicSpray" } as const,
+  BossSimonZombieWave: { tag: "BossSimonZombieWave" } as const,
+  BossSimonTransform: { tag: "BossSimonTransform" } as const,
+  BossSimonChemicalBoltPattern: { tag: "BossSimonChemicalBoltPattern" } as const,
+  BossSimonToxicZonePattern: { tag: "BossSimonToxicZonePattern" } as const,
+  BossSimonPhase2Transform: { tag: "BossSimonPhase2Transform" } as const,
 
-  export function getTypeScriptAlgebraicType(): AlgebraicType {
-    return AlgebraicType.createSumType([
-      new SumTypeVariant("Default", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossEnderIdle", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossEnderChase", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossEnderDance", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossEnderVanish", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossEnderLurk", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossEnderTeleport", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossEnderTransform", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Stationary", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossAgnaIdle", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossAgnaFlamethrower", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossAgnaMagicCircle", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossAgnaRitualMatch", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossAgnaRitualWick", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossAgnaRitualFailed", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossAgnaRitualComplete", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossSimonIdle", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossSimonToxicSpray", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossSimonZombieWave", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossSimonTransform", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossSimonChemicalBoltPattern", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossSimonToxicZonePattern", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossSimonPhase2Transform", AlgebraicType.createProductType([])),
-    ]);
-  }
+  getTypeScriptAlgebraicType(): __AlgebraicTypeType {
+    return __AlgebraicTypeValue.Sum({
+      variants: [
+        { name: "Default", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BossEnderIdle", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BossEnderChase", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BossEnderDance", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BossEnderVanish", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BossEnderLurk", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BossEnderTeleport", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BossEnderTransform", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Stationary", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BossAgnaIdle", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BossAgnaFlamethrower", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BossAgnaMagicCircle", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BossAgnaRitualMatch", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BossAgnaRitualWick", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BossAgnaRitualFailed", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BossAgnaRitualComplete", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BossSimonIdle", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BossSimonToxicSpray", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BossSimonZombieWave", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BossSimonTransform", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BossSimonChemicalBoltPattern", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BossSimonToxicZonePattern", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BossSimonPhase2Transform", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+      ]
+    });
+  },
 
-  export function serialize(writer: BinaryWriter, value: AiState): void {
-      AiState.getTypeScriptAlgebraicType().serialize(writer, value);
-  }
+  serialize(writer: __BinaryWriter, value: AiState): void {
+      __AlgebraicTypeValue.serializeValue(writer, AiState.getTypeScriptAlgebraicType(), value);
+  },
 
-  export function deserialize(reader: BinaryReader): AiState {
-      return AiState.getTypeScriptAlgebraicType().deserialize(reader);
-  }
+  deserialize(reader: __BinaryReader): AiState {
+      return __AlgebraicTypeValue.deserializeValue(reader, AiState.getTypeScriptAlgebraicType());
+  },
 
 }
 
-// The tagged union or sum type for the algebraic type `AiState`.
-export type AiState = AiState.Default | AiState.BossEnderIdle | AiState.BossEnderChase | AiState.BossEnderDance | AiState.BossEnderVanish | AiState.BossEnderLurk | AiState.BossEnderTeleport | AiState.BossEnderTransform | AiState.Stationary | AiState.BossAgnaIdle | AiState.BossAgnaFlamethrower | AiState.BossAgnaMagicCircle | AiState.BossAgnaRitualMatch | AiState.BossAgnaRitualWick | AiState.BossAgnaRitualFailed | AiState.BossAgnaRitualComplete | AiState.BossSimonIdle | AiState.BossSimonToxicSpray | AiState.BossSimonZombieWave | AiState.BossSimonTransform | AiState.BossSimonChemicalBoltPattern | AiState.BossSimonToxicZonePattern | AiState.BossSimonPhase2Transform;
-
 export default AiState;
+
 

@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 
 import { HealthRegenScheduler as __HealthRegenScheduler } from "./health_regen_scheduler_type";
 

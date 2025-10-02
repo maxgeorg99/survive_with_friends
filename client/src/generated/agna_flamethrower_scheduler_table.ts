@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 import { AgnaFlamethrowerScheduler } from "./agna_flamethrower_scheduler_type";
 import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
 

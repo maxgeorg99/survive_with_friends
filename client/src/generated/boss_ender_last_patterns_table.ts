@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 import { BossEnderLastPattern } from "./boss_ender_last_pattern_type";
 import { AiState as __AiState } from "./ai_state_type";
 

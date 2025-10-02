@@ -3,35 +3,32 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+  AlgebraicType as __AlgebraicTypeValue,
+  BinaryReader as __BinaryReader,
+  BinaryWriter as __BinaryWriter,
+  ClientCache as __ClientCache,
+  ConnectionId as __ConnectionId,
+  DbConnectionBuilder as __DbConnectionBuilder,
+  DbConnectionImpl as __DbConnectionImpl,
+  Identity as __Identity,
+  SubscriptionBuilderImpl as __SubscriptionBuilderImpl,
+  TableCache as __TableCache,
+  TimeDuration as __TimeDuration,
+  Timestamp as __Timestamp,
+  deepEqual as __deepEqual,
+  type AlgebraicType as __AlgebraicTypeType,
+  type AlgebraicTypeVariants as __AlgebraicTypeVariants,
+  type CallReducerFlags as __CallReducerFlags,
+  type ErrorContextInterface as __ErrorContextInterface,
+  type Event as __Event,
+  type EventContextInterface as __EventContextInterface,
+  type ReducerEventContextInterface as __ReducerEventContextInterface,
+  type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+} from "spacetimedb";
 import { World } from "./world_type";
-import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
+import { type EventContext, type Reducer, RemoteReducers, RemoteTables } from ".";
+declare type __keep = [EventContext, Reducer, RemoteReducers, RemoteTables];
 
 /**
  * Table handle for the table `world`.
@@ -44,9 +41,9 @@ import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
  * like `ctx.db.world.on_insert(...)`.
  */
 export class WorldTableHandle {
-  tableCache: TableCache<World>;
+  tableCache: __TableCache<World>;
 
-  constructor(tableCache: TableCache<World>) {
+  constructor(tableCache: __TableCache<World>) {
     this.tableCache = tableCache;
   }
 
@@ -73,7 +70,7 @@ export class WorldTableHandle {
     // if such a row is present in the client cache.
     find: (col_val: number): World | undefined => {
       for (let row of this.tableCache.iter()) {
-        if (deepEqual(row.worldId, col_val)) {
+        if (__deepEqual(row.worldId, col_val)) {
           return row;
         }
       }

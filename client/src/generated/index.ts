@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 
 // Import and reexport all reducer arg types
 import { ChangeMonsterState } from "./change_monster_state_reducer.ts";

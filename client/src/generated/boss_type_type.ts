@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 // A namespace for generated variants and helper functions.
 export namespace BossType {
   // These are the generated variant types for each variant of the tagged union.

@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 
 import { AgnaCandleScheduler as __AgnaCandleScheduler } from "./agna_candle_scheduler_type";
 

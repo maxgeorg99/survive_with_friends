@@ -3,108 +3,104 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
-// A namespace for generated variants and helper functions.
-export namespace MonsterAttackType {
-  // These are the generated variant types for each variant of the tagged union.
-  // One type is generated per variant and will be used in the `value` field of
-  // the tagged union.
-  export type ImpBolt = { tag: "ImpBolt" };
-  export type EnderBolt = { tag: "EnderBolt" };
-  export type EnderScytheSpawn = { tag: "EnderScytheSpawn" };
-  export type EnderScythe = { tag: "EnderScythe" };
-  export type ChaosBall = { tag: "ChaosBall" };
-  export type VoidZone = { tag: "VoidZone" };
-  export type AgnaFlamethrowerJet = { tag: "AgnaFlamethrowerJet" };
-  export type AgnaOrbSpawn = { tag: "AgnaOrbSpawn" };
-  export type AgnaFireOrb = { tag: "AgnaFireOrb" };
-  export type AgnaCandleBolt = { tag: "AgnaCandleBolt" };
-  export type AgnaPhase2FlameJet = { tag: "AgnaPhase2FlameJet" };
-  export type AgnaGroundFlame = { tag: "AgnaGroundFlame" };
-  export type SimonChemicalBolt = { tag: "SimonChemicalBolt" };
-  export type SimonToxicZone = { tag: "SimonToxicZone" };
-  export type SimonToxicSpray = { tag: "SimonToxicSpray" };
+  AlgebraicType as __AlgebraicTypeValue,
+  BinaryReader as __BinaryReader,
+  BinaryWriter as __BinaryWriter,
+  ClientCache as __ClientCache,
+  ConnectionId as __ConnectionId,
+  DbConnectionBuilder as __DbConnectionBuilder,
+  DbConnectionImpl as __DbConnectionImpl,
+  Identity as __Identity,
+  SubscriptionBuilderImpl as __SubscriptionBuilderImpl,
+  TableCache as __TableCache,
+  TimeDuration as __TimeDuration,
+  Timestamp as __Timestamp,
+  deepEqual as __deepEqual,
+  type AlgebraicType as __AlgebraicTypeType,
+  type AlgebraicTypeVariants as __AlgebraicTypeVariants,
+  type CallReducerFlags as __CallReducerFlags,
+  type ErrorContextInterface as __ErrorContextInterface,
+  type Event as __Event,
+  type EventContextInterface as __EventContextInterface,
+  type ReducerEventContextInterface as __ReducerEventContextInterface,
+  type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+} from "spacetimedb";
+import * as MonsterAttackTypeVariants from './monster_attack_type_variants'
 
+// The tagged union or sum type for the algebraic type `MonsterAttackType`.
+export type MonsterAttackType = MonsterAttackTypeVariants.ImpBolt |
+  MonsterAttackTypeVariants.EnderBolt |
+  MonsterAttackTypeVariants.EnderScytheSpawn |
+  MonsterAttackTypeVariants.EnderScythe |
+  MonsterAttackTypeVariants.ChaosBall |
+  MonsterAttackTypeVariants.VoidZone |
+  MonsterAttackTypeVariants.AgnaFlamethrowerJet |
+  MonsterAttackTypeVariants.AgnaOrbSpawn |
+  MonsterAttackTypeVariants.AgnaFireOrb |
+  MonsterAttackTypeVariants.AgnaCandleBolt |
+  MonsterAttackTypeVariants.AgnaPhase2FlameJet |
+  MonsterAttackTypeVariants.AgnaGroundFlame |
+  MonsterAttackTypeVariants.SimonChemicalBolt |
+  MonsterAttackTypeVariants.SimonToxicZone |
+  MonsterAttackTypeVariants.SimonToxicSpray;
+
+// A value with helper functions to construct the type.
+export const MonsterAttackType = {
   // Helper functions for constructing each variant of the tagged union.
   // ```
   // const foo = Foo.A(42);
   // assert!(foo.tag === "A");
   // assert!(foo.value === 42);
   // ```
-  export const ImpBolt = { tag: "ImpBolt" };
-  export const EnderBolt = { tag: "EnderBolt" };
-  export const EnderScytheSpawn = { tag: "EnderScytheSpawn" };
-  export const EnderScythe = { tag: "EnderScythe" };
-  export const ChaosBall = { tag: "ChaosBall" };
-  export const VoidZone = { tag: "VoidZone" };
-  export const AgnaFlamethrowerJet = { tag: "AgnaFlamethrowerJet" };
-  export const AgnaOrbSpawn = { tag: "AgnaOrbSpawn" };
-  export const AgnaFireOrb = { tag: "AgnaFireOrb" };
-  export const AgnaCandleBolt = { tag: "AgnaCandleBolt" };
-  export const AgnaPhase2FlameJet = { tag: "AgnaPhase2FlameJet" };
-  export const AgnaGroundFlame = { tag: "AgnaGroundFlame" };
-  export const SimonChemicalBolt = { tag: "SimonChemicalBolt" };
-  export const SimonToxicZone = { tag: "SimonToxicZone" };
-  export const SimonToxicSpray = { tag: "SimonToxicSpray" };
+  ImpBolt: { tag: "ImpBolt" } as const,
+  EnderBolt: { tag: "EnderBolt" } as const,
+  EnderScytheSpawn: { tag: "EnderScytheSpawn" } as const,
+  EnderScythe: { tag: "EnderScythe" } as const,
+  ChaosBall: { tag: "ChaosBall" } as const,
+  VoidZone: { tag: "VoidZone" } as const,
+  AgnaFlamethrowerJet: { tag: "AgnaFlamethrowerJet" } as const,
+  AgnaOrbSpawn: { tag: "AgnaOrbSpawn" } as const,
+  AgnaFireOrb: { tag: "AgnaFireOrb" } as const,
+  AgnaCandleBolt: { tag: "AgnaCandleBolt" } as const,
+  AgnaPhase2FlameJet: { tag: "AgnaPhase2FlameJet" } as const,
+  AgnaGroundFlame: { tag: "AgnaGroundFlame" } as const,
+  SimonChemicalBolt: { tag: "SimonChemicalBolt" } as const,
+  SimonToxicZone: { tag: "SimonToxicZone" } as const,
+  SimonToxicSpray: { tag: "SimonToxicSpray" } as const,
 
-  export function getTypeScriptAlgebraicType(): AlgebraicType {
-    return AlgebraicType.createSumType([
-      new SumTypeVariant("ImpBolt", AlgebraicType.createProductType([])),
-      new SumTypeVariant("EnderBolt", AlgebraicType.createProductType([])),
-      new SumTypeVariant("EnderScytheSpawn", AlgebraicType.createProductType([])),
-      new SumTypeVariant("EnderScythe", AlgebraicType.createProductType([])),
-      new SumTypeVariant("ChaosBall", AlgebraicType.createProductType([])),
-      new SumTypeVariant("VoidZone", AlgebraicType.createProductType([])),
-      new SumTypeVariant("AgnaFlamethrowerJet", AlgebraicType.createProductType([])),
-      new SumTypeVariant("AgnaOrbSpawn", AlgebraicType.createProductType([])),
-      new SumTypeVariant("AgnaFireOrb", AlgebraicType.createProductType([])),
-      new SumTypeVariant("AgnaCandleBolt", AlgebraicType.createProductType([])),
-      new SumTypeVariant("AgnaPhase2FlameJet", AlgebraicType.createProductType([])),
-      new SumTypeVariant("AgnaGroundFlame", AlgebraicType.createProductType([])),
-      new SumTypeVariant("SimonChemicalBolt", AlgebraicType.createProductType([])),
-      new SumTypeVariant("SimonToxicZone", AlgebraicType.createProductType([])),
-      new SumTypeVariant("SimonToxicSpray", AlgebraicType.createProductType([])),
-    ]);
-  }
+  getTypeScriptAlgebraicType(): __AlgebraicTypeType {
+    return __AlgebraicTypeValue.Sum({
+      variants: [
+        { name: "ImpBolt", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "EnderBolt", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "EnderScytheSpawn", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "EnderScythe", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "ChaosBall", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "VoidZone", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "AgnaFlamethrowerJet", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "AgnaOrbSpawn", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "AgnaFireOrb", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "AgnaCandleBolt", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "AgnaPhase2FlameJet", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "AgnaGroundFlame", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "SimonChemicalBolt", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "SimonToxicZone", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "SimonToxicSpray", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+      ]
+    });
+  },
 
-  export function serialize(writer: BinaryWriter, value: MonsterAttackType): void {
-      MonsterAttackType.getTypeScriptAlgebraicType().serialize(writer, value);
-  }
+  serialize(writer: __BinaryWriter, value: MonsterAttackType): void {
+      __AlgebraicTypeValue.serializeValue(writer, MonsterAttackType.getTypeScriptAlgebraicType(), value);
+  },
 
-  export function deserialize(reader: BinaryReader): MonsterAttackType {
-      return MonsterAttackType.getTypeScriptAlgebraicType().deserialize(reader);
-  }
+  deserialize(reader: __BinaryReader): MonsterAttackType {
+      return __AlgebraicTypeValue.deserializeValue(reader, MonsterAttackType.getTypeScriptAlgebraicType());
+  },
 
 }
 
-// The tagged union or sum type for the algebraic type `MonsterAttackType`.
-export type MonsterAttackType = MonsterAttackType.ImpBolt | MonsterAttackType.EnderBolt | MonsterAttackType.EnderScytheSpawn | MonsterAttackType.EnderScythe | MonsterAttackType.ChaosBall | MonsterAttackType.VoidZone | MonsterAttackType.AgnaFlamethrowerJet | MonsterAttackType.AgnaOrbSpawn | MonsterAttackType.AgnaFireOrb | MonsterAttackType.AgnaCandleBolt | MonsterAttackType.AgnaPhase2FlameJet | MonsterAttackType.AgnaGroundFlame | MonsterAttackType.SimonChemicalBolt | MonsterAttackType.SimonToxicZone | MonsterAttackType.SimonToxicSpray;
-
 export default MonsterAttackType;
+
 

@@ -3,35 +3,32 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+  AlgebraicType as __AlgebraicTypeValue,
+  BinaryReader as __BinaryReader,
+  BinaryWriter as __BinaryWriter,
+  ClientCache as __ClientCache,
+  ConnectionId as __ConnectionId,
+  DbConnectionBuilder as __DbConnectionBuilder,
+  DbConnectionImpl as __DbConnectionImpl,
+  Identity as __Identity,
+  SubscriptionBuilderImpl as __SubscriptionBuilderImpl,
+  TableCache as __TableCache,
+  TimeDuration as __TimeDuration,
+  Timestamp as __Timestamp,
+  deepEqual as __deepEqual,
+  type AlgebraicType as __AlgebraicTypeType,
+  type AlgebraicTypeVariants as __AlgebraicTypeVariants,
+  type CallReducerFlags as __CallReducerFlags,
+  type ErrorContextInterface as __ErrorContextInterface,
+  type Event as __Event,
+  type EventContextInterface as __EventContextInterface,
+  type ReducerEventContextInterface as __ReducerEventContextInterface,
+  type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+} from "spacetimedb";
 import { AgnaPhase2FlamethrowerScheduler } from "./agna_phase_2_flamethrower_scheduler_type";
-import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
+import { type EventContext, type Reducer, RemoteReducers, RemoteTables } from ".";
+declare type __keep = [EventContext, Reducer, RemoteReducers, RemoteTables];
 
 /**
  * Table handle for the table `agna_phase2_flamethrower_scheduler`.
@@ -44,9 +41,9 @@ import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
  * like `ctx.db.agnaPhase2FlamethrowerScheduler.on_insert(...)`.
  */
 export class AgnaPhase2FlamethrowerSchedulerTableHandle {
-  tableCache: TableCache<AgnaPhase2FlamethrowerScheduler>;
+  tableCache: __TableCache<AgnaPhase2FlamethrowerScheduler>;
 
-  constructor(tableCache: TableCache<AgnaPhase2FlamethrowerScheduler>) {
+  constructor(tableCache: __TableCache<AgnaPhase2FlamethrowerScheduler>) {
     this.tableCache = tableCache;
   }
 
@@ -73,7 +70,7 @@ export class AgnaPhase2FlamethrowerSchedulerTableHandle {
     // if such a row is present in the client cache.
     find: (col_val: bigint): AgnaPhase2FlamethrowerScheduler | undefined => {
       for (let row of this.tableCache.iter()) {
-        if (deepEqual(row.scheduledId, col_val)) {
+        if (__deepEqual(row.scheduledId, col_val)) {
           return row;
         }
       }

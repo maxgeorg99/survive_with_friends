@@ -3,40 +3,39 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
-import { AttackType as __AttackType } from "./attack_type_type";
+  AlgebraicType as __AlgebraicTypeValue,
+  BinaryReader as __BinaryReader,
+  BinaryWriter as __BinaryWriter,
+  ClientCache as __ClientCache,
+  ConnectionId as __ConnectionId,
+  DbConnectionBuilder as __DbConnectionBuilder,
+  DbConnectionImpl as __DbConnectionImpl,
+  Identity as __Identity,
+  SubscriptionBuilderImpl as __SubscriptionBuilderImpl,
+  TableCache as __TableCache,
+  TimeDuration as __TimeDuration,
+  Timestamp as __Timestamp,
+  deepEqual as __deepEqual,
+  type AlgebraicType as __AlgebraicTypeType,
+  type AlgebraicTypeVariants as __AlgebraicTypeVariants,
+  type CallReducerFlags as __CallReducerFlags,
+  type ErrorContextInterface as __ErrorContextInterface,
+  type Event as __Event,
+  type EventContextInterface as __EventContextInterface,
+  type ReducerEventContextInterface as __ReducerEventContextInterface,
+  type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+} from "spacetimedb";
+import { AttackType } from "./attack_type_type";
+// Mark import as potentially unused
+declare type __keep_AttackType = AttackType;
+
 
 export type ActiveAttack = {
   activeAttackId: number,
   entityId: number,
   playerId: number,
-  attackType: __AttackType,
+  attackType: AttackType,
   idWithinBurst: number,
   parameterU: number,
   ticksElapsed: number,
@@ -44,38 +43,41 @@ export type ActiveAttack = {
   radius: number,
   piercing: boolean,
 };
-
 /**
- * A namespace for generated helper functions.
+ * An object for generated helper functions.
  */
-export namespace ActiveAttack {
+export const ActiveAttack = {
   /**
   * A function which returns this type represented as an AlgebraicType.
   * This function is derived from the AlgebraicType used to generate this type.
   */
-  export function getTypeScriptAlgebraicType(): AlgebraicType {
-    return AlgebraicType.createProductType([
-      new ProductTypeElement("activeAttackId", AlgebraicType.createU32Type()),
-      new ProductTypeElement("entityId", AlgebraicType.createU32Type()),
-      new ProductTypeElement("playerId", AlgebraicType.createU32Type()),
-      new ProductTypeElement("attackType", __AttackType.getTypeScriptAlgebraicType()),
-      new ProductTypeElement("idWithinBurst", AlgebraicType.createU32Type()),
-      new ProductTypeElement("parameterU", AlgebraicType.createU32Type()),
-      new ProductTypeElement("ticksElapsed", AlgebraicType.createU32Type()),
-      new ProductTypeElement("damage", AlgebraicType.createU32Type()),
-      new ProductTypeElement("radius", AlgebraicType.createF32Type()),
-      new ProductTypeElement("piercing", AlgebraicType.createBoolType()),
-    ]);
-  }
+  getTypeScriptAlgebraicType(): __AlgebraicTypeType {
+    return __AlgebraicTypeValue.Product({
+      elements: [
+        { name: "activeAttackId", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "entityId", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "playerId", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "attackType", algebraicType: AttackType.getTypeScriptAlgebraicType()},
+        { name: "idWithinBurst", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "parameterU", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "ticksElapsed", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "damage", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "radius", algebraicType: __AlgebraicTypeValue.F32},
+        { name: "piercing", algebraicType: __AlgebraicTypeValue.Bool},
+      ]
+    });
+  },
 
-  export function serialize(writer: BinaryWriter, value: ActiveAttack): void {
-    ActiveAttack.getTypeScriptAlgebraicType().serialize(writer, value);
-  }
+  serialize(writer: __BinaryWriter, value: ActiveAttack): void {
+    __AlgebraicTypeValue.serializeValue(writer, ActiveAttack.getTypeScriptAlgebraicType(), value);
+  },
 
-  export function deserialize(reader: BinaryReader): ActiveAttack {
-    return ActiveAttack.getTypeScriptAlgebraicType().deserialize(reader);
-  }
+  deserialize(reader: __BinaryReader): ActiveAttack {
+    return __AlgebraicTypeValue.deserializeValue(reader, ActiveAttack.getTypeScriptAlgebraicType());
+  },
 
 }
+
+export default ActiveAttack;
 
 

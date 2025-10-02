@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 import { FoundLoreScrolls } from "./found_lore_scrolls_type";
 import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
 

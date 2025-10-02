@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 import { Gem } from "./gem_type";
 import { GemLevel as __GemLevel } from "./gem_level_type";
 

@@ -3,71 +3,71 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+  AlgebraicType as __AlgebraicTypeValue,
+  BinaryReader as __BinaryReader,
+  BinaryWriter as __BinaryWriter,
+  ClientCache as __ClientCache,
+  ConnectionId as __ConnectionId,
+  DbConnectionBuilder as __DbConnectionBuilder,
+  DbConnectionImpl as __DbConnectionImpl,
+  Identity as __Identity,
+  SubscriptionBuilderImpl as __SubscriptionBuilderImpl,
+  TableCache as __TableCache,
+  TimeDuration as __TimeDuration,
+  Timestamp as __Timestamp,
+  deepEqual as __deepEqual,
+  type AlgebraicType as __AlgebraicTypeType,
+  type AlgebraicTypeVariants as __AlgebraicTypeVariants,
+  type CallReducerFlags as __CallReducerFlags,
+  type ErrorContextInterface as __ErrorContextInterface,
+  type Event as __Event,
+  type EventContextInterface as __EventContextInterface,
+  type ReducerEventContextInterface as __ReducerEventContextInterface,
+  type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+} from "spacetimedb";
+
 export type World = {
   worldId: number,
   tickCount: number,
-  lastTickTime: Timestamp,
+  lastTickTime: __Timestamp,
   averageTickMs: number,
   minTickMs: number,
   maxTickMs: number,
   timingSamplesCollected: number,
 };
-
 /**
- * A namespace for generated helper functions.
+ * An object for generated helper functions.
  */
-export namespace World {
+export const World = {
   /**
   * A function which returns this type represented as an AlgebraicType.
   * This function is derived from the AlgebraicType used to generate this type.
   */
-  export function getTypeScriptAlgebraicType(): AlgebraicType {
-    return AlgebraicType.createProductType([
-      new ProductTypeElement("worldId", AlgebraicType.createU32Type()),
-      new ProductTypeElement("tickCount", AlgebraicType.createU32Type()),
-      new ProductTypeElement("lastTickTime", AlgebraicType.createTimestampType()),
-      new ProductTypeElement("averageTickMs", AlgebraicType.createF64Type()),
-      new ProductTypeElement("minTickMs", AlgebraicType.createF64Type()),
-      new ProductTypeElement("maxTickMs", AlgebraicType.createF64Type()),
-      new ProductTypeElement("timingSamplesCollected", AlgebraicType.createU32Type()),
-    ]);
-  }
+  getTypeScriptAlgebraicType(): __AlgebraicTypeType {
+    return __AlgebraicTypeValue.Product({
+      elements: [
+        { name: "worldId", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "tickCount", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "lastTickTime", algebraicType: __AlgebraicTypeValue.createTimestampType()},
+        { name: "averageTickMs", algebraicType: __AlgebraicTypeValue.F64},
+        { name: "minTickMs", algebraicType: __AlgebraicTypeValue.F64},
+        { name: "maxTickMs", algebraicType: __AlgebraicTypeValue.F64},
+        { name: "timingSamplesCollected", algebraicType: __AlgebraicTypeValue.U32},
+      ]
+    });
+  },
 
-  export function serialize(writer: BinaryWriter, value: World): void {
-    World.getTypeScriptAlgebraicType().serialize(writer, value);
-  }
+  serialize(writer: __BinaryWriter, value: World): void {
+    __AlgebraicTypeValue.serializeValue(writer, World.getTypeScriptAlgebraicType(), value);
+  },
 
-  export function deserialize(reader: BinaryReader): World {
-    return World.getTypeScriptAlgebraicType().deserialize(reader);
-  }
+  deserialize(reader: __BinaryReader): World {
+    return __AlgebraicTypeValue.deserializeValue(reader, World.getTypeScriptAlgebraicType());
+  },
 
 }
+
+export default World;
 
 

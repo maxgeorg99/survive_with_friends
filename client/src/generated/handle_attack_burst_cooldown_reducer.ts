@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 
 import { AttackBurstCooldown as __AttackBurstCooldown } from "./attack_burst_cooldown_type";
 

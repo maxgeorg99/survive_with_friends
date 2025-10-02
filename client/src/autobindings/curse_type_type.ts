@@ -3,126 +3,122 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
-// A namespace for generated variants and helper functions.
-export namespace CurseType {
-  // These are the generated variant types for each variant of the tagged union.
-  // One type is generated per variant and will be used in the `value` field of
-  // the tagged union.
-  export type MonsterMoreHp = { tag: "MonsterMoreHp" };
-  export type MonsterMoreDamage = { tag: "MonsterMoreDamage" };
-  export type MonsterMoreSpeed = { tag: "MonsterMoreSpeed" };
-  export type MonsterHealthRegen = { tag: "MonsterHealthRegen" };
-  export type CursedMonstersSpawn = { tag: "CursedMonstersSpawn" };
-  export type NoFreeReroll = { tag: "NoFreeReroll" };
-  export type NoHealOnLevelUp = { tag: "NoHealOnLevelUp" };
-  export type NegativeHealthRegen = { tag: "NegativeHealthRegen" };
-  export type PlayersStartLessHp = { tag: "PlayersStartLessHp" };
-  export type PlayersStartLessSpeed = { tag: "PlayersStartLessSpeed" };
-  export type NoDiceDrops = { tag: "NoDiceDrops" };
-  export type NoFoodDrops = { tag: "NoFoodDrops" };
-  export type NoBoosterPackDrops = { tag: "NoBoosterPackDrops" };
-  export type NoStructureLoot = { tag: "NoStructureLoot" };
-  export type OneLessVoidChest = { tag: "OneLessVoidChest" };
-  export type OneLessVoidChestSecond = { tag: "OneLessVoidChestSecond" };
-  export type MonstersDropFewerGems = { tag: "MonstersDropFewerGems" };
-  export type BossAppearsSooner = { tag: "BossAppearsSooner" };
-  export type DeadlierBosses = { tag: "DeadlierBosses" };
-  export type DeadlierBossesTwo = { tag: "DeadlierBossesTwo" };
-  export type Scaling = { tag: "Scaling" };
+  AlgebraicType as __AlgebraicTypeValue,
+  BinaryReader as __BinaryReader,
+  BinaryWriter as __BinaryWriter,
+  ClientCache as __ClientCache,
+  ConnectionId as __ConnectionId,
+  DbConnectionBuilder as __DbConnectionBuilder,
+  DbConnectionImpl as __DbConnectionImpl,
+  Identity as __Identity,
+  SubscriptionBuilderImpl as __SubscriptionBuilderImpl,
+  TableCache as __TableCache,
+  TimeDuration as __TimeDuration,
+  Timestamp as __Timestamp,
+  deepEqual as __deepEqual,
+  type AlgebraicType as __AlgebraicTypeType,
+  type AlgebraicTypeVariants as __AlgebraicTypeVariants,
+  type CallReducerFlags as __CallReducerFlags,
+  type ErrorContextInterface as __ErrorContextInterface,
+  type Event as __Event,
+  type EventContextInterface as __EventContextInterface,
+  type ReducerEventContextInterface as __ReducerEventContextInterface,
+  type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+} from "spacetimedb";
+import * as CurseTypeVariants from './curse_type_variants'
 
+// The tagged union or sum type for the algebraic type `CurseType`.
+export type CurseType = CurseTypeVariants.MonsterMoreHp |
+  CurseTypeVariants.MonsterMoreDamage |
+  CurseTypeVariants.MonsterMoreSpeed |
+  CurseTypeVariants.MonsterHealthRegen |
+  CurseTypeVariants.CursedMonstersSpawn |
+  CurseTypeVariants.NoFreeReroll |
+  CurseTypeVariants.NoHealOnLevelUp |
+  CurseTypeVariants.NegativeHealthRegen |
+  CurseTypeVariants.PlayersStartLessHp |
+  CurseTypeVariants.PlayersStartLessSpeed |
+  CurseTypeVariants.NoDiceDrops |
+  CurseTypeVariants.NoFoodDrops |
+  CurseTypeVariants.NoBoosterPackDrops |
+  CurseTypeVariants.NoStructureLoot |
+  CurseTypeVariants.OneLessVoidChest |
+  CurseTypeVariants.OneLessVoidChestSecond |
+  CurseTypeVariants.MonstersDropFewerGems |
+  CurseTypeVariants.BossAppearsSooner |
+  CurseTypeVariants.DeadlierBosses |
+  CurseTypeVariants.DeadlierBossesTwo |
+  CurseTypeVariants.Scaling;
+
+// A value with helper functions to construct the type.
+export const CurseType = {
   // Helper functions for constructing each variant of the tagged union.
   // ```
   // const foo = Foo.A(42);
   // assert!(foo.tag === "A");
   // assert!(foo.value === 42);
   // ```
-  export const MonsterMoreHp = { tag: "MonsterMoreHp" };
-  export const MonsterMoreDamage = { tag: "MonsterMoreDamage" };
-  export const MonsterMoreSpeed = { tag: "MonsterMoreSpeed" };
-  export const MonsterHealthRegen = { tag: "MonsterHealthRegen" };
-  export const CursedMonstersSpawn = { tag: "CursedMonstersSpawn" };
-  export const NoFreeReroll = { tag: "NoFreeReroll" };
-  export const NoHealOnLevelUp = { tag: "NoHealOnLevelUp" };
-  export const NegativeHealthRegen = { tag: "NegativeHealthRegen" };
-  export const PlayersStartLessHp = { tag: "PlayersStartLessHp" };
-  export const PlayersStartLessSpeed = { tag: "PlayersStartLessSpeed" };
-  export const NoDiceDrops = { tag: "NoDiceDrops" };
-  export const NoFoodDrops = { tag: "NoFoodDrops" };
-  export const NoBoosterPackDrops = { tag: "NoBoosterPackDrops" };
-  export const NoStructureLoot = { tag: "NoStructureLoot" };
-  export const OneLessVoidChest = { tag: "OneLessVoidChest" };
-  export const OneLessVoidChestSecond = { tag: "OneLessVoidChestSecond" };
-  export const MonstersDropFewerGems = { tag: "MonstersDropFewerGems" };
-  export const BossAppearsSooner = { tag: "BossAppearsSooner" };
-  export const DeadlierBosses = { tag: "DeadlierBosses" };
-  export const DeadlierBossesTwo = { tag: "DeadlierBossesTwo" };
-  export const Scaling = { tag: "Scaling" };
+  MonsterMoreHp: { tag: "MonsterMoreHp" } as const,
+  MonsterMoreDamage: { tag: "MonsterMoreDamage" } as const,
+  MonsterMoreSpeed: { tag: "MonsterMoreSpeed" } as const,
+  MonsterHealthRegen: { tag: "MonsterHealthRegen" } as const,
+  CursedMonstersSpawn: { tag: "CursedMonstersSpawn" } as const,
+  NoFreeReroll: { tag: "NoFreeReroll" } as const,
+  NoHealOnLevelUp: { tag: "NoHealOnLevelUp" } as const,
+  NegativeHealthRegen: { tag: "NegativeHealthRegen" } as const,
+  PlayersStartLessHp: { tag: "PlayersStartLessHp" } as const,
+  PlayersStartLessSpeed: { tag: "PlayersStartLessSpeed" } as const,
+  NoDiceDrops: { tag: "NoDiceDrops" } as const,
+  NoFoodDrops: { tag: "NoFoodDrops" } as const,
+  NoBoosterPackDrops: { tag: "NoBoosterPackDrops" } as const,
+  NoStructureLoot: { tag: "NoStructureLoot" } as const,
+  OneLessVoidChest: { tag: "OneLessVoidChest" } as const,
+  OneLessVoidChestSecond: { tag: "OneLessVoidChestSecond" } as const,
+  MonstersDropFewerGems: { tag: "MonstersDropFewerGems" } as const,
+  BossAppearsSooner: { tag: "BossAppearsSooner" } as const,
+  DeadlierBosses: { tag: "DeadlierBosses" } as const,
+  DeadlierBossesTwo: { tag: "DeadlierBossesTwo" } as const,
+  Scaling: { tag: "Scaling" } as const,
 
-  export function getTypeScriptAlgebraicType(): AlgebraicType {
-    return AlgebraicType.createSumType([
-      new SumTypeVariant("MonsterMoreHp", AlgebraicType.createProductType([])),
-      new SumTypeVariant("MonsterMoreDamage", AlgebraicType.createProductType([])),
-      new SumTypeVariant("MonsterMoreSpeed", AlgebraicType.createProductType([])),
-      new SumTypeVariant("MonsterHealthRegen", AlgebraicType.createProductType([])),
-      new SumTypeVariant("CursedMonstersSpawn", AlgebraicType.createProductType([])),
-      new SumTypeVariant("NoFreeReroll", AlgebraicType.createProductType([])),
-      new SumTypeVariant("NoHealOnLevelUp", AlgebraicType.createProductType([])),
-      new SumTypeVariant("NegativeHealthRegen", AlgebraicType.createProductType([])),
-      new SumTypeVariant("PlayersStartLessHp", AlgebraicType.createProductType([])),
-      new SumTypeVariant("PlayersStartLessSpeed", AlgebraicType.createProductType([])),
-      new SumTypeVariant("NoDiceDrops", AlgebraicType.createProductType([])),
-      new SumTypeVariant("NoFoodDrops", AlgebraicType.createProductType([])),
-      new SumTypeVariant("NoBoosterPackDrops", AlgebraicType.createProductType([])),
-      new SumTypeVariant("NoStructureLoot", AlgebraicType.createProductType([])),
-      new SumTypeVariant("OneLessVoidChest", AlgebraicType.createProductType([])),
-      new SumTypeVariant("OneLessVoidChestSecond", AlgebraicType.createProductType([])),
-      new SumTypeVariant("MonstersDropFewerGems", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossAppearsSooner", AlgebraicType.createProductType([])),
-      new SumTypeVariant("DeadlierBosses", AlgebraicType.createProductType([])),
-      new SumTypeVariant("DeadlierBossesTwo", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Scaling", AlgebraicType.createProductType([])),
-    ]);
-  }
+  getTypeScriptAlgebraicType(): __AlgebraicTypeType {
+    return __AlgebraicTypeValue.Sum({
+      variants: [
+        { name: "MonsterMoreHp", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "MonsterMoreDamage", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "MonsterMoreSpeed", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "MonsterHealthRegen", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "CursedMonstersSpawn", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "NoFreeReroll", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "NoHealOnLevelUp", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "NegativeHealthRegen", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "PlayersStartLessHp", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "PlayersStartLessSpeed", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "NoDiceDrops", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "NoFoodDrops", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "NoBoosterPackDrops", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "NoStructureLoot", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "OneLessVoidChest", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "OneLessVoidChestSecond", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "MonstersDropFewerGems", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BossAppearsSooner", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "DeadlierBosses", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "DeadlierBossesTwo", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Scaling", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+      ]
+    });
+  },
 
-  export function serialize(writer: BinaryWriter, value: CurseType): void {
-      CurseType.getTypeScriptAlgebraicType().serialize(writer, value);
-  }
+  serialize(writer: __BinaryWriter, value: CurseType): void {
+      __AlgebraicTypeValue.serializeValue(writer, CurseType.getTypeScriptAlgebraicType(), value);
+  },
 
-  export function deserialize(reader: BinaryReader): CurseType {
-      return CurseType.getTypeScriptAlgebraicType().deserialize(reader);
-  }
+  deserialize(reader: __BinaryReader): CurseType {
+      return __AlgebraicTypeValue.deserializeValue(reader, CurseType.getTypeScriptAlgebraicType());
+  },
 
 }
 
-// The tagged union or sum type for the algebraic type `CurseType`.
-export type CurseType = CurseType.MonsterMoreHp | CurseType.MonsterMoreDamage | CurseType.MonsterMoreSpeed | CurseType.MonsterHealthRegen | CurseType.CursedMonstersSpawn | CurseType.NoFreeReroll | CurseType.NoHealOnLevelUp | CurseType.NegativeHealthRegen | CurseType.PlayersStartLessHp | CurseType.PlayersStartLessSpeed | CurseType.NoDiceDrops | CurseType.NoFoodDrops | CurseType.NoBoosterPackDrops | CurseType.NoStructureLoot | CurseType.OneLessVoidChest | CurseType.OneLessVoidChestSecond | CurseType.MonstersDropFewerGems | CurseType.BossAppearsSooner | CurseType.DeadlierBosses | CurseType.DeadlierBossesTwo | CurseType.Scaling;
-
 export default CurseType;
+
 

@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 import { MonsterHitCleanup } from "./monster_hit_cleanup_type";
 import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
 

@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 
 import { DeadPlayerTransitionTimer as __DeadPlayerTransitionTimer } from "./dead_player_transition_timer_type";
 

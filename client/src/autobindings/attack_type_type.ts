@@ -3,99 +3,95 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
-// A namespace for generated variants and helper functions.
-export namespace AttackType {
-  // These are the generated variant types for each variant of the tagged union.
-  // One type is generated per variant and will be used in the `value` field of
-  // the tagged union.
-  export type Sword = { tag: "Sword" };
-  export type Wand = { tag: "Wand" };
-  export type Knives = { tag: "Knives" };
-  export type Shield = { tag: "Shield" };
-  export type ThunderHorn = { tag: "ThunderHorn" };
-  export type AngelStaff = { tag: "AngelStaff" };
-  export type Football = { tag: "Football" };
-  export type Cards = { tag: "Cards" };
-  export type Dumbbell = { tag: "Dumbbell" };
-  export type Garlic = { tag: "Garlic" };
-  export type Volleyball = { tag: "Volleyball" };
-  export type Joint = { tag: "Joint" };
+  AlgebraicType as __AlgebraicTypeValue,
+  BinaryReader as __BinaryReader,
+  BinaryWriter as __BinaryWriter,
+  ClientCache as __ClientCache,
+  ConnectionId as __ConnectionId,
+  DbConnectionBuilder as __DbConnectionBuilder,
+  DbConnectionImpl as __DbConnectionImpl,
+  Identity as __Identity,
+  SubscriptionBuilderImpl as __SubscriptionBuilderImpl,
+  TableCache as __TableCache,
+  TimeDuration as __TimeDuration,
+  Timestamp as __Timestamp,
+  deepEqual as __deepEqual,
+  type AlgebraicType as __AlgebraicTypeType,
+  type AlgebraicTypeVariants as __AlgebraicTypeVariants,
+  type CallReducerFlags as __CallReducerFlags,
+  type ErrorContextInterface as __ErrorContextInterface,
+  type Event as __Event,
+  type EventContextInterface as __EventContextInterface,
+  type ReducerEventContextInterface as __ReducerEventContextInterface,
+  type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+} from "spacetimedb";
+import * as AttackTypeVariants from './attack_type_variants'
 
+// The tagged union or sum type for the algebraic type `AttackType`.
+export type AttackType = AttackTypeVariants.Sword |
+  AttackTypeVariants.Wand |
+  AttackTypeVariants.Knives |
+  AttackTypeVariants.Shield |
+  AttackTypeVariants.ThunderHorn |
+  AttackTypeVariants.AngelStaff |
+  AttackTypeVariants.Football |
+  AttackTypeVariants.Cards |
+  AttackTypeVariants.Dumbbell |
+  AttackTypeVariants.Garlic |
+  AttackTypeVariants.Volleyball |
+  AttackTypeVariants.Joint;
+
+// A value with helper functions to construct the type.
+export const AttackType = {
   // Helper functions for constructing each variant of the tagged union.
   // ```
   // const foo = Foo.A(42);
   // assert!(foo.tag === "A");
   // assert!(foo.value === 42);
   // ```
-  export const Sword = { tag: "Sword" };
-  export const Wand = { tag: "Wand" };
-  export const Knives = { tag: "Knives" };
-  export const Shield = { tag: "Shield" };
-  export const ThunderHorn = { tag: "ThunderHorn" };
-  export const AngelStaff = { tag: "AngelStaff" };
-  export const Football = { tag: "Football" };
-  export const Cards = { tag: "Cards" };
-  export const Dumbbell = { tag: "Dumbbell" };
-  export const Garlic = { tag: "Garlic" };
-  export const Volleyball = { tag: "Volleyball" };
-  export const Joint = { tag: "Joint" };
+  Sword: { tag: "Sword" } as const,
+  Wand: { tag: "Wand" } as const,
+  Knives: { tag: "Knives" } as const,
+  Shield: { tag: "Shield" } as const,
+  ThunderHorn: { tag: "ThunderHorn" } as const,
+  AngelStaff: { tag: "AngelStaff" } as const,
+  Football: { tag: "Football" } as const,
+  Cards: { tag: "Cards" } as const,
+  Dumbbell: { tag: "Dumbbell" } as const,
+  Garlic: { tag: "Garlic" } as const,
+  Volleyball: { tag: "Volleyball" } as const,
+  Joint: { tag: "Joint" } as const,
 
-  export function getTypeScriptAlgebraicType(): AlgebraicType {
-    return AlgebraicType.createSumType([
-      new SumTypeVariant("Sword", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Wand", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Knives", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Shield", AlgebraicType.createProductType([])),
-      new SumTypeVariant("ThunderHorn", AlgebraicType.createProductType([])),
-      new SumTypeVariant("AngelStaff", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Football", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Cards", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Dumbbell", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Garlic", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Volleyball", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Joint", AlgebraicType.createProductType([])),
-    ]);
-  }
+  getTypeScriptAlgebraicType(): __AlgebraicTypeType {
+    return __AlgebraicTypeValue.Sum({
+      variants: [
+        { name: "Sword", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Wand", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Knives", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Shield", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "ThunderHorn", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "AngelStaff", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Football", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Cards", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Dumbbell", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Garlic", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Volleyball", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Joint", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+      ]
+    });
+  },
 
-  export function serialize(writer: BinaryWriter, value: AttackType): void {
-      AttackType.getTypeScriptAlgebraicType().serialize(writer, value);
-  }
+  serialize(writer: __BinaryWriter, value: AttackType): void {
+      __AlgebraicTypeValue.serializeValue(writer, AttackType.getTypeScriptAlgebraicType(), value);
+  },
 
-  export function deserialize(reader: BinaryReader): AttackType {
-      return AttackType.getTypeScriptAlgebraicType().deserialize(reader);
-  }
+  deserialize(reader: __BinaryReader): AttackType {
+      return __AlgebraicTypeValue.deserializeValue(reader, AttackType.getTypeScriptAlgebraicType());
+  },
 
 }
 
-// The tagged union or sum type for the algebraic type `AttackType`.
-export type AttackType = AttackType.Sword | AttackType.Wand | AttackType.Knives | AttackType.Shield | AttackType.ThunderHorn | AttackType.AngelStaff | AttackType.Football | AttackType.Cards | AttackType.Dumbbell | AttackType.Garlic | AttackType.Volleyball | AttackType.Joint;
-
 export default AttackType;
+
 

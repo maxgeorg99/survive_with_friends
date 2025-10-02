@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 import { World } from "./world_type";
 import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
 

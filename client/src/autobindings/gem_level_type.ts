@@ -3,90 +3,86 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
-// A namespace for generated variants and helper functions.
-export namespace GemLevel {
-  // These are the generated variant types for each variant of the tagged union.
-  // One type is generated per variant and will be used in the `value` field of
-  // the tagged union.
-  export type Small = { tag: "Small" };
-  export type Medium = { tag: "Medium" };
-  export type Large = { tag: "Large" };
-  export type Huge = { tag: "Huge" };
-  export type Soul = { tag: "Soul" };
-  export type Fries = { tag: "Fries" };
-  export type Dice = { tag: "Dice" };
-  export type BoosterPack = { tag: "BoosterPack" };
-  export type LoreScroll = { tag: "LoreScroll" };
+  AlgebraicType as __AlgebraicTypeValue,
+  BinaryReader as __BinaryReader,
+  BinaryWriter as __BinaryWriter,
+  ClientCache as __ClientCache,
+  ConnectionId as __ConnectionId,
+  DbConnectionBuilder as __DbConnectionBuilder,
+  DbConnectionImpl as __DbConnectionImpl,
+  Identity as __Identity,
+  SubscriptionBuilderImpl as __SubscriptionBuilderImpl,
+  TableCache as __TableCache,
+  TimeDuration as __TimeDuration,
+  Timestamp as __Timestamp,
+  deepEqual as __deepEqual,
+  type AlgebraicType as __AlgebraicTypeType,
+  type AlgebraicTypeVariants as __AlgebraicTypeVariants,
+  type CallReducerFlags as __CallReducerFlags,
+  type ErrorContextInterface as __ErrorContextInterface,
+  type Event as __Event,
+  type EventContextInterface as __EventContextInterface,
+  type ReducerEventContextInterface as __ReducerEventContextInterface,
+  type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+} from "spacetimedb";
+import * as GemLevelVariants from './gem_level_variants'
 
+// The tagged union or sum type for the algebraic type `GemLevel`.
+export type GemLevel = GemLevelVariants.Small |
+  GemLevelVariants.Medium |
+  GemLevelVariants.Large |
+  GemLevelVariants.Huge |
+  GemLevelVariants.Soul |
+  GemLevelVariants.Fries |
+  GemLevelVariants.Dice |
+  GemLevelVariants.BoosterPack |
+  GemLevelVariants.LoreScroll;
+
+// A value with helper functions to construct the type.
+export const GemLevel = {
   // Helper functions for constructing each variant of the tagged union.
   // ```
   // const foo = Foo.A(42);
   // assert!(foo.tag === "A");
   // assert!(foo.value === 42);
   // ```
-  export const Small = { tag: "Small" };
-  export const Medium = { tag: "Medium" };
-  export const Large = { tag: "Large" };
-  export const Huge = { tag: "Huge" };
-  export const Soul = { tag: "Soul" };
-  export const Fries = { tag: "Fries" };
-  export const Dice = { tag: "Dice" };
-  export const BoosterPack = { tag: "BoosterPack" };
-  export const LoreScroll = { tag: "LoreScroll" };
+  Small: { tag: "Small" } as const,
+  Medium: { tag: "Medium" } as const,
+  Large: { tag: "Large" } as const,
+  Huge: { tag: "Huge" } as const,
+  Soul: { tag: "Soul" } as const,
+  Fries: { tag: "Fries" } as const,
+  Dice: { tag: "Dice" } as const,
+  BoosterPack: { tag: "BoosterPack" } as const,
+  LoreScroll: { tag: "LoreScroll" } as const,
 
-  export function getTypeScriptAlgebraicType(): AlgebraicType {
-    return AlgebraicType.createSumType([
-      new SumTypeVariant("Small", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Medium", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Large", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Huge", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Soul", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Fries", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Dice", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BoosterPack", AlgebraicType.createProductType([])),
-      new SumTypeVariant("LoreScroll", AlgebraicType.createProductType([])),
-    ]);
-  }
+  getTypeScriptAlgebraicType(): __AlgebraicTypeType {
+    return __AlgebraicTypeValue.Sum({
+      variants: [
+        { name: "Small", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Medium", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Large", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Huge", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Soul", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Fries", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Dice", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BoosterPack", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "LoreScroll", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+      ]
+    });
+  },
 
-  export function serialize(writer: BinaryWriter, value: GemLevel): void {
-      GemLevel.getTypeScriptAlgebraicType().serialize(writer, value);
-  }
+  serialize(writer: __BinaryWriter, value: GemLevel): void {
+      __AlgebraicTypeValue.serializeValue(writer, GemLevel.getTypeScriptAlgebraicType(), value);
+  },
 
-  export function deserialize(reader: BinaryReader): GemLevel {
-      return GemLevel.getTypeScriptAlgebraicType().deserialize(reader);
-  }
+  deserialize(reader: __BinaryReader): GemLevel {
+      return __AlgebraicTypeValue.deserializeValue(reader, GemLevel.getTypeScriptAlgebraicType());
+  },
 
 }
 
-// The tagged union or sum type for the algebraic type `GemLevel`.
-export type GemLevel = GemLevel.Small | GemLevel.Medium | GemLevel.Large | GemLevel.Huge | GemLevel.Soul | GemLevel.Fries | GemLevel.Dice | GemLevel.BoosterPack | GemLevel.LoreScroll;
-
 export default GemLevel;
+
 

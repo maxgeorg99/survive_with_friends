@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 
 import { AgnaRitualCompletionCheck as __AgnaRitualCompletionCheck } from "./agna_ritual_completion_check_type";
 

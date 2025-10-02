@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 import { UpgradeType as __UpgradeType } from "./upgrade_type_type";
 
 export type ChosenUpgradeData = {

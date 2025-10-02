@@ -3,42 +3,43 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
-import { DbVector2 as __DbVector2 } from "./db_vector_2_type";
-import { MonsterAttackType as __MonsterAttackType } from "./monster_attack_type_type";
+  AlgebraicType as __AlgebraicTypeValue,
+  BinaryReader as __BinaryReader,
+  BinaryWriter as __BinaryWriter,
+  ClientCache as __ClientCache,
+  ConnectionId as __ConnectionId,
+  DbConnectionBuilder as __DbConnectionBuilder,
+  DbConnectionImpl as __DbConnectionImpl,
+  Identity as __Identity,
+  SubscriptionBuilderImpl as __SubscriptionBuilderImpl,
+  TableCache as __TableCache,
+  TimeDuration as __TimeDuration,
+  Timestamp as __Timestamp,
+  deepEqual as __deepEqual,
+  type AlgebraicType as __AlgebraicTypeType,
+  type AlgebraicTypeVariants as __AlgebraicTypeVariants,
+  type CallReducerFlags as __CallReducerFlags,
+  type ErrorContextInterface as __ErrorContextInterface,
+  type Event as __Event,
+  type EventContextInterface as __EventContextInterface,
+  type ReducerEventContextInterface as __ReducerEventContextInterface,
+  type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+} from "spacetimedb";
+import { DbVector2 } from "./db_vector_2_type";
+// Mark import as potentially unused
+declare type __keep_DbVector2 = DbVector2;
+import { MonsterAttackType } from "./monster_attack_type_type";
+// Mark import as potentially unused
+declare type __keep_MonsterAttackType = MonsterAttackType;
+
 
 export type ActiveMonsterAttack = {
   activeMonsterAttackId: bigint,
-  scheduledAt: { tag: "Interval", value: TimeDuration } | { tag: "Time", value: Timestamp },
-  position: __DbVector2,
-  direction: __DbVector2,
-  monsterAttackType: __MonsterAttackType,
+  scheduledAt: { tag: "Interval", value: __TimeDuration } | { tag: "Time", value: __Timestamp },
+  position: DbVector2,
+  direction: DbVector2,
+  monsterAttackType: MonsterAttackType,
   piercing: boolean,
   damage: number,
   radius: number,
@@ -48,41 +49,44 @@ export type ActiveMonsterAttack = {
   ticksElapsed: number,
   fromShinyMonster: boolean,
 };
-
 /**
- * A namespace for generated helper functions.
+ * An object for generated helper functions.
  */
-export namespace ActiveMonsterAttack {
+export const ActiveMonsterAttack = {
   /**
   * A function which returns this type represented as an AlgebraicType.
   * This function is derived from the AlgebraicType used to generate this type.
   */
-  export function getTypeScriptAlgebraicType(): AlgebraicType {
-    return AlgebraicType.createProductType([
-      new ProductTypeElement("activeMonsterAttackId", AlgebraicType.createU64Type()),
-      new ProductTypeElement("scheduledAt", AlgebraicType.createScheduleAtType()),
-      new ProductTypeElement("position", __DbVector2.getTypeScriptAlgebraicType()),
-      new ProductTypeElement("direction", __DbVector2.getTypeScriptAlgebraicType()),
-      new ProductTypeElement("monsterAttackType", __MonsterAttackType.getTypeScriptAlgebraicType()),
-      new ProductTypeElement("piercing", AlgebraicType.createBoolType()),
-      new ProductTypeElement("damage", AlgebraicType.createU32Type()),
-      new ProductTypeElement("radius", AlgebraicType.createF32Type()),
-      new ProductTypeElement("speed", AlgebraicType.createF32Type()),
-      new ProductTypeElement("parameterU", AlgebraicType.createU32Type()),
-      new ProductTypeElement("parameterF", AlgebraicType.createF32Type()),
-      new ProductTypeElement("ticksElapsed", AlgebraicType.createU32Type()),
-      new ProductTypeElement("fromShinyMonster", AlgebraicType.createBoolType()),
-    ]);
-  }
+  getTypeScriptAlgebraicType(): __AlgebraicTypeType {
+    return __AlgebraicTypeValue.Product({
+      elements: [
+        { name: "activeMonsterAttackId", algebraicType: __AlgebraicTypeValue.U64},
+        { name: "scheduledAt", algebraicType: __AlgebraicTypeValue.createScheduleAtType()},
+        { name: "position", algebraicType: DbVector2.getTypeScriptAlgebraicType()},
+        { name: "direction", algebraicType: DbVector2.getTypeScriptAlgebraicType()},
+        { name: "monsterAttackType", algebraicType: MonsterAttackType.getTypeScriptAlgebraicType()},
+        { name: "piercing", algebraicType: __AlgebraicTypeValue.Bool},
+        { name: "damage", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "radius", algebraicType: __AlgebraicTypeValue.F32},
+        { name: "speed", algebraicType: __AlgebraicTypeValue.F32},
+        { name: "parameterU", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "parameterF", algebraicType: __AlgebraicTypeValue.F32},
+        { name: "ticksElapsed", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "fromShinyMonster", algebraicType: __AlgebraicTypeValue.Bool},
+      ]
+    });
+  },
 
-  export function serialize(writer: BinaryWriter, value: ActiveMonsterAttack): void {
-    ActiveMonsterAttack.getTypeScriptAlgebraicType().serialize(writer, value);
-  }
+  serialize(writer: __BinaryWriter, value: ActiveMonsterAttack): void {
+    __AlgebraicTypeValue.serializeValue(writer, ActiveMonsterAttack.getTypeScriptAlgebraicType(), value);
+  },
 
-  export function deserialize(reader: BinaryReader): ActiveMonsterAttack {
-    return ActiveMonsterAttack.getTypeScriptAlgebraicType().deserialize(reader);
-  }
+  deserialize(reader: __BinaryReader): ActiveMonsterAttack {
+    return __AlgebraicTypeValue.deserializeValue(reader, ActiveMonsterAttack.getTypeScriptAlgebraicType());
+  },
 
 }
+
+export default ActiveMonsterAttack;
 
 

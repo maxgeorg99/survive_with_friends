@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 
 import { ImpAttackScheduler as __ImpAttackScheduler } from "./imp_attack_scheduler_type";
 

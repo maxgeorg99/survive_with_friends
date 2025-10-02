@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 
 import { VoidZoneScheduler as __VoidZoneScheduler } from "./void_zone_scheduler_type";
 

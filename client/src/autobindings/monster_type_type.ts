@@ -3,117 +3,113 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
-// A namespace for generated variants and helper functions.
-export namespace MonsterType {
-  // These are the generated variant types for each variant of the tagged union.
-  // One type is generated per variant and will be used in the `value` field of
-  // the tagged union.
-  export type Rat = { tag: "Rat" };
-  export type Slime = { tag: "Slime" };
-  export type Bat = { tag: "Bat" };
-  export type Orc = { tag: "Orc" };
-  export type Imp = { tag: "Imp" };
-  export type Zombie = { tag: "Zombie" };
-  export type VoidChest = { tag: "VoidChest" };
-  export type EnderClaw = { tag: "EnderClaw" };
-  export type BossEnderPhase1 = { tag: "BossEnderPhase1" };
-  export type BossEnderPhase2 = { tag: "BossEnderPhase2" };
-  export type BossAgnaPhase1 = { tag: "BossAgnaPhase1" };
-  export type BossAgnaPhase2 = { tag: "BossAgnaPhase2" };
-  export type BossSimonPhase1 = { tag: "BossSimonPhase1" };
-  export type BossSimonPhase2 = { tag: "BossSimonPhase2" };
-  export type AgnaCandle = { tag: "AgnaCandle" };
-  export type Crate = { tag: "Crate" };
-  export type Tree = { tag: "Tree" };
-  export type Statue = { tag: "Statue" };
+  AlgebraicType as __AlgebraicTypeValue,
+  BinaryReader as __BinaryReader,
+  BinaryWriter as __BinaryWriter,
+  ClientCache as __ClientCache,
+  ConnectionId as __ConnectionId,
+  DbConnectionBuilder as __DbConnectionBuilder,
+  DbConnectionImpl as __DbConnectionImpl,
+  Identity as __Identity,
+  SubscriptionBuilderImpl as __SubscriptionBuilderImpl,
+  TableCache as __TableCache,
+  TimeDuration as __TimeDuration,
+  Timestamp as __Timestamp,
+  deepEqual as __deepEqual,
+  type AlgebraicType as __AlgebraicTypeType,
+  type AlgebraicTypeVariants as __AlgebraicTypeVariants,
+  type CallReducerFlags as __CallReducerFlags,
+  type ErrorContextInterface as __ErrorContextInterface,
+  type Event as __Event,
+  type EventContextInterface as __EventContextInterface,
+  type ReducerEventContextInterface as __ReducerEventContextInterface,
+  type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+} from "spacetimedb";
+import * as MonsterTypeVariants from './monster_type_variants'
 
+// The tagged union or sum type for the algebraic type `MonsterType`.
+export type MonsterType = MonsterTypeVariants.Rat |
+  MonsterTypeVariants.Slime |
+  MonsterTypeVariants.Bat |
+  MonsterTypeVariants.Orc |
+  MonsterTypeVariants.Imp |
+  MonsterTypeVariants.Zombie |
+  MonsterTypeVariants.VoidChest |
+  MonsterTypeVariants.EnderClaw |
+  MonsterTypeVariants.BossEnderPhase1 |
+  MonsterTypeVariants.BossEnderPhase2 |
+  MonsterTypeVariants.BossAgnaPhase1 |
+  MonsterTypeVariants.BossAgnaPhase2 |
+  MonsterTypeVariants.BossSimonPhase1 |
+  MonsterTypeVariants.BossSimonPhase2 |
+  MonsterTypeVariants.AgnaCandle |
+  MonsterTypeVariants.Crate |
+  MonsterTypeVariants.Tree |
+  MonsterTypeVariants.Statue;
+
+// A value with helper functions to construct the type.
+export const MonsterType = {
   // Helper functions for constructing each variant of the tagged union.
   // ```
   // const foo = Foo.A(42);
   // assert!(foo.tag === "A");
   // assert!(foo.value === 42);
   // ```
-  export const Rat = { tag: "Rat" };
-  export const Slime = { tag: "Slime" };
-  export const Bat = { tag: "Bat" };
-  export const Orc = { tag: "Orc" };
-  export const Imp = { tag: "Imp" };
-  export const Zombie = { tag: "Zombie" };
-  export const VoidChest = { tag: "VoidChest" };
-  export const EnderClaw = { tag: "EnderClaw" };
-  export const BossEnderPhase1 = { tag: "BossEnderPhase1" };
-  export const BossEnderPhase2 = { tag: "BossEnderPhase2" };
-  export const BossAgnaPhase1 = { tag: "BossAgnaPhase1" };
-  export const BossAgnaPhase2 = { tag: "BossAgnaPhase2" };
-  export const BossSimonPhase1 = { tag: "BossSimonPhase1" };
-  export const BossSimonPhase2 = { tag: "BossSimonPhase2" };
-  export const AgnaCandle = { tag: "AgnaCandle" };
-  export const Crate = { tag: "Crate" };
-  export const Tree = { tag: "Tree" };
-  export const Statue = { tag: "Statue" };
+  Rat: { tag: "Rat" } as const,
+  Slime: { tag: "Slime" } as const,
+  Bat: { tag: "Bat" } as const,
+  Orc: { tag: "Orc" } as const,
+  Imp: { tag: "Imp" } as const,
+  Zombie: { tag: "Zombie" } as const,
+  VoidChest: { tag: "VoidChest" } as const,
+  EnderClaw: { tag: "EnderClaw" } as const,
+  BossEnderPhase1: { tag: "BossEnderPhase1" } as const,
+  BossEnderPhase2: { tag: "BossEnderPhase2" } as const,
+  BossAgnaPhase1: { tag: "BossAgnaPhase1" } as const,
+  BossAgnaPhase2: { tag: "BossAgnaPhase2" } as const,
+  BossSimonPhase1: { tag: "BossSimonPhase1" } as const,
+  BossSimonPhase2: { tag: "BossSimonPhase2" } as const,
+  AgnaCandle: { tag: "AgnaCandle" } as const,
+  Crate: { tag: "Crate" } as const,
+  Tree: { tag: "Tree" } as const,
+  Statue: { tag: "Statue" } as const,
 
-  export function getTypeScriptAlgebraicType(): AlgebraicType {
-    return AlgebraicType.createSumType([
-      new SumTypeVariant("Rat", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Slime", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Bat", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Orc", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Imp", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Zombie", AlgebraicType.createProductType([])),
-      new SumTypeVariant("VoidChest", AlgebraicType.createProductType([])),
-      new SumTypeVariant("EnderClaw", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossEnderPhase1", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossEnderPhase2", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossAgnaPhase1", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossAgnaPhase2", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossSimonPhase1", AlgebraicType.createProductType([])),
-      new SumTypeVariant("BossSimonPhase2", AlgebraicType.createProductType([])),
-      new SumTypeVariant("AgnaCandle", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Crate", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Tree", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Statue", AlgebraicType.createProductType([])),
-    ]);
-  }
+  getTypeScriptAlgebraicType(): __AlgebraicTypeType {
+    return __AlgebraicTypeValue.Sum({
+      variants: [
+        { name: "Rat", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Slime", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Bat", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Orc", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Imp", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Zombie", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "VoidChest", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "EnderClaw", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BossEnderPhase1", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BossEnderPhase2", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BossAgnaPhase1", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BossAgnaPhase2", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BossSimonPhase1", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "BossSimonPhase2", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "AgnaCandle", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Crate", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Tree", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Statue", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+      ]
+    });
+  },
 
-  export function serialize(writer: BinaryWriter, value: MonsterType): void {
-      MonsterType.getTypeScriptAlgebraicType().serialize(writer, value);
-  }
+  serialize(writer: __BinaryWriter, value: MonsterType): void {
+      __AlgebraicTypeValue.serializeValue(writer, MonsterType.getTypeScriptAlgebraicType(), value);
+  },
 
-  export function deserialize(reader: BinaryReader): MonsterType {
-      return MonsterType.getTypeScriptAlgebraicType().deserialize(reader);
-  }
+  deserialize(reader: __BinaryReader): MonsterType {
+      return __AlgebraicTypeValue.deserializeValue(reader, MonsterType.getTypeScriptAlgebraicType());
+  },
 
 }
 
-// The tagged union or sum type for the algebraic type `MonsterType`.
-export type MonsterType = MonsterType.Rat | MonsterType.Slime | MonsterType.Bat | MonsterType.Orc | MonsterType.Imp | MonsterType.Zombie | MonsterType.VoidChest | MonsterType.EnderClaw | MonsterType.BossEnderPhase1 | MonsterType.BossEnderPhase2 | MonsterType.BossAgnaPhase1 | MonsterType.BossAgnaPhase2 | MonsterType.BossSimonPhase1 | MonsterType.BossSimonPhase2 | MonsterType.AgnaCandle | MonsterType.Crate | MonsterType.Tree | MonsterType.Statue;
-
 export default MonsterType;
+
 

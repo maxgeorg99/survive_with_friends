@@ -3,71 +3,73 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
-import { DbVector2 as __DbVector2 } from "./db_vector_2_type";
+  AlgebraicType as __AlgebraicTypeValue,
+  BinaryReader as __BinaryReader,
+  BinaryWriter as __BinaryWriter,
+  ClientCache as __ClientCache,
+  ConnectionId as __ConnectionId,
+  DbConnectionBuilder as __DbConnectionBuilder,
+  DbConnectionImpl as __DbConnectionImpl,
+  Identity as __Identity,
+  SubscriptionBuilderImpl as __SubscriptionBuilderImpl,
+  TableCache as __TableCache,
+  TimeDuration as __TimeDuration,
+  Timestamp as __Timestamp,
+  deepEqual as __deepEqual,
+  type AlgebraicType as __AlgebraicTypeType,
+  type AlgebraicTypeVariants as __AlgebraicTypeVariants,
+  type CallReducerFlags as __CallReducerFlags,
+  type ErrorContextInterface as __ErrorContextInterface,
+  type Event as __Event,
+  type EventContextInterface as __EventContextInterface,
+  type ReducerEventContextInterface as __ReducerEventContextInterface,
+  type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+} from "spacetimedb";
+import { DbVector2 } from "./db_vector_2_type";
+// Mark import as potentially unused
+declare type __keep_DbVector2 = DbVector2;
+
 
 export type AgnaDelayedOrbScheduler = {
   scheduledId: bigint,
-  scheduledAt: { tag: "Interval", value: TimeDuration } | { tag: "Time", value: Timestamp },
+  scheduledAt: { tag: "Interval", value: __TimeDuration } | { tag: "Time", value: __Timestamp },
   bossMonsterId: number,
   targetPlayerId: number,
-  circlePosition: __DbVector2,
+  circlePosition: DbVector2,
   circleIndex: number,
 };
-
 /**
- * A namespace for generated helper functions.
+ * An object for generated helper functions.
  */
-export namespace AgnaDelayedOrbScheduler {
+export const AgnaDelayedOrbScheduler = {
   /**
   * A function which returns this type represented as an AlgebraicType.
   * This function is derived from the AlgebraicType used to generate this type.
   */
-  export function getTypeScriptAlgebraicType(): AlgebraicType {
-    return AlgebraicType.createProductType([
-      new ProductTypeElement("scheduledId", AlgebraicType.createU64Type()),
-      new ProductTypeElement("scheduledAt", AlgebraicType.createScheduleAtType()),
-      new ProductTypeElement("bossMonsterId", AlgebraicType.createU32Type()),
-      new ProductTypeElement("targetPlayerId", AlgebraicType.createU32Type()),
-      new ProductTypeElement("circlePosition", __DbVector2.getTypeScriptAlgebraicType()),
-      new ProductTypeElement("circleIndex", AlgebraicType.createU32Type()),
-    ]);
-  }
+  getTypeScriptAlgebraicType(): __AlgebraicTypeType {
+    return __AlgebraicTypeValue.Product({
+      elements: [
+        { name: "scheduledId", algebraicType: __AlgebraicTypeValue.U64},
+        { name: "scheduledAt", algebraicType: __AlgebraicTypeValue.createScheduleAtType()},
+        { name: "bossMonsterId", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "targetPlayerId", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "circlePosition", algebraicType: DbVector2.getTypeScriptAlgebraicType()},
+        { name: "circleIndex", algebraicType: __AlgebraicTypeValue.U32},
+      ]
+    });
+  },
 
-  export function serialize(writer: BinaryWriter, value: AgnaDelayedOrbScheduler): void {
-    AgnaDelayedOrbScheduler.getTypeScriptAlgebraicType().serialize(writer, value);
-  }
+  serialize(writer: __BinaryWriter, value: AgnaDelayedOrbScheduler): void {
+    __AlgebraicTypeValue.serializeValue(writer, AgnaDelayedOrbScheduler.getTypeScriptAlgebraicType(), value);
+  },
 
-  export function deserialize(reader: BinaryReader): AgnaDelayedOrbScheduler {
-    return AgnaDelayedOrbScheduler.getTypeScriptAlgebraicType().deserialize(reader);
-  }
+  deserialize(reader: __BinaryReader): AgnaDelayedOrbScheduler {
+    return __AlgebraicTypeValue.deserializeValue(reader, AgnaDelayedOrbScheduler.getTypeScriptAlgebraicType());
+  },
 
 }
+
+export default AgnaDelayedOrbScheduler;
 
 

@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 import { DbVector2 as __DbVector2 } from "./db_vector_2_type";
 import { PlayerClass as __PlayerClass } from "./player_class_type";
 

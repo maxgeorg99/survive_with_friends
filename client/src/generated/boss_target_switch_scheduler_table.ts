@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 import { BossTargetSwitchScheduler } from "./boss_target_switch_scheduler_type";
 import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
 

@@ -16,7 +16,8 @@
   "license": "ISC",
   "dependencies": {
     "phaser": "^3.80.1",
-    "@clockworklabs/spacetimedb-sdk": "latest"
+    "spacetimedb": "latest",
+    "oidc-client-ts": "latest"
   },
   "devDependencies": {
     "typescript": "^5.3.3",

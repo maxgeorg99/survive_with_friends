@@ -3,40 +3,39 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
-import { UpgradeType as __UpgradeType } from "./upgrade_type_type";
+  AlgebraicType as __AlgebraicTypeValue,
+  BinaryReader as __BinaryReader,
+  BinaryWriter as __BinaryWriter,
+  ClientCache as __ClientCache,
+  ConnectionId as __ConnectionId,
+  DbConnectionBuilder as __DbConnectionBuilder,
+  DbConnectionImpl as __DbConnectionImpl,
+  Identity as __Identity,
+  SubscriptionBuilderImpl as __SubscriptionBuilderImpl,
+  TableCache as __TableCache,
+  TimeDuration as __TimeDuration,
+  Timestamp as __Timestamp,
+  deepEqual as __deepEqual,
+  type AlgebraicType as __AlgebraicTypeType,
+  type AlgebraicTypeVariants as __AlgebraicTypeVariants,
+  type CallReducerFlags as __CallReducerFlags,
+  type ErrorContextInterface as __ErrorContextInterface,
+  type Event as __Event,
+  type EventContextInterface as __EventContextInterface,
+  type ReducerEventContextInterface as __ReducerEventContextInterface,
+  type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+} from "spacetimedb";
+import { UpgradeType } from "./upgrade_type_type";
+// Mark import as potentially unused
+declare type __keep_UpgradeType = UpgradeType;
+
 
 export type UpgradeOptionData = {
   upgradeId: number,
   playerId: number,
   upgradeIndex: number,
-  upgradeType: __UpgradeType,
+  upgradeType: UpgradeType,
   isAttackUpgrade: boolean,
   value: number,
   attackType: number,
@@ -47,41 +46,44 @@ export type UpgradeOptionData = {
   radius: number,
   isNewAttack: boolean,
 };
-
 /**
- * A namespace for generated helper functions.
+ * An object for generated helper functions.
  */
-export namespace UpgradeOptionData {
+export const UpgradeOptionData = {
   /**
   * A function which returns this type represented as an AlgebraicType.
   * This function is derived from the AlgebraicType used to generate this type.
   */
-  export function getTypeScriptAlgebraicType(): AlgebraicType {
-    return AlgebraicType.createProductType([
-      new ProductTypeElement("upgradeId", AlgebraicType.createU32Type()),
-      new ProductTypeElement("playerId", AlgebraicType.createU32Type()),
-      new ProductTypeElement("upgradeIndex", AlgebraicType.createU32Type()),
-      new ProductTypeElement("upgradeType", __UpgradeType.getTypeScriptAlgebraicType()),
-      new ProductTypeElement("isAttackUpgrade", AlgebraicType.createBoolType()),
-      new ProductTypeElement("value", AlgebraicType.createU32Type()),
-      new ProductTypeElement("attackType", AlgebraicType.createU32Type()),
-      new ProductTypeElement("damage", AlgebraicType.createU32Type()),
-      new ProductTypeElement("cooldownRatio", AlgebraicType.createU32Type()),
-      new ProductTypeElement("projectiles", AlgebraicType.createU32Type()),
-      new ProductTypeElement("speed", AlgebraicType.createU32Type()),
-      new ProductTypeElement("radius", AlgebraicType.createU32Type()),
-      new ProductTypeElement("isNewAttack", AlgebraicType.createBoolType()),
-    ]);
-  }
+  getTypeScriptAlgebraicType(): __AlgebraicTypeType {
+    return __AlgebraicTypeValue.Product({
+      elements: [
+        { name: "upgradeId", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "playerId", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "upgradeIndex", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "upgradeType", algebraicType: UpgradeType.getTypeScriptAlgebraicType()},
+        { name: "isAttackUpgrade", algebraicType: __AlgebraicTypeValue.Bool},
+        { name: "value", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "attackType", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "damage", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "cooldownRatio", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "projectiles", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "speed", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "radius", algebraicType: __AlgebraicTypeValue.U32},
+        { name: "isNewAttack", algebraicType: __AlgebraicTypeValue.Bool},
+      ]
+    });
+  },
 
-  export function serialize(writer: BinaryWriter, value: UpgradeOptionData): void {
-    UpgradeOptionData.getTypeScriptAlgebraicType().serialize(writer, value);
-  }
+  serialize(writer: __BinaryWriter, value: UpgradeOptionData): void {
+    __AlgebraicTypeValue.serializeValue(writer, UpgradeOptionData.getTypeScriptAlgebraicType(), value);
+  },
 
-  export function deserialize(reader: BinaryReader): UpgradeOptionData {
-    return UpgradeOptionData.getTypeScriptAlgebraicType().deserialize(reader);
-  }
+  deserialize(reader: __BinaryReader): UpgradeOptionData {
+    return __AlgebraicTypeValue.deserializeValue(reader, UpgradeOptionData.getTypeScriptAlgebraicType());
+  },
 
 }
+
+export default UpgradeOptionData;
 
 

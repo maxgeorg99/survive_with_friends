@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 import { AgnaCandleBoltScheduler } from "./agna_candle_bolt_scheduler_type";
 import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
 

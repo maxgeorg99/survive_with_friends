@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 
 import { AgnaSummoningCircleSpawner as __AgnaSummoningCircleSpawner } from "./agna_summoning_circle_spawner_type";
 

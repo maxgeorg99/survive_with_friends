@@ -3,81 +3,77 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
-// A namespace for generated variants and helper functions.
-export namespace AccountState {
-  // These are the generated variant types for each variant of the tagged union.
-  // One type is generated per variant and will be used in the `value` field of
-  // the tagged union.
-  export type ChoosingName = { tag: "ChoosingName" };
-  export type ChoosingClass = { tag: "ChoosingClass" };
-  export type Playing = { tag: "Playing" };
-  export type Dead = { tag: "Dead" };
-  export type Winner = { tag: "Winner" };
-  export type CurseCutscene = { tag: "CurseCutscene" };
+  AlgebraicType as __AlgebraicTypeValue,
+  BinaryReader as __BinaryReader,
+  BinaryWriter as __BinaryWriter,
+  ClientCache as __ClientCache,
+  ConnectionId as __ConnectionId,
+  DbConnectionBuilder as __DbConnectionBuilder,
+  DbConnectionImpl as __DbConnectionImpl,
+  Identity as __Identity,
+  SubscriptionBuilderImpl as __SubscriptionBuilderImpl,
+  TableCache as __TableCache,
+  TimeDuration as __TimeDuration,
+  Timestamp as __Timestamp,
+  deepEqual as __deepEqual,
+  type AlgebraicType as __AlgebraicTypeType,
+  type AlgebraicTypeVariants as __AlgebraicTypeVariants,
+  type CallReducerFlags as __CallReducerFlags,
+  type ErrorContextInterface as __ErrorContextInterface,
+  type Event as __Event,
+  type EventContextInterface as __EventContextInterface,
+  type ReducerEventContextInterface as __ReducerEventContextInterface,
+  type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
+} from "spacetimedb";
+import * as AccountStateVariants from './account_state_variants'
 
+// The tagged union or sum type for the algebraic type `AccountState`.
+export type AccountState = AccountStateVariants.ChoosingName |
+  AccountStateVariants.ChoosingClass |
+  AccountStateVariants.Playing |
+  AccountStateVariants.Dead |
+  AccountStateVariants.Winner |
+  AccountStateVariants.CurseCutscene;
+
+// A value with helper functions to construct the type.
+export const AccountState = {
   // Helper functions for constructing each variant of the tagged union.
   // ```
   // const foo = Foo.A(42);
   // assert!(foo.tag === "A");
   // assert!(foo.value === 42);
   // ```
-  export const ChoosingName = { tag: "ChoosingName" };
-  export const ChoosingClass = { tag: "ChoosingClass" };
-  export const Playing = { tag: "Playing" };
-  export const Dead = { tag: "Dead" };
-  export const Winner = { tag: "Winner" };
-  export const CurseCutscene = { tag: "CurseCutscene" };
+  ChoosingName: { tag: "ChoosingName" } as const,
+  ChoosingClass: { tag: "ChoosingClass" } as const,
+  Playing: { tag: "Playing" } as const,
+  Dead: { tag: "Dead" } as const,
+  Winner: { tag: "Winner" } as const,
+  CurseCutscene: { tag: "CurseCutscene" } as const,
 
-  export function getTypeScriptAlgebraicType(): AlgebraicType {
-    return AlgebraicType.createSumType([
-      new SumTypeVariant("ChoosingName", AlgebraicType.createProductType([])),
-      new SumTypeVariant("ChoosingClass", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Playing", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Dead", AlgebraicType.createProductType([])),
-      new SumTypeVariant("Winner", AlgebraicType.createProductType([])),
-      new SumTypeVariant("CurseCutscene", AlgebraicType.createProductType([])),
-    ]);
-  }
+  getTypeScriptAlgebraicType(): __AlgebraicTypeType {
+    return __AlgebraicTypeValue.Sum({
+      variants: [
+        { name: "ChoosingName", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "ChoosingClass", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Playing", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Dead", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "Winner", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+        { name: "CurseCutscene", algebraicType: __AlgebraicTypeValue.Product({ elements: [] }) },
+      ]
+    });
+  },
 
-  export function serialize(writer: BinaryWriter, value: AccountState): void {
-      AccountState.getTypeScriptAlgebraicType().serialize(writer, value);
-  }
+  serialize(writer: __BinaryWriter, value: AccountState): void {
+      __AlgebraicTypeValue.serializeValue(writer, AccountState.getTypeScriptAlgebraicType(), value);
+  },
 
-  export function deserialize(reader: BinaryReader): AccountState {
-      return AccountState.getTypeScriptAlgebraicType().deserialize(reader);
-  }
+  deserialize(reader: __BinaryReader): AccountState {
+      return __AlgebraicTypeValue.deserializeValue(reader, AccountState.getTypeScriptAlgebraicType());
+  },
 
 }
 
-// The tagged union or sum type for the algebraic type `AccountState`.
-export type AccountState = AccountState.ChoosingName | AccountState.ChoosingClass | AccountState.Playing | AccountState.Dead | AccountState.Winner | AccountState.CurseCutscene;
-
 export default AccountState;
+
 

@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 
 import { ActiveAttackCleanup as __ActiveAttackCleanup } from "./active_attack_cleanup_type";
 

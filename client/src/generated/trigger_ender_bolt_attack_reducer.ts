@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 
 import { EnderBoltScheduler as __EnderBoltScheduler } from "./ender_bolt_scheduler_type";
 

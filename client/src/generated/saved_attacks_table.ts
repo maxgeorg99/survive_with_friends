@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 import { SavedAttack } from "./saved_attack_type";
 import { AttackType as __AttackType } from "./attack_type_type";
 

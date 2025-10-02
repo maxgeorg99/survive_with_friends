@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 import { WinnerTransitionTimer } from "./winner_transition_timer_type";
 import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
 

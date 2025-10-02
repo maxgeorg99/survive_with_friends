@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 import { BossSelection } from "./boss_selection_type";
 import { BossType as __BossType } from "./boss_type_type";
 

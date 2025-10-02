@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 import { GuaranteedVoidChestSpawn } from "./guaranteed_void_chest_spawn_type";
 import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
 

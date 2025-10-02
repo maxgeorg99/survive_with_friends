@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 import { DeadPlayer } from "./dead_player_type";
 import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
 

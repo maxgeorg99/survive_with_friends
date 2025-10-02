@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 
 import { BossPhase2Timer as __BossPhase2Timer } from "./boss_phase_2_timer_type";
 

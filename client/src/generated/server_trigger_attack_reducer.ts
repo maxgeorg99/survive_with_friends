@@ -29,7 +29,7 @@ import {
   TimeDuration,
   Timestamp,
   deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
+} from "spacetimedb";
 
 import { PlayerScheduledAttack as __PlayerScheduledAttack } from "./player_scheduled_attack_type";
 
