@@ -51,7 +51,7 @@ export default class ChosenUpgradesUI {
         const { width } = this.scene.cameras.main;
 
         // The small, persistent button in the top-right corner
-        this.toggleButton = this.scene.add.text(width - 20, 20, '(U)', {
+        this.toggleButton = this.scene.add.text(width - 20, 20, '(U)pgrades', {
             fontSize: '16px', color: '#ffffff', fontStyle: 'bold', backgroundColor: '#444444',
             padding: { x: 8, y: 6 }
         });
@@ -185,7 +185,7 @@ export default class ChosenUpgradesUI {
         contentContainer.add(weaponHeader);
         contentContainer.add(this.scene.add.text(-470, currentY, 'Damage', headerStyle));
         contentContainer.add(this.scene.add.text(-350, currentY, 'Cooldown', headerStyle));
-        contentContainer.add(this.scene.add.text(-230, currentY, 'Projectiles', headerStyle));
+        contentContainer.add(this.scene.add.text(-230, currentY, 'Count', headerStyle));
         contentContainer.add(this.scene.add.text(-130, currentY, 'Speed', headerStyle));
         contentContainer.add(this.scene.add.text(-50, currentY, 'Size', headerStyle));
         currentY += 30;
@@ -195,7 +195,7 @@ export default class ChosenUpgradesUI {
             contentContainer.add(this.scene.add.image(-panelWidth + padding + 30, currentY + 8, weapon.icon).setScale(0.6));
             contentContainer.add(this.scene.add.text(-470, currentY, String(weapon.damageUpgrades), rowStyle).setOrigin(0.5, 0));
             contentContainer.add(this.scene.add.text(-350, currentY, String(weapon.cooldownUpgrades), rowStyle).setOrigin(0.5, 0));
-            contentContainer.add(this.scene.add.text(-230, currentY, String(weapon.projectileUpgrades), rowStyle).setOrigin(0.5, 0));
+            contentContainer.add(this.scene.add.text(-230, currentY, String(weapon.projectileUpgrades + 1), rowStyle).setOrigin(0.5, 0));
             contentContainer.add(this.scene.add.text(-130, currentY, String(weapon.speedUpgrades), rowStyle).setOrigin(0.5, 0));
             contentContainer.add(this.scene.add.text(-50, currentY, String(weapon.radiusUpgrades), rowStyle).setOrigin(0.5, 0));
             currentY += 36;
