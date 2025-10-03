@@ -15,7 +15,7 @@ const PROXY_SPACETIMEDB_URI : string = "ws://localhost:3001";
 function isDevEnvironment() {
     // In browser environment
     if (typeof window !== 'undefined') {
-        return window.location.hostname === 'localhost' || 
+        return window.location.hostname === 'localhost' ||
                window.location.port === '8080';
     }
     return false;
@@ -116,6 +116,7 @@ class SpacetimeDBClient {
                 "SELECT * FROM agna_magic_circles",
                 "SELECT * FROM agna_candle_spawns",
                 "SELECT * FROM found_lore_scrolls",
+                "SELECT * FROM class_data",
                 "SELECT * FROM curses"
             ]);
 

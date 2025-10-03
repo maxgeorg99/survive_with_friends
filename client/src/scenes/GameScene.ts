@@ -24,6 +24,7 @@ import Minimap, { MinimapElements } from '../ui/Minimap';
 import { DebugManager } from '../managers/DebugManager'; // Added import for DebugManager
 import { getSoundVolume } from '../managers/VolumeSettings';
 import MonsterSpawnerManager from '../managers/MonsterSpawnerManager';
+import ChosenUpgradesUI from '../ui/ChosenUpgradesUI';
 
 // Constants
 const PLAYER_SPEED = 200;
@@ -110,7 +111,8 @@ export default class GameScene extends Phaser.Scene {
     
     // Add upgrade UI manager
     private upgradeUI: UpgradeUI | null = null;
-    
+    private chosenUpgradesUI: ChosenUpgradesUI | null = null;
+
     // Add player HUD
     private playerHUD: PlayerHUD | null = null;
     
@@ -319,7 +321,7 @@ export default class GameScene extends Phaser.Scene {
         
         // Load Curse UI assets
         this.load.image('curse_card', '/assets/curse_card.png');
-        
+
         // Load a white pixel for particle effects
         this.load.image('white_pixel', '/assets/white_pixel.png');
         
@@ -583,6 +585,13 @@ export default class GameScene extends Phaser.Scene {
             }
         });
 
+        // Add key listener for toggling chosen upgrades menu
+        this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.U).on('down', () => {
+            if (this.chosenUpgradesUI) {
+                this.chosenUpgradesUI.toggle();
+            }
+        });
+
         // Handle window resize to update UI positions
         this.scale.on('resize', this.handleResize, this);
 
@@ -764,6 +773,11 @@ export default class GameScene extends Phaser.Scene {
         // Rest of existing player update handling
         if (isLocalPlayer) {
             this.updateLocalPlayerAttributes(ctx, newPlayer);
+
+            //Refresh the chosen upgrades UI
+            if (this.chosenUpgradesUI) {
+                this.chosenUpgradesUI.refresh();
+            }
         } else {
             this.addOrUpdateOtherPlayer(newPlayer, ctx);
         }
@@ -1007,6 +1021,21 @@ export default class GameScene extends Phaser.Scene {
         
         // Initialize PlayerHUD for reroll count display
         this.playerHUD = new PlayerHUD(this, this.spacetimeDBClient, this.localPlayerId);
+
+        let startingAttackType = null;
+        const playerClass = player.playerClass;
+
+        // Iterate through all available class data to find a match
+        for (const data of ctx.db.classData.iter()) {
+            if (data.playerClass.tag === playerClass.tag) {
+                startingAttackType = data.startingAttackType;
+                break;
+            }
+        }
+
+        if (!this.chosenUpgradesUI) {
+            this.chosenUpgradesUI = new ChosenUpgradesUI(this, this.spacetimeDBClient, this.localPlayerId, startingAttackType);
+        }
 
         this.attackManager?.setLocalPlayerRadius(player.radius);
 
@@ -1265,7 +1294,7 @@ export default class GameScene extends Phaser.Scene {
                     // Calculate damage amount to check if it's from negative health regen
                     const damageAmount = currentHp - player.hp;
                     const isNegativeRegenDamage = Math.abs(damageAmount - 4.953) < 0.01; // Allow small floating point tolerance
-                    
+
                     // Play player damage sound (only if not already playing and not from negative regen)
                     if (!this.isPlayerDamageSoundPlaying && !isNegativeRegenDamage) {
                         this.isPlayerDamageSoundPlaying = true;
@@ -1659,7 +1688,7 @@ export default class GameScene extends Phaser.Scene {
                     if (!sprite || !sprite.active) {
                         return;
                     }
-                    
+
                     // Create cycling colors for visible effect
                     const t = Math.sin(this.time.now / 200) * 0.5 + 0.5;
                     const color1 = new Phaser.Display.Color(255, 255, 255);
@@ -2048,6 +2077,10 @@ export default class GameScene extends Phaser.Scene {
             this.upgradeUI.update(time, delta);
         }
 
+        if (this.chosenUpgradesUI) {
+            this.chosenUpgradesUI.refresh();
+        }
+
         // Update gem manager for hover animations
         if (this.gemManager) {
             this.gemManager.update(time, delta);
@@ -2231,7 +2264,12 @@ export default class GameScene extends Phaser.Scene {
             this.upgradeUI.destroy();
             this.upgradeUI = null;
         }
-        
+
+        if (this.chosenUpgradesUI) {
+            this.chosenUpgradesUI.destroy();
+            this.chosenUpgradesUI = null;
+        }
+
         // Clean up PlayerHUD
         if (this.playerHUD) {
             this.playerHUD.destroy();
@@ -2267,13 +2305,13 @@ export default class GameScene extends Phaser.Scene {
             this.optionsUI.destroy();
             this.optionsUI = null;
         }
-        
+
         // Clean up Curse UI
         if (this.curseUI) {
             this.curseUI.destroy();
             this.curseUI = null;
         }
-        
+
         // DEFENSIVE CLEANUP: Remove any lingering game objects that might persist between scenes
         console.log("GameScene: Performing defensive cleanup of lingering game objects");
         
@@ -2374,6 +2412,7 @@ export default class GameScene extends Phaser.Scene {
             this.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.R);
             this.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.D);
             this.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.O);
+            this.input.keyboard.removeKey(Phaser.Input.Keyboard.KeyCodes.U);
         }
         this.debugManager?.clearDebugKeys();
         
@@ -2959,7 +2998,7 @@ export default class GameScene extends Phaser.Scene {
         if (this.monsterCounterUI) {
             this.monsterCounterUI.updatePosition();
         }
-        
+
         // Update CurseUI position when screen resizes
         if (this.curseUI) {
             this.curseUI.updatePosition();
@@ -3070,6 +3109,5 @@ export default class GameScene extends Phaser.Scene {
             this.localPlayerSprite.setData('pvpIndicator', null);
         }
     }
-    
-    // Development functions removed for production
+
 }
