@@ -124,6 +124,7 @@ export default class GameScene extends Phaser.Scene {
     private localPlayerId: number = 0;
     
     private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null;
+    private wasdKeys: { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key; } | null = null;
 
     private backgroundTile: Phaser.GameObjects.TileSprite | null = null;
     private isPlayerDataReady = false;
@@ -469,8 +470,18 @@ export default class GameScene extends Phaser.Scene {
 
         // Setup keyboard input
         this.cursors = this.input.keyboard?.createCursorKeys() ?? null;
-        
-        if (this.input.keyboard) 
+
+        // Setup WASD keys
+        if (this.input.keyboard) {
+            this.wasdKeys = {
+                W: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
+                A: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
+                S: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
+                D: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D)
+            };
+        }
+
+        if (this.input.keyboard)
         {
             this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R).on('down', this.rerollUpgrades, this);
         }
@@ -1916,9 +1927,12 @@ export default class GameScene extends Phaser.Scene {
         if (soundManager && soundManager.updateFrame) {
             soundManager.updateFrame();
         }
-        
+
         // Skip if local player sprite isn't initialized yet
         if (!this.localPlayerSprite || !this.isPlayerDataReady) return;
+
+        // Handle keyboard movement (WASD and arrow keys)
+        this.handleKeyboardMovement();
 
         // Get entity radius using helper function
         const entityRadius = this.getPlayerEntityRadius();
@@ -2767,6 +2781,53 @@ export default class GameScene extends Phaser.Scene {
                 }
             }
         });
+    }
+
+    // Handle keyboard movement input
+    private handleKeyboardMovement() {
+        if (!this.localPlayerSprite || this.gameOver) return;
+
+        // Check if any movement key is pressed (WASD or arrow keys)
+        const left = (this.cursors?.left.isDown || this.wasdKeys?.A.isDown) ?? false;
+        const right = (this.cursors?.right.isDown || this.wasdKeys?.D.isDown) ?? false;
+        const up = (this.cursors?.up.isDown || this.wasdKeys?.W.isDown) ?? false;
+        const down = (this.cursors?.down.isDown || this.wasdKeys?.S.isDown) ?? false;
+
+        // If no keys are pressed, do nothing
+        if (!left && !right && !up && !down) return;
+
+        // Calculate direction vector
+        let dirX = 0;
+        let dirY = 0;
+
+        if (left) dirX -= 1;
+        if (right) dirX += 1;
+        if (up) dirY -= 1;
+        if (down) dirY += 1;
+
+        // Normalize diagonal movement
+        if (dirX !== 0 && dirY !== 0) {
+            const length = Math.sqrt(dirX * dirX + dirY * dirY);
+            dirX /= length;
+            dirY /= length;
+        }
+
+        // Calculate waypoint at a fixed distance from player
+        const moveDistance = 300; // Distance ahead to set waypoint
+        const targetX = this.localPlayerSprite.x + (dirX * moveDistance);
+        const targetY = this.localPlayerSprite.y + (dirY * moveDistance);
+
+        // Update tap target and send to server
+        this.tapTarget = new Phaser.Math.Vector2(targetX, targetY);
+        this.updateTapMarker();
+
+        // Send waypoint to server
+        if (this.spacetimeDBClient?.sdkConnection?.db) {
+            this.spacetimeDBClient.sdkConnection.reducers.setPlayerWaypoint(
+                this.tapTarget.x,
+                this.tapTarget.y
+            );
+        }
     }
 
     // Add updatePlayerUI method
