@@ -3,106 +3,28 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
-import { Entity } from "./entity_type";
-import { DbVector2 as __DbVector2 } from "./db_vector_2_type";
+  TypeBuilder as __TypeBuilder,
+  t as __t,
+  type AlgebraicTypeType as __AlgebraicTypeType,
+  type Infer as __Infer,
+} from "spacetimedb";
+import {
+  DbVector2,
+} from "./types";
 
-import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
 
-/**
- * Table handle for the table `entity`.
- *
- * Obtain a handle from the [`entity`] property on [`RemoteTables`],
- * like `ctx.db.entity`.
- *
- * Users are encouraged not to explicitly reference this type,
- * but to directly chain method calls,
- * like `ctx.db.entity.on_insert(...)`.
- */
-export class EntityTableHandle {
-  tableCache: TableCache<Entity>;
-
-  constructor(tableCache: TableCache<Entity>) {
-    this.tableCache = tableCache;
-  }
-
-  count(): number {
-    return this.tableCache.count();
-  }
-
-  iter(): Iterable<Entity> {
-    return this.tableCache.iter();
-  }
-  /**
-   * Access to the `entityId` unique index on the table `entity`,
-   * which allows point queries on the field of the same name
-   * via the [`EntityEntityIdUnique.find`] method.
-   *
-   * Users are encouraged not to explicitly reference this type,
-   * but to directly chain method calls,
-   * like `ctx.db.entity.entityId().find(...)`.
-   *
-   * Get a handle on the `entityId` unique index on the table `entity`.
-   */
-  entityId = {
-    // Find the subscribed row whose `entityId` column value is equal to `col_val`,
-    // if such a row is present in the client cache.
-    find: (col_val: number): Entity | undefined => {
-      for (let row of this.tableCache.iter()) {
-        if (deepEqual(row.entityId, col_val)) {
-          return row;
-        }
-      }
-    },
-  };
-
-  onInsert = (cb: (ctx: EventContext, row: Entity) => void) => {
-    return this.tableCache.onInsert(cb);
-  }
-
-  removeOnInsert = (cb: (ctx: EventContext, row: Entity) => void) => {
-    return this.tableCache.removeOnInsert(cb);
-  }
-
-  onDelete = (cb: (ctx: EventContext, row: Entity) => void) => {
-    return this.tableCache.onDelete(cb);
-  }
-
-  removeOnDelete = (cb: (ctx: EventContext, row: Entity) => void) => {
-    return this.tableCache.removeOnDelete(cb);
-  }
-
-  // Updates are only defined for tables with primary keys.
-  onUpdate = (cb: (ctx: EventContext, oldRow: Entity, newRow: Entity) => void) => {
-    return this.tableCache.onUpdate(cb);
-  }
-
-  removeOnUpdate = (cb: (ctx: EventContext, onRow: Entity, newRow: Entity) => void) => {
-    return this.tableCache.removeOnUpdate(cb);
-  }}
+export default __t.row({
+  entityId: __t.u32().primaryKey().name("entity_id"),
+  get position() {
+    return DbVector2;
+  },
+  get direction() {
+    return DbVector2;
+  },
+  radius: __t.f32(),
+  get waypoint() {
+    return DbVector2;
+  },
+  hasWaypoint: __t.bool().name("has_waypoint"),
+});

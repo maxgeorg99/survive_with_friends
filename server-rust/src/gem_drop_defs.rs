@@ -1,5 +1,5 @@
-use spacetimedb::{ReducerContext, rand::Rng};
-use crate::{GemLevel, MonsterType, account, bestiary};
+use crate::{account, bestiary, GemLevel, MonsterType};
+use spacetimedb::{rand::Rng, ReducerContext};
 use std::collections::HashMap;
 
 // Gem drop weight tables for each monster tier (0-5)
@@ -13,7 +13,6 @@ pub const TIER_GEM_DROP_WEIGHTS: [&[(GemLevel, u32)]; 6] = [
         (GemLevel::Large, 0),
         (GemLevel::Huge, 0),
     ],
-    
     // Tier 1 (Slime, EnderClaw): Slightly better drops
     &[
         (GemLevel::Small, 70),
@@ -21,7 +20,6 @@ pub const TIER_GEM_DROP_WEIGHTS: [&[(GemLevel, u32)]; 6] = [
         (GemLevel::Large, 5),
         (GemLevel::Huge, 0),
     ],
-    
     // Tier 2 (Bat): Improved drops, small chance for large gems
     &[
         (GemLevel::Small, 60),
@@ -29,7 +27,6 @@ pub const TIER_GEM_DROP_WEIGHTS: [&[(GemLevel, u32)]; 6] = [
         (GemLevel::Large, 10),
         (GemLevel::Huge, 0),
     ],
-    
     // Tier 3 (Orc): Good drops, decent chance for large gems
     &[
         (GemLevel::Small, 45),
@@ -37,7 +34,6 @@ pub const TIER_GEM_DROP_WEIGHTS: [&[(GemLevel, u32)]; 6] = [
         (GemLevel::Large, 18),
         (GemLevel::Huge, 2),
     ],
-    
     // Tier 4 (Imp): Great drops, good chance for large gems
     &[
         (GemLevel::Small, 30),
@@ -45,7 +41,6 @@ pub const TIER_GEM_DROP_WEIGHTS: [&[(GemLevel, u32)]; 6] = [
         (GemLevel::Large, 25),
         (GemLevel::Huge, 5),
     ],
-    
     // Tier 5 (Zombie, Boss): Excellent drops, high chance for large/huge gems
     &[
         (GemLevel::Small, 20),
@@ -59,20 +54,23 @@ pub const TIER_GEM_DROP_WEIGHTS: [&[(GemLevel, u32)]; 6] = [
 pub fn select_weighted_gem_level(ctx: &ReducerContext, monster_tier: u32) -> GemLevel {
     let tier_index = (monster_tier as usize).min(TIER_GEM_DROP_WEIGHTS.len() - 1);
     let weights = TIER_GEM_DROP_WEIGHTS[tier_index];
-    
+
     // Calculate total weight
     let total_weight: u32 = weights.iter().map(|(_, weight)| weight).sum();
-    
+
     if total_weight == 0 {
         // Fallback to Small gem if all weights are 0
-        log::warn!("All gem drop weights are 0 for tier {}, defaulting to Small gem", monster_tier);
+        log::warn!(
+            "All gem drop weights are 0 for tier {}, defaulting to Small gem",
+            monster_tier
+        );
         return GemLevel::Small;
     }
-    
+
     // Generate random number between 1 and total_weight (inclusive)
     let mut rng = ctx.rng();
     let mut random_value = rng.gen_range(1..=total_weight);
-    
+
     // Find which gem level this random value corresponds to
     for &(ref gem_level, weight) in weights.iter() {
         if random_value <= weight {
@@ -80,9 +78,12 @@ pub fn select_weighted_gem_level(ctx: &ReducerContext, monster_tier: u32) -> Gem
         }
         random_value -= weight;
     }
-    
+
     // Fallback (should never reach here) - return Small gem
-    log::warn!("Weighted gem selection failed for tier {}, defaulting to Small gem", monster_tier);
+    log::warn!(
+        "Weighted gem selection failed for tier {}, defaulting to Small gem",
+        monster_tier
+    );
     GemLevel::Small
 }
 
@@ -90,13 +91,13 @@ pub fn select_weighted_gem_level(ctx: &ReducerContext, monster_tier: u32) -> Gem
 pub fn get_tier_gem_weights_debug_string(tier: u32) -> String {
     let tier_index = (tier as usize).min(TIER_GEM_DROP_WEIGHTS.len() - 1);
     let weights = TIER_GEM_DROP_WEIGHTS[tier_index];
-    
+
     // Create a HashMap for easy lookup
     let weight_map: HashMap<GemLevel, u32> = weights.iter().cloned().collect();
-    
+
     format!(
         "Tier {} gem weights: Small={}, Medium={}, Large={}, Huge={}",
-        tier, 
+        tier,
         weight_map.get(&GemLevel::Small).unwrap_or(&0),
         weight_map.get(&GemLevel::Medium).unwrap_or(&0),
         weight_map.get(&GemLevel::Large).unwrap_or(&0),
@@ -109,12 +110,13 @@ pub fn get_gem_drop_percentages(tier: u32) -> Vec<(GemLevel, f32)> {
     let tier_index = (tier as usize).min(TIER_GEM_DROP_WEIGHTS.len() - 1);
     let weights = TIER_GEM_DROP_WEIGHTS[tier_index];
     let total_weight: u32 = weights.iter().map(|(_, weight)| weight).sum();
-    
+
     if total_weight == 0 {
         return vec![];
     }
-    
-    weights.iter()
+
+    weights
+        .iter()
         .map(|&(ref gem_level, weight)| {
             let percentage = (weight as f32 / total_weight as f32) * 100.0;
             (gem_level.clone(), percentage)
@@ -126,23 +128,23 @@ pub fn get_gem_drop_percentages(tier: u32) -> Vec<(GemLevel, f32)> {
 #[spacetimedb::reducer]
 pub fn debug_check_gem_drops(ctx: &spacetimedb::ReducerContext) {
     // Get the caller's identity
-    let caller_identity = ctx.sender;
-    
+    let caller_identity = ctx.sender();
+
     // Find the caller's account
     let account_opt = ctx.db.account().identity().find(&caller_identity);
     if account_opt.is_none() {
         log::error!("debug_check_gem_drops: Account not found for caller");
         return;
     }
-    
+
     let account = account_opt.unwrap();
     if account.current_player_id == 0 {
         log::error!("debug_check_gem_drops: Caller has no active player");
         return;
     }
-    
+
     log::info!("=== GEM DROP DEBUG INFO ===");
-    
+
     // Show gem drop info for each monster type
     let monster_types = [
         MonsterType::Rat,
@@ -156,20 +158,30 @@ pub fn debug_check_gem_drops(ctx: &spacetimedb::ReducerContext) {
         MonsterType::BossAgnaPhase1,
         MonsterType::BossAgnaPhase2,
     ];
-    
+
     for monster_type in monster_types {
         // Get bestiary entry for this monster
-        if let Some(bestiary_entry) = ctx.db.bestiary().bestiary_id().find(&(monster_type.clone() as u32)) {
+        if let Some(bestiary_entry) = ctx
+            .db
+            .bestiary()
+            .bestiary_id()
+            .find(&(monster_type.clone() as u32))
+        {
             let tier = bestiary_entry.tier;
-            log::info!("{:?} (Tier {}): {}", monster_type, tier, get_tier_gem_weights_debug_string(tier));
-            
+            log::info!(
+                "{:?} (Tier {}): {}",
+                monster_type,
+                tier,
+                get_tier_gem_weights_debug_string(tier)
+            );
+
             let percentages = get_gem_drop_percentages(tier);
             for (gem_level, percentage) in percentages {
                 log::info!("  {:?}: {:.1}%", gem_level, percentage);
             }
         }
     }
-    
+
     log::info!("Note: Special items (Fries, Dice, BoosterPack) have separate fixed drop rates");
     log::info!("=================================");
-} 
+}

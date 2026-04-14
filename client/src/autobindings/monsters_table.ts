@@ -3,109 +3,38 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
-import { Monsters } from "./monsters_type";
-import { DbVector2 as __DbVector2 } from "./db_vector_2_type";
-import { MonsterType as __MonsterType } from "./monster_type_type";
-import { AiState as __AiState } from "./ai_state_type";
-import { MonsterVariant as __MonsterVariant } from "./monster_variant_type";
+  TypeBuilder as __TypeBuilder,
+  t as __t,
+  type AlgebraicTypeType as __AlgebraicTypeType,
+  type Infer as __Infer,
+} from "spacetimedb";
+import {
+  DbVector2,
+  MonsterType,
+  AiState,
+  MonsterVariant,
+} from "./types";
 
-import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
 
-/**
- * Table handle for the table `monsters`.
- *
- * Obtain a handle from the [`monsters`] property on [`RemoteTables`],
- * like `ctx.db.monsters`.
- *
- * Users are encouraged not to explicitly reference this type,
- * but to directly chain method calls,
- * like `ctx.db.monsters.on_insert(...)`.
- */
-export class MonstersTableHandle {
-  tableCache: TableCache<Monsters>;
-
-  constructor(tableCache: TableCache<Monsters>) {
-    this.tableCache = tableCache;
-  }
-
-  count(): number {
-    return this.tableCache.count();
-  }
-
-  iter(): Iterable<Monsters> {
-    return this.tableCache.iter();
-  }
-  /**
-   * Access to the `monsterId` unique index on the table `monsters`,
-   * which allows point queries on the field of the same name
-   * via the [`MonstersMonsterIdUnique.find`] method.
-   *
-   * Users are encouraged not to explicitly reference this type,
-   * but to directly chain method calls,
-   * like `ctx.db.monsters.monsterId().find(...)`.
-   *
-   * Get a handle on the `monsterId` unique index on the table `monsters`.
-   */
-  monsterId = {
-    // Find the subscribed row whose `monsterId` column value is equal to `col_val`,
-    // if such a row is present in the client cache.
-    find: (col_val: number): Monsters | undefined => {
-      for (let row of this.tableCache.iter()) {
-        if (deepEqual(row.monsterId, col_val)) {
-          return row;
-        }
-      }
-    },
-  };
-
-  onInsert = (cb: (ctx: EventContext, row: Monsters) => void) => {
-    return this.tableCache.onInsert(cb);
-  }
-
-  removeOnInsert = (cb: (ctx: EventContext, row: Monsters) => void) => {
-    return this.tableCache.removeOnInsert(cb);
-  }
-
-  onDelete = (cb: (ctx: EventContext, row: Monsters) => void) => {
-    return this.tableCache.onDelete(cb);
-  }
-
-  removeOnDelete = (cb: (ctx: EventContext, row: Monsters) => void) => {
-    return this.tableCache.removeOnDelete(cb);
-  }
-
-  // Updates are only defined for tables with primary keys.
-  onUpdate = (cb: (ctx: EventContext, oldRow: Monsters, newRow: Monsters) => void) => {
-    return this.tableCache.onUpdate(cb);
-  }
-
-  removeOnUpdate = (cb: (ctx: EventContext, onRow: Monsters, newRow: Monsters) => void) => {
-    return this.tableCache.removeOnUpdate(cb);
-  }}
+export default __t.row({
+  monsterId: __t.u32().primaryKey().name("monster_id"),
+  get bestiaryId() {
+    return MonsterType.name("bestiary_id");
+  },
+  get variant() {
+    return MonsterVariant;
+  },
+  hp: __t.u32(),
+  maxHp: __t.u32().name("max_hp"),
+  atk: __t.f32(),
+  speed: __t.f32(),
+  targetPlayerId: __t.u32().name("target_player_id"),
+  get aiState() {
+    return AiState.name("ai_state");
+  },
+  radius: __t.f32(),
+  get spawnPosition() {
+    return DbVector2.name("spawn_position");
+  },
+});

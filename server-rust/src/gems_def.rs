@@ -1,23 +1,28 @@
-use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, SpacetimeType, rand::Rng};
-use crate::{DbVector2, MAX_GEM_COUNT, WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_HEIGHT, WORLD_GRID_WIDTH,
-           get_world_cell_from_position, spatial_hash_collision_checker, CollisionCache, entity, player, account, monsters, bestiary};
+use crate::{
+    account, bestiary, entity, get_world_cell_from_position, monsters, player,
+    spatial_hash_collision_checker, CollisionCache, DbVector2, MAX_GEM_COUNT, WORLD_CELL_BIT_SHIFT,
+    WORLD_CELL_MASK, WORLD_GRID_HEIGHT, WORLD_GRID_WIDTH,
+};
+use spacetimedb::{
+    rand::Rng, reducer, table, Identity, ReducerContext, SpacetimeType, Table, Timestamp,
+};
 
 // Define the gem levels (1-4 + Soul + Special types)
 #[derive(SpacetimeType, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum GemLevel {
-    Small,      // = 1
-    Medium,     // = 2
-    Large,      // = 3
-    Huge,       // = 4
-    Soul,       // Special gem created from player deaths
-    Fries,      // Special gem that heals 100 HP
-    Dice,       // Special gem that grants extra reroll
+    Small,       // = 1
+    Medium,      // = 2
+    Large,       // = 3
+    Huge,        // = 4
+    Soul,        // Special gem created from player deaths
+    Fries,       // Special gem that heals 100 HP
+    Dice,        // Special gem that grants extra reroll
     BoosterPack, // Special gem that grants immediate upgrade
-    LoreScroll, // Special gem that levels player up exactly once (values 0-12)
+    LoreScroll,  // Special gem that levels player up exactly once (values 0-12)
 }
 
 // Table for storing gem objects in the game
-#[table(name = gems, public)]
+#[table(accessor = gems, public)]
 pub struct Gem {
     #[primary_key]
     #[auto_inc]
@@ -31,7 +36,7 @@ pub struct Gem {
 }
 
 // Table for storing experience configuration
-#[table(name = exp_config, public)]
+#[table(accessor = exp_config, public)]
 pub struct ExpConfig {
     #[primary_key]
     pub config_id: u32, // Should always be 0 for the one global config
@@ -44,7 +49,7 @@ pub struct ExpConfig {
 
     // Base experience required for each level
     pub base_exp_per_level: u32,
-    
+
     // Factor for calculating experience needed for level up
     // Formula: base_exp_per_level * (level ^ level_exp_factor)
     pub level_exp_factor: f32,
@@ -87,10 +92,15 @@ pub fn create_gem(ctx: &ReducerContext, position: DbVector2, level: GemLevel) ->
 
     let config = config.unwrap();
     let gem_radius = config.gem_radius;
-    
+
     // Apply curse restrictions - convert special gems to normal gems when curses are active
     let actual_level = match level {
-        GemLevel::Dice if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::NoDiceDrops) => {
+        GemLevel::Dice
+            if crate::curses_defs::is_curse_active(
+                ctx,
+                crate::curses_defs::CurseType::NoDiceDrops,
+            ) =>
+        {
             // Convert dice to random normal gem
             match ctx.rng().gen_range(0..4) {
                 0 => GemLevel::Small,
@@ -98,8 +108,13 @@ pub fn create_gem(ctx: &ReducerContext, position: DbVector2, level: GemLevel) ->
                 2 => GemLevel::Large,
                 _ => GemLevel::Huge,
             }
-        },
-        GemLevel::Fries if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::NoFoodDrops) => {
+        }
+        GemLevel::Fries
+            if crate::curses_defs::is_curse_active(
+                ctx,
+                crate::curses_defs::CurseType::NoFoodDrops,
+            ) =>
+        {
             // Convert food to random normal gem
             match ctx.rng().gen_range(0..4) {
                 0 => GemLevel::Small,
@@ -107,8 +122,13 @@ pub fn create_gem(ctx: &ReducerContext, position: DbVector2, level: GemLevel) ->
                 2 => GemLevel::Large,
                 _ => GemLevel::Huge,
             }
-        },
-        GemLevel::BoosterPack if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::NoBoosterPackDrops) => {
+        }
+        GemLevel::BoosterPack
+            if crate::curses_defs::is_curse_active(
+                ctx,
+                crate::curses_defs::CurseType::NoBoosterPackDrops,
+            ) =>
+        {
             // Convert booster pack to random normal gem
             match ctx.rng().gen_range(0..4) {
                 0 => GemLevel::Small,
@@ -116,7 +136,7 @@ pub fn create_gem(ctx: &ReducerContext, position: DbVector2, level: GemLevel) ->
                 2 => GemLevel::Large,
                 _ => GemLevel::Huge,
             }
-        },
+        }
         _ => level, // No curse active or not a restricted gem type
     };
 
@@ -126,9 +146,9 @@ pub fn create_gem(ctx: &ReducerContext, position: DbVector2, level: GemLevel) ->
         GemLevel::Medium => config.exp_medium_gem,
         GemLevel::Large => config.exp_large_gem,
         GemLevel::Huge => config.exp_huge_gem,
-        GemLevel::Soul => 0, // Soul gems have their value set separately
-        GemLevel::Fries => 0, // Special gems don't use exp values
-        GemLevel::Dice => 0, // Special gems don't use exp values
+        GemLevel::Soul => 0,        // Soul gems have their value set separately
+        GemLevel::Fries => 0,       // Special gems don't use exp values
+        GemLevel::Dice => 0,        // Special gems don't use exp values
         GemLevel::BoosterPack => 0, // Special gems don't use exp values
         GemLevel::LoreScroll => 0, // Lore scrolls have their value set separately (level-up amount)
     };
@@ -138,7 +158,7 @@ pub fn create_gem(ctx: &ReducerContext, position: DbVector2, level: GemLevel) ->
         entity_id: 0,
         position,
         direction: DbVector2::new(0.0, 0.0), // Gems don't move
-        radius: gem_radius, // Fixed radius for gems
+        radius: gem_radius,                  // Fixed radius for gems
         waypoint: DbVector2::new(0.0, 0.0),
         has_waypoint: false,
     });
@@ -173,7 +193,7 @@ pub fn create_soul_gem(ctx: &ReducerContext, position: DbVector2, exp_value: u32
         entity_id: 0,
         position,
         direction: DbVector2::new(0.0, 0.0), // Gems don't move
-        radius: gem_radius, // Fixed radius for gems
+        radius: gem_radius,                  // Fixed radius for gems
         waypoint: DbVector2::new(0.0, 0.0),
         has_waypoint: false,
     });
@@ -189,7 +209,13 @@ pub fn create_soul_gem(ctx: &ReducerContext, position: DbVector2, exp_value: u32
     });
 
     let gem = gem_opt;
-    log::info!("Created Soul gem (ID: {}) worth {} exp at position {}, {}", gem.gem_id, gem.value, position.x, position.y);
+    log::info!(
+        "Created Soul gem (ID: {}) worth {} exp at position {}, {}",
+        gem.gem_id,
+        gem.value,
+        position.x,
+        position.y
+    );
     gem.gem_id
 }
 
@@ -212,7 +238,7 @@ pub fn create_lore_scroll(ctx: &ReducerContext, position: DbVector2, scroll_type
         entity_id: 0,
         position,
         direction: DbVector2::new(0.0, 0.0), // Lore scrolls don't move
-        radius: gem_radius, // Fixed radius for gems
+        radius: gem_radius,                  // Fixed radius for gems
         waypoint: DbVector2::new(0.0, 0.0),
         has_waypoint: false,
     });
@@ -228,7 +254,13 @@ pub fn create_lore_scroll(ctx: &ReducerContext, position: DbVector2, scroll_type
     });
 
     let gem = gem_opt;
-    log::info!("Created Lore Scroll (ID: {}, Type: {}) at position {}, {}", gem.gem_id, clamped_scroll_type, position.x, position.y);
+    log::info!(
+        "Created Lore Scroll (ID: {}, Type: {}) at position {}, {}",
+        gem.gem_id,
+        clamped_scroll_type,
+        position.x,
+        position.y
+    );
     gem.gem_id
 }
 
@@ -252,7 +284,12 @@ pub fn spawn_random_gem(ctx: &ReducerContext, position: DbVector2) -> u32 {
 }
 
 // Spawns a gem at the position of a killed monster using tier-based drops
-pub fn spawn_gem_on_monster_death(ctx: &ReducerContext, monster_id: u32, position: DbVector2, collision_cache: &CollisionCache) {
+pub fn spawn_gem_on_monster_death(
+    ctx: &ReducerContext,
+    monster_id: u32,
+    position: DbVector2,
+    collision_cache: &CollisionCache,
+) {
     if collision_cache.gem.cached_count_gems >= MAX_GEM_COUNT as i32 {
         //TODO grow gems
         return;
@@ -261,26 +298,39 @@ pub fn spawn_gem_on_monster_death(ctx: &ReducerContext, monster_id: u32, positio
     // Get monster data to determine gem drop tier
     let monster_opt = ctx.db.monsters().monster_id().find(&monster_id);
     if monster_opt.is_none() {
-        log::warn!("Monster {} not found for gem drop, using default tier", monster_id);
+        log::warn!(
+            "Monster {} not found for gem drop, using default tier",
+            monster_id
+        );
         spawn_random_gem(ctx, position);
         return;
     }
-    
+
     let monster = monster_opt.unwrap();
-    
+
     // Get bestiary entry to find monster tier
-    let bestiary_entry_opt = ctx.db.bestiary().bestiary_id().find(&(monster.bestiary_id.clone() as u32));
+    let bestiary_entry_opt = ctx
+        .db
+        .bestiary()
+        .bestiary_id()
+        .find(&(monster.bestiary_id.clone() as u32));
     if bestiary_entry_opt.is_none() {
-        log::warn!("Bestiary entry not found for monster type {:?}, using default tier", monster.bestiary_id);
+        log::warn!(
+            "Bestiary entry not found for monster type {:?}, using default tier",
+            monster.bestiary_id
+        );
         spawn_random_gem(ctx, position);
         return;
     }
-    
+
     let bestiary_entry = bestiary_entry_opt.unwrap();
     let monster_tier = bestiary_entry.tier;
 
     // Check for MonstersDropFewerGems curse - reduces drop chance by 10%
-    let drop_chance = if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::MonstersDropFewerGems) {
+    let drop_chance = if crate::curses_defs::is_curse_active(
+        ctx,
+        crate::curses_defs::CurseType::MonstersDropFewerGems,
+    ) {
         0.9 // 90% drop chance when curse is active (10% chance of no drop)
     } else {
         1.0 // Default 100% drop chance
@@ -292,31 +342,55 @@ pub fn spawn_gem_on_monster_death(ctx: &ReducerContext, monster_id: u32, positio
     if roll <= drop_chance {
         // Small chance for special gems (2% total, preserving original special gem rates)
         let special_gem_roll = rng.gen_range(1..=100);
-        
+
         if special_gem_roll == 1 {
             let sub_special_gem_roll = rng.gen_range(1..=100);
 
             // 1% chance for Fries
             if sub_special_gem_roll <= 50 {
                 create_gem(ctx, position, GemLevel::Fries);
-                log::info!("Monster {} (Tier {}) dropped special Fries gem at position {}, {}", monster_id, monster_tier, position.x, position.y);
+                log::info!(
+                    "Monster {} (Tier {}) dropped special Fries gem at position {}, {}",
+                    monster_id,
+                    monster_tier,
+                    position.x,
+                    position.y
+                );
             }
             // 1% chance for Dice
             else if sub_special_gem_roll <= 90 {
                 create_gem(ctx, position, GemLevel::Dice);
-                log::info!("Monster {} (Tier {}) dropped special Dice gem at position {}, {}", monster_id, monster_tier, position.x, position.y);
+                log::info!(
+                    "Monster {} (Tier {}) dropped special Dice gem at position {}, {}",
+                    monster_id,
+                    monster_tier,
+                    position.x,
+                    position.y
+                );
             }
             // 1% chance for BoosterPack
-            else{
+            else {
                 create_gem(ctx, position, GemLevel::BoosterPack);
-                log::info!("Monster {} (Tier {}) dropped special BoosterPack gem at position {}, {}", monster_id, monster_tier, position.x, position.y);
+                log::info!(
+                    "Monster {} (Tier {}) dropped special BoosterPack gem at position {}, {}",
+                    monster_id,
+                    monster_tier,
+                    position.x,
+                    position.y
+                );
             }
-        }
-        else {
+        } else {
             // 97% chance for tier-based regular gem
             let gem_level = crate::gem_drop_defs::select_weighted_gem_level(ctx, monster_tier);
             create_gem(ctx, position, gem_level.clone());
-            log::info!("Monster {} (Tier {}) dropped {:?} gem at position {}, {}", monster_id, monster_tier, gem_level, position.x, position.y);
+            log::info!(
+                "Monster {} (Tier {}) dropped {:?} gem at position {}, {}",
+                monster_id,
+                monster_tier,
+                gem_level,
+                position.x,
+                position.y
+            );
         }
     }
 }
@@ -334,12 +408,16 @@ pub fn calculate_exp_for_level(ctx: &ReducerContext, level: u32) -> u32 {
 }
 
 // Calculate the total accumulated experience for a player (all XP earned to reach current level + remaining XP)
-pub fn calculate_total_player_exp(ctx: &ReducerContext, player_level: u32, remaining_exp: u32) -> u32 {
+pub fn calculate_total_player_exp(
+    ctx: &ReducerContext,
+    player_level: u32,
+    remaining_exp: u32,
+) -> u32 {
     if player_level <= 1 {
         // Level 1 players only have their remaining exp
         return remaining_exp;
     }
-    
+
     let config = ctx.db.exp_config().config_id().find(&0);
     if config.is_none() {
         // Fallback calculation if config not found
@@ -352,13 +430,14 @@ pub fn calculate_total_player_exp(ctx: &ReducerContext, player_level: u32, remai
 
     let config = config.unwrap();
     let mut total_exp = 0;
-    
+
     // Sum up all XP needed from level 1 to current level
     for level in 1..player_level {
-        let exp_for_level = (config.base_exp_per_level as f32 * (level as f32).powf(config.level_exp_factor)) as u32;
+        let exp_for_level = (config.base_exp_per_level as f32
+            * (level as f32).powf(config.level_exp_factor)) as u32;
         total_exp += exp_for_level;
     }
-    
+
     // Add the remaining XP for the current level
     total_exp + remaining_exp
 }
@@ -407,24 +486,24 @@ pub fn give_player_exp(ctx: &ReducerContext, player_id: u32, exp_amount: u32) {
     let mut current_level = player.level;
     let mut leveled_up = false;
     let mut remaining_exp = new_exp;
-    
+
     // Get exp needed for current level from player data
     let mut exp_needed = player.exp_for_next_level;
-    
+
     // Loop to handle multiple level ups
     while remaining_exp >= exp_needed {
         // Level up
         current_level += 1;
         remaining_exp -= exp_needed;
         leveled_up = true;
-        
+
         // Calculate exp needed for next level
         exp_needed = calculate_exp_for_level(ctx, current_level);
     }
-    
+
     // Apply updates to player
     player.exp = remaining_exp;
-    
+
     if leveled_up {
         let levels_gained = current_level - player.level;
         player.level = current_level;
@@ -432,13 +511,14 @@ pub fn give_player_exp(ctx: &ReducerContext, player_id: u32, exp_amount: u32) {
         player.exp_for_next_level = exp_needed;
 
         let prev_unspent_upgrades = player.unspent_upgrades;
-        
+
         // Grant an unspent upgrade point for each level gained
         player.unspent_upgrades += levels_gained;
-        
+
         // Heal player to max HP when leveling up (unless NoHealOnLevelUp curse is active)
         let old_hp = player.hp;
-        if !crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::NoHealOnLevelUp) {
+        if !crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::NoHealOnLevelUp)
+        {
             player.hp = player.max_hp;
         }
 
@@ -446,13 +526,20 @@ pub fn give_player_exp(ctx: &ReducerContext, player_id: u32, exp_amount: u32) {
             // Draw upgrade options for the player
             crate::upgrades_def::draw_upgrade_options(ctx, player_id);
         }
-        
-        log::info!("Player {} leveled up to level {}! Exp: {}/{}, Healed from {:.1} to {:.1} HP", 
-                  player_id, current_level, remaining_exp, exp_needed, old_hp, player.max_hp);
+
+        log::info!(
+            "Player {} leveled up to level {}! Exp: {}/{}, Healed from {:.1} to {:.1} HP",
+            player_id,
+            current_level,
+            remaining_exp,
+            exp_needed,
+            old_hp,
+            player.max_hp
+        );
     } else {
         //Log::info(&format!("Player {} gained {} exp. Now: {}/{}", player_id, exp_amount, remaining_exp, exp_needed));
     }
-    
+
     // Update player record
     ctx.db.player().player_id().update(player);
 }
@@ -480,14 +567,19 @@ pub fn collect_gem(ctx: &ReducerContext, gem_id: u32, player_id: u32) {
                 let new_hp = (player.hp + heal_amount).min(player.max_hp);
                 let actual_heal = new_hp - player.hp;
                 let max_hp = player.max_hp; // Store max_hp before updating
-                
+
                 player.hp = new_hp;
                 ctx.db.player().player_id().update(player);
-                
-                log::info!("Player {} collected Fries gem, healed {:.1} HP (now {:.1}/{:.1})", 
-                          player_id, actual_heal, new_hp, max_hp);
+
+                log::info!(
+                    "Player {} collected Fries gem, healed {:.1} HP (now {:.1}/{:.1})",
+                    player_id,
+                    actual_heal,
+                    new_hp,
+                    max_hp
+                );
             }
-        },
+        }
         GemLevel::Dice => {
             // Dice grant an extra reroll
             let player_opt = ctx.db.player().player_id().find(&player_id);
@@ -495,11 +587,14 @@ pub fn collect_gem(ctx: &ReducerContext, gem_id: u32, player_id: u32) {
                 player.rerolls += 1;
                 let new_rerolls = player.rerolls; // Store new value before updating
                 ctx.db.player().player_id().update(player);
-                
-                log::info!("Player {} collected Dice gem, gained 1 reroll (now has {})", 
-                          player_id, new_rerolls);
+
+                log::info!(
+                    "Player {} collected Dice gem, gained 1 reroll (now has {})",
+                    player_id,
+                    new_rerolls
+                );
             }
-        },
+        }
         GemLevel::BoosterPack => {
             // BoosterPack grants an immediate upgrade point (without leveling up)
             let player_opt = ctx.db.player().player_id().find(&player_id);
@@ -507,39 +602,47 @@ pub fn collect_gem(ctx: &ReducerContext, gem_id: u32, player_id: u32) {
                 player.unspent_upgrades += 1;
                 let new_upgrades = player.unspent_upgrades; // Store new value before updating
                 ctx.db.player().player_id().update(player);
-                
-                log::info!("Player {} collected BoosterPack gem, gained 1 upgrade point (now has {})", 
-                          player_id, new_upgrades);
-                
+
+                log::info!(
+                    "Player {} collected BoosterPack gem, gained 1 upgrade point (now has {})",
+                    player_id,
+                    new_upgrades
+                );
+
                 // If this is their first unspent upgrade, draw upgrade options
                 if new_upgrades == 1 {
                     crate::upgrades_def::draw_upgrade_options(ctx, player_id);
                 }
             }
-        },
+        }
         GemLevel::LoreScroll => {
             // Lore Scroll levels the player up exactly once
             let player_opt = ctx.db.player().player_id().find(&player_id);
             if let Some(player) = player_opt {
                 // Calculate exactly how much exp is needed to level up once
                 let exp_needed_for_next_level = player.exp_for_next_level - player.exp;
-                
+
                 // Use the give_player_exp function to handle the level up logic
                 give_player_exp(ctx, player_id, exp_needed_for_next_level);
-                
+
                 let scroll_type = gem.value; // 0-12 representing different lore scroll types
                 log::info!("Player {} collected Lore Scroll (Type {}) and leveled up! Granted {} exp to reach next level", 
                           player_id, scroll_type, exp_needed_for_next_level);
-                
+
                 // Log the lore scroll pickup in the tracking table
                 crate::lorescrolls_defs::log_lore_scroll_pickup(ctx, player_id, scroll_type);
             }
-        },
+        }
         _ => {
             // Regular gems (including Soul gems) give experience
             let exp_value = gem.value;
             give_player_exp(ctx, player_id, exp_value);
-            log::info!("Player {} collected a {:?} gem worth {} exp", player_id, gem.level, exp_value);
+            log::info!(
+                "Player {} collected a {:?} gem worth {} exp",
+                player_id,
+                gem.level,
+                exp_value
+            );
         }
     }
 
@@ -572,8 +675,9 @@ pub fn maintain_gems(ctx: &ReducerContext, collision_cache: &mut CollisionCache)
         collision_cache.gem.pos_x_gem[cache_index] = gem_entity.position.x;
         collision_cache.gem.pos_y_gem[cache_index] = gem_entity.position.y;
         collision_cache.gem.radius_gem[cache_index] = gem_entity.radius;
-        
-        let grid_cell_key = get_world_cell_from_position(gem_entity.position.x, gem_entity.position.y) as usize;
+
+        let grid_cell_key =
+            get_world_cell_from_position(gem_entity.position.x, gem_entity.position.y) as usize;
         collision_cache.gem.nexts_gem[cache_index] = collision_cache.gem.heads_gem[grid_cell_key];
         collision_cache.gem.heads_gem[grid_cell_key] = collision_cache.gem.cached_count_gems;
 
@@ -625,7 +729,7 @@ pub fn process_gem_collisions_spatial_hash(ctx: &ReducerContext, collision_cache
                     if spatial_hash_collision_checker(px, py, pr, gx, gy, gr) {
                         collect_gem(ctx, collision_cache.gem.keys_gem[gid_usize], real_player_id);
                     }
-                    
+
                     gid = collision_cache.gem.nexts_gem[gid_usize];
                 }
             }
@@ -638,41 +742,41 @@ pub fn process_gem_collisions_spatial_hash(ctx: &ReducerContext, collision_cache
 pub fn spawn_debug_special_gem(ctx: &ReducerContext) {
     // Check admin access first
     crate::require_admin_access(ctx, "SpawnDebugSpecialGem");
-    
+
     // Get the caller's identity
-    let caller_identity = ctx.sender;
-    
+    let caller_identity = ctx.sender();
+
     // Find the caller's account
     let account_opt = ctx.db.account().identity().find(&caller_identity);
     if account_opt.is_none() {
         log::error!("spawn_debug_special_gem: Account not found for caller");
         return;
     }
-    
+
     let account = account_opt.unwrap();
     if account.current_player_id == 0 {
         log::error!("spawn_debug_special_gem: Caller has no active player");
         return;
     }
-    
+
     // Find the player
     let player_opt = ctx.db.player().player_id().find(&account.current_player_id);
     if player_opt.is_none() {
-        log::error!("spawn_debug_special_gem: Player {} not found", account.current_player_id);
+        log::error!(
+            "spawn_debug_special_gem: Player {} not found",
+            account.current_player_id
+        );
         return;
     }
-    
+
     let player = player_opt.unwrap();
-    
+
     // Generate a random position near the player (within 100 units)
     let mut rng = ctx.rng();
     let offset_x = rng.gen_range(-100.0..100.0);
     let offset_y = rng.gen_range(-100.0..100.0);
-    let spawn_position = DbVector2::new(
-        player.position.x + offset_x,
-        player.position.y + offset_y,
-    );
-    
+    let spawn_position = DbVector2::new(player.position.x + offset_x, player.position.y + offset_y);
+
     // Randomly select a special gem type
     let gem_type_roll = rng.gen_range(1..=3);
     let gem_level = match gem_type_roll {
@@ -680,17 +784,17 @@ pub fn spawn_debug_special_gem(ctx: &ReducerContext) {
         2 => GemLevel::Dice,
         _ => GemLevel::BoosterPack,
     };
-    
+
     // Create the special gem
     let gem_id = create_gem(ctx, spawn_position, gem_level.clone());
-    
+
     log::info!(
         "Debug: Spawned {} gem (ID: {}) at position ({:.1}, {:.1}) for player {} ({})",
         match gem_level {
             GemLevel::Fries => "Fries",
-            GemLevel::Dice => "Dice", 
+            GemLevel::Dice => "Dice",
             GemLevel::BoosterPack => "BoosterPack",
-            _ => "Unknown"
+            _ => "Unknown",
         },
         gem_id,
         spawn_position.x,
@@ -705,47 +809,47 @@ pub fn spawn_debug_special_gem(ctx: &ReducerContext) {
 pub fn spawn_debug_lore_scroll(ctx: &ReducerContext) {
     // Check admin access first
     crate::require_admin_access(ctx, "SpawnDebugLoreScroll");
-    
+
     // Get the caller's identity
-    let caller_identity = ctx.sender;
-    
+    let caller_identity = ctx.sender();
+
     // Find the caller's account
     let account_opt = ctx.db.account().identity().find(&caller_identity);
     if account_opt.is_none() {
         log::error!("spawn_debug_lore_scroll: Account not found for caller");
         return;
     }
-    
+
     let account = account_opt.unwrap();
     if account.current_player_id == 0 {
         log::error!("spawn_debug_lore_scroll: Caller has no active player");
         return;
     }
-    
+
     // Find the player
     let player_opt = ctx.db.player().player_id().find(&account.current_player_id);
     if player_opt.is_none() {
-        log::error!("spawn_debug_lore_scroll: Player {} not found", account.current_player_id);
+        log::error!(
+            "spawn_debug_lore_scroll: Player {} not found",
+            account.current_player_id
+        );
         return;
     }
-    
+
     let player = player_opt.unwrap();
-    
+
     // Generate a random position near the player (within 100 units)
     let mut rng = ctx.rng();
     let offset_x = rng.gen_range(-100.0..100.0);
     let offset_y = rng.gen_range(-100.0..100.0);
-    let spawn_position = DbVector2::new(
-        player.position.x + offset_x,
-        player.position.y + offset_y,
-    );
-    
+    let spawn_position = DbVector2::new(player.position.x + offset_x, player.position.y + offset_y);
+
     // Randomly select a lore scroll type (0-12)
     let scroll_type = rng.gen_range(0..=12);
-    
+
     // Create the lore scroll
     let scroll_id = create_lore_scroll(ctx, spawn_position, scroll_type);
-    
+
     log::info!(
         "Debug: Spawned Lore Scroll (ID: {}, Type: {}) at position ({:.1}, {:.1}) for player {} ({})",
         scroll_id,
@@ -755,4 +859,4 @@ pub fn spawn_debug_lore_scroll(ctx: &ReducerContext) {
         player.name,
         player.player_id
     );
-} 
+}

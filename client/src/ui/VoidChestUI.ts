@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import * as Phaser from 'phaser';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 
 const ALERT_DURATION = 2000; // How long the alert stays visible (5 seconds - increased from 3)

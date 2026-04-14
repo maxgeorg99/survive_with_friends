@@ -3,128 +3,22 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
-import { Gem } from "./gem_type";
-import { GemLevel as __GemLevel } from "./gem_level_type";
+  TypeBuilder as __TypeBuilder,
+  t as __t,
+  type AlgebraicTypeType as __AlgebraicTypeType,
+  type Infer as __Infer,
+} from "spacetimedb";
+import {
+  GemLevel,
+} from "./types";
 
-import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
 
-/**
- * Table handle for the table `gems`.
- *
- * Obtain a handle from the [`gems`] property on [`RemoteTables`],
- * like `ctx.db.gems`.
- *
- * Users are encouraged not to explicitly reference this type,
- * but to directly chain method calls,
- * like `ctx.db.gems.on_insert(...)`.
- */
-export class GemsTableHandle {
-  tableCache: TableCache<Gem>;
-
-  constructor(tableCache: TableCache<Gem>) {
-    this.tableCache = tableCache;
-  }
-
-  count(): number {
-    return this.tableCache.count();
-  }
-
-  iter(): Iterable<Gem> {
-    return this.tableCache.iter();
-  }
-  /**
-   * Access to the `gemId` unique index on the table `gems`,
-   * which allows point queries on the field of the same name
-   * via the [`GemsGemIdUnique.find`] method.
-   *
-   * Users are encouraged not to explicitly reference this type,
-   * but to directly chain method calls,
-   * like `ctx.db.gems.gemId().find(...)`.
-   *
-   * Get a handle on the `gemId` unique index on the table `gems`.
-   */
-  gemId = {
-    // Find the subscribed row whose `gemId` column value is equal to `col_val`,
-    // if such a row is present in the client cache.
-    find: (col_val: number): Gem | undefined => {
-      for (let row of this.tableCache.iter()) {
-        if (deepEqual(row.gemId, col_val)) {
-          return row;
-        }
-      }
-    },
-  };
-  /**
-   * Access to the `entityId` unique index on the table `gems`,
-   * which allows point queries on the field of the same name
-   * via the [`GemsEntityIdUnique.find`] method.
-   *
-   * Users are encouraged not to explicitly reference this type,
-   * but to directly chain method calls,
-   * like `ctx.db.gems.entityId().find(...)`.
-   *
-   * Get a handle on the `entityId` unique index on the table `gems`.
-   */
-  entityId = {
-    // Find the subscribed row whose `entityId` column value is equal to `col_val`,
-    // if such a row is present in the client cache.
-    find: (col_val: number): Gem | undefined => {
-      for (let row of this.tableCache.iter()) {
-        if (deepEqual(row.entityId, col_val)) {
-          return row;
-        }
-      }
-    },
-  };
-
-  onInsert = (cb: (ctx: EventContext, row: Gem) => void) => {
-    return this.tableCache.onInsert(cb);
-  }
-
-  removeOnInsert = (cb: (ctx: EventContext, row: Gem) => void) => {
-    return this.tableCache.removeOnInsert(cb);
-  }
-
-  onDelete = (cb: (ctx: EventContext, row: Gem) => void) => {
-    return this.tableCache.onDelete(cb);
-  }
-
-  removeOnDelete = (cb: (ctx: EventContext, row: Gem) => void) => {
-    return this.tableCache.removeOnDelete(cb);
-  }
-
-  // Updates are only defined for tables with primary keys.
-  onUpdate = (cb: (ctx: EventContext, oldRow: Gem, newRow: Gem) => void) => {
-    return this.tableCache.onUpdate(cb);
-  }
-
-  removeOnUpdate = (cb: (ctx: EventContext, onRow: Gem, newRow: Gem) => void) => {
-    return this.tableCache.removeOnUpdate(cb);
-  }}
+export default __t.row({
+  gemId: __t.u32().primaryKey().name("gem_id"),
+  entityId: __t.u32().name("entity_id"),
+  get level() {
+    return GemLevel;
+  },
+  value: __t.u32(),
+});

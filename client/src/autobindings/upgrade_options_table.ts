@@ -3,106 +3,31 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
-import { UpgradeOptionData } from "./upgrade_option_data_type";
-import { UpgradeType as __UpgradeType } from "./upgrade_type_type";
+  TypeBuilder as __TypeBuilder,
+  t as __t,
+  type AlgebraicTypeType as __AlgebraicTypeType,
+  type Infer as __Infer,
+} from "spacetimedb";
+import {
+  UpgradeType,
+} from "./types";
 
-import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
 
-/**
- * Table handle for the table `upgrade_options`.
- *
- * Obtain a handle from the [`upgradeOptions`] property on [`RemoteTables`],
- * like `ctx.db.upgradeOptions`.
- *
- * Users are encouraged not to explicitly reference this type,
- * but to directly chain method calls,
- * like `ctx.db.upgradeOptions.on_insert(...)`.
- */
-export class UpgradeOptionsTableHandle {
-  tableCache: TableCache<UpgradeOptionData>;
-
-  constructor(tableCache: TableCache<UpgradeOptionData>) {
-    this.tableCache = tableCache;
-  }
-
-  count(): number {
-    return this.tableCache.count();
-  }
-
-  iter(): Iterable<UpgradeOptionData> {
-    return this.tableCache.iter();
-  }
-  /**
-   * Access to the `upgradeId` unique index on the table `upgrade_options`,
-   * which allows point queries on the field of the same name
-   * via the [`UpgradeOptionsUpgradeIdUnique.find`] method.
-   *
-   * Users are encouraged not to explicitly reference this type,
-   * but to directly chain method calls,
-   * like `ctx.db.upgradeOptions.upgradeId().find(...)`.
-   *
-   * Get a handle on the `upgradeId` unique index on the table `upgrade_options`.
-   */
-  upgradeId = {
-    // Find the subscribed row whose `upgradeId` column value is equal to `col_val`,
-    // if such a row is present in the client cache.
-    find: (col_val: number): UpgradeOptionData | undefined => {
-      for (let row of this.tableCache.iter()) {
-        if (deepEqual(row.upgradeId, col_val)) {
-          return row;
-        }
-      }
-    },
-  };
-
-  onInsert = (cb: (ctx: EventContext, row: UpgradeOptionData) => void) => {
-    return this.tableCache.onInsert(cb);
-  }
-
-  removeOnInsert = (cb: (ctx: EventContext, row: UpgradeOptionData) => void) => {
-    return this.tableCache.removeOnInsert(cb);
-  }
-
-  onDelete = (cb: (ctx: EventContext, row: UpgradeOptionData) => void) => {
-    return this.tableCache.onDelete(cb);
-  }
-
-  removeOnDelete = (cb: (ctx: EventContext, row: UpgradeOptionData) => void) => {
-    return this.tableCache.removeOnDelete(cb);
-  }
-
-  // Updates are only defined for tables with primary keys.
-  onUpdate = (cb: (ctx: EventContext, oldRow: UpgradeOptionData, newRow: UpgradeOptionData) => void) => {
-    return this.tableCache.onUpdate(cb);
-  }
-
-  removeOnUpdate = (cb: (ctx: EventContext, onRow: UpgradeOptionData, newRow: UpgradeOptionData) => void) => {
-    return this.tableCache.removeOnUpdate(cb);
-  }}
+export default __t.row({
+  upgradeId: __t.u32().primaryKey().name("upgrade_id"),
+  playerId: __t.u32().name("player_id"),
+  upgradeIndex: __t.u32().name("upgrade_index"),
+  get upgradeType() {
+    return UpgradeType.name("upgrade_type");
+  },
+  isAttackUpgrade: __t.bool().name("is_attack_upgrade"),
+  value: __t.u32(),
+  attackType: __t.u32().name("attack_type"),
+  damage: __t.u32(),
+  cooldownRatio: __t.u32().name("cooldown_ratio"),
+  projectiles: __t.u32(),
+  speed: __t.u32(),
+  radius: __t.u32(),
+  isNewAttack: __t.bool().name("is_new_attack"),
+});

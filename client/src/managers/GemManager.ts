@@ -1,9 +1,9 @@
-import Phaser from 'phaser';
+import * as Phaser from 'phaser';
 import { EventContext } from "../autobindings";
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { GameEvents } from '../constants/GameEvents';
 import { GEM_ASSET_KEYS, GEM_ANIMATION, GEM_PARTICLE_COLORS } from '../constants/GemConfig';
-import GemLevel from '../autobindings/gem_level_type';
+import { GemLevel } from '../autobindings/types';
 
 // Constants from GameScene
 const SHADOW_ASSET_KEY = 'shadow';

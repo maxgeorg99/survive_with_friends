@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import * as Phaser from 'phaser';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { EventContext } from "../autobindings";
 import { GameEvents } from '../constants/GameEvents';

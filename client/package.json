@@ -10,16 +10,16 @@
     "serve": "vite preview",
     "predeploy": "npm run build && echo survive-with-friends.com > dist/CNAME",
     "deploy": "gh-pages -d dist",
-    "generate-bindings": "spacetimedb generate --lang typescript --out-dir ./src/autobindings"
+    "generate-bindings": "spacetime generate --lang typescript --out-dir ./src/autobindings"
   },
-  "author": "",
+  "author": "maximilian georg",
   "license": "ISC",
   "dependencies": {
-    "phaser": "^3.80.1",
-    "@clockworklabs/spacetimedb-sdk": "latest"
+    "phaser": "^4.0.0",
+    "spacetimedb": "^2.1.0"
   },
   "devDependencies": {
-    "typescript": "^5.3.3",
-    "vite": "^5.0.11"
+    "typescript": "latest",
+    "vite": "latest"
   }
 }

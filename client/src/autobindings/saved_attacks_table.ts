@@ -3,106 +3,33 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
-import { SavedAttack } from "./saved_attack_type";
-import { AttackType as __AttackType } from "./attack_type_type";
+  TypeBuilder as __TypeBuilder,
+  t as __t,
+  type AlgebraicTypeType as __AlgebraicTypeType,
+  type Infer as __Infer,
+} from "spacetimedb";
+import {
+  AttackType,
+} from "./types";
 
-import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
 
-/**
- * Table handle for the table `saved_attacks`.
- *
- * Obtain a handle from the [`savedAttacks`] property on [`RemoteTables`],
- * like `ctx.db.savedAttacks`.
- *
- * Users are encouraged not to explicitly reference this type,
- * but to directly chain method calls,
- * like `ctx.db.savedAttacks.on_insert(...)`.
- */
-export class SavedAttacksTableHandle {
-  tableCache: TableCache<SavedAttack>;
-
-  constructor(tableCache: TableCache<SavedAttack>) {
-    this.tableCache = tableCache;
-  }
-
-  count(): number {
-    return this.tableCache.count();
-  }
-
-  iter(): Iterable<SavedAttack> {
-    return this.tableCache.iter();
-  }
-  /**
-   * Access to the `savedAttackId` unique index on the table `saved_attacks`,
-   * which allows point queries on the field of the same name
-   * via the [`SavedAttacksSavedAttackIdUnique.find`] method.
-   *
-   * Users are encouraged not to explicitly reference this type,
-   * but to directly chain method calls,
-   * like `ctx.db.savedAttacks.savedAttackId().find(...)`.
-   *
-   * Get a handle on the `savedAttackId` unique index on the table `saved_attacks`.
-   */
-  savedAttackId = {
-    // Find the subscribed row whose `savedAttackId` column value is equal to `col_val`,
-    // if such a row is present in the client cache.
-    find: (col_val: number): SavedAttack | undefined => {
-      for (let row of this.tableCache.iter()) {
-        if (deepEqual(row.savedAttackId, col_val)) {
-          return row;
-        }
-      }
-    },
-  };
-
-  onInsert = (cb: (ctx: EventContext, row: SavedAttack) => void) => {
-    return this.tableCache.onInsert(cb);
-  }
-
-  removeOnInsert = (cb: (ctx: EventContext, row: SavedAttack) => void) => {
-    return this.tableCache.removeOnInsert(cb);
-  }
-
-  onDelete = (cb: (ctx: EventContext, row: SavedAttack) => void) => {
-    return this.tableCache.onDelete(cb);
-  }
-
-  removeOnDelete = (cb: (ctx: EventContext, row: SavedAttack) => void) => {
-    return this.tableCache.removeOnDelete(cb);
-  }
-
-  // Updates are only defined for tables with primary keys.
-  onUpdate = (cb: (ctx: EventContext, oldRow: SavedAttack, newRow: SavedAttack) => void) => {
-    return this.tableCache.onUpdate(cb);
-  }
-
-  removeOnUpdate = (cb: (ctx: EventContext, onRow: SavedAttack, newRow: SavedAttack) => void) => {
-    return this.tableCache.removeOnUpdate(cb);
-  }}
+export default __t.row({
+  savedAttackId: __t.u32().primaryKey().name("saved_attack_id"),
+  get attackType() {
+    return AttackType.name("attack_type");
+  },
+  skillLevel: __t.u32().name("skill_level"),
+  parameterU: __t.u32().name("parameter_u"),
+  parameterI: __t.i32().name("parameter_i"),
+  attackCount: __t.u32().name("attack_count"),
+  cooldown: __t.u32(),
+  duration: __t.u32(),
+  projectiles: __t.u32(),
+  fireDelay: __t.u32().name("fire_delay"),
+  speed: __t.f32(),
+  piercing: __t.bool(),
+  radius: __t.f32(),
+  damage: __t.u32(),
+  armorPiercing: __t.u32().name("armor_piercing"),
+});

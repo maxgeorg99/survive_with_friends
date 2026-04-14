@@ -1,5 +1,5 @@
-import Phaser from 'phaser';
-import { MonsterType } from '../autobindings/monster_type_type';
+import * as Phaser from 'phaser';
+import { MonsterType } from '../autobindings/types';
 import { isMobileDevice } from '../utils/device';
 import {localization} from '../utils/localization';
 import SpacetimeDBClient from '../SpacetimeDBClient';

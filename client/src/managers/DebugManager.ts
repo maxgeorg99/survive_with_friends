@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import * as Phaser from 'phaser';
 import { Player, Entity, PlayerClass, Account, EventContext, ErrorContext, UpgradeOptionData } from "../autobindings";
 import SpacetimeDBClient from '../SpacetimeDBClient'; // Path relative to client/src/managers/
 import GameScene from '../scenes/GameScene'; // Corrected import for default export

@@ -27,7 +27,7 @@ pub enum MonsterType {
 pub fn get_monster_type_name(bestiary_id: &MonsterType) -> &'static str {
     match bestiary_id {
         MonsterType::Rat => "Rat",
-        MonsterType::Slime => "Slime", 
+        MonsterType::Slime => "Slime",
         MonsterType::Bat => "Bat",
         MonsterType::Orc => "Orc",
         MonsterType::Imp => "Imp",

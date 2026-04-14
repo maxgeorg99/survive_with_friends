@@ -1,13 +1,14 @@
-use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp};
-use crate::{entity, monsters, monsters_boid, gems, monster_spawners, boss_spawn_timer, 
-    boss_phase_two_timer, game_state, monster_spawn_timer, monster_hit_cleanup, 
-    active_attack_cleanup, attack_burst_cooldowns, player_scheduled_attacks, monster_damage, 
-    player, upgrade_options, active_attacks, void_zone_scheduler, chaos_ball_scheduler, 
-    active_monster_attacks, agna_magic_circles, agna_fire_orb_scheduler, 
-    agna_delayed_orb_scheduler, agna_flamethrower_scheduler, agna_candle_spawns, 
-    agna_candle_scheduler, agna_candle_bolt_scheduler, agna_ritual_completion_check, 
-    agna_summoning_circle_spawner, agna_target_switch_scheduler, 
-    agna_phase2_flamethrower_scheduler, boss_agna_last_patterns};
+use crate::{
+    active_attack_cleanup, active_attacks, active_monster_attacks, agna_candle_bolt_scheduler,
+    agna_candle_scheduler, agna_candle_spawns, agna_delayed_orb_scheduler, agna_fire_orb_scheduler,
+    agna_flamethrower_scheduler, agna_magic_circles, agna_phase2_flamethrower_scheduler,
+    agna_ritual_completion_check, agna_summoning_circle_spawner, agna_target_switch_scheduler,
+    attack_burst_cooldowns, boss_agna_last_patterns, boss_phase_two_timer, boss_spawn_timer,
+    chaos_ball_scheduler, entity, game_state, gems, monster_damage, monster_hit_cleanup,
+    monster_spawn_timer, monster_spawners, monsters, monsters_boid, player,
+    player_scheduled_attacks, upgrade_options, void_zone_scheduler,
+};
+use spacetimedb::{reducer, table, Identity, ReducerContext, Table, Timestamp};
 
 use crate::boss_ender_defs::boss_ender_last_patterns;
 use crate::boss_simon_defs::boss_simon_last_patterns;
@@ -21,72 +22,102 @@ pub fn reset_world(ctx: &ReducerContext) {
     // Verify that no players are alive
     let player_count = ctx.db.player().count();
     if player_count > 0 {
-        log::info!("ResetWorld: Canceled reset because {} players are still alive", player_count);
+        log::info!(
+            "ResetWorld: Canceled reset because {} players are still alive",
+            player_count
+        );
         return;
     }
 
     // 1. Clear all monsters
     let mut monster_count = 0;
-    
+
     let monsters_to_delete: Vec<u32> = ctx.db.monsters().iter().map(|m| m.monster_id).collect();
     for monster_id in monsters_to_delete {
         ctx.db.monsters().monster_id().delete(&monster_id);
         ctx.db.monsters_boid().monster_id().delete(&monster_id);
         monster_count += 1;
     }
-    
+
     log::info!("ResetWorld: Cleared {} monsters", monster_count);
-    
+
     // 2. Clear all gems
     let mut gem_count = 0;
     let mut gem_entity_ids = Vec::new();
-    
+
     for gem in ctx.db.gems().iter() {
         gem_entity_ids.push(gem.entity_id);
         ctx.db.gems().gem_id().delete(&gem.gem_id);
         gem_count += 1;
     }
-    
+
     // Delete gem entities
     for entity_id in gem_entity_ids {
         ctx.db.entity().entity_id().delete(&entity_id);
     }
-    
+
     log::info!("ResetWorld: Cleared {} gems", gem_count);
-    
+
     // 3. Clear all monster spawners
     let mut spawner_count = 0;
-    
-    let spawners_to_delete: Vec<u64> = ctx.db.monster_spawners().iter().map(|s| s.scheduled_id).collect();
+
+    let spawners_to_delete: Vec<u64> = ctx
+        .db
+        .monster_spawners()
+        .iter()
+        .map(|s| s.scheduled_id)
+        .collect();
     for scheduled_id in spawners_to_delete {
-        ctx.db.monster_spawners().scheduled_id().delete(&scheduled_id);
+        ctx.db
+            .monster_spawners()
+            .scheduled_id()
+            .delete(&scheduled_id);
         spawner_count += 1;
     }
-    
+
     log::info!("ResetWorld: Cleared {} monster spawners", spawner_count);
-    
+
     // 4. Clear boss spawn timer
     let mut boss_timer_count = 0;
-    
-    let boss_timers_to_delete: Vec<u64> = ctx.db.boss_spawn_timer().iter().map(|t| t.scheduled_id).collect();
+
+    let boss_timers_to_delete: Vec<u64> = ctx
+        .db
+        .boss_spawn_timer()
+        .iter()
+        .map(|t| t.scheduled_id)
+        .collect();
     for scheduled_id in boss_timers_to_delete {
-        ctx.db.boss_spawn_timer().scheduled_id().delete(&scheduled_id);
+        ctx.db
+            .boss_spawn_timer()
+            .scheduled_id()
+            .delete(&scheduled_id);
         boss_timer_count += 1;
     }
-    
+
     log::info!("ResetWorld: Cleared {} boss spawn timers", boss_timer_count);
-    
+
     // 4.5. Clear boss phase 2 timers
     let mut boss_phase2_timer_count = 0;
-    
-    let boss_phase2_timers_to_delete: Vec<u64> = ctx.db.boss_phase_two_timer().iter().map(|t| t.scheduled_id).collect();
+
+    let boss_phase2_timers_to_delete: Vec<u64> = ctx
+        .db
+        .boss_phase_two_timer()
+        .iter()
+        .map(|t| t.scheduled_id)
+        .collect();
     for scheduled_id in boss_phase2_timers_to_delete {
-        ctx.db.boss_phase_two_timer().scheduled_id().delete(&scheduled_id);
+        ctx.db
+            .boss_phase_two_timer()
+            .scheduled_id()
+            .delete(&scheduled_id);
         boss_phase2_timer_count += 1;
     }
-    
-    log::info!("ResetWorld: Cleared {} boss phase 2 timers", boss_phase2_timer_count);
-    
+
+    log::info!(
+        "ResetWorld: Cleared {} boss phase 2 timers",
+        boss_phase2_timer_count
+    );
+
     // 5. Reset game state (boss status and restart timer)
     if let Some(mut game_state) = ctx.db.game_state().id().find(&0) {
         game_state.boss_active = false;
@@ -95,223 +126,414 @@ pub fn reset_world(ctx: &ReducerContext) {
         game_state.normal_spawning_paused = false;
         game_state.game_start_time = ctx.timestamp; // Reset game start time for new session
         ctx.db.game_state().id().update(game_state);
-        
+
         log::info!("ResetWorld: Reset game state (boss status and timer)");
     }
-    
+
     // 6. Clear the monster spawn timer
     let mut monster_timer_count = 0;
-    
-    let monster_timers_to_delete: Vec<u64> = ctx.db.monster_spawn_timer().iter().map(|t| t.scheduled_id).collect();
+
+    let monster_timers_to_delete: Vec<u64> = ctx
+        .db
+        .monster_spawn_timer()
+        .iter()
+        .map(|t| t.scheduled_id)
+        .collect();
     for scheduled_id in monster_timers_to_delete {
-        ctx.db.monster_spawn_timer().scheduled_id().delete(&scheduled_id);
+        ctx.db
+            .monster_spawn_timer()
+            .scheduled_id()
+            .delete(&scheduled_id);
         monster_timer_count += 1;
     }
-    
-    log::info!("ResetWorld: Cleared {} monster spawn timers", monster_timer_count);
-    
+
+    log::info!(
+        "ResetWorld: Cleared {} monster spawn timers",
+        monster_timer_count
+    );
+
     // 7. Clean up monster hit cleanup records
     let mut monster_hit_cleanup_count = 0;
-    let cleanup_to_delete: Vec<u64> = ctx.db.monster_hit_cleanup().iter().map(|c| c.scheduled_id).collect();
+    let cleanup_to_delete: Vec<u64> = ctx
+        .db
+        .monster_hit_cleanup()
+        .iter()
+        .map(|c| c.scheduled_id)
+        .collect();
     for scheduled_id in cleanup_to_delete {
-        ctx.db.monster_hit_cleanup().scheduled_id().delete(&scheduled_id);
+        ctx.db
+            .monster_hit_cleanup()
+            .scheduled_id()
+            .delete(&scheduled_id);
         monster_hit_cleanup_count += 1;
     }
-    
-    log::info!("ResetWorld: Cleared {} monster hit cleanup records", monster_hit_cleanup_count);
-    
+
+    log::info!(
+        "ResetWorld: Cleared {} monster hit cleanup records",
+        monster_hit_cleanup_count
+    );
+
     // 8. Clean up active attack cleanup records
     let mut active_attack_cleanup_count = 0;
-    let attack_cleanup_to_delete: Vec<u64> = ctx.db.active_attack_cleanup().iter().map(|c| c.scheduled_id).collect();
+    let attack_cleanup_to_delete: Vec<u64> = ctx
+        .db
+        .active_attack_cleanup()
+        .iter()
+        .map(|c| c.scheduled_id)
+        .collect();
     for scheduled_id in attack_cleanup_to_delete {
-        ctx.db.active_attack_cleanup().scheduled_id().delete(&scheduled_id);
+        ctx.db
+            .active_attack_cleanup()
+            .scheduled_id()
+            .delete(&scheduled_id);
         active_attack_cleanup_count += 1;
     }
-    
-    log::info!("ResetWorld: Cleared {} active attack cleanup records", active_attack_cleanup_count);
-    
+
+    log::info!(
+        "ResetWorld: Cleared {} active attack cleanup records",
+        active_attack_cleanup_count
+    );
+
     // 9. Clean up attack burst cooldowns
     let mut burst_cooldown_count = 0;
-    let burst_cooldowns_to_delete: Vec<u64> = ctx.db.attack_burst_cooldowns().iter().map(|c| c.scheduled_id).collect();
+    let burst_cooldowns_to_delete: Vec<u64> = ctx
+        .db
+        .attack_burst_cooldowns()
+        .iter()
+        .map(|c| c.scheduled_id)
+        .collect();
     for scheduled_id in burst_cooldowns_to_delete {
-        ctx.db.attack_burst_cooldowns().scheduled_id().delete(&scheduled_id);
+        ctx.db
+            .attack_burst_cooldowns()
+            .scheduled_id()
+            .delete(&scheduled_id);
         burst_cooldown_count += 1;
     }
-    
-    log::info!("ResetWorld: Cleared {} attack burst cooldowns", burst_cooldown_count);
-    
+
+    log::info!(
+        "ResetWorld: Cleared {} attack burst cooldowns",
+        burst_cooldown_count
+    );
+
     // 10. Clean up player scheduled attacks
     let mut scheduled_attack_count = 0;
-    let scheduled_attacks_to_delete: Vec<u64> = ctx.db.player_scheduled_attacks().iter().map(|a| a.scheduled_id).collect();
+    let scheduled_attacks_to_delete: Vec<u64> = ctx
+        .db
+        .player_scheduled_attacks()
+        .iter()
+        .map(|a| a.scheduled_id)
+        .collect();
     for scheduled_id in scheduled_attacks_to_delete {
-        ctx.db.player_scheduled_attacks().scheduled_id().delete(&scheduled_id);
+        ctx.db
+            .player_scheduled_attacks()
+            .scheduled_id()
+            .delete(&scheduled_id);
         scheduled_attack_count += 1;
     }
-    
-    log::info!("ResetWorld: Cleared {} player scheduled attacks", scheduled_attack_count);
-    
+
+    log::info!(
+        "ResetWorld: Cleared {} player scheduled attacks",
+        scheduled_attack_count
+    );
+
     // 11. Clean up any remaining active attacks and their entities
     let mut active_attack_count = 0;
     let mut attack_entity_ids = Vec::new();
-    
+
     for active_attack in ctx.db.active_attacks().iter() {
         attack_entity_ids.push(active_attack.entity_id);
-        ctx.db.active_attacks().active_attack_id().delete(&active_attack.active_attack_id);
+        ctx.db
+            .active_attacks()
+            .active_attack_id()
+            .delete(&active_attack.active_attack_id);
         active_attack_count += 1;
     }
-    
+
     // Delete attack entities
     for entity_id in attack_entity_ids {
         ctx.db.entity().entity_id().delete(&entity_id);
     }
-    
-    log::info!("ResetWorld: Cleared {} active attacks and their entities", active_attack_count);
-    
+
+    log::info!(
+        "ResetWorld: Cleared {} active attacks and their entities",
+        active_attack_count
+    );
+
     // 12. Clean up any remaining monster damage records
     let mut monster_damage_count = 0;
-    let damage_records_to_delete: Vec<u32> = ctx.db.monster_damage().iter().map(|d| d.damage_id).collect();
+    let damage_records_to_delete: Vec<u32> = ctx
+        .db
+        .monster_damage()
+        .iter()
+        .map(|d| d.damage_id)
+        .collect();
     for damage_id in damage_records_to_delete {
         ctx.db.monster_damage().damage_id().delete(&damage_id);
         monster_damage_count += 1;
     }
-    
-    log::info!("ResetWorld: Cleared {} monster damage records", monster_damage_count);
+
+    log::info!(
+        "ResetWorld: Cleared {} monster damage records",
+        monster_damage_count
+    );
 
     // 13. Clean up all player upgrade options
     let mut upgrade_options_count = 0;
-    let upgrade_options_to_delete: Vec<u32> = ctx.db.upgrade_options().iter().map(|uo| uo.upgrade_id).collect();
+    let upgrade_options_to_delete: Vec<u32> = ctx
+        .db
+        .upgrade_options()
+        .iter()
+        .map(|uo| uo.upgrade_id)
+        .collect();
     for upgrade_id in upgrade_options_to_delete {
         ctx.db.upgrade_options().upgrade_id().delete(&upgrade_id);
         upgrade_options_count += 1;
     }
-    log::info!("ResetWorld: Cleared {} player upgrade options", upgrade_options_count);
-    
+    log::info!(
+        "ResetWorld: Cleared {} player upgrade options",
+        upgrade_options_count
+    );
+
     // 14. Clean up any pending guaranteed VoidChest spawns
     crate::loot_capsule_defs::cleanup_guaranteed_void_chest_spawns(ctx);
-    
+
     // 15. Clean up all void zone schedulers and active monster attacks (VoidZones, ChaosBalls, etc.)
     let mut void_zone_scheduler_count = 0;
-    let void_zone_schedulers_to_delete: Vec<u64> = ctx.db.void_zone_scheduler().iter().map(|s| s.scheduled_id).collect();
+    let void_zone_schedulers_to_delete: Vec<u64> = ctx
+        .db
+        .void_zone_scheduler()
+        .iter()
+        .map(|s| s.scheduled_id)
+        .collect();
     for scheduled_id in void_zone_schedulers_to_delete {
-        ctx.db.void_zone_scheduler().scheduled_id().delete(&scheduled_id);
+        ctx.db
+            .void_zone_scheduler()
+            .scheduled_id()
+            .delete(&scheduled_id);
         void_zone_scheduler_count += 1;
     }
-    
+
     let mut chaos_ball_scheduler_count = 0;
-    let chaos_ball_schedulers_to_delete: Vec<u64> = ctx.db.chaos_ball_scheduler().iter().map(|s| s.scheduled_id).collect();
+    let chaos_ball_schedulers_to_delete: Vec<u64> = ctx
+        .db
+        .chaos_ball_scheduler()
+        .iter()
+        .map(|s| s.scheduled_id)
+        .collect();
     for scheduled_id in chaos_ball_schedulers_to_delete {
-        ctx.db.chaos_ball_scheduler().scheduled_id().delete(&scheduled_id);
+        ctx.db
+            .chaos_ball_scheduler()
+            .scheduled_id()
+            .delete(&scheduled_id);
         chaos_ball_scheduler_count += 1;
     }
-    
+
     let mut active_monster_attack_count = 0;
-    let active_monster_attacks_to_delete: Vec<u64> = ctx.db.active_monster_attacks().iter().map(|a| a.active_monster_attack_id).collect();
+    let active_monster_attacks_to_delete: Vec<u64> = ctx
+        .db
+        .active_monster_attacks()
+        .iter()
+        .map(|a| a.active_monster_attack_id)
+        .collect();
     for attack_id in active_monster_attacks_to_delete {
-        ctx.db.active_monster_attacks().active_monster_attack_id().delete(&attack_id);
+        ctx.db
+            .active_monster_attacks()
+            .active_monster_attack_id()
+            .delete(&attack_id);
         active_monster_attack_count += 1;
     }
-    
+
     log::info!("ResetWorld: Cleaned up {} void zone schedulers, {} chaos ball schedulers, and {} active monster attacks", 
               void_zone_scheduler_count, chaos_ball_scheduler_count, active_monster_attack_count);
-    
+
     // 16. Clean up all Agna boss attack schedules (magic circles, flamethrower, fire orbs, delayed orbs)
     let mut agna_magic_circle_count = 0;
-    let agna_magic_circles_to_delete: Vec<u64> = ctx.db.agna_magic_circles().iter().map(|c| c.circle_id).collect();
+    let agna_magic_circles_to_delete: Vec<u64> = ctx
+        .db
+        .agna_magic_circles()
+        .iter()
+        .map(|c| c.circle_id)
+        .collect();
     for circle_id in agna_magic_circles_to_delete {
         ctx.db.agna_magic_circles().circle_id().delete(&circle_id);
         agna_magic_circle_count += 1;
     }
-    
+
     let mut agna_fire_orb_scheduler_count = 0;
-    let agna_fire_orb_schedulers_to_delete: Vec<u64> = ctx.db.agna_fire_orb_scheduler().iter().map(|s| s.scheduled_id).collect();
+    let agna_fire_orb_schedulers_to_delete: Vec<u64> = ctx
+        .db
+        .agna_fire_orb_scheduler()
+        .iter()
+        .map(|s| s.scheduled_id)
+        .collect();
     for scheduled_id in agna_fire_orb_schedulers_to_delete {
-        ctx.db.agna_fire_orb_scheduler().scheduled_id().delete(&scheduled_id);
+        ctx.db
+            .agna_fire_orb_scheduler()
+            .scheduled_id()
+            .delete(&scheduled_id);
         agna_fire_orb_scheduler_count += 1;
     }
-    
+
     let mut agna_delayed_orb_scheduler_count = 0;
-    let agna_delayed_orb_schedulers_to_delete: Vec<u64> = ctx.db.agna_delayed_orb_scheduler().iter().map(|s| s.scheduled_id).collect();
+    let agna_delayed_orb_schedulers_to_delete: Vec<u64> = ctx
+        .db
+        .agna_delayed_orb_scheduler()
+        .iter()
+        .map(|s| s.scheduled_id)
+        .collect();
     for scheduled_id in agna_delayed_orb_schedulers_to_delete {
-        ctx.db.agna_delayed_orb_scheduler().scheduled_id().delete(&scheduled_id);
+        ctx.db
+            .agna_delayed_orb_scheduler()
+            .scheduled_id()
+            .delete(&scheduled_id);
         agna_delayed_orb_scheduler_count += 1;
     }
-    
+
     let mut agna_flamethrower_scheduler_count = 0;
-    let agna_flamethrower_schedulers_to_delete: Vec<u64> = ctx.db.agna_flamethrower_scheduler().iter().map(|s| s.scheduled_id).collect();
+    let agna_flamethrower_schedulers_to_delete: Vec<u64> = ctx
+        .db
+        .agna_flamethrower_scheduler()
+        .iter()
+        .map(|s| s.scheduled_id)
+        .collect();
     for scheduled_id in agna_flamethrower_schedulers_to_delete {
-        ctx.db.agna_flamethrower_scheduler().scheduled_id().delete(&scheduled_id);
+        ctx.db
+            .agna_flamethrower_scheduler()
+            .scheduled_id()
+            .delete(&scheduled_id);
         agna_flamethrower_scheduler_count += 1;
     }
-    
+
     // Clean up Agna candle-related tables that were missing from cleanup
     let mut agna_candle_spawn_count = 0;
-    let agna_candle_spawns_to_delete: Vec<u64> = ctx.db.agna_candle_spawns().iter().map(|s| s.spawn_id).collect();
+    let agna_candle_spawns_to_delete: Vec<u64> = ctx
+        .db
+        .agna_candle_spawns()
+        .iter()
+        .map(|s| s.spawn_id)
+        .collect();
     for spawn_id in agna_candle_spawns_to_delete {
         ctx.db.agna_candle_spawns().spawn_id().delete(&spawn_id);
         agna_candle_spawn_count += 1;
     }
-    
+
     let mut agna_candle_scheduler_count = 0;
-    let agna_candle_schedulers_to_delete: Vec<u64> = ctx.db.agna_candle_scheduler().iter().map(|s| s.scheduled_id).collect();
+    let agna_candle_schedulers_to_delete: Vec<u64> = ctx
+        .db
+        .agna_candle_scheduler()
+        .iter()
+        .map(|s| s.scheduled_id)
+        .collect();
     for scheduled_id in agna_candle_schedulers_to_delete {
-        ctx.db.agna_candle_scheduler().scheduled_id().delete(&scheduled_id);
+        ctx.db
+            .agna_candle_scheduler()
+            .scheduled_id()
+            .delete(&scheduled_id);
         agna_candle_scheduler_count += 1;
     }
-    
+
     let mut agna_candle_bolt_scheduler_count = 0;
-    let agna_candle_bolt_schedulers_to_delete: Vec<u64> = ctx.db.agna_candle_bolt_scheduler().iter().map(|s| s.scheduled_id).collect();
+    let agna_candle_bolt_schedulers_to_delete: Vec<u64> = ctx
+        .db
+        .agna_candle_bolt_scheduler()
+        .iter()
+        .map(|s| s.scheduled_id)
+        .collect();
     for scheduled_id in agna_candle_bolt_schedulers_to_delete {
-        ctx.db.agna_candle_bolt_scheduler().scheduled_id().delete(&scheduled_id);
+        ctx.db
+            .agna_candle_bolt_scheduler()
+            .scheduled_id()
+            .delete(&scheduled_id);
         agna_candle_bolt_scheduler_count += 1;
     }
-    
+
     let mut agna_ritual_completion_count = 0;
-    let agna_ritual_completion_checks_to_delete: Vec<u64> = ctx.db.agna_ritual_completion_check().iter().map(|c| c.scheduled_id).collect();
+    let agna_ritual_completion_checks_to_delete: Vec<u64> = ctx
+        .db
+        .agna_ritual_completion_check()
+        .iter()
+        .map(|c| c.scheduled_id)
+        .collect();
     for scheduled_id in agna_ritual_completion_checks_to_delete {
-        ctx.db.agna_ritual_completion_check().scheduled_id().delete(&scheduled_id);
+        ctx.db
+            .agna_ritual_completion_check()
+            .scheduled_id()
+            .delete(&scheduled_id);
         agna_ritual_completion_count += 1;
     }
-    
+
     // Clean up Agna Phase 2 tables
     let mut agna_summoning_spawner_count = 0;
-    let agna_summoning_spawners_to_delete: Vec<u64> = ctx.db.agna_summoning_circle_spawner().iter().map(|s| s.scheduled_id).collect();
+    let agna_summoning_spawners_to_delete: Vec<u64> = ctx
+        .db
+        .agna_summoning_circle_spawner()
+        .iter()
+        .map(|s| s.scheduled_id)
+        .collect();
     for scheduled_id in agna_summoning_spawners_to_delete {
-        ctx.db.agna_summoning_circle_spawner().scheduled_id().delete(&scheduled_id);
+        ctx.db
+            .agna_summoning_circle_spawner()
+            .scheduled_id()
+            .delete(&scheduled_id);
         agna_summoning_spawner_count += 1;
     }
-    
+
     let mut agna_target_switch_count = 0;
-    let agna_target_switch_schedulers_to_delete: Vec<u64> = ctx.db.agna_target_switch_scheduler().iter().map(|s| s.scheduled_id).collect();
+    let agna_target_switch_schedulers_to_delete: Vec<u64> = ctx
+        .db
+        .agna_target_switch_scheduler()
+        .iter()
+        .map(|s| s.scheduled_id)
+        .collect();
     for scheduled_id in agna_target_switch_schedulers_to_delete {
-        ctx.db.agna_target_switch_scheduler().scheduled_id().delete(&scheduled_id);
+        ctx.db
+            .agna_target_switch_scheduler()
+            .scheduled_id()
+            .delete(&scheduled_id);
         agna_target_switch_count += 1;
     }
-    
+
     let mut agna_phase2_flamethrower_count = 0;
-    let agna_phase2_flamethrower_schedulers_to_delete: Vec<u64> = ctx.db.agna_phase2_flamethrower_scheduler().iter().map(|s| s.scheduled_id).collect();
+    let agna_phase2_flamethrower_schedulers_to_delete: Vec<u64> = ctx
+        .db
+        .agna_phase2_flamethrower_scheduler()
+        .iter()
+        .map(|s| s.scheduled_id)
+        .collect();
     for scheduled_id in agna_phase2_flamethrower_schedulers_to_delete {
-        ctx.db.agna_phase2_flamethrower_scheduler().scheduled_id().delete(&scheduled_id);
+        ctx.db
+            .agna_phase2_flamethrower_scheduler()
+            .scheduled_id()
+            .delete(&scheduled_id);
         agna_phase2_flamethrower_count += 1;
     }
-    
+
     // Clean up Agna last pattern tracking
     let mut agna_last_pattern_count = 0;
-    let agna_last_patterns_to_delete: Vec<u32> = ctx.db.boss_agna_last_patterns().iter().map(|p| p.monster_id).collect();
+    let agna_last_patterns_to_delete: Vec<u32> = ctx
+        .db
+        .boss_agna_last_patterns()
+        .iter()
+        .map(|p| p.monster_id)
+        .collect();
     for monster_id in agna_last_patterns_to_delete {
-        ctx.db.boss_agna_last_patterns().monster_id().delete(&monster_id);
+        ctx.db
+            .boss_agna_last_patterns()
+            .monster_id()
+            .delete(&monster_id);
         agna_last_pattern_count += 1;
     }
-    
+
     log::info!("ResetWorld: Cleaned up {} Agna magic circles, {} fire orb schedulers, {} delayed orb schedulers, {} flamethrower schedulers, {} candle spawns, {} candle schedulers, {} candle bolt schedulers, {} ritual completion checks, {} summoning spawners, {} target switch schedulers, {} phase 2 flamethrower schedulers, and {} last pattern records", 
               agna_magic_circle_count, agna_fire_orb_scheduler_count, agna_delayed_orb_scheduler_count, agna_flamethrower_scheduler_count, agna_candle_spawn_count, agna_candle_scheduler_count, agna_candle_bolt_scheduler_count, agna_ritual_completion_count, agna_summoning_spawner_count, agna_target_switch_count, agna_phase2_flamethrower_count, agna_last_pattern_count);
-    
+
     // 17. Clean up lore scroll pickup records
     crate::lorescrolls_defs::clear_lore_scroll_pickups(ctx);
-    
+
     // Note: Curse clearing is handled separately - only on defeat (in damage_player), not on victory
     // Note: Monster spawning will be rescheduled when the first player joins
     // This ensures spawning only occurs when players are present
-    
+
     log::info!("ResetWorld: Game world reset completed successfully");
 }
 
@@ -319,14 +541,12 @@ pub fn reset_world(ctx: &ReducerContext) {
 #[reducer]
 pub fn cleanup_game_state(ctx: &ReducerContext) {
     // Clean up all monster states
-    let monster_ids: Vec<u32> = ctx.db.monsters().iter()
-        .map(|m| m.monster_id)
-        .collect();
-    
+    let monster_ids: Vec<u32> = ctx.db.monsters().iter().map(|m| m.monster_id).collect();
+
     for monster_id in monster_ids {
         // Clean up AI schedules
         crate::monster_ai_defs::cleanup_monster_ai_schedules(ctx, monster_id);
-        
+
         // Clean up boss specific attacks/states
         crate::boss_ender_defs::cleanup_ender_scythe_schedules(ctx, monster_id);
         crate::boss_agna_defs::cleanup_agna_ai_schedules(ctx, monster_id);
@@ -337,16 +557,25 @@ pub fn cleanup_game_state(ctx: &ReducerContext) {
     }
 
     // Clean up all active attacks
-    let active_attack_ids: Vec<u64> = ctx.db.active_monster_attacks().iter()
+    let active_attack_ids: Vec<u64> = ctx
+        .db
+        .active_monster_attacks()
+        .iter()
         .map(|a| a.active_monster_attack_id)
         .collect();
 
     for attack_id in active_attack_ids {
-        ctx.db.active_monster_attacks().active_monster_attack_id().delete(&attack_id);
+        ctx.db
+            .active_monster_attacks()
+            .active_monster_attack_id()
+            .delete(&attack_id);
     }
 
     // Clean up monster spawners (including zombies)
-    let spawner_ids: Vec<u64> = ctx.db.monster_spawners().iter()
+    let spawner_ids: Vec<u64> = ctx
+        .db
+        .monster_spawners()
+        .iter()
         .map(|s| s.scheduled_id)
         .collect();
 
@@ -355,12 +584,24 @@ pub fn cleanup_game_state(ctx: &ReducerContext) {
     }
 
     // Clean up boss pattern states
-    ctx.db.boss_ender_last_patterns().iter()
-        .for_each(|p| { ctx.db.boss_ender_last_patterns().monster_id().delete(&p.monster_id); });
-    ctx.db.boss_simon_last_patterns().iter()
-        .for_each(|p| { ctx.db.boss_simon_last_patterns().monster_id().delete(&p.monster_id); });
-    ctx.db.boss_agna_last_patterns().iter()
-        .for_each(|p| { ctx.db.boss_agna_last_patterns().monster_id().delete(&p.monster_id); });
-        
+    ctx.db.boss_ender_last_patterns().iter().for_each(|p| {
+        ctx.db
+            .boss_ender_last_patterns()
+            .monster_id()
+            .delete(&p.monster_id);
+    });
+    ctx.db.boss_simon_last_patterns().iter().for_each(|p| {
+        ctx.db
+            .boss_simon_last_patterns()
+            .monster_id()
+            .delete(&p.monster_id);
+    });
+    ctx.db.boss_agna_last_patterns().iter().for_each(|p| {
+        ctx.db
+            .boss_agna_last_patterns()
+            .monster_id()
+            .delete(&p.monster_id);
+    });
+
     log::info!("Cleaned up all monster states and attacks");
 }

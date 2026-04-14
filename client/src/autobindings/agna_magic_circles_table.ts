@@ -3,106 +3,25 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
-import { AgnaMagicCircle } from "./agna_magic_circle_type";
-import { DbVector2 as __DbVector2 } from "./db_vector_2_type";
+  TypeBuilder as __TypeBuilder,
+  t as __t,
+  type AlgebraicTypeType as __AlgebraicTypeType,
+  type Infer as __Infer,
+} from "spacetimedb";
+import {
+  DbVector2,
+} from "./types";
 
-import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
 
-/**
- * Table handle for the table `agna_magic_circles`.
- *
- * Obtain a handle from the [`agnaMagicCircles`] property on [`RemoteTables`],
- * like `ctx.db.agnaMagicCircles`.
- *
- * Users are encouraged not to explicitly reference this type,
- * but to directly chain method calls,
- * like `ctx.db.agnaMagicCircles.on_insert(...)`.
- */
-export class AgnaMagicCirclesTableHandle {
-  tableCache: TableCache<AgnaMagicCircle>;
-
-  constructor(tableCache: TableCache<AgnaMagicCircle>) {
-    this.tableCache = tableCache;
-  }
-
-  count(): number {
-    return this.tableCache.count();
-  }
-
-  iter(): Iterable<AgnaMagicCircle> {
-    return this.tableCache.iter();
-  }
-  /**
-   * Access to the `circleId` unique index on the table `agna_magic_circles`,
-   * which allows point queries on the field of the same name
-   * via the [`AgnaMagicCirclesCircleIdUnique.find`] method.
-   *
-   * Users are encouraged not to explicitly reference this type,
-   * but to directly chain method calls,
-   * like `ctx.db.agnaMagicCircles.circleId().find(...)`.
-   *
-   * Get a handle on the `circleId` unique index on the table `agna_magic_circles`.
-   */
-  circleId = {
-    // Find the subscribed row whose `circleId` column value is equal to `col_val`,
-    // if such a row is present in the client cache.
-    find: (col_val: bigint): AgnaMagicCircle | undefined => {
-      for (let row of this.tableCache.iter()) {
-        if (deepEqual(row.circleId, col_val)) {
-          return row;
-        }
-      }
-    },
-  };
-
-  onInsert = (cb: (ctx: EventContext, row: AgnaMagicCircle) => void) => {
-    return this.tableCache.onInsert(cb);
-  }
-
-  removeOnInsert = (cb: (ctx: EventContext, row: AgnaMagicCircle) => void) => {
-    return this.tableCache.removeOnInsert(cb);
-  }
-
-  onDelete = (cb: (ctx: EventContext, row: AgnaMagicCircle) => void) => {
-    return this.tableCache.onDelete(cb);
-  }
-
-  removeOnDelete = (cb: (ctx: EventContext, row: AgnaMagicCircle) => void) => {
-    return this.tableCache.removeOnDelete(cb);
-  }
-
-  // Updates are only defined for tables with primary keys.
-  onUpdate = (cb: (ctx: EventContext, oldRow: AgnaMagicCircle, newRow: AgnaMagicCircle) => void) => {
-    return this.tableCache.onUpdate(cb);
-  }
-
-  removeOnUpdate = (cb: (ctx: EventContext, onRow: AgnaMagicCircle, newRow: AgnaMagicCircle) => void) => {
-    return this.tableCache.removeOnUpdate(cb);
-  }}
+export default __t.row({
+  circleId: __t.u64().primaryKey().name("circle_id"),
+  bossMonsterId: __t.u32().name("boss_monster_id"),
+  targetPlayerId: __t.u32().name("target_player_id"),
+  circleIndex: __t.u32().name("circle_index"),
+  initialRotation: __t.f32().name("initial_rotation"),
+  ticksElapsed: __t.u32().name("ticks_elapsed"),
+  get position() {
+    return DbVector2;
+  },
+});

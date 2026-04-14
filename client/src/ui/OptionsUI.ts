@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import * as Phaser from 'phaser';
 import { getMusicVolume, setMusicVolume, getSoundVolume, setSoundVolume, initializeGlobalVolumes } from '../managers/VolumeSettings';
 
 // Settings interface for localStorage

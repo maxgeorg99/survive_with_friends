@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import * as Phaser from 'phaser';
 import { EventContext, AgnaMagicCircle, AgnaCandleSpawn, ActiveMonsterAttack, MonsterAttackType, Monsters, AiState, Player, AgnaSummoningCircleSpawner } from '../autobindings';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 

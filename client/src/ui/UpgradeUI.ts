@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import * as Phaser from 'phaser';
 import { UpgradeOptionData, UpgradeType } from '../autobindings';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { ChooseUpgrade } from '../autobindings';

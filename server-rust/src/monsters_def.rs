@@ -1,8 +1,14 @@
-use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp, ScheduleAt, SpacetimeType, rand::Rng};
-use crate::{DbVector2, MonsterType, MAX_MONSTERS, WORLD_SIZE, DELTA_TIME, 
-           get_world_cell_from_position, spatial_hash_collision_checker,
-           WORLD_CELL_MASK, WORLD_CELL_BIT_SHIFT, WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT, config, player, game_state, bestiary, ActiveAttack, active_attacks, entity, account};
 use crate::monster_ai_defs::AIState;
+use crate::{
+    account, active_attacks, bestiary, config, entity, game_state, get_world_cell_from_position,
+    player, spatial_hash_collision_checker, ActiveAttack, DbVector2, MonsterType, DELTA_TIME,
+    MAX_MONSTERS, WORLD_CELL_BIT_SHIFT, WORLD_CELL_MASK, WORLD_GRID_HEIGHT, WORLD_GRID_WIDTH,
+    WORLD_SIZE,
+};
+use spacetimedb::{
+    rand::Rng, reducer, table, Identity, ReducerContext, ScheduleAt, SpacetimeType, Table,
+    Timestamp,
+};
 use std::collections::HashMap;
 use std::time::Duration;
 
@@ -10,7 +16,7 @@ use std::time::Duration;
 const VOID_CHEST_SPAWN_CHANCE_DENOMINATOR: u32 = 400; // 0.5% chance (1 in 200)
 
 // Shiny monster constants
-const SHINY_SPAWN_CHANCE_DENOMINATOR: u32 = 100; 
+const SHINY_SPAWN_CHANCE_DENOMINATOR: u32 = 100;
 const SHINY_SCALE_MULTIPLIER: f32 = 1.5; // Shiny monsters are 50% larger
 const SHINY_HP_MULTIPLIER: f32 = 10.0; // Shiny monsters have 10x HP
 const SHINY_ATTACK_MULTIPLIER: f32 = 2.0; // Shiny monsters have 2x attack
@@ -19,7 +25,7 @@ const SHINY_MAX_RADIUS: f32 = 128.0; // Maximum radius for shiny monsters
 
 // Cursed monster constants
 const CURSED_SPAWN_CHANCE_DENOMINATOR: u32 = 10; // 1 in 10 chance (10%) for cursed monsters
-const CURSED_SCALE_MULTIPLIER: f32 = 1.2; // Cursed monsters are 20% larger    
+const CURSED_SCALE_MULTIPLIER: f32 = 1.2; // Cursed monsters are 20% larger
 const CURSED_HP_MULTIPLIER: f32 = 5.0; // Cursed monsters have 5x HP
 const CURSED_ATTACK_MULTIPLIER: f32 = 2.0; // Cursed monsters have 2x attack
 const CURSED_SPEED_MULTIPLIER: f32 = 1.3; // Cursed monsters are 30% faster
@@ -29,7 +35,7 @@ const CURSED_MAX_RADIUS: f32 = 128.0; // Maximum radius for cursed monsters
 // VoidChests still have a fixed 0.5% spawn chance regardless of tier
 
 // Main monsters table
-#[table(name = monsters, public)]
+#[table(accessor = monsters, public)]
 #[derive(Clone)]
 pub struct Monsters {
     #[primary_key]
@@ -44,7 +50,7 @@ pub struct Monsters {
     pub atk: f32,
     pub speed: f32,
     pub target_player_id: u32,
-    pub ai_state: AIState,  // AI state for boss behaviors
+    pub ai_state: AIState, // AI state for boss behaviors
     // entity attributes
     pub radius: f32,
     pub spawn_position: DbVector2,
@@ -52,7 +58,7 @@ pub struct Monsters {
 
 // Monster position/boid table
 #[derive(Clone)]
-#[table(name = monsters_boid, public)]
+#[table(accessor = monsters_boid, public)]
 pub struct MonsterBoid {
     #[primary_key]
     pub monster_id: u32,
@@ -60,7 +66,7 @@ pub struct MonsterBoid {
 }
 
 // Timer table for spawning monsters
-#[table(name = monster_spawn_timer, scheduled(pre_spawn_monster_wave), public)]
+#[table(accessor = monster_spawn_timer, scheduled(pre_spawn_monster_wave), public)]
 pub struct MonsterSpawnTimer {
     #[primary_key]
     #[auto_inc]
@@ -69,43 +75,41 @@ pub struct MonsterSpawnTimer {
 }
 
 // New table for monster spawners (scheduled)
-#[table(name = monster_spawners, scheduled(spawn_monster), public)]
+#[table(accessor = monster_spawners, scheduled(spawn_monster), public)]
 pub struct MonsterSpawners {
     #[primary_key]
     #[auto_inc]
     pub scheduled_id: u64,
-    
-    pub position: DbVector2,          // Where the monster will spawn
-    pub monster_type: MonsterType,    // The type of monster to spawn
-    pub scheduled_at: ScheduleAt,     // When the monster will be spawned
+
+    pub position: DbVector2,       // Where the monster will spawn
+    pub monster_type: MonsterType, // The type of monster to spawn
+    pub scheduled_at: ScheduleAt,  // When the monster will be spawned
 }
 
 // Table to track which monsters have been hit by which attacks
-#[table(name = monster_damage, public)]
+#[table(accessor = monster_damage, public)]
 pub struct MonsterDamage {
     #[primary_key]
     #[auto_inc]
     pub damage_id: u32,
-    
+
     #[index(btree)]
-    pub monster_id: u32,       // The monster that was hit
+    pub monster_id: u32, // The monster that was hit
 
     #[index(btree)]
     pub attack_entity_id: u32, // The attack entity that hit the monster
 }
 
 // Scheduled table for monster hit cleanup
-#[table(name = monster_hit_cleanup, scheduled(cleanup_monster_hit_record), public)]
+#[table(accessor = monster_hit_cleanup, scheduled(cleanup_monster_hit_record), public)]
 pub struct MonsterHitCleanup {
     #[primary_key]
     #[auto_inc]
     pub scheduled_id: u64,
-    
-    pub damage_id: u32,        // The damage record to clean up
+
+    pub damage_id: u32,           // The damage record to clean up
     pub scheduled_at: ScheduleAt, // When to clean up the record
 }
-
-
 
 // TODO: Placeholder types for systems not yet ported
 // These will be replaced when we port the attacks and other systems
@@ -129,12 +133,16 @@ pub fn get_collision_cache() -> &'static mut crate::collision::CollisionCache {
 
 #[reducer]
 pub fn pre_spawn_monster_wave(ctx: &ReducerContext, _timer: MonsterSpawnTimer) {
-    if ctx.sender != ctx.identity() {
+    if ctx.sender() != ctx.identity() {
         panic!("Reducer PreSpawnMonsterWave may not be invoked by clients, only via scheduling.");
     }
 
     // Get wave size
-    let config = ctx.db.config().id().find(&0)
+    let config = ctx
+        .db
+        .config()
+        .id()
+        .find(&0)
         .expect("PreSpawnMonsterWave: Could not find game configuration!");
     let wave_size = config.monster_wave_size;
 
@@ -149,7 +157,7 @@ pub fn pre_spawn_monster_wave(ctx: &ReducerContext, _timer: MonsterSpawnTimer) {
 }
 
 pub fn pre_spawn_monster(ctx: &ReducerContext, _timer: &MonsterSpawnTimer) {
-    if ctx.sender != ctx.identity() {
+    if ctx.sender() != ctx.identity() {
         panic!("Reducer PreSpawnMonster may not be invoked by clients, only via scheduling.");
     }
 
@@ -159,11 +167,15 @@ pub fn pre_spawn_monster(ctx: &ReducerContext, _timer: &MonsterSpawnTimer) {
         //Log::info("PreSpawnMonster: No players online, skipping monster spawn.");
         return;
     }
-    
+
     // Get game configuration
-    let config = ctx.db.config().id().find(&0)
+    let config = ctx
+        .db
+        .config()
+        .id()
+        .find(&0)
         .expect("PreSpawnMonster: Could not find game configuration!");
-    
+
     // Check if boss fight is active - skip normal spawning during boss fights
     if let Some(game_state) = ctx.db.game_state().id().find(&0) {
         if game_state.boss_active || game_state.normal_spawning_paused {
@@ -171,20 +183,20 @@ pub fn pre_spawn_monster(ctx: &ReducerContext, _timer: &MonsterSpawnTimer) {
             return;
         }
     }
-    
+
     // Check if we're at monster capacity
     let monster_count = ctx.db.monsters().count();
     if monster_count >= config.max_monsters as u64 {
         //Log::info(&format!("PreSpawnMonster: At maximum monster capacity ({}/{}), skipping spawn.", monster_count, config.max_monsters));
         return;
     }
-    
+
     // Calculate current tier based on elapsed game time
     let current_tier = crate::monster_spawn_defs::calculate_current_tier(ctx);
-    
+
     // Get a random monster type using tier-based weights
     let mut rng = ctx.rng();
-    
+
     // 0.5% chance to spawn a rare VoidChest instead of regular monsters
     let rare_spawn_roll = rng.gen_range(1..=VOID_CHEST_SPAWN_CHANCE_DENOMINATOR);
     let monster_type = if rare_spawn_roll <= 1 {
@@ -194,20 +206,27 @@ pub fn pre_spawn_monster(ctx: &ReducerContext, _timer: &MonsterSpawnTimer) {
         // Regular monster spawn using tier-based weights (99.5% chance)
         crate::monster_spawn_defs::select_weighted_monster_type(ctx, current_tier)
     };
-    
+
     // Get monster stats from bestiary using the monster type as numerical ID
-    let bestiary_entry = ctx.db.bestiary().bestiary_id().find(&(monster_type.clone() as u32))
-        .expect(&format!("PreSpawnMonster: Could not find bestiary entry for monster type: {:?}", monster_type));
-    
+    let bestiary_entry = ctx
+        .db
+        .bestiary()
+        .bestiary_id()
+        .find(&(monster_type.clone() as u32))
+        .expect(&format!(
+            "PreSpawnMonster: Could not find bestiary entry for monster type: {:?}",
+            monster_type
+        ));
+
     // Calculate spawn position
     let mut position = if monster_type == MonsterType::VoidChest {
         // VoidChests spawn randomly across the entire map
         let margin = bestiary_entry.radius + 50.0; // Extra margin for safety
         let spawn_area_size = config.world_size as f32 - (2.0 * margin);
-        
+
         DbVector2::new(
             margin + (rng.gen::<f32>() * spawn_area_size),
-            margin + (rng.gen::<f32>() * spawn_area_size)
+            margin + (rng.gen::<f32>() * spawn_area_size),
         )
     } else {
         // Regular monsters spawn near players
@@ -215,39 +234,43 @@ pub fn pre_spawn_monster(ctx: &ReducerContext, _timer: &MonsterSpawnTimer) {
         let players: Vec<_> = ctx.db.player().iter().collect();
         let random_skip = (rng.gen::<f32>() * players.len() as f32) as usize;
         let target_player = &players[random_skip];
-        
+
         // Calculate spawn position near the player (random direction, within 300-800 pixel radius)
         let spawn_radius = 300.0 + (rng.gen::<f32>() * 501.0); // Distance from player
         let spawn_angle = rng.gen::<f32>() * std::f32::consts::PI * 2.0; // Random angle in radians
-        
+
         DbVector2::new(
             target_player.position.x + spawn_radius * spawn_angle.cos(),
-            target_player.position.y + spawn_radius * spawn_angle.sin()
+            target_player.position.y + spawn_radius * spawn_angle.sin(),
         )
     };
-    
+
     // Clamp to world boundaries using monster radius (safety check)
     let monster_radius = bestiary_entry.radius;
-    position.x = position.x.clamp(monster_radius, config.world_size as f32 - monster_radius);
-    position.y = position.y.clamp(monster_radius, config.world_size as f32 - monster_radius);
-    
+    position.x = position
+        .x
+        .clamp(monster_radius, config.world_size as f32 - monster_radius);
+    position.y = position
+        .y
+        .clamp(monster_radius, config.world_size as f32 - monster_radius);
+
     // Instead of immediately spawning the monster, schedule it for actual spawning
     // with a delay to give the player time to respond
     const PRE_SPAWN_DELAY_MS: u64 = 2000; // 2 seconds warning before monster spawns
-    
+
     ctx.db.monster_spawners().insert(MonsterSpawners {
         scheduled_id: 0,
         position,
         monster_type,
         scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(PRE_SPAWN_DELAY_MS)),
     });
-    
+
     //Log::info(&format!("PreSpawned {:?} monster for position ({}, {}) for player: {}. Will spawn in {}ms", monster_type, position.x, position.y, target_player.name, PRE_SPAWN_DELAY_MS));
 }
 
 #[reducer]
 pub fn spawn_monster(ctx: &ReducerContext, spawner: MonsterSpawners) {
-    if ctx.sender != ctx.identity() {
+    if ctx.sender() != ctx.identity() {
         panic!("Reducer SpawnMonster may not be invoked by clients, only via scheduling.");
     }
 
@@ -257,47 +280,62 @@ pub fn spawn_monster(ctx: &ReducerContext, spawner: MonsterSpawners) {
         //Log::info("SpawnMonster: No players online, skipping monster spawn.");
         return;
     }
-    
+
     // Get game configuration
-    let config = ctx.db.config().id().find(&0)
+    let config = ctx
+        .db
+        .config()
+        .id()
+        .find(&0)
         .expect("SpawnMonster: Could not find game configuration!");
-    
+
     // Check if we're at monster capacity (player could have spawned during delay)
     let monster_count = ctx.db.monsters().count();
-    if monster_count >= config.max_monsters as u64 && 
-               spawner.monster_type != MonsterType::BossEnderPhase1 && 
-       spawner.monster_type != MonsterType::BossEnderPhase2 &&
-       spawner.monster_type != MonsterType::BossAgnaPhase1 &&
-       spawner.monster_type != MonsterType::BossAgnaPhase2 {
+    if monster_count >= config.max_monsters as u64
+        && spawner.monster_type != MonsterType::BossEnderPhase1
+        && spawner.monster_type != MonsterType::BossEnderPhase2
+        && spawner.monster_type != MonsterType::BossAgnaPhase1
+        && spawner.monster_type != MonsterType::BossAgnaPhase2
+    {
         //Log::info(&format!("SpawnMonster: At maximum monster capacity ({}/{}), skipping spawn.", monster_count, config.max_monsters));
         return;
     }
-    
+
     // Get monster stats from bestiary using the monster type as numerical ID
-    let bestiary_entry = ctx.db.bestiary().bestiary_id().find(&(spawner.monster_type.clone() as u32))
-        .expect(&format!("SpawnMonster: Could not find bestiary entry for monster type: {:?}", spawner.monster_type.clone()));
-    
+    let bestiary_entry = ctx
+        .db
+        .bestiary()
+        .bestiary_id()
+        .find(&(spawner.monster_type.clone() as u32))
+        .expect(&format!(
+            "SpawnMonster: Could not find bestiary entry for monster type: {:?}",
+            spawner.monster_type.clone()
+        ));
+
     // Find the closest player to target
     let closest_player_id = get_closest_player(ctx, &spawner.position);
-    
+
     // Determine initial AI state based on monster type
-    let initial_ai_state = if spawner.monster_type == MonsterType::BossEnderPhase1 || 
-                              spawner.monster_type == MonsterType::BossEnderPhase2 {
+    let initial_ai_state = if spawner.monster_type == MonsterType::BossEnderPhase1
+        || spawner.monster_type == MonsterType::BossEnderPhase2
+    {
         AIState::BossEnderIdle
-    } else if spawner.monster_type == MonsterType::BossAgnaPhase1 ||
-              spawner.monster_type == MonsterType::BossAgnaPhase2 {
+    } else if spawner.monster_type == MonsterType::BossAgnaPhase1
+        || spawner.monster_type == MonsterType::BossAgnaPhase2
+    {
         AIState::BossAgnaIdle
-    } else if spawner.monster_type == MonsterType::BossSimonPhase1 ||
-              spawner.monster_type == MonsterType::BossSimonPhase2 {
+    } else if spawner.monster_type == MonsterType::BossSimonPhase1
+        || spawner.monster_type == MonsterType::BossSimonPhase2
+    {
         AIState::BossSimonIdle
     } else if spawner.monster_type == MonsterType::VoidChest {
         AIState::Stationary
     } else if spawner.monster_type == MonsterType::EnderClaw {
-        AIState::Default  // EnderClaws use normal AI but are fast and aggressive
+        AIState::Default // EnderClaws use normal AI but are fast and aggressive
     } else {
         AIState::Default
     };
-    
+
     // Determine monster variant (priority: shiny > cursed > default)
     let is_shiny = should_spawn_as_shiny(ctx, &spawner.monster_type);
     let is_cursed = if !is_shiny {
@@ -305,7 +343,7 @@ pub fn spawn_monster(ctx: &ReducerContext, spawner: MonsterSpawners) {
     } else {
         false // Can't be both shiny and cursed
     };
-    
+
     let variant = if is_shiny {
         crate::MonsterVariant::Shiny
     } else if is_cursed {
@@ -313,51 +351,88 @@ pub fn spawn_monster(ctx: &ReducerContext, spawner: MonsterSpawners) {
     } else {
         crate::MonsterVariant::Default
     };
-    
+
     // Apply variant modifiers (shiny, cursed, or default)
-    let (mut final_hp, mut final_max_hp, mut final_atk, mut final_speed, final_radius) = if is_shiny {
-        apply_shiny_modifiers(bestiary_entry.max_hp, bestiary_entry.max_hp, bestiary_entry.atk, bestiary_entry.speed, bestiary_entry.radius)
+    let (mut final_hp, mut final_max_hp, mut final_atk, mut final_speed, final_radius) = if is_shiny
+    {
+        apply_shiny_modifiers(
+            bestiary_entry.max_hp,
+            bestiary_entry.max_hp,
+            bestiary_entry.atk,
+            bestiary_entry.speed,
+            bestiary_entry.radius,
+        )
     } else if is_cursed {
-        apply_cursed_modifiers(bestiary_entry.max_hp, bestiary_entry.max_hp, bestiary_entry.atk, bestiary_entry.speed, bestiary_entry.radius)
+        apply_cursed_modifiers(
+            bestiary_entry.max_hp,
+            bestiary_entry.max_hp,
+            bestiary_entry.atk,
+            bestiary_entry.speed,
+            bestiary_entry.radius,
+        )
     } else {
-        (bestiary_entry.max_hp, bestiary_entry.max_hp, bestiary_entry.atk, bestiary_entry.speed, bestiary_entry.radius)
+        (
+            bestiary_entry.max_hp,
+            bestiary_entry.max_hp,
+            bestiary_entry.atk,
+            bestiary_entry.speed,
+            bestiary_entry.radius,
+        )
     };
-    
+
     // Apply curse multipliers for non-boss, non-structure monsters
-    let is_boss = matches!(spawner.monster_type, 
-        MonsterType::BossEnderPhase1 | MonsterType::BossEnderPhase2 |
-        MonsterType::BossAgnaPhase1 | MonsterType::BossAgnaPhase2);
+    let is_boss = matches!(
+        spawner.monster_type,
+        MonsterType::BossEnderPhase1
+            | MonsterType::BossEnderPhase2
+            | MonsterType::BossAgnaPhase1
+            | MonsterType::BossAgnaPhase2
+    );
     let is_structure = crate::structure_defs::is_structure_type(&spawner.monster_type);
-    
+
     if !is_boss && !is_structure {
         // Apply curse effects if curses are active
         if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::MonsterMoreHp) {
             final_hp = (final_hp as f32 * 1.5) as u32;
             final_max_hp = (final_max_hp as f32 * 1.5) as u32;
         }
-        
-        if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::MonsterMoreDamage) {
+
+        if crate::curses_defs::is_curse_active(
+            ctx,
+            crate::curses_defs::CurseType::MonsterMoreDamage,
+        ) {
             final_atk *= 2.0;
         }
-        
-        if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::MonsterMoreSpeed) {
+
+        if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::MonsterMoreSpeed)
+        {
             final_speed *= 1.2;
         }
     }
-    
+
     // Apply boss stat modification curses if this is a boss monster
-    if spawner.monster_type == MonsterType::BossEnderPhase1 || spawner.monster_type == MonsterType::BossAgnaPhase1 {
+    if spawner.monster_type == MonsterType::BossEnderPhase1
+        || spawner.monster_type == MonsterType::BossAgnaPhase1
+    {
         // Apply DeadlierBosses curse modifications
         if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::DeadlierBosses) {
             final_hp = (final_hp as f32 * 2.0) as u32; // 2x HP
             final_max_hp = (final_max_hp as f32 * 2.0) as u32; // 2x max HP
             final_atk *= 1.5; // 1.5x damage
             final_speed *= 1.2; // 1.2x speed
-            log::info!("DeadlierBosses curse applied to Phase 1 boss - HP: {}, ATK: {:.1}, Speed: {:.1}", final_hp, final_atk, final_speed);
+            log::info!(
+                "DeadlierBosses curse applied to Phase 1 boss - HP: {}, ATK: {:.1}, Speed: {:.1}",
+                final_hp,
+                final_atk,
+                final_speed
+            );
         }
-        
+
         // Apply DeadlierBossesTwo curse modifications (stacks with first curse)
-        if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::DeadlierBossesTwo) {
+        if crate::curses_defs::is_curse_active(
+            ctx,
+            crate::curses_defs::CurseType::DeadlierBossesTwo,
+        ) {
             final_hp = (final_hp as f32 * 2.0) as u32; // Additional 2x HP
             final_max_hp = (final_max_hp as f32 * 2.0) as u32; // Additional 2x max HP
             final_atk *= 1.5; // Additional 1.5x damage
@@ -385,10 +460,10 @@ pub fn spawn_monster(ctx: &ReducerContext, spawner: MonsterSpawners) {
         final_hp = (final_hp as f32 * scaling_multiplier) as u32; // 1.5x HP per Scaling curse
         final_max_hp = (final_max_hp as f32 * scaling_multiplier) as u32; // 1.5x max HP per Scaling curse
         final_atk *= scaling_multiplier; // 1.5x damage per Scaling curse
-        // Speed stays the same (1.0x) as requested
+                                         // Speed stays the same (1.0x) as requested
         log::info!("Scaling curse applied to monster ({} curses active) - HP: {}, ATK: {:.1}, Speed: {:.1}", scaling_curse_count, final_hp, final_atk, final_speed);
     }
-    
+
     // Create the monster
     let monster_opt = ctx.db.monsters().insert(Monsters {
         monster_id: 0,
@@ -403,7 +478,7 @@ pub fn spawn_monster(ctx: &ReducerContext, spawner: MonsterSpawners) {
         spawn_position: spawner.position.clone(),
         ai_state: initial_ai_state,
     });
-    
+
     // Log shiny monster spawn
     if is_shiny {
         log::info!("SHINY MONSTER SPAWNED! Type: {:?}, ID: {}, HP: {}/{}, ATK: {:.1}, Speed: {:.1}, Radius: {:.1}", 
@@ -416,24 +491,29 @@ pub fn spawn_monster(ctx: &ReducerContext, spawner: MonsterSpawners) {
     let _boid_opt = ctx.db.monsters_boid().insert(MonsterBoid {
         monster_id: monster.monster_id,
         position: spawner.position,
-    }); 
+    });
 
     //Log::info(&format!("Spawned {:?} monster. Total monsters: {}", spawner.monster_type, ctx.db.monsters().count()));
-    
+
     // If this is a boss monster, update the game state and initialize AI
-    if spawner.monster_type.clone() == MonsterType::BossEnderPhase1 || 
-       spawner.monster_type.clone() == MonsterType::BossEnderPhase2 ||
-       spawner.monster_type.clone() == MonsterType::BossAgnaPhase1 ||
-       spawner.monster_type.clone() == MonsterType::BossAgnaPhase2 ||
-       spawner.monster_type.clone() == MonsterType::BossSimonPhase1 ||
-       spawner.monster_type.clone() == MonsterType::BossSimonPhase2 {
-        log::info!("Boss monster of type {:?} created with ID {}", spawner.monster_type, monster.monster_id);
+    if spawner.monster_type.clone() == MonsterType::BossEnderPhase1
+        || spawner.monster_type.clone() == MonsterType::BossEnderPhase2
+        || spawner.monster_type.clone() == MonsterType::BossAgnaPhase1
+        || spawner.monster_type.clone() == MonsterType::BossAgnaPhase2
+        || spawner.monster_type.clone() == MonsterType::BossSimonPhase1
+        || spawner.monster_type.clone() == MonsterType::BossSimonPhase2
+    {
+        log::info!(
+            "Boss monster of type {:?} created with ID {}",
+            spawner.monster_type,
+            monster.monster_id
+        );
         crate::boss_system::update_boss_monster_id(ctx, monster.monster_id);
-        
+
         // Initialize boss AI
         crate::monster_ai_defs::initialize_boss_ai(ctx, monster.monster_id);
     }
-    
+
     // If this is an Imp, start its attack schedule
     if spawner.monster_type == MonsterType::Imp {
         crate::monster_attacks_def::start_imp_attack_schedule(ctx, monster.monster_id);
@@ -443,13 +523,13 @@ pub fn spawn_monster(ctx: &ReducerContext, spawner: MonsterSpawners) {
 pub fn get_closest_player(ctx: &ReducerContext, position: &DbVector2) -> u32 {
     let mut closest_player_id = 0;
     let mut closest_distance = f32::MAX;
-    
+
     for player in ctx.db.player().iter() {
         // Calculate distance to this player
         let dx = player.position.x - position.x;
         let dy = player.position.y - position.y;
         let distance_squared = dx * dx + dy * dy;
-        
+
         // Update closest player if this one is closer
         if distance_squared < closest_distance {
             closest_distance = distance_squared;
@@ -464,21 +544,26 @@ pub fn get_closest_player(ctx: &ReducerContext, position: &DbVector2) -> u32 {
 // Method to schedule monster spawning - called from Init in Lib.cs
 pub fn schedule_monster_spawning(ctx: &ReducerContext) {
     log::info!("Scheduling monster spawning...");
-    
+
     // Schedule monster spawning every 1.5 seconds (increased spawn rate for better action)
     ctx.db.monster_spawn_timer().insert(MonsterSpawnTimer {
         scheduled_id: 0,
         scheduled_at: ScheduleAt::Interval(Duration::from_millis(1500).into()),
     });
-    
+
     // Schedule guaranteed VoidChest spawns
     crate::loot_capsule_defs::schedule_guaranteed_void_chest_spawns(ctx);
-    
+
     log::info!("Monster spawning scheduled successfully");
 }
 
 // Helper function to create monster spawner entries from other modules
-pub fn create_monster_spawner(ctx: &ReducerContext, position: DbVector2, monster_type: MonsterType, scheduled_at: ScheduleAt) {
+pub fn create_monster_spawner(
+    ctx: &ReducerContext,
+    position: DbVector2,
+    monster_type: MonsterType,
+    scheduled_at: ScheduleAt,
+) {
     ctx.db.monster_spawners().insert(MonsterSpawners {
         scheduled_id: 0,
         position,
@@ -500,15 +585,16 @@ pub fn process_monster_movements(ctx: &ReducerContext) {
 fn move_monsters(ctx: &ReducerContext, cache: &mut crate::collision::CollisionCache) {
     for i in 0..cache.monster.cached_count_monsters {
         let i = i as usize;
-        
+
         // Get cached movement behavior
-        let movement_behavior = crate::monster_ai_defs::movement_behavior_from_u8(cache.monster.movement_behavior[i]);
-        
+        let movement_behavior =
+            crate::monster_ai_defs::movement_behavior_from_u8(cache.monster.movement_behavior[i]);
+
         // Check if monster should stand still
         if movement_behavior == crate::monster_ai_defs::MovementBehavior::StandStill {
             continue; // Skip movement for this monster
         }
-        
+
         let dist_x = cache.monster.target_x_monster[i] - cache.monster.pos_x_monster[i];
         let dist_y = cache.monster.target_y_monster[i] - cache.monster.pos_y_monster[i];
 
@@ -519,34 +605,46 @@ fn move_monsters(ctx: &ReducerContext, cache: &mut crate::collision::CollisionCa
         let norm_y = dist_y * inv_dist;
 
         let mut speed = cache.monster.speed_monster[i];
-        
+
         // Handle chase behavior (delegated to boss-specific modules)
         if movement_behavior == crate::monster_ai_defs::MovementBehavior::EnderChase {
             // Delegate chase behavior to the appropriate boss module
-            let should_continue_movement = crate::boss_ender_defs::handle_ender_boss_chase_movement(ctx, cache, i);
+            let should_continue_movement =
+                crate::boss_ender_defs::handle_ender_boss_chase_movement(ctx, cache, i);
             if !should_continue_movement {
                 continue; // Skip movement if chase handler says to stop
             }
-            
+
             // Update speed from cache (may have been modified by chase handler)
             speed = cache.monster.speed_monster[i];
         }
-        
+
         let move_x = norm_x * speed * DELTA_TIME;
         let move_y = norm_y * speed * DELTA_TIME;
 
         cache.monster.pos_x_monster[i] += move_x;
         cache.monster.pos_y_monster[i] += move_y;
 
-        cache.monster.pos_x_monster[i] = cache.monster.pos_x_monster[i].clamp(cache.monster.radius_monster[i], WORLD_SIZE as f32 - cache.monster.radius_monster[i]);
-        cache.monster.pos_y_monster[i] = cache.monster.pos_y_monster[i].clamp(cache.monster.radius_monster[i], WORLD_SIZE as f32 - cache.monster.radius_monster[i]);
+        cache.monster.pos_x_monster[i] = cache.monster.pos_x_monster[i].clamp(
+            cache.monster.radius_monster[i],
+            WORLD_SIZE as f32 - cache.monster.radius_monster[i],
+        );
+        cache.monster.pos_y_monster[i] = cache.monster.pos_y_monster[i].clamp(
+            cache.monster.radius_monster[i],
+            WORLD_SIZE as f32 - cache.monster.radius_monster[i],
+        );
     }
 
     // Clean up monster status
     for i in 0..cache.monster.cached_count_monsters {
         let i = i as usize;
         if cache.monster.target_id_monster[i] == -1 {
-            if let Some(monster) = ctx.db.monsters().monster_id().find(&cache.monster.keys_monster[i]) {
+            if let Some(monster) = ctx
+                .db
+                .monsters()
+                .monster_id()
+                .find(&cache.monster.keys_monster[i])
+            {
                 reassign_monster_target(ctx, monster);
             }
         }
@@ -562,7 +660,10 @@ fn calculate_monster_spatial_hash_grid(cache: &mut crate::collision::CollisionCa
     // Calculate the spatial hash grid
     for mid in 0..cache.monster.cached_count_monsters {
         let mid = mid as usize;
-        let grid_cell_key = get_world_cell_from_position(cache.monster.pos_x_monster[mid], cache.monster.pos_y_monster[mid]);
+        let grid_cell_key = get_world_cell_from_position(
+            cache.monster.pos_x_monster[mid],
+            cache.monster.pos_y_monster[mid],
+        );
         cache.monster.nexts_monster[mid] = cache.monster.heads_monster[grid_cell_key as usize];
         cache.monster.heads_monster[grid_cell_key as usize] = mid as i32;
         cache.monster.cell_monster[mid] = grid_cell_key as i32;
@@ -572,47 +673,63 @@ fn calculate_monster_spatial_hash_grid(cache: &mut crate::collision::CollisionCa
 fn populate_monster_cache(ctx: &ReducerContext, cache: &mut crate::collision::CollisionCache) {
     cache.monster.cached_count_monsters = 0;
     cache.monster.key_to_cache_index_monster.clear();
-    
+
     for monster in ctx.db.monsters().iter() {
         let idx = cache.monster.cached_count_monsters as usize;
-        
+
         cache.monster.keys_monster[idx] = monster.monster_id;
-        cache.monster.key_to_cache_index_monster.insert(monster.monster_id, cache.monster.cached_count_monsters as u32);
+        cache.monster.key_to_cache_index_monster.insert(
+            monster.monster_id,
+            cache.monster.cached_count_monsters as u32,
+        );
         cache.monster.radius_monster[idx] = monster.radius;
         cache.monster.speed_monster[idx] = monster.speed;
         cache.monster.atk_monster[idx] = monster.atk;
-        
+
         // Cache movement behavior based on AI state
-        let movement_behavior = crate::monster_ai_defs::get_movement_behavior_for_state(&monster.ai_state);
-        cache.monster.movement_behavior[idx] = crate::monster_ai_defs::movement_behavior_to_u8(movement_behavior);
-        
+        let movement_behavior =
+            crate::monster_ai_defs::get_movement_behavior_for_state(&monster.ai_state);
+        cache.monster.movement_behavior[idx] =
+            crate::monster_ai_defs::movement_behavior_to_u8(movement_behavior);
+
         // Cache whether monster can deal damage based on AI state
-        cache.monster.can_deal_damage[idx] = crate::monster_ai_defs::can_monster_deal_damage(&monster.ai_state);
-        
+        cache.monster.can_deal_damage[idx] =
+            crate::monster_ai_defs::can_monster_deal_damage(&monster.ai_state);
+
         //Structures and bosses have their weight set to 0.0 to prevent them from being pushed around
-        if monster.bestiary_id == MonsterType::VoidChest || 
-           monster.bestiary_id == MonsterType::BossEnderPhase1 || 
-           monster.bestiary_id == MonsterType::BossEnderPhase2 ||
-           monster.bestiary_id == MonsterType::BossAgnaPhase1 ||
-           monster.bestiary_id == MonsterType::BossAgnaPhase2 ||
-           monster.bestiary_id == MonsterType::AgnaCandle {
+        if monster.bestiary_id == MonsterType::VoidChest
+            || monster.bestiary_id == MonsterType::BossEnderPhase1
+            || monster.bestiary_id == MonsterType::BossEnderPhase2
+            || monster.bestiary_id == MonsterType::BossAgnaPhase1
+            || monster.bestiary_id == MonsterType::BossAgnaPhase2
+            || monster.bestiary_id == MonsterType::AgnaCandle
+        {
             cache.monster.push_ratio_monster[idx] = 0;
-        }
-        else {
+        } else {
             cache.monster.push_ratio_monster[idx] = 1;
         }
 
         let target_player_id = monster.target_player_id;
-        if cache.player.player_id_to_cache_index.contains_key(&target_player_id) {
+        if cache
+            .player
+            .player_id_to_cache_index
+            .contains_key(&target_player_id)
+        {
             cache.monster.target_id_monster[idx] = target_player_id as i32;
         } else {
             cache.monster.target_id_monster[idx] = -1;
         }
 
         if cache.monster.target_id_monster[idx] != -1 {
-            if let Some(&player_cache_idx) = cache.player.player_id_to_cache_index.get(&(target_player_id)) {
-                cache.monster.target_x_monster[idx] = cache.player.pos_x_player[player_cache_idx as usize];
-                cache.monster.target_y_monster[idx] = cache.player.pos_y_player[player_cache_idx as usize];
+            if let Some(&player_cache_idx) = cache
+                .player
+                .player_id_to_cache_index
+                .get(&(target_player_id))
+            {
+                cache.monster.target_x_monster[idx] =
+                    cache.player.pos_x_player[player_cache_idx as usize];
+                cache.monster.target_y_monster[idx] =
+                    cache.player.pos_y_player[player_cache_idx as usize];
             }
         } else {
             cache.monster.target_x_monster[idx] = cache.monster.pos_x_monster[idx];
@@ -623,7 +740,11 @@ fn populate_monster_cache(ctx: &ReducerContext, cache: &mut crate::collision::Co
     }
 
     for boid in ctx.db.monsters_boid().iter() {
-        if let Some(&monster_cache_idx) = cache.monster.key_to_cache_index_monster.get(&boid.monster_id) {
+        if let Some(&monster_cache_idx) = cache
+            .monster
+            .key_to_cache_index_monster
+            .get(&boid.monster_id)
+        {
             let idx = monster_cache_idx as usize;
             cache.monster.pos_x_monster[idx] = boid.position.x;
             cache.monster.pos_y_monster[idx] = boid.position.y;
@@ -638,11 +759,21 @@ fn populate_monster_cache(ctx: &ReducerContext, cache: &mut crate::collision::Co
 
 fn commit_monster_motion(ctx: &ReducerContext, cache: &mut crate::collision::CollisionCache) {
     for boid in ctx.db.monsters_boid().iter() {
-        if let Some(&monster_cache_idx) = cache.monster.key_to_cache_index_monster.get(&boid.monster_id) {
+        if let Some(&monster_cache_idx) = cache
+            .monster
+            .key_to_cache_index_monster
+            .get(&boid.monster_id)
+        {
             let idx = monster_cache_idx as usize;
             let mut boid_updated = boid;
-            boid_updated.position.x = cache.monster.pos_x_monster[idx].clamp(cache.monster.radius_monster[idx], WORLD_SIZE as f32 - cache.monster.radius_monster[idx]);
-            boid_updated.position.y = cache.monster.pos_y_monster[idx].clamp(cache.monster.radius_monster[idx], WORLD_SIZE as f32 - cache.monster.radius_monster[idx]);
+            boid_updated.position.x = cache.monster.pos_x_monster[idx].clamp(
+                cache.monster.radius_monster[idx],
+                WORLD_SIZE as f32 - cache.monster.radius_monster[idx],
+            );
+            boid_updated.position.y = cache.monster.pos_y_monster[idx].clamp(
+                cache.monster.radius_monster[idx],
+                WORLD_SIZE as f32 - cache.monster.radius_monster[idx],
+            );
 
             ctx.db.monsters_boid().monster_id().update(boid_updated);
         }
@@ -657,28 +788,32 @@ fn reassign_monster_target(ctx: &ReducerContext, monster: Monsters) {
     if player_count == 0 {
         return;
     }
-    
+
     // Choose a random player as the new target
     let mut rng = ctx.rng();
     let random_index = (rng.gen::<f32>() * player_count as f32) as usize;
     let new_target = &players[random_index];
-    
+
     // Update the monster with the new target
     let mut updated_monster = monster;
     updated_monster.target_player_id = new_target.player_id;
-    
+
     let cache = get_collision_cache();
-    if let Some(&monster_cache_idx) = cache.monster.key_to_cache_index_monster.get(&updated_monster.monster_id) {
+    if let Some(&monster_cache_idx) = cache
+        .monster
+        .key_to_cache_index_monster
+        .get(&updated_monster.monster_id)
+    {
         cache.monster.target_id_monster[monster_cache_idx as usize] = new_target.player_id as i32;
     }
-    
+
     ctx.db.monsters().monster_id().update(updated_monster);
 }
 
 // Helper method to process collisions between player attacks and monsters using spatial hash
 pub fn process_player_attack_monster_collisions_spatial_hash(ctx: &ReducerContext) {
     let cache = get_collision_cache();
-    
+
     for aid in 0..cache.attack.cached_count_attacks {
         let aid = aid as usize;
         let ax = cache.attack.pos_x_attack[aid];
@@ -720,7 +855,12 @@ pub fn process_player_attack_monster_collisions_spatial_hash(ctx: &ReducerContex
                     if spatial_hash_collision_checker(ax, ay, ar, mx, my, mr) {
                         // Get the active attack data
                         if current_attack_data.is_none() {
-                            if let Some(active_attack) = ctx.db.active_attacks().active_attack_id().find(&cache.attack.keys_attack[aid]) {
+                            if let Some(active_attack) = ctx
+                                .db
+                                .active_attacks()
+                                .active_attack_id()
+                                .find(&cache.attack.keys_attack[aid])
+                            {
                                 current_attack_data = Some(active_attack);
                             } else {
                                 mid = cache.monster.nexts_monster[mid_usize];
@@ -732,19 +872,27 @@ pub fn process_player_attack_monster_collisions_spatial_hash(ctx: &ReducerContex
                         active_attack_is_piercing = active_attack.piercing;
 
                         // Check if this monster has already been hit by this attack
-                        if has_monster_been_hit_by_attack(ctx, cache.monster.keys_monster[mid_usize], active_attack.entity_id) {
+                        if has_monster_been_hit_by_attack(
+                            ctx,
+                            cache.monster.keys_monster[mid_usize],
+                            active_attack.entity_id,
+                        ) {
                             mid = cache.monster.nexts_monster[mid_usize];
                             continue;
                         }
-                        
+
                         // Record the hit
-                        record_monster_hit_by_attack(ctx, cache.monster.keys_monster[mid_usize], active_attack.entity_id);
-                        
+                        record_monster_hit_by_attack(
+                            ctx,
+                            cache.monster.keys_monster[mid_usize],
+                            active_attack.entity_id,
+                        );
+
                         // Apply damage to monster using the active attack's damage value
                         let damage = active_attack.damage;
                         cache.monster.damage_to_monster[mid_usize] += damage as f32;
                         attack_hit_monster = true;
-                        
+
                         // For non-piercing attacks, stop checking other monsters and destroy the attack
                         if !active_attack_is_piercing {
                             break;
@@ -765,16 +913,19 @@ pub fn process_player_attack_monster_collisions_spatial_hash(ctx: &ReducerContex
                 break;
             }
         }
-        
+
         // If the attack hit a monster and it's not piercing, remove the attack
         if attack_hit_monster && !active_attack_is_piercing {
             if let Some(active_attack) = current_attack_data {
                 // Delete the attack entity
                 ctx.db.entity().entity_id().delete(&active_attack.entity_id);
-                
+
                 // Delete the active attack record
-                ctx.db.active_attacks().active_attack_id().delete(&active_attack.active_attack_id);
-                
+                ctx.db
+                    .active_attacks()
+                    .active_attack_id()
+                    .delete(&active_attack.active_attack_id);
+
                 // Clean up any damage records for this attack
                 crate::attacks_def::cleanup_attack_damage_records(ctx, active_attack.entity_id);
             }
@@ -843,14 +994,23 @@ fn solve_monster_repulsion_spatial_hash(cache: &mut crate::collision::CollisionC
                     let monster_id_b = cache.monster.keys_monster[i_b_usize];
 
                     let monster_a_push_value = cache.monster.push_ratio_monster[i_a] * monster_id_a;
-                    let monster_b_push_value = cache.monster.push_ratio_monster[i_b_usize] * monster_id_b;
+                    let monster_b_push_value =
+                        cache.monster.push_ratio_monster[i_b_usize] * monster_id_b;
 
                     if monster_a_push_value > monster_b_push_value {
-                        cache.monster.pos_x_monster[i_a] = (cache.monster.pos_x_monster[i_a] + push_x).clamp(r_a, WORLD_SIZE as f32 - r_a);
-                        cache.monster.pos_y_monster[i_a] = (cache.monster.pos_y_monster[i_a] + push_y).clamp(r_a, WORLD_SIZE as f32 - r_a);
+                        cache.monster.pos_x_monster[i_a] = (cache.monster.pos_x_monster[i_a]
+                            + push_x)
+                            .clamp(r_a, WORLD_SIZE as f32 - r_a);
+                        cache.monster.pos_y_monster[i_a] = (cache.monster.pos_y_monster[i_a]
+                            + push_y)
+                            .clamp(r_a, WORLD_SIZE as f32 - r_a);
                     } else {
-                        cache.monster.pos_x_monster[i_b_usize] = (cache.monster.pos_x_monster[i_b_usize] - push_x).clamp(r_a, WORLD_SIZE as f32 - r_a);
-                        cache.monster.pos_y_monster[i_b_usize] = (cache.monster.pos_y_monster[i_b_usize] - push_y).clamp(r_a, WORLD_SIZE as f32 - r_a);
+                        cache.monster.pos_x_monster[i_b_usize] =
+                            (cache.monster.pos_x_monster[i_b_usize] - push_x)
+                                .clamp(r_a, WORLD_SIZE as f32 - r_a);
+                        cache.monster.pos_y_monster[i_b_usize] =
+                            (cache.monster.pos_y_monster[i_b_usize] - push_y)
+                                .clamp(r_a, WORLD_SIZE as f32 - r_a);
                     }
 
                     i_b = cache.monster.nexts_monster[i_b_usize];
@@ -861,17 +1021,26 @@ fn solve_monster_repulsion_spatial_hash(cache: &mut crate::collision::CollisionC
 }
 
 // Helper function to check if a monster has already been hit by an attack
-fn has_monster_been_hit_by_attack(ctx: &ReducerContext, monster_id: u32, attack_entity_id: u32) -> bool {
+fn has_monster_been_hit_by_attack(
+    ctx: &ReducerContext,
+    monster_id: u32,
+    attack_entity_id: u32,
+) -> bool {
     // First filter: Use the BTree index to efficiently find all damage records for this attack
-    let attack_damage_records: Vec<_> = ctx.db.monster_damage().attack_entity_id().filter(&attack_entity_id).collect();
-    
+    let attack_damage_records: Vec<_> = ctx
+        .db
+        .monster_damage()
+        .attack_entity_id()
+        .filter(&attack_entity_id)
+        .collect();
+
     // Second filter: Check if any of those records match our monster
     for damage in attack_damage_records {
         if damage.monster_id == monster_id {
             return true; // Found a record - this monster was hit by this attack
         }
     }
-    
+
     false // No matching record found
 }
 
@@ -883,22 +1052,22 @@ fn record_monster_hit_by_attack(ctx: &ReducerContext, monster_id: u32, attack_en
         monster_id,
         attack_entity_id,
     });
-    
+
     let damage_record = damage_record;
-    
+
     // Get cleanup delay from config
     let mut cleanup_delay = 500; // Default to 500ms if config not found
     if let Some(config) = ctx.db.config().id().find(&0) {
         cleanup_delay = config.monster_hit_cleanup_delay;
     }
-    
+
     // Schedule cleanup after the configured delay
     ctx.db.monster_hit_cleanup().insert(MonsterHitCleanup {
         scheduled_id: 0,
         damage_id: damage_record.damage_id,
         scheduled_at: ScheduleAt::Time(ctx.timestamp + Duration::from_millis(cleanup_delay as u64)),
     });
-    
+
     //Log::info(&format!("Recorded monster {} hit by attack {}, cleanup scheduled in {}ms", monster_id, attack_entity_id, cleanup_delay));
 }
 
@@ -921,68 +1090,71 @@ pub fn commit_monster_damage(ctx: &ReducerContext) -> bool {
 // Reducer to clean up a monster hit record
 #[reducer]
 pub fn cleanup_monster_hit_record(ctx: &ReducerContext, cleanup: MonsterHitCleanup) {
-    if ctx.sender != ctx.identity() {
+    if ctx.sender() != ctx.identity() {
         panic!("CleanupMonsterHitRecord may not be invoked by clients, only via scheduling.");
     }
-    
+
     // Delete the damage record
-    ctx.db.monster_damage().damage_id().delete(&cleanup.damage_id);
+    ctx.db
+        .monster_damage()
+        .damage_id()
+        .delete(&cleanup.damage_id);
 }
-
-
-
-
 
 // Debug reducer to spawn a VoidChest near the calling player
 #[reducer]
 pub fn spawn_debug_void_chest(ctx: &ReducerContext) {
     // Check admin access first
     crate::require_admin_access(ctx, "SpawnDebugVoidChest");
-    
+
     // Get the caller's identity
-    let caller_identity = ctx.sender;
-    
+    let caller_identity = ctx.sender();
+
     // Find the caller's account
     let account_opt = ctx.db.account().identity().find(&caller_identity);
     if account_opt.is_none() {
         log::error!("spawn_debug_void_chest: Account not found for caller");
         return;
     }
-    
+
     let account = account_opt.unwrap();
     if account.current_player_id == 0 {
         log::error!("spawn_debug_void_chest: Caller has no active player");
         return;
     }
-    
+
     // Find the player
     let player_opt = ctx.db.player().player_id().find(&account.current_player_id);
     if player_opt.is_none() {
         log::error!("spawn_debug_void_chest: Player not found for caller");
         return;
     }
-    
+
     let player = player_opt.unwrap();
-    
+
     // Get VoidChest stats from bestiary
-    let bestiary_entry_opt = ctx.db.bestiary().bestiary_id().find(&(MonsterType::VoidChest as u32));
+    let bestiary_entry_opt = ctx
+        .db
+        .bestiary()
+        .bestiary_id()
+        .find(&(MonsterType::VoidChest as u32));
     if bestiary_entry_opt.is_none() {
         log::error!("spawn_debug_void_chest: VoidChest not found in bestiary");
         return;
     }
-    
+
     let bestiary_entry = bestiary_entry_opt.unwrap();
-    
+
     // Calculate spawn position near the player (100-200 pixels away)
     let mut rng = ctx.rng();
     let spawn_distance = 100.0 + (rng.gen::<f32>() * 100.0); // 100-200 pixels from player
     let spawn_angle = rng.gen::<f32>() * std::f32::consts::PI * 2.0; // Random angle
-    
+
     let spawn_position = DbVector2::new(
         player.position.x + spawn_distance * spawn_angle.cos(),
-        player.position.y + spawn_distance * spawn_angle.sin()
+        player.position.y + spawn_distance * spawn_angle.sin(),
     );
-    
+
     // Get world boundaries from config
     let config = ctx.db.config().id().find(&0);
     let world_size = if let Some(config) = config {
@@ -990,14 +1162,18 @@ pub fn spawn_debug_void_chest(ctx: &ReducerContext) {
     } else {
         6400.0 // Default world size
     };
-    
+
     // Clamp to world boundaries
     let monster_radius = bestiary_entry.radius;
     let clamped_position = DbVector2::new(
-        spawn_position.x.clamp(monster_radius, world_size - monster_radius),
-        spawn_position.y.clamp(monster_radius, world_size - monster_radius)
+        spawn_position
+            .x
+            .clamp(monster_radius, world_size - monster_radius),
+        spawn_position
+            .y
+            .clamp(monster_radius, world_size - monster_radius),
     );
-    
+
     // Create the VoidChest monster directly
     let monster = ctx.db.monsters().insert(Monsters {
         monster_id: 0,
@@ -1012,13 +1188,13 @@ pub fn spawn_debug_void_chest(ctx: &ReducerContext) {
         spawn_position: clamped_position.clone(),
         ai_state: AIState::Stationary,
     });
-    
+
     // Create the boid for movement
     let _boid = ctx.db.monsters_boid().insert(MonsterBoid {
         monster_id: monster.monster_id,
         position: clamped_position,
     });
-    
+
     log::info!(
         "Debug: Spawned VoidChest (ID: {}) at position ({:.1}, {:.1}) for player {} ({})",
         monster.monster_id,
@@ -1029,19 +1205,25 @@ pub fn spawn_debug_void_chest(ctx: &ReducerContext) {
     );
 }
 
-
-
 // Function to determine if a monster should spawn as shiny (excludes bosses, VoidChests, EnderClaws, and structures)
 fn should_spawn_as_shiny(ctx: &ReducerContext, monster_type: &MonsterType) -> bool {
     // Never spawn bosses, VoidChests, EnderClaws, or structures as shiny
     match monster_type {
-        MonsterType::BossEnderPhase1 | MonsterType::BossEnderPhase2 | 
-        MonsterType::BossAgnaPhase1 | MonsterType::BossAgnaPhase2 |
-        MonsterType::VoidChest | MonsterType::EnderClaw |
-        MonsterType::Crate | MonsterType::Tree | MonsterType::Statue => {
-            log::debug!("{} excluded from shiny spawning", crate::monster_types_def::get_monster_type_name(monster_type));
+        MonsterType::BossEnderPhase1
+        | MonsterType::BossEnderPhase2
+        | MonsterType::BossAgnaPhase1
+        | MonsterType::BossAgnaPhase2
+        | MonsterType::VoidChest
+        | MonsterType::EnderClaw
+        | MonsterType::Crate
+        | MonsterType::Tree
+        | MonsterType::Statue => {
+            log::debug!(
+                "{} excluded from shiny spawning",
+                crate::monster_types_def::get_monster_type_name(monster_type)
+            );
             false
-        },
+        }
         _ => {
             // 1% chance for regular monsters to be shiny
             let mut rng = ctx.rng();
@@ -1052,39 +1234,58 @@ fn should_spawn_as_shiny(ctx: &ReducerContext, monster_type: &MonsterType) -> bo
 }
 
 // Function to apply shiny modifiers to monster stats
-fn apply_shiny_modifiers(hp: u32, max_hp: u32, atk: f32, speed: f32, radius: f32) -> (u32, u32, f32, f32, f32) {
+fn apply_shiny_modifiers(
+    hp: u32,
+    max_hp: u32,
+    atk: f32,
+    speed: f32,
+    radius: f32,
+) -> (u32, u32, f32, f32, f32) {
     let new_hp = (hp as f32 * SHINY_HP_MULTIPLIER) as u32;
     let new_max_hp = (max_hp as f32 * SHINY_HP_MULTIPLIER) as u32;
     let new_atk = atk * SHINY_ATTACK_MULTIPLIER;
     let new_speed = speed * SHINY_SPEED_MULTIPLIER;
     let scaled_radius = radius * SHINY_SCALE_MULTIPLIER;
     let new_radius = scaled_radius.min(SHINY_MAX_RADIUS);
-    
+
     // Log when radius is capped
     if scaled_radius > SHINY_MAX_RADIUS {
-        log::info!("Shiny monster radius capped: {:.1} -> {:.1} (base: {:.1})", 
-                  scaled_radius, new_radius, radius);
+        log::info!(
+            "Shiny monster radius capped: {:.1} -> {:.1} (base: {:.1})",
+            scaled_radius,
+            new_radius,
+            radius
+        );
     }
-    
+
     (new_hp, new_max_hp, new_atk, new_speed, new_radius)
 }
 
 // Function to determine if a monster should spawn as cursed (excludes bosses, VoidChests, EnderClaws, and structures)
 fn should_spawn_as_cursed(ctx: &ReducerContext, monster_type: &MonsterType) -> bool {
     // Only spawn cursed monsters if the CursedMonstersSpawn curse is active
-    if !crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::CursedMonstersSpawn) {
+    if !crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::CursedMonstersSpawn)
+    {
         return false;
     }
-    
+
     // Never spawn bosses, VoidChests, EnderClaws, or structures as cursed
     match monster_type {
-        MonsterType::BossEnderPhase1 | MonsterType::BossEnderPhase2 | 
-        MonsterType::BossAgnaPhase1 | MonsterType::BossAgnaPhase2 |
-        MonsterType::VoidChest | MonsterType::EnderClaw |
-        MonsterType::Crate | MonsterType::Tree | MonsterType::Statue => {
-            log::debug!("{} excluded from cursed spawning", crate::monster_types_def::get_monster_type_name(monster_type));
+        MonsterType::BossEnderPhase1
+        | MonsterType::BossEnderPhase2
+        | MonsterType::BossAgnaPhase1
+        | MonsterType::BossAgnaPhase2
+        | MonsterType::VoidChest
+        | MonsterType::EnderClaw
+        | MonsterType::Crate
+        | MonsterType::Tree
+        | MonsterType::Statue => {
+            log::debug!(
+                "{} excluded from cursed spawning",
+                crate::monster_types_def::get_monster_type_name(monster_type)
+            );
             false
-        },
+        }
         _ => {
             // 10% chance for regular monsters to be cursed
             let mut rng = ctx.rng();
@@ -1095,65 +1296,93 @@ fn should_spawn_as_cursed(ctx: &ReducerContext, monster_type: &MonsterType) -> b
 }
 
 // Function to apply cursed modifiers to monster stats
-fn apply_cursed_modifiers(hp: u32, max_hp: u32, atk: f32, speed: f32, radius: f32) -> (u32, u32, f32, f32, f32) {
+fn apply_cursed_modifiers(
+    hp: u32,
+    max_hp: u32,
+    atk: f32,
+    speed: f32,
+    radius: f32,
+) -> (u32, u32, f32, f32, f32) {
     let new_hp = (hp as f32 * CURSED_HP_MULTIPLIER) as u32;
     let new_max_hp = (max_hp as f32 * CURSED_HP_MULTIPLIER) as u32;
     let new_atk = atk * CURSED_ATTACK_MULTIPLIER;
     let new_speed = speed * CURSED_SPEED_MULTIPLIER;
     let scaled_radius = radius * CURSED_SCALE_MULTIPLIER;
     let final_radius = scaled_radius.min(CURSED_MAX_RADIUS);
-    
+
     // Log when radius is capped
     if scaled_radius > CURSED_MAX_RADIUS {
-        log::info!("Cursed monster radius capped: {:.1} -> {:.1} (base: {:.1})", 
-                  scaled_radius, final_radius, radius);
+        log::info!(
+            "Cursed monster radius capped: {:.1} -> {:.1} (base: {:.1})",
+            scaled_radius,
+            final_radius,
+            radius
+        );
     }
-    
+
     (new_hp, new_max_hp, new_atk, new_speed, final_radius)
 }
 
 // Function to trigger shiny monster death pinata - spawns void capsules
 pub fn trigger_shiny_monster_death_pinata(ctx: &ReducerContext, monster: &Monsters) {
     // Get the monster's current position from the boid, fallback to spawn position if not found
-    let monster_position = if let Some(boid) = ctx.db.monsters_boid().monster_id().find(&monster.monster_id) {
+    let monster_position = if let Some(boid) = ctx
+        .db
+        .monsters_boid()
+        .monster_id()
+        .find(&monster.monster_id)
+    {
         boid.position
     } else {
-        log::warn!("Shiny monster {} has no boid data, using spawn position for death loot", monster.monster_id);
+        log::warn!(
+            "Shiny monster {} has no boid data, using spawn position for death loot",
+            monster.monster_id
+        );
         monster.spawn_position
     };
-    
+
     // Get tier from bestiary entry and calculate loot count using formula: (tier + 1) × 3
-    let bestiary_entry = ctx.db.bestiary().bestiary_id().find(&(monster.bestiary_id.clone() as u32));
+    let bestiary_entry = ctx
+        .db
+        .bestiary()
+        .bestiary_id()
+        .find(&(monster.bestiary_id.clone() as u32));
     let monster_tier = if let Some(entry) = bestiary_entry {
         entry.tier
     } else {
-        log::warn!("Bestiary entry not found for monster type {:?}, defaulting to tier 1", &monster.bestiary_id);
+        log::warn!(
+            "Bestiary entry not found for monster type {:?}, defaulting to tier 1",
+            &monster.bestiary_id
+        );
         1 // Default to tier 1 if bestiary entry not found
     };
-    
+
     let capsule_count = (monster_tier + 1) * 3;
-    
+
     log::info!("Shiny {} (Tier {}) death pinata! Spawning {} void capsules at current position ({:.1}, {:.1})", 
               crate::monster_types_def::get_monster_type_name(&monster.bestiary_id), monster_tier, capsule_count, monster_position.x, monster_position.y);
-    
+
     // Spawn the calculated number of void capsules
     for i in 0..capsule_count {
         // Use public function from loot_capsule_defs with appropriate radius
         let gem_type = crate::loot_capsule_defs::select_weighted_gem_type(&mut ctx.rng());
-        
+
         if i == 0 {
             log::info!("First shiny death capsule: {:?} gem", gem_type);
         }
-        
+
         // Use the public radius constants from loot_capsule_defs
         crate::loot_capsule_defs::spawn_loot_capsule_in_radius(
-            ctx, 
-            monster_position, 
+            ctx,
+            monster_position,
             crate::loot_capsule_defs::MONSTER_MIN_RADIUS,
-            crate::loot_capsule_defs::MONSTER_MAX_RADIUS, 
-            gem_type
+            crate::loot_capsule_defs::MONSTER_MAX_RADIUS,
+            gem_type,
         );
     }
-    
-    log::info!("Shiny monster death pinata complete - {} capsules spawned", capsule_count);
+
+    log::info!(
+        "Shiny monster death pinata complete - {} capsules spawned",
+        capsule_count
+    );
 }

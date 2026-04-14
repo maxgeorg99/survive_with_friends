@@ -1,7 +1,7 @@
-import Phaser from 'phaser';
+import * as Phaser from 'phaser';
 import { GameEvents } from '../constants/GameEvents';
 import SpacetimeDBClient from '../SpacetimeDBClient';
-import { AccountState } from '../autobindings/account_state_type';
+import { AccountState } from '../autobindings/types';
 
 // Constants for responsive design
 const RESPONSIVE_CONFIG = {

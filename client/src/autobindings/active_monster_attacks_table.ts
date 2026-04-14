@@ -3,107 +3,36 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
-import { ActiveMonsterAttack } from "./active_monster_attack_type";
-import { DbVector2 as __DbVector2 } from "./db_vector_2_type";
-import { MonsterAttackType as __MonsterAttackType } from "./monster_attack_type_type";
+  TypeBuilder as __TypeBuilder,
+  t as __t,
+  type AlgebraicTypeType as __AlgebraicTypeType,
+  type Infer as __Infer,
+} from "spacetimedb";
+import {
+  DbVector2,
+  MonsterAttackType,
+} from "./types";
 
-import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
 
-/**
- * Table handle for the table `active_monster_attacks`.
- *
- * Obtain a handle from the [`activeMonsterAttacks`] property on [`RemoteTables`],
- * like `ctx.db.activeMonsterAttacks`.
- *
- * Users are encouraged not to explicitly reference this type,
- * but to directly chain method calls,
- * like `ctx.db.activeMonsterAttacks.on_insert(...)`.
- */
-export class ActiveMonsterAttacksTableHandle {
-  tableCache: TableCache<ActiveMonsterAttack>;
-
-  constructor(tableCache: TableCache<ActiveMonsterAttack>) {
-    this.tableCache = tableCache;
-  }
-
-  count(): number {
-    return this.tableCache.count();
-  }
-
-  iter(): Iterable<ActiveMonsterAttack> {
-    return this.tableCache.iter();
-  }
-  /**
-   * Access to the `activeMonsterAttackId` unique index on the table `active_monster_attacks`,
-   * which allows point queries on the field of the same name
-   * via the [`ActiveMonsterAttacksActiveMonsterAttackIdUnique.find`] method.
-   *
-   * Users are encouraged not to explicitly reference this type,
-   * but to directly chain method calls,
-   * like `ctx.db.activeMonsterAttacks.activeMonsterAttackId().find(...)`.
-   *
-   * Get a handle on the `activeMonsterAttackId` unique index on the table `active_monster_attacks`.
-   */
-  activeMonsterAttackId = {
-    // Find the subscribed row whose `activeMonsterAttackId` column value is equal to `col_val`,
-    // if such a row is present in the client cache.
-    find: (col_val: bigint): ActiveMonsterAttack | undefined => {
-      for (let row of this.tableCache.iter()) {
-        if (deepEqual(row.activeMonsterAttackId, col_val)) {
-          return row;
-        }
-      }
-    },
-  };
-
-  onInsert = (cb: (ctx: EventContext, row: ActiveMonsterAttack) => void) => {
-    return this.tableCache.onInsert(cb);
-  }
-
-  removeOnInsert = (cb: (ctx: EventContext, row: ActiveMonsterAttack) => void) => {
-    return this.tableCache.removeOnInsert(cb);
-  }
-
-  onDelete = (cb: (ctx: EventContext, row: ActiveMonsterAttack) => void) => {
-    return this.tableCache.onDelete(cb);
-  }
-
-  removeOnDelete = (cb: (ctx: EventContext, row: ActiveMonsterAttack) => void) => {
-    return this.tableCache.removeOnDelete(cb);
-  }
-
-  // Updates are only defined for tables with primary keys.
-  onUpdate = (cb: (ctx: EventContext, oldRow: ActiveMonsterAttack, newRow: ActiveMonsterAttack) => void) => {
-    return this.tableCache.onUpdate(cb);
-  }
-
-  removeOnUpdate = (cb: (ctx: EventContext, onRow: ActiveMonsterAttack, newRow: ActiveMonsterAttack) => void) => {
-    return this.tableCache.removeOnUpdate(cb);
-  }}
+export default __t.row({
+  activeMonsterAttackId: __t.u64().primaryKey().name("active_monster_attack_id"),
+  scheduledAt: __t.scheduleAt().name("scheduled_at"),
+  get position() {
+    return DbVector2;
+  },
+  get direction() {
+    return DbVector2;
+  },
+  get monsterAttackType() {
+    return MonsterAttackType.name("monster_attack_type");
+  },
+  piercing: __t.bool(),
+  damage: __t.u32(),
+  radius: __t.f32(),
+  speed: __t.f32(),
+  parameterU: __t.u32().name("parameter_u"),
+  parameterF: __t.f32().name("parameter_f"),
+  ticksElapsed: __t.u32().name("ticks_elapsed"),
+  fromShinyMonster: __t.bool().name("from_shiny_monster"),
+});

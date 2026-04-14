@@ -3,104 +3,16 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
-import { AgnaCandleScheduler } from "./agna_candle_scheduler_type";
-import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
+  TypeBuilder as __TypeBuilder,
+  t as __t,
+  type AlgebraicTypeType as __AlgebraicTypeType,
+  type Infer as __Infer,
+} from "spacetimedb";
 
-/**
- * Table handle for the table `agna_candle_scheduler`.
- *
- * Obtain a handle from the [`agnaCandleScheduler`] property on [`RemoteTables`],
- * like `ctx.db.agnaCandleScheduler`.
- *
- * Users are encouraged not to explicitly reference this type,
- * but to directly chain method calls,
- * like `ctx.db.agnaCandleScheduler.on_insert(...)`.
- */
-export class AgnaCandleSchedulerTableHandle {
-  tableCache: TableCache<AgnaCandleScheduler>;
-
-  constructor(tableCache: TableCache<AgnaCandleScheduler>) {
-    this.tableCache = tableCache;
-  }
-
-  count(): number {
-    return this.tableCache.count();
-  }
-
-  iter(): Iterable<AgnaCandleScheduler> {
-    return this.tableCache.iter();
-  }
-  /**
-   * Access to the `scheduledId` unique index on the table `agna_candle_scheduler`,
-   * which allows point queries on the field of the same name
-   * via the [`AgnaCandleSchedulerScheduledIdUnique.find`] method.
-   *
-   * Users are encouraged not to explicitly reference this type,
-   * but to directly chain method calls,
-   * like `ctx.db.agnaCandleScheduler.scheduledId().find(...)`.
-   *
-   * Get a handle on the `scheduledId` unique index on the table `agna_candle_scheduler`.
-   */
-  scheduledId = {
-    // Find the subscribed row whose `scheduledId` column value is equal to `col_val`,
-    // if such a row is present in the client cache.
-    find: (col_val: bigint): AgnaCandleScheduler | undefined => {
-      for (let row of this.tableCache.iter()) {
-        if (deepEqual(row.scheduledId, col_val)) {
-          return row;
-        }
-      }
-    },
-  };
-
-  onInsert = (cb: (ctx: EventContext, row: AgnaCandleScheduler) => void) => {
-    return this.tableCache.onInsert(cb);
-  }
-
-  removeOnInsert = (cb: (ctx: EventContext, row: AgnaCandleScheduler) => void) => {
-    return this.tableCache.removeOnInsert(cb);
-  }
-
-  onDelete = (cb: (ctx: EventContext, row: AgnaCandleScheduler) => void) => {
-    return this.tableCache.onDelete(cb);
-  }
-
-  removeOnDelete = (cb: (ctx: EventContext, row: AgnaCandleScheduler) => void) => {
-    return this.tableCache.removeOnDelete(cb);
-  }
-
-  // Updates are only defined for tables with primary keys.
-  onUpdate = (cb: (ctx: EventContext, oldRow: AgnaCandleScheduler, newRow: AgnaCandleScheduler) => void) => {
-    return this.tableCache.onUpdate(cb);
-  }
-
-  removeOnUpdate = (cb: (ctx: EventContext, onRow: AgnaCandleScheduler, newRow: AgnaCandleScheduler) => void) => {
-    return this.tableCache.removeOnUpdate(cb);
-  }}
+export default __t.row({
+  scheduledId: __t.u64().primaryKey().name("scheduled_id"),
+  scheduledAt: __t.scheduleAt().name("scheduled_at"),
+  bossMonsterId: __t.u32().name("boss_monster_id"),
+  spawnId: __t.u64().name("spawn_id"),
+});

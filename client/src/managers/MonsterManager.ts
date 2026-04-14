@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import * as Phaser from 'phaser';
 import { Monsters, EventContext, MonsterType, MonsterBoid, AiState, MonsterVariant} from "../autobindings";
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { MONSTER_ASSET_KEYS, MONSTER_SHADOW_OFFSETS_X, MONSTER_SHADOW_OFFSETS_Y, MONSTER_SHADOW_SCALE, MONSTER_DEPTH_OFFSETS, MONSTER_SPRITE_OFFSETS_X, MONSTER_SPRITE_OFFSETS_Y} from '../constants/MonsterConfig';

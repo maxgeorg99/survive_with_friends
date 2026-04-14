@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import * as Phaser from 'phaser';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 
 const ARROW_OFFSET_X_FROM_PLAYER = 8; // Offset from player to show arrow

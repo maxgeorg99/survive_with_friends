@@ -1,7 +1,7 @@
-import Phaser from 'phaser';
+import * as Phaser from 'phaser';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { Account } from '../autobindings';
-import PlayerClass from '../autobindings/player_class_type';
+import { PlayerClass } from '../autobindings/types';
 import { GameEvents } from '../constants/GameEvents';
 import MusicManager from '../managers/MusicManager';
 import OptionsUI from '../ui/OptionsUI';

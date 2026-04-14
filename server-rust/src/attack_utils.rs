@@ -1,9 +1,15 @@
-use spacetimedb::{ReducerContext, Table, rand::{Rng, RngCore}};
-use crate::{DbVector2, AttackType, PlayerScheduledAttack, monsters_def::{monsters, monsters_boid}};
+use crate::{
+    monsters_def::{monsters, monsters_boid},
+    AttackType, DbVector2, PlayerScheduledAttack,
+};
+use spacetimedb::{
+    rand::{Rng, RngCore},
+    ReducerContext, Table,
+};
 use std::f64::consts::PI;
 
 // Thunder Horn attack configuration constants
-pub const THUNDER_HORN_TARGET_RADIUS: f32 = 700.0;  // Maximum range for Thunder Horn targeting
+pub const THUNDER_HORN_TARGET_RADIUS: f32 = 700.0; // Maximum range for Thunder Horn targeting
 
 // Get parameter_u for an attack
 pub fn get_parameter_u(ctx: &ReducerContext, attack: &PlayerScheduledAttack) -> u32 {
@@ -21,7 +27,8 @@ pub fn get_parameter_u(ctx: &ReducerContext, attack: &PlayerScheduledAttack) -> 
             // Calculate consistent rotation based on attack count
             // Each attack should rotate by the angle between knives
             let angle_between_knives = 360.0 / attack.projectiles as f64;
-            let rotation_offset = (attack.attack_count as f64 * angle_between_knives / 12.0) % 360.0;
+            let rotation_offset =
+                (attack.attack_count as f64 * angle_between_knives / 12.0) % 360.0;
             rotation_offset as u32
         }
         AttackType::Shield => {
@@ -77,12 +84,18 @@ pub fn determine_attack_direction(
     let player_cache_idx = match cache.player.player_id_to_cache_index.get(&player_id) {
         Some(&idx) => idx as usize,
         None => {
-            log::error!("Player {} not found in collision cache for attack direction", player_id);
+            log::error!(
+                "Player {} not found in collision cache for attack direction",
+                player_id
+            );
             return DbVector2::new(1.0, 0.0); // Fallback direction
         }
     };
-    let player_pos = DbVector2::new(cache.player.pos_x_player[player_cache_idx], cache.player.pos_y_player[player_cache_idx]);
-    
+    let player_pos = DbVector2::new(
+        cache.player.pos_x_player[player_cache_idx],
+        cache.player.pos_y_player[player_cache_idx],
+    );
+
     // Since dir_x and dir_y don't exist in the cache, we'll use a fallback direction
     // or calculate direction based on player's last movement or target
     let player_dir = DbVector2::new(1.0, 0.0); // Default direction (right)
@@ -96,7 +109,7 @@ pub fn determine_attack_direction(
                     return dir;
                 }
             }
-            
+
             // If no enemies, fall back to alternating left/right pattern
             let count_param = parameter_u + id_within_burst;
             if count_param % 2 == 0 {
@@ -113,7 +126,7 @@ pub fn determine_attack_direction(
                     return dir;
                 }
             }
-            
+
             // If no enemies or calculation issue, use player's direction
             get_normalized_direction(player_dir)
         }
@@ -131,23 +144,27 @@ pub fn determine_attack_direction(
                 if base_dir.length_sq() > 0.0 {
                     // For multiple cards, spread them in a fan pattern toward the enemy
                     let fan_angle_range = 45.0; // degrees total spread
-                    
+
                     let fan_angle = if num_projectiles > 1 {
-                        -fan_angle_range / 2.0 + (fan_angle_range * id_within_burst as f64 / (num_projectiles - 1) as f64)
+                        -fan_angle_range / 2.0
+                            + (fan_angle_range * id_within_burst as f64
+                                / (num_projectiles - 1) as f64)
                     } else {
                         0.0
                     };
-                    
+
                     let fan_angle_rad = fan_angle * PI / 180.0;
-                    
+
                     // Rotate the base vector by the fan angle
-                    let rotated_x = base_dir.x as f64 * fan_angle_rad.cos() - base_dir.y as f64 * fan_angle_rad.sin();
-                    let rotated_y = base_dir.x as f64 * fan_angle_rad.sin() + base_dir.y as f64 * fan_angle_rad.cos();
-                    
+                    let rotated_x = base_dir.x as f64 * fan_angle_rad.cos()
+                        - base_dir.y as f64 * fan_angle_rad.sin();
+                    let rotated_y = base_dir.x as f64 * fan_angle_rad.sin()
+                        + base_dir.y as f64 * fan_angle_rad.cos();
+
                     return DbVector2::new(rotated_x as f32, rotated_y as f32);
                 }
             }
-            
+
             // If no enemies found, fall back to the circular pattern like knives
             let start_angle = parameter_u as f64 * PI / 180.0;
             let angle_step = 360.0 / num_projectiles as f64;
@@ -194,7 +211,11 @@ pub fn determine_attack_direction(
 }
 
 // Find the nearest enemy to a given position
-pub fn find_nearest_enemy(ctx: &ReducerContext, position: DbVector2, player_id: u32) -> Option<DbVector2> {
+pub fn find_nearest_enemy(
+    ctx: &ReducerContext,
+    position: DbVector2,
+    player_id: u32,
+) -> Option<DbVector2> {
     let mut nearest_enemy: Option<DbVector2> = None;
     let mut nearest_distance_squared = f32::MAX;
 
@@ -217,28 +238,39 @@ pub fn find_nearest_enemy(ctx: &ReducerContext, position: DbVector2, player_id: 
 }
 
 // Find the nearest enemy to a given position and return its entity ID
-pub fn find_nearest_enemy_entity_id(ctx: &ReducerContext, position: DbVector2, _player_id: u32) -> Option<u32> {
+pub fn find_nearest_enemy_entity_id(
+    ctx: &ReducerContext,
+    position: DbVector2,
+    _player_id: u32,
+) -> Option<u32> {
     let mut nearest_enemy_id: Option<u32> = None;
     let mut min_dist_sq = f32::MAX;
 
     // Iterate over all monsters in the boid cache
     for boid in ctx.db.monsters_boid().iter() {
         // Skip monsters that are owned by the player (removed owner_id check since field doesn't exist)
-        
-        let dist_sq = (boid.position.x - position.x).powi(2) + (boid.position.y - position.y).powi(2);
+
+        let dist_sq =
+            (boid.position.x - position.x).powi(2) + (boid.position.y - position.y).powi(2);
         if dist_sq < min_dist_sq {
             min_dist_sq = dist_sq;
             nearest_enemy_id = Some(boid.monster_id);
         }
     }
-    
+
     // Also check non-boid monsters
     for monster in ctx.db.monsters().iter() {
         // Skip monsters that are owned by the player (removed owner_id check since field doesn't exist)
-        
+
         // Get monster position from boid data
-        if let Some(boid) = ctx.db.monsters_boid().monster_id().find(&monster.monster_id) {
-            let dist_sq = (boid.position.x - position.x).powi(2) + (boid.position.y - position.y).powi(2);
+        if let Some(boid) = ctx
+            .db
+            .monsters_boid()
+            .monster_id()
+            .find(&monster.monster_id)
+        {
+            let dist_sq =
+                (boid.position.x - position.x).powi(2) + (boid.position.y - position.y).powi(2);
             if dist_sq < min_dist_sq {
                 min_dist_sq = dist_sq;
                 nearest_enemy_id = Some(monster.monster_id);
@@ -250,7 +282,12 @@ pub fn find_nearest_enemy_entity_id(ctx: &ReducerContext, position: DbVector2, _
 }
 
 // Find a random enemy within a certain radius
-pub fn find_random_target_in_radius(ctx: &ReducerContext, attacker_position: DbVector2, _attacker_player_id: u32, max_radius: f32) -> Option<DbVector2> {
+pub fn find_random_target_in_radius(
+    ctx: &ReducerContext,
+    attacker_position: DbVector2,
+    _attacker_player_id: u32,
+    max_radius: f32,
+) -> Option<DbVector2> {
     let mut targets_in_range: Vec<DbVector2> = Vec::new();
     let max_radius_squared = max_radius * max_radius;
 
@@ -284,7 +321,11 @@ pub fn get_normalized_direction(direction: DbVector2) -> DbVector2 {
     }
 }
 
-pub fn find_safe_ability_position(ctx: &ReducerContext, position: DbVector2, _player_id: u32) -> Option<DbVector2> {
+pub fn find_safe_ability_position(
+    ctx: &ReducerContext,
+    position: DbVector2,
+    _player_id: u32,
+) -> Option<DbVector2> {
     let mut targets_in_range: Vec<DbVector2> = Vec::new();
     let safe_radius = 300.0; // Example safe radius
     let max_distance_squared = safe_radius * safe_radius;

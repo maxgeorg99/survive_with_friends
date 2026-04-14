@@ -1,5 +1,5 @@
-use spacetimedb::{table, reducer, Table, ReducerContext, SpacetimeType, rand::Rng};
 use crate::monsters;
+use spacetimedb::{rand::Rng, reducer, table, ReducerContext, SpacetimeType, Table};
 
 // Curse type enum defining all possible curse effects
 #[derive(SpacetimeType, Clone, Debug, PartialEq, Eq, Hash)]
@@ -10,14 +10,14 @@ pub enum CurseType {
     MonsterMoreSpeed,
     MonsterHealthRegen,
     CursedMonstersSpawn,
-    
+
     // Player restrictions
     NoFreeReroll,
     NoHealOnLevelUp,
     NegativeHealthRegen,
     PlayersStartLessHp,
     PlayersStartLessSpeed,
-    
+
     // Loot restrictions
     NoDiceDrops,
     NoFoodDrops,
@@ -26,18 +26,18 @@ pub enum CurseType {
     OneLessVoidChest,
     OneLessVoidChestSecond, // Second instance since there are 2 of these
     MonstersDropFewerGems,
-    
+
     // Game progression
     BossAppearsSooner,
     DeadlierBosses,
-    DeadlierBossesTwo,   // Multiple stages of deadlier bosses
-    
+    DeadlierBossesTwo, // Multiple stages of deadlier bosses
+
     // Scaling curse when all others are taken
     Scaling,
 }
 
 // Curses table to track active curses
-#[table(name = curses, public)]
+#[table(accessor = curses, public)]
 pub struct Curse {
     #[primary_key]
     #[auto_inc]
@@ -48,15 +48,17 @@ pub struct Curse {
 // Helper function to add a random new curse on victory
 pub fn add_random_curse(ctx: &ReducerContext) {
     log::info!("Adding random curse after victory...");
-    
+
     // Get all existing curse types
-    let existing_curses: std::collections::HashSet<CurseType> = ctx.db.curses()
+    let existing_curses: std::collections::HashSet<CurseType> = ctx
+        .db
+        .curses()
         .iter()
         .map(|curse| curse.curse_type.clone())
         .collect();
-    
+
     log::info!("Found {} existing curses", existing_curses.len());
-    
+
     // Define all possible curse types (excluding Scaling)
     let all_curse_types = vec![
         CurseType::MonsterMoreHp,
@@ -78,15 +80,15 @@ pub fn add_random_curse(ctx: &ReducerContext) {
         CurseType::MonstersDropFewerGems,
         CurseType::BossAppearsSooner,
         CurseType::DeadlierBosses,
-        CurseType::DeadlierBossesTwo
+        CurseType::DeadlierBossesTwo,
     ];
-    
+
     // Find available curse types (not yet taken)
     let available_curses: Vec<CurseType> = all_curse_types
         .into_iter()
         .filter(|curse_type| !existing_curses.contains(curse_type))
         .collect();
-    
+
     let selected_curse = if available_curses.is_empty() {
         // All regular curses are taken, add scaling curse
         log::info!("All curse types are taken, adding Scaling curse");
@@ -96,22 +98,26 @@ pub fn add_random_curse(ctx: &ReducerContext) {
         let mut rng = ctx.rng();
         let index = rng.gen_range(0..available_curses.len());
         let selected = available_curses[index].clone();
-        log::info!("Selected curse: {:?} from {} available options", selected, available_curses.len());
+        log::info!(
+            "Selected curse: {:?} from {} available options",
+            selected,
+            available_curses.len()
+        );
         selected
     };
-    
+
     // Add the curse to the table
     ctx.db.curses().insert(Curse {
         curse_id: 0, // Auto-incremented
         curse_type: selected_curse.clone(),
     });
-    
+
     log::info!("Added curse: {:?}", selected_curse);
-    
+
     // Log current total curse count
     let total_curses = ctx.db.curses().count();
     log::info!("Total active curses: {}", total_curses);
-    
+
     // Start monster health regeneration if needed
     start_monster_health_regen_if_needed(ctx);
 }
@@ -119,19 +125,19 @@ pub fn add_random_curse(ctx: &ReducerContext) {
 // Helper function to clear all curses on defeat
 pub fn clear_all_curses(ctx: &ReducerContext) {
     log::info!("Clearing all curses after defeat...");
-    
+
     let curse_count = ctx.db.curses().count();
     if curse_count == 0 {
         log::info!("No curses to clear");
         return;
     }
-    
+
     // Delete all curses
     let curses_to_delete: Vec<u64> = ctx.db.curses().iter().map(|curse| curse.curse_id).collect();
     for curse_id in curses_to_delete {
         ctx.db.curses().curse_id().delete(&curse_id);
     }
-    
+
     log::info!("Cleared {} curses", curse_count);
 }
 
@@ -160,10 +166,10 @@ pub fn count_scaling_curses(ctx: &ReducerContext) -> u32 {
 #[reducer]
 pub fn admin_add_curse(ctx: &ReducerContext) {
     crate::require_admin_access(ctx, "AdminAddCurse");
-    
+
     log::info!("Admin manually adding curse");
     add_random_curse(ctx);
-    
+
     // Note: start_monster_health_regen_if_needed is already called within add_random_curse
 }
 
@@ -171,7 +177,7 @@ pub fn admin_add_curse(ctx: &ReducerContext) {
 #[reducer]
 pub fn admin_clear_curses(ctx: &ReducerContext) {
     crate::require_admin_access(ctx, "AdminClearCurses");
-    
+
     log::info!("Admin manually clearing all curses");
     clear_all_curses(ctx);
 }
@@ -180,26 +186,26 @@ pub fn admin_clear_curses(ctx: &ReducerContext) {
 #[reducer]
 pub fn admin_add_debug_curse(ctx: &ReducerContext) {
     crate::require_admin_access(ctx, "AdminAddDebugCurse");
-    
+
     // Hardcoded list of curses for testing - starting with scaling curse
     let debug_curses = vec![
         CurseType::MonsterMoreDamage,
         CurseType::NoDiceDrops,
         // Add more curses here as needed for testing
     ];
-    
+
     log::info!("Admin adding debug curse from test list...");
-    
+
     // Try to find a curse from the list that isn't already active
     let mut curse_to_add: Option<CurseType> = None;
-    
+
     for curse_type in &debug_curses {
         if !is_curse_active(ctx, curse_type.clone()) {
             curse_to_add = Some(curse_type.clone());
             break;
         }
     }
-    
+
     match curse_to_add {
         Some(curse_type) => {
             // Add the specific curse
@@ -207,28 +213,37 @@ pub fn admin_add_debug_curse(ctx: &ReducerContext) {
                 curse_id: 0,
                 curse_type: curse_type.clone(),
             });
-            
-            log::info!("Admin added debug curse: {:?} (ID: {})", curse_type, curse.curse_id);
-            
+
+            log::info!(
+                "Admin added debug curse: {:?} (ID: {})",
+                curse_type,
+                curse.curse_id
+            );
+
             // Log current total curse count
             let total_curses = ctx.db.curses().count();
             log::info!("Total active curses: {}", total_curses);
-            
+
             // Start monster health regeneration if needed
             start_monster_health_regen_if_needed(ctx);
-        },
+        }
         None => {
             log::info!("Admin debug curse: All test curses are already active!");
-            
+
             // Log which curses are currently active
-            let active_curses: Vec<CurseType> = ctx.db.curses().iter().map(|curse| curse.curse_type).collect();
+            let active_curses: Vec<CurseType> = ctx
+                .db
+                .curses()
+                .iter()
+                .map(|curse| curse.curse_type)
+                .collect();
             log::info!("Currently active curses: {:?}", active_curses);
         }
     }
 }
 
 // Monster health regeneration system
-#[table(name = monster_health_regen_timer, scheduled(monster_health_regen_tick), public)]
+#[table(accessor = monster_health_regen_timer, scheduled(monster_health_regen_tick), public)]
 pub struct MonsterHealthRegenTimer {
     #[primary_key]
     #[auto_inc]
@@ -239,20 +254,20 @@ pub struct MonsterHealthRegenTimer {
 // Reducer to handle monster health regeneration
 #[reducer]
 pub fn monster_health_regen_tick(ctx: &ReducerContext, _timer: MonsterHealthRegenTimer) {
-    if ctx.sender != ctx.identity() {
+    if ctx.sender() != ctx.identity() {
         panic!("MonsterHealthRegenTick may not be invoked by clients, only via scheduling.");
     }
-    
+
     // Only regenerate if the MonsterHealthRegen curse is active
     if !is_curse_active(ctx, CurseType::MonsterHealthRegen) {
         return;
     }
-    
+
     const REGEN_AMOUNT: u32 = 1; // HP to regenerate per tick
-    
+
     // Iterate through all living monsters and regenerate their health
     let monsters_to_update: Vec<_> = ctx.db.monsters().iter().collect();
-    
+
     for monster in monsters_to_update {
         if monster.hp < monster.max_hp {
             let mut updated_monster = monster;
@@ -260,7 +275,7 @@ pub fn monster_health_regen_tick(ctx: &ReducerContext, _timer: MonsterHealthRege
             ctx.db.monsters().monster_id().update(updated_monster);
         }
     }
-    
+
     // Schedule the next regeneration tick
     schedule_monster_health_regen(ctx);
 }
@@ -268,12 +283,16 @@ pub fn monster_health_regen_tick(ctx: &ReducerContext, _timer: MonsterHealthRege
 // Helper function to schedule monster health regeneration
 pub fn schedule_monster_health_regen(ctx: &ReducerContext) {
     use std::time::Duration;
-    
+
     // Schedule regeneration every 2 seconds
-    ctx.db.monster_health_regen_timer().insert(MonsterHealthRegenTimer {
-        scheduled_id: 0,
-        scheduled_at: spacetimedb::ScheduleAt::Time(ctx.timestamp + Duration::from_millis(2000)),
-    });
+    ctx.db
+        .monster_health_regen_timer()
+        .insert(MonsterHealthRegenTimer {
+            scheduled_id: 0,
+            scheduled_at: spacetimedb::ScheduleAt::Time(
+                ctx.timestamp + Duration::from_millis(2000),
+            ),
+        });
 }
 
 // Function to start monster health regeneration when curse becomes active

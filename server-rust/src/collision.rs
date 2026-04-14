@@ -1,6 +1,9 @@
-use spacetimedb::{table, reducer, Table, ReducerContext, Identity, Timestamp};
-use crate::{MAX_PLAYERS, MAX_MONSTERS, MAX_GEM_COUNT, MAX_ATTACK_COUNT, MAX_MONSTER_ATTACK_COUNT, NUM_WORLD_CELLS, 
-           WORLD_GRID_WIDTH, WORLD_GRID_HEIGHT, WORLD_CELL_BIT_SHIFT, WORLD_CELL_MASK, WORLD_CELL_SIZE};
+use crate::{
+    MAX_ATTACK_COUNT, MAX_GEM_COUNT, MAX_MONSTERS, MAX_MONSTER_ATTACK_COUNT, MAX_PLAYERS,
+    NUM_WORLD_CELLS, WORLD_CELL_BIT_SHIFT, WORLD_CELL_MASK, WORLD_CELL_SIZE, WORLD_GRID_HEIGHT,
+    WORLD_GRID_WIDTH,
+};
+use spacetimedb::{reducer, table, Identity, ReducerContext, Table, Timestamp};
 use std::collections::HashMap;
 
 // --- Player Collision ---
@@ -15,7 +18,7 @@ pub struct PlayerCollisionCache {
     pub radius_player: Box<[f32]>,
     pub damage_to_player: Box<[f32]>,
     pub shield_count_player: Box<[u32]>,
-    pub pvp_player: Box<[bool]>,  // Whether each player has PvP enabled
+    pub pvp_player: Box<[bool]>, // Whether each player has PvP enabled
     pub cached_count_players: u32,
 }
 
@@ -57,8 +60,8 @@ pub struct MonsterCollisionCache {
     pub atk_monster: Box<[f32]>,
     pub damage_to_monster: Box<[f32]>,
     pub push_ratio_monster: Box<[u32]>,
-    pub movement_behavior: Box<[u8]>,  // Cache the MovementBehavior as u8 (0=Normal, 1=Chase, 2=StandStill)
-    pub can_deal_damage: Box<[bool]>,  // Whether the monster can deal damage based on AI state
+    pub movement_behavior: Box<[u8]>, // Cache the MovementBehavior as u8 (0=Normal, 1=Chase, 2=StandStill)
+    pub can_deal_damage: Box<[bool]>, // Whether the monster can deal damage based on AI state
     pub cached_count_monsters: i32,
 }
 
@@ -122,7 +125,7 @@ pub struct AttackCollisionCache {
     pub pos_x_attack: Box<[f32]>,
     pub pos_y_attack: Box<[f32]>,
     pub radius_attack: Box<[f32]>,
-    pub pvp_enabled_attack: Box<[bool]>,  // Whether the attacking player has PvP enabled
+    pub pvp_enabled_attack: Box<[bool]>, // Whether the attacking player has PvP enabled
     pub cached_count_attacks: i32,
 }
 
@@ -248,7 +251,7 @@ impl CollisionCache {
 pub fn get_world_cell_from_position(x: f32, y: f32) -> u16 {
     // 1. Convert world-space to *integer* cell coordinates
     //    (fast floor because they're non-negative here)
-    let cell_x = (x / WORLD_CELL_SIZE as f32) as u16;  // 0 … 156
+    let cell_x = (x / WORLD_CELL_SIZE as f32) as u16; // 0 … 156
     let cell_y = (y / WORLD_CELL_SIZE as f32) as u16; // 0 … 156
 
     // 2. Pack into one 16-bit value: cell_y in the high byte, cell_x in the low
@@ -256,16 +259,23 @@ pub fn get_world_cell_from_position(x: f32, y: f32) -> u16 {
 }
 
 #[inline]
-pub fn spatial_hash_collision_checker(ax: f32, ay: f32, ar: f32, bx: f32, by: f32, br: f32) -> bool {
+pub fn spatial_hash_collision_checker(
+    ax: f32,
+    ay: f32,
+    ar: f32,
+    bx: f32,
+    by: f32,
+    br: f32,
+) -> bool {
     // Get the distance between the two entities
     let dx = ax - bx;
     let dy = ay - by;
     let distance_squared = dx * dx + dy * dy;
-    
+
     // Calculate the minimum distance to avoid collision (sum of both radii)
     let min_distance = ar + br;
     let min_distance_squared = min_distance * min_distance;
-    
+
     // If distance squared is less than minimum distance squared, they are colliding
     distance_squared < min_distance_squared
-} 
+}

@@ -3,104 +3,15 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
-import { DeadPlayer } from "./dead_player_type";
-import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
+  TypeBuilder as __TypeBuilder,
+  t as __t,
+  type AlgebraicTypeType as __AlgebraicTypeType,
+  type Infer as __Infer,
+} from "spacetimedb";
 
-/**
- * Table handle for the table `dead_players`.
- *
- * Obtain a handle from the [`deadPlayers`] property on [`RemoteTables`],
- * like `ctx.db.deadPlayers`.
- *
- * Users are encouraged not to explicitly reference this type,
- * but to directly chain method calls,
- * like `ctx.db.deadPlayers.on_insert(...)`.
- */
-export class DeadPlayersTableHandle {
-  tableCache: TableCache<DeadPlayer>;
-
-  constructor(tableCache: TableCache<DeadPlayer>) {
-    this.tableCache = tableCache;
-  }
-
-  count(): number {
-    return this.tableCache.count();
-  }
-
-  iter(): Iterable<DeadPlayer> {
-    return this.tableCache.iter();
-  }
-  /**
-   * Access to the `playerId` unique index on the table `dead_players`,
-   * which allows point queries on the field of the same name
-   * via the [`DeadPlayersPlayerIdUnique.find`] method.
-   *
-   * Users are encouraged not to explicitly reference this type,
-   * but to directly chain method calls,
-   * like `ctx.db.deadPlayers.playerId().find(...)`.
-   *
-   * Get a handle on the `playerId` unique index on the table `dead_players`.
-   */
-  playerId = {
-    // Find the subscribed row whose `playerId` column value is equal to `col_val`,
-    // if such a row is present in the client cache.
-    find: (col_val: number): DeadPlayer | undefined => {
-      for (let row of this.tableCache.iter()) {
-        if (deepEqual(row.playerId, col_val)) {
-          return row;
-        }
-      }
-    },
-  };
-
-  onInsert = (cb: (ctx: EventContext, row: DeadPlayer) => void) => {
-    return this.tableCache.onInsert(cb);
-  }
-
-  removeOnInsert = (cb: (ctx: EventContext, row: DeadPlayer) => void) => {
-    return this.tableCache.removeOnInsert(cb);
-  }
-
-  onDelete = (cb: (ctx: EventContext, row: DeadPlayer) => void) => {
-    return this.tableCache.onDelete(cb);
-  }
-
-  removeOnDelete = (cb: (ctx: EventContext, row: DeadPlayer) => void) => {
-    return this.tableCache.removeOnDelete(cb);
-  }
-
-  // Updates are only defined for tables with primary keys.
-  onUpdate = (cb: (ctx: EventContext, oldRow: DeadPlayer, newRow: DeadPlayer) => void) => {
-    return this.tableCache.onUpdate(cb);
-  }
-
-  removeOnUpdate = (cb: (ctx: EventContext, onRow: DeadPlayer, newRow: DeadPlayer) => void) => {
-    return this.tableCache.removeOnUpdate(cb);
-  }}
+export default __t.row({
+  playerId: __t.u32().primaryKey().name("player_id"),
+  name: __t.string(),
+  isTrueSurvivor: __t.bool().name("is_true_survivor"),
+});

@@ -3,107 +3,44 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
-import { Player } from "./player_type";
-import { DbVector2 as __DbVector2 } from "./db_vector_2_type";
-import { PlayerClass as __PlayerClass } from "./player_class_type";
+  TypeBuilder as __TypeBuilder,
+  t as __t,
+  type AlgebraicTypeType as __AlgebraicTypeType,
+  type Infer as __Infer,
+} from "spacetimedb";
+import {
+  DbVector2,
+  PlayerClass,
+} from "./types";
 
-import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
 
-/**
- * Table handle for the table `player`.
- *
- * Obtain a handle from the [`player`] property on [`RemoteTables`],
- * like `ctx.db.player`.
- *
- * Users are encouraged not to explicitly reference this type,
- * but to directly chain method calls,
- * like `ctx.db.player.on_insert(...)`.
- */
-export class PlayerTableHandle {
-  tableCache: TableCache<Player>;
-
-  constructor(tableCache: TableCache<Player>) {
-    this.tableCache = tableCache;
-  }
-
-  count(): number {
-    return this.tableCache.count();
-  }
-
-  iter(): Iterable<Player> {
-    return this.tableCache.iter();
-  }
-  /**
-   * Access to the `playerId` unique index on the table `player`,
-   * which allows point queries on the field of the same name
-   * via the [`PlayerPlayerIdUnique.find`] method.
-   *
-   * Users are encouraged not to explicitly reference this type,
-   * but to directly chain method calls,
-   * like `ctx.db.player.playerId().find(...)`.
-   *
-   * Get a handle on the `playerId` unique index on the table `player`.
-   */
-  playerId = {
-    // Find the subscribed row whose `playerId` column value is equal to `col_val`,
-    // if such a row is present in the client cache.
-    find: (col_val: number): Player | undefined => {
-      for (let row of this.tableCache.iter()) {
-        if (deepEqual(row.playerId, col_val)) {
-          return row;
-        }
-      }
-    },
-  };
-
-  onInsert = (cb: (ctx: EventContext, row: Player) => void) => {
-    return this.tableCache.onInsert(cb);
-  }
-
-  removeOnInsert = (cb: (ctx: EventContext, row: Player) => void) => {
-    return this.tableCache.removeOnInsert(cb);
-  }
-
-  onDelete = (cb: (ctx: EventContext, row: Player) => void) => {
-    return this.tableCache.onDelete(cb);
-  }
-
-  removeOnDelete = (cb: (ctx: EventContext, row: Player) => void) => {
-    return this.tableCache.removeOnDelete(cb);
-  }
-
-  // Updates are only defined for tables with primary keys.
-  onUpdate = (cb: (ctx: EventContext, oldRow: Player, newRow: Player) => void) => {
-    return this.tableCache.onUpdate(cb);
-  }
-
-  removeOnUpdate = (cb: (ctx: EventContext, onRow: Player, newRow: Player) => void) => {
-    return this.tableCache.removeOnUpdate(cb);
-  }}
+export default __t.row({
+  playerId: __t.u32().primaryKey().name("player_id"),
+  name: __t.string(),
+  spawnGracePeriodRemaining: __t.u32().name("spawn_grace_period_remaining"),
+  get playerClass() {
+    return PlayerClass.name("player_class");
+  },
+  level: __t.u32(),
+  exp: __t.u32(),
+  expForNextLevel: __t.u32().name("exp_for_next_level"),
+  maxHp: __t.f32().name("max_hp"),
+  hp: __t.f32(),
+  hpRegen: __t.u32().name("hp_regen"),
+  speed: __t.f32(),
+  armor: __t.u32(),
+  unspentUpgrades: __t.u32().name("unspent_upgrades"),
+  rerolls: __t.u32(),
+  shieldCount: __t.u32().name("shield_count"),
+  pvp: __t.bool(),
+  get waypoint() {
+    return DbVector2;
+  },
+  hasWaypoint: __t.bool().name("has_waypoint"),
+  get position() {
+    return DbVector2;
+  },
+  radius: __t.f32(),
+  isBot: __t.bool().name("is_bot"),
+});

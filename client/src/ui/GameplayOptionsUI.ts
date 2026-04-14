@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import * as Phaser from 'phaser';
 import OptionsUI, { SliderControl } from './OptionsUI';
 import { SetPlayerPvpMode } from '../autobindings/set_player_pvp_mode_reducer';
 

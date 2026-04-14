@@ -1,13 +1,13 @@
-use spacetimedb::{table, reducer, Table, ReducerContext, ScheduleAt};
-use crate::{AttackType, account, player, player_scheduled_attacks};
+use crate::{account, player, player_scheduled_attacks, AttackType};
+use spacetimedb::{reducer, table, ReducerContext, ScheduleAt, Table};
 use std::time::Duration;
 
 // Table to store a saved player build's core stats
-#[table(name = saved_build, public)]
+#[table(accessor = saved_build, public)]
 pub struct SavedBuild {
     #[primary_key]
     pub build_id: u32,
-    
+
     pub max_hp: f32,
     pub armor: u32,
     pub speed: f32,
@@ -15,18 +15,18 @@ pub struct SavedBuild {
 }
 
 // Table to store saved attacks (copy of PlayerScheduledAttack without scheduling fields)
-#[table(name = saved_attacks, public)]
+#[table(accessor = saved_attacks, public)]
 pub struct SavedAttack {
     #[primary_key]
     #[auto_inc]
     pub saved_attack_id: u32,
-    
+
     pub attack_type: AttackType,
     pub skill_level: u32,
     pub parameter_u: u32,
     pub parameter_i: i32,
     pub attack_count: u32,
-    
+
     // Combat stats
     pub cooldown: u32,
     pub duration: u32,
@@ -44,12 +44,16 @@ pub struct SavedAttack {
 pub fn save_build(ctx: &ReducerContext) {
     // Check admin access first
     crate::require_admin_access(ctx, "SaveBuild");
-    
+
     // Get the identity of the caller
-    let identity = ctx.sender;
-    
+    let identity = ctx.sender();
+
     // Find the account for the caller
-    let account = ctx.db.account().identity().find(&identity)
+    let account = ctx
+        .db
+        .account()
+        .identity()
+        .find(&identity)
         .expect("SaveBuild: Account does not exist for caller");
 
     let player_id = account.current_player_id;
@@ -59,10 +63,18 @@ pub fn save_build(ctx: &ReducerContext) {
     }
 
     // Get the player data
-    let player = ctx.db.player().player_id().find(&player_id)
+    let player = ctx
+        .db
+        .player()
+        .player_id()
+        .find(&player_id)
         .expect(&format!("SaveBuild: Player {} does not exist", player_id));
 
-    log::info!("SaveBuild: Saving build for player {} ({})", player.name, player_id);
+    log::info!(
+        "SaveBuild: Saving build for player {} ({})",
+        player.name,
+        player_id
+    );
 
     // Clear existing saved build data (only holds one build at a time)
     let existing_builds: Vec<_> = ctx.db.saved_build().iter().collect();
@@ -76,9 +88,15 @@ pub fn save_build(ctx: &ReducerContext) {
     let existing_attacks: Vec<_> = ctx.db.saved_attacks().iter().collect();
     let attacks_count = existing_attacks.len();
     for attack in existing_attacks {
-        ctx.db.saved_attacks().saved_attack_id().delete(&attack.saved_attack_id);
+        ctx.db
+            .saved_attacks()
+            .saved_attack_id()
+            .delete(&attack.saved_attack_id);
     }
-    log::info!("SaveBuild: Cleared {} existing saved attacks", attacks_count);
+    log::info!(
+        "SaveBuild: Cleared {} existing saved attacks",
+        attacks_count
+    );
 
     // Save the player's core stats
     ctx.db.saved_build().insert(SavedBuild {
@@ -89,13 +107,23 @@ pub fn save_build(ctx: &ReducerContext) {
         hp_regen: player.hp_regen,
     });
 
-    log::info!("SaveBuild: Saved core stats - MaxHP: {}, Armor: {}, Speed: {}, HPRegen: {}", 
-               player.max_hp, player.armor, player.speed, player.hp_regen);
+    log::info!(
+        "SaveBuild: Saved core stats - MaxHP: {}, Armor: {}, Speed: {}, HPRegen: {}",
+        player.max_hp,
+        player.armor,
+        player.speed,
+        player.hp_regen
+    );
 
     // Save all player's scheduled attacks
-    let scheduled_attacks: Vec<_> = ctx.db.player_scheduled_attacks().player_id().filter(&player_id).collect();
+    let scheduled_attacks: Vec<_> = ctx
+        .db
+        .player_scheduled_attacks()
+        .player_id()
+        .filter(&player_id)
+        .collect();
     let mut saved_count = 0;
-    
+
     for scheduled_attack in scheduled_attacks {
         ctx.db.saved_attacks().insert(SavedAttack {
             saved_attack_id: 0,
@@ -115,13 +143,23 @@ pub fn save_build(ctx: &ReducerContext) {
             armor_piercing: scheduled_attack.armor_piercing,
         });
         saved_count += 1;
-        
-        log::info!("SaveBuild: Saved attack {:?} - Damage: {}, Projectiles: {}, Speed: {}, Cooldown: {}ms", 
-                   scheduled_attack.attack_type, scheduled_attack.damage, scheduled_attack.projectiles, scheduled_attack.speed, scheduled_attack.cooldown);
+
+        log::info!(
+            "SaveBuild: Saved attack {:?} - Damage: {}, Projectiles: {}, Speed: {}, Cooldown: {}ms",
+            scheduled_attack.attack_type,
+            scheduled_attack.damage,
+            scheduled_attack.projectiles,
+            scheduled_attack.speed,
+            scheduled_attack.cooldown
+        );
     }
 
-    log::info!("SaveBuild: Successfully saved build with {} attacks for player {} ({})", 
-               saved_count, player.name, player_id);
+    log::info!(
+        "SaveBuild: Successfully saved build with {} attacks for player {} ({})",
+        saved_count,
+        player.name,
+        player_id
+    );
 }
 
 // Admin-only cheat reducer to load the saved build onto the current player
@@ -129,12 +167,16 @@ pub fn save_build(ctx: &ReducerContext) {
 pub fn load_build(ctx: &ReducerContext) {
     // Check admin access first
     crate::require_admin_access(ctx, "LoadBuild");
-    
+
     // Get the identity of the caller
-    let identity = ctx.sender;
-    
+    let identity = ctx.sender();
+
     // Find the account for the caller
-    let account = ctx.db.account().identity().find(&identity)
+    let account = ctx
+        .db
+        .account()
+        .identity()
+        .find(&identity)
         .expect("LoadBuild: Account does not exist for caller");
 
     let player_id = account.current_player_id;
@@ -144,10 +186,18 @@ pub fn load_build(ctx: &ReducerContext) {
     }
 
     // Get the player data
-    let mut player = ctx.db.player().player_id().find(&player_id)
+    let mut player = ctx
+        .db
+        .player()
+        .player_id()
+        .find(&player_id)
         .expect(&format!("LoadBuild: Player {} does not exist", player_id));
 
-    log::info!("LoadBuild: Loading build onto player {} ({})", player.name, player_id);
+    log::info!(
+        "LoadBuild: Loading build onto player {} ({})",
+        player.name,
+        player_id
+    );
 
     // Check if we have a saved build to load
     let saved_build = ctx.db.saved_build().build_id().find(&1);
@@ -158,14 +208,25 @@ pub fn load_build(ctx: &ReducerContext) {
     let saved_build = saved_build.unwrap();
 
     // Cancel all existing scheduled attacks for the player
-    let existing_attacks: Vec<_> = ctx.db.player_scheduled_attacks().player_id().filter(&player_id).collect();
+    let existing_attacks: Vec<_> = ctx
+        .db
+        .player_scheduled_attacks()
+        .player_id()
+        .filter(&player_id)
+        .collect();
     let mut cancelled_count = 0;
-    
+
     for attack in existing_attacks {
-        ctx.db.player_scheduled_attacks().scheduled_id().delete(&attack.scheduled_id);
+        ctx.db
+            .player_scheduled_attacks()
+            .scheduled_id()
+            .delete(&attack.scheduled_id);
         cancelled_count += 1;
     }
-    log::info!("LoadBuild: Cancelled {} existing scheduled attacks", cancelled_count);
+    log::info!(
+        "LoadBuild: Cancelled {} existing scheduled attacks",
+        cancelled_count
+    );
 
     // Update player's core stats from saved build
     player.max_hp = saved_build.max_hp;
@@ -180,8 +241,13 @@ pub fn load_build(ctx: &ReducerContext) {
     // Update the player in the database
     ctx.db.player().player_id().update(player);
 
-    log::info!("LoadBuild: Updated core stats - MaxHP: {}, Armor: {}, Speed: {}, HPRegen: {}", 
-               saved_build.max_hp, saved_build.armor, saved_build.speed, saved_build.hp_regen);
+    log::info!(
+        "LoadBuild: Updated core stats - MaxHP: {}, Armor: {}, Speed: {}, HPRegen: {}",
+        saved_build.max_hp,
+        saved_build.armor,
+        saved_build.speed,
+        saved_build.hp_regen
+    );
 
     // Load and schedule all saved attacks
     let saved_attacks: Vec<_> = ctx.db.saved_attacks().iter().collect();
@@ -192,31 +258,37 @@ pub fn load_build(ctx: &ReducerContext) {
         let cooldown = saved_attack.cooldown;
 
         // Create new scheduled attack using saved data (including upgraded cooldown)
-        ctx.db.player_scheduled_attacks().insert(crate::PlayerScheduledAttack {
-            scheduled_id: 0,
-            player_id,
-            attack_type: saved_attack.attack_type.clone(),
-            skill_level: saved_attack.skill_level,
-            parameter_u: saved_attack.parameter_u,
-            parameter_i: saved_attack.parameter_i,
-            attack_count: saved_attack.attack_count,
-            cooldown: saved_attack.cooldown,
-            duration: saved_attack.duration,
-            projectiles: saved_attack.projectiles,
-            fire_delay: saved_attack.fire_delay,
-            speed: saved_attack.speed,
-            piercing: saved_attack.piercing,
-            radius: saved_attack.radius,
-            damage: saved_attack.damage,
-            armor_piercing: saved_attack.armor_piercing,
-            scheduled_at: ScheduleAt::Interval(Duration::from_millis(cooldown as u64).into()),
-        });
+        ctx.db
+            .player_scheduled_attacks()
+            .insert(crate::PlayerScheduledAttack {
+                scheduled_id: 0,
+                player_id,
+                attack_type: saved_attack.attack_type.clone(),
+                skill_level: saved_attack.skill_level,
+                parameter_u: saved_attack.parameter_u,
+                parameter_i: saved_attack.parameter_i,
+                attack_count: saved_attack.attack_count,
+                cooldown: saved_attack.cooldown,
+                duration: saved_attack.duration,
+                projectiles: saved_attack.projectiles,
+                fire_delay: saved_attack.fire_delay,
+                speed: saved_attack.speed,
+                piercing: saved_attack.piercing,
+                radius: saved_attack.radius,
+                damage: saved_attack.damage,
+                armor_piercing: saved_attack.armor_piercing,
+                scheduled_at: ScheduleAt::Interval(Duration::from_millis(cooldown as u64).into()),
+            });
         loaded_count += 1;
 
         log::info!("LoadBuild: Loaded attack {:?} - Damage: {}, Projectiles: {}, Speed: {}, Cooldown: {}ms", 
                    saved_attack.attack_type, saved_attack.damage, saved_attack.projectiles, saved_attack.speed, saved_attack.cooldown);
     }
 
-    log::info!("LoadBuild: Successfully loaded build with {} attacks onto player {} ({})", 
-               loaded_count, player_name, player_id);
-} 
+    log::info!(
+        "LoadBuild: Successfully loaded build with {} attacks onto player {} ({})",
+        loaded_count,
+        player_name,
+        player_id
+    );
+}

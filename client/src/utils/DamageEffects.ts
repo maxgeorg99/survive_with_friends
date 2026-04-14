@@ -2,7 +2,7 @@
  * Utility functions for rendering damage visual effects
  */
 
-import Phaser from 'phaser';
+import * as Phaser from 'phaser';
 
 // Constants for player damage effects
 export const PLAYER_DAMAGE_FLASH_DURATION = 300; // milliseconds

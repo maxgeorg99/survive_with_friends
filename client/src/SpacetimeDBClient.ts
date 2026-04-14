@@ -54,7 +54,7 @@ class SpacetimeDBClient {
         // The actual DbConnection instance is received in onConnect.
         DbConnection.builder()
             .withUri(URI_TO_USE)
-            .withModuleName(SPACETIMEDB_DB_NAME)
+            .withDatabaseName(SPACETIMEDB_DB_NAME)
             .withToken(localStorage.getItem(TOKEN_TO_USE) || '')
             //.withToken('')
             .onConnect(this.handleConnect.bind(this))

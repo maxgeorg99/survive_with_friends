@@ -3,104 +3,19 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
-import { World } from "./world_type";
-import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
+  TypeBuilder as __TypeBuilder,
+  t as __t,
+  type AlgebraicTypeType as __AlgebraicTypeType,
+  type Infer as __Infer,
+} from "spacetimedb";
 
-/**
- * Table handle for the table `world`.
- *
- * Obtain a handle from the [`world`] property on [`RemoteTables`],
- * like `ctx.db.world`.
- *
- * Users are encouraged not to explicitly reference this type,
- * but to directly chain method calls,
- * like `ctx.db.world.on_insert(...)`.
- */
-export class WorldTableHandle {
-  tableCache: TableCache<World>;
-
-  constructor(tableCache: TableCache<World>) {
-    this.tableCache = tableCache;
-  }
-
-  count(): number {
-    return this.tableCache.count();
-  }
-
-  iter(): Iterable<World> {
-    return this.tableCache.iter();
-  }
-  /**
-   * Access to the `worldId` unique index on the table `world`,
-   * which allows point queries on the field of the same name
-   * via the [`WorldWorldIdUnique.find`] method.
-   *
-   * Users are encouraged not to explicitly reference this type,
-   * but to directly chain method calls,
-   * like `ctx.db.world.worldId().find(...)`.
-   *
-   * Get a handle on the `worldId` unique index on the table `world`.
-   */
-  worldId = {
-    // Find the subscribed row whose `worldId` column value is equal to `col_val`,
-    // if such a row is present in the client cache.
-    find: (col_val: number): World | undefined => {
-      for (let row of this.tableCache.iter()) {
-        if (deepEqual(row.worldId, col_val)) {
-          return row;
-        }
-      }
-    },
-  };
-
-  onInsert = (cb: (ctx: EventContext, row: World) => void) => {
-    return this.tableCache.onInsert(cb);
-  }
-
-  removeOnInsert = (cb: (ctx: EventContext, row: World) => void) => {
-    return this.tableCache.removeOnInsert(cb);
-  }
-
-  onDelete = (cb: (ctx: EventContext, row: World) => void) => {
-    return this.tableCache.onDelete(cb);
-  }
-
-  removeOnDelete = (cb: (ctx: EventContext, row: World) => void) => {
-    return this.tableCache.removeOnDelete(cb);
-  }
-
-  // Updates are only defined for tables with primary keys.
-  onUpdate = (cb: (ctx: EventContext, oldRow: World, newRow: World) => void) => {
-    return this.tableCache.onUpdate(cb);
-  }
-
-  removeOnUpdate = (cb: (ctx: EventContext, onRow: World, newRow: World) => void) => {
-    return this.tableCache.removeOnUpdate(cb);
-  }}
+export default __t.row({
+  worldId: __t.u32().primaryKey().name("world_id"),
+  tickCount: __t.u32().name("tick_count"),
+  lastTickTime: __t.timestamp().name("last_tick_time"),
+  averageTickMs: __t.f64().name("average_tick_ms"),
+  minTickMs: __t.f64().name("min_tick_ms"),
+  maxTickMs: __t.f64().name("max_tick_ms"),
+  timingSamplesCollected: __t.u32().name("timing_samples_collected"),
+});

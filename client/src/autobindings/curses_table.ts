@@ -3,106 +3,20 @@
 
 /* eslint-disable */
 /* tslint:disable */
-// @ts-nocheck
 import {
-  AlgebraicType,
-  AlgebraicValue,
-  BinaryReader,
-  BinaryWriter,
-  CallReducerFlags,
-  ConnectionId,
-  DbConnectionBuilder,
-  DbConnectionImpl,
-  DbContext,
-  ErrorContextInterface,
-  Event,
-  EventContextInterface,
-  Identity,
-  ProductType,
-  ProductTypeElement,
-  ReducerEventContextInterface,
-  SubscriptionBuilderImpl,
-  SubscriptionEventContextInterface,
-  SumType,
-  SumTypeVariant,
-  TableCache,
-  TimeDuration,
-  Timestamp,
-  deepEqual,
-} from "@clockworklabs/spacetimedb-sdk";
-import { Curse } from "./curse_type";
-import { CurseType as __CurseType } from "./curse_type_type";
+  TypeBuilder as __TypeBuilder,
+  t as __t,
+  type AlgebraicTypeType as __AlgebraicTypeType,
+  type Infer as __Infer,
+} from "spacetimedb";
+import {
+  CurseType,
+} from "./types";
 
-import { EventContext, Reducer, RemoteReducers, RemoteTables } from ".";
 
-/**
- * Table handle for the table `curses`.
- *
- * Obtain a handle from the [`curses`] property on [`RemoteTables`],
- * like `ctx.db.curses`.
- *
- * Users are encouraged not to explicitly reference this type,
- * but to directly chain method calls,
- * like `ctx.db.curses.on_insert(...)`.
- */
-export class CursesTableHandle {
-  tableCache: TableCache<Curse>;
-
-  constructor(tableCache: TableCache<Curse>) {
-    this.tableCache = tableCache;
-  }
-
-  count(): number {
-    return this.tableCache.count();
-  }
-
-  iter(): Iterable<Curse> {
-    return this.tableCache.iter();
-  }
-  /**
-   * Access to the `curseId` unique index on the table `curses`,
-   * which allows point queries on the field of the same name
-   * via the [`CursesCurseIdUnique.find`] method.
-   *
-   * Users are encouraged not to explicitly reference this type,
-   * but to directly chain method calls,
-   * like `ctx.db.curses.curseId().find(...)`.
-   *
-   * Get a handle on the `curseId` unique index on the table `curses`.
-   */
-  curseId = {
-    // Find the subscribed row whose `curseId` column value is equal to `col_val`,
-    // if such a row is present in the client cache.
-    find: (col_val: bigint): Curse | undefined => {
-      for (let row of this.tableCache.iter()) {
-        if (deepEqual(row.curseId, col_val)) {
-          return row;
-        }
-      }
-    },
-  };
-
-  onInsert = (cb: (ctx: EventContext, row: Curse) => void) => {
-    return this.tableCache.onInsert(cb);
-  }
-
-  removeOnInsert = (cb: (ctx: EventContext, row: Curse) => void) => {
-    return this.tableCache.removeOnInsert(cb);
-  }
-
-  onDelete = (cb: (ctx: EventContext, row: Curse) => void) => {
-    return this.tableCache.onDelete(cb);
-  }
-
-  removeOnDelete = (cb: (ctx: EventContext, row: Curse) => void) => {
-    return this.tableCache.removeOnDelete(cb);
-  }
-
-  // Updates are only defined for tables with primary keys.
-  onUpdate = (cb: (ctx: EventContext, oldRow: Curse, newRow: Curse) => void) => {
-    return this.tableCache.onUpdate(cb);
-  }
-
-  removeOnUpdate = (cb: (ctx: EventContext, onRow: Curse, newRow: Curse) => void) => {
-    return this.tableCache.removeOnUpdate(cb);
-  }}
+export default __t.row({
+  curseId: __t.u64().primaryKey().name("curse_id"),
+  get curseType() {
+    return CurseType.name("curse_type");
+  },
+});

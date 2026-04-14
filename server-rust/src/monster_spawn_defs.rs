@@ -1,5 +1,5 @@
-use spacetimedb::{ReducerContext, rand::Rng, Table};
-use crate::{MonsterType, game_state, account, boss_spawn_timer};
+use crate::{account, boss_spawn_timer, game_state, MonsterType};
+use spacetimedb::{rand::Rng, ReducerContext, Table};
 use std::collections::HashMap;
 
 // Maximum tier level (tier increases every 30 seconds up to this max)
@@ -21,7 +21,6 @@ pub const TIER_SPAWN_WEIGHTS: [&[(MonsterType, u32)]; 6] = [
         (MonsterType::Imp, 0),
         (MonsterType::Zombie, 0),
     ],
-    
     // Tier 1 (50-100s):
     &[
         (MonsterType::Rat, 40),
@@ -31,7 +30,6 @@ pub const TIER_SPAWN_WEIGHTS: [&[(MonsterType, u32)]; 6] = [
         (MonsterType::Imp, 0),
         (MonsterType::Zombie, 0),
     ],
-    
     // Tier 2 (100-150s):
     &[
         (MonsterType::Rat, 30),
@@ -41,7 +39,6 @@ pub const TIER_SPAWN_WEIGHTS: [&[(MonsterType, u32)]; 6] = [
         (MonsterType::Imp, 0),
         (MonsterType::Zombie, 0),
     ],
-    
     // Tier 3 (150-200s):
     &[
         (MonsterType::Rat, 20),
@@ -51,7 +48,6 @@ pub const TIER_SPAWN_WEIGHTS: [&[(MonsterType, u32)]; 6] = [
         (MonsterType::Imp, 5),
         (MonsterType::Zombie, 0),
     ],
-    
     // Tier 4 (200-250s):
     &[
         (MonsterType::Rat, 10),
@@ -61,7 +57,6 @@ pub const TIER_SPAWN_WEIGHTS: [&[(MonsterType, u32)]; 6] = [
         (MonsterType::Imp, 10),
         (MonsterType::Zombie, 5),
     ],
-    
     // Tier 5 (250-300s):
     &[
         (MonsterType::Rat, 5),
@@ -84,25 +79,31 @@ pub fn calculate_current_tier(ctx: &ReducerContext) -> u32 {
     } else {
         // No boss timer found, fallback to game state
         log::warn!("No boss spawn timer found, falling back to game state for session timing");
-        ctx.db.game_state().id().find(&0)
+        ctx.db
+            .game_state()
+            .id()
+            .find(&0)
             .map(|gs| gs.game_start_time)
             .unwrap_or(ctx.timestamp)
     };
-    
+
     // Calculate elapsed time in seconds since session start
     if let Some(elapsed_duration) = ctx.timestamp.duration_since(session_start_time) {
         let elapsed_seconds = elapsed_duration.as_secs();
-        
+
         // Check for BossAppearsSooner curse to accelerate tier progression
-        let tier_interval = if crate::curses_defs::is_curse_active(ctx, crate::curses_defs::CurseType::BossAppearsSooner) {
+        let tier_interval = if crate::curses_defs::is_curse_active(
+            ctx,
+            crate::curses_defs::CurseType::BossAppearsSooner,
+        ) {
             45 // Faster tier progression when curse is active
         } else {
             TIER_INCREASE_INTERVAL_SECONDS // Normal 50 second intervals
         };
-        
+
         // Calculate tier (increases every tier_interval seconds)
         let calculated_tier = elapsed_seconds / tier_interval;
-        
+
         // Cap at maximum tier
         calculated_tier.min(MAX_TIER as u64) as u32
     } else {
@@ -116,20 +117,23 @@ pub fn calculate_current_tier(ctx: &ReducerContext) -> u32 {
 pub fn select_weighted_monster_type(ctx: &ReducerContext, tier: u32) -> MonsterType {
     let tier_index = (tier as usize).min(TIER_SPAWN_WEIGHTS.len() - 1);
     let weights = TIER_SPAWN_WEIGHTS[tier_index];
-    
+
     // Calculate total weight
     let total_weight: u32 = weights.iter().map(|(_, weight)| weight).sum();
-    
+
     if total_weight == 0 {
         // Fallback to Rat if all weights are 0
-        log::warn!("All spawn weights are 0 for tier {}, defaulting to Rat", tier);
+        log::warn!(
+            "All spawn weights are 0 for tier {}, defaulting to Rat",
+            tier
+        );
         return MonsterType::Rat;
     }
-    
+
     // Generate random number between 1 and total_weight (inclusive)
     let mut rng = ctx.rng();
     let mut random_value = rng.gen_range(1..=total_weight);
-    
+
     // Find which monster type this random value corresponds to
     for &(ref monster_type, weight) in weights.iter() {
         if random_value <= weight {
@@ -137,9 +141,12 @@ pub fn select_weighted_monster_type(ctx: &ReducerContext, tier: u32) -> MonsterT
         }
         random_value -= weight;
     }
-    
+
     // Fallback (should never reach here) - return the first monster type
-    log::warn!("Weighted selection failed for tier {}, defaulting to Rat", tier);
+    log::warn!(
+        "Weighted selection failed for tier {}, defaulting to Rat",
+        tier
+    );
     MonsterType::Rat
 }
 
@@ -147,13 +154,13 @@ pub fn select_weighted_monster_type(ctx: &ReducerContext, tier: u32) -> MonsterT
 pub fn get_tier_weights_debug_string(tier: u32) -> String {
     let tier_index = (tier as usize).min(TIER_SPAWN_WEIGHTS.len() - 1);
     let weights = TIER_SPAWN_WEIGHTS[tier_index];
-    
+
     // Create a HashMap for easy lookup
     let weight_map: HashMap<MonsterType, u32> = weights.iter().cloned().collect();
-    
+
     format!(
         "Tier {} weights: Rat={}, Slime={}, Bat={}, Orc={}, Imp={}, Zombie={}",
-        tier, 
+        tier,
         weight_map.get(&MonsterType::Rat).unwrap_or(&0),
         weight_map.get(&MonsterType::Slime).unwrap_or(&0),
         weight_map.get(&MonsterType::Bat).unwrap_or(&0),
@@ -168,12 +175,13 @@ pub fn get_spawn_percentages(tier: u32) -> Vec<(MonsterType, f32)> {
     let tier_index = (tier as usize).min(TIER_SPAWN_WEIGHTS.len() - 1);
     let weights = TIER_SPAWN_WEIGHTS[tier_index];
     let total_weight: u32 = weights.iter().map(|(_, weight)| weight).sum();
-    
+
     if total_weight == 0 {
         return vec![];
     }
-    
-    weights.iter()
+
+    weights
+        .iter()
         .map(|&(ref monster_type, weight)| {
             let percentage = (weight as f32 / total_weight as f32) * 100.0;
             (monster_type.clone(), percentage)
@@ -185,52 +193,66 @@ pub fn get_spawn_percentages(tier: u32) -> Vec<(MonsterType, f32)> {
 #[spacetimedb::reducer]
 pub fn debug_check_tier(ctx: &spacetimedb::ReducerContext) {
     // Get the caller's identity
-    let caller_identity = ctx.sender;
-    
+    let caller_identity = ctx.sender();
+
     // Find the caller's account
     let account_opt = ctx.db.account().identity().find(&caller_identity);
     if account_opt.is_none() {
         log::error!("debug_check_tier: Account not found for caller");
         return;
     }
-    
+
     let account = account_opt.unwrap();
     if account.current_player_id == 0 {
         log::error!("debug_check_tier: Caller has no active player");
         return;
     }
-    
+
     // Calculate current tier
     let current_tier = calculate_current_tier(ctx);
-    
+
     // Get spawn percentages for this tier
     let percentages = get_spawn_percentages(current_tier);
-    
+
     // Calculate elapsed time (use same logic as calculate_current_tier)
     let session_start_time = if let Some(boss_timer) = ctx.db.boss_spawn_timer().iter().next() {
         boss_timer.session_start_time
     } else {
-        ctx.db.game_state().id().find(&0)
+        ctx.db
+            .game_state()
+            .id()
+            .find(&0)
             .map(|gs| gs.game_start_time)
             .unwrap_or(ctx.timestamp)
     };
-    
-    let elapsed_seconds = if let Some(elapsed_duration) = ctx.timestamp.duration_since(session_start_time) {
-        elapsed_duration.as_secs()
-    } else {
-        0
-    };
-    
+
+    let elapsed_seconds =
+        if let Some(elapsed_duration) = ctx.timestamp.duration_since(session_start_time) {
+            elapsed_duration.as_secs()
+        } else {
+            0
+        };
+
     log::info!("=== TIER DEBUG INFO ===");
-    log::info!("Current tier: {} (elapsed: {}s)", current_tier, elapsed_seconds);
-    log::info!("Tier increases every {} seconds", TIER_INCREASE_INTERVAL_SECONDS);
+    log::info!(
+        "Current tier: {} (elapsed: {}s)",
+        current_tier,
+        elapsed_seconds
+    );
+    log::info!(
+        "Tier increases every {} seconds",
+        TIER_INCREASE_INTERVAL_SECONDS
+    );
     log::info!("Max tier: {}", MAX_TIER);
-    log::info!("Current spawn weights: {}", get_tier_weights_debug_string(current_tier));
-    
+    log::info!(
+        "Current spawn weights: {}",
+        get_tier_weights_debug_string(current_tier)
+    );
+
     log::info!("Spawn percentages for tier {}:", current_tier);
     for (monster_type, percentage) in percentages {
         log::info!("  {:?}: {:.1}%", monster_type, percentage);
     }
     log::info!("  VoidChest: 0.5% (fixed rare spawn)");
     log::info!("======================");
-} 
+}

@@ -1,5 +1,5 @@
-import Phaser from 'phaser';
-import { ChosenUpgradeData } from '../generated/chosen_upgrade_data_type';
+import * as Phaser from 'phaser';
+import { ChosenUpgradeData } from '../autobindings/types';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { AttackType } from '../autobindings';
 
