@@ -335,10 +335,10 @@ export default class BossTimerUI {
         
         // Update timer text if game state exists
         if (this.spacetimeClient.sdkConnection?.db) {
-            const gameState = this.spacetimeClient.sdkConnection.db.gameState.id.find(0);
+            const gameState = this.spacetimeClient.sdkConnection.db.game_state.id.find(0);
             if (gameState) {
                 // Show timer if we have a boss spawn timer
-                const bossTimers = Array.from(this.spacetimeClient.sdkConnection.db.bossSpawnTimer.iter());
+                const bossTimers = Array.from(this.spacetimeClient.sdkConnection.db.boss_spawn_timer.iter());
                 if (bossTimers.length > 0 && !gameState.bossActive) {
                     // Force visibility and check container properties
                     this.container.setVisible(true);
@@ -447,7 +447,7 @@ export default class BossTimerUI {
         if (this.spacetimeClient?.sdkConnection?.db) {
             try {
                 // Try to find a boss timer in the database
-                const bossTimers = Array.from(this.spacetimeClient.sdkConnection.db.bossSpawnTimer.iter());
+                const bossTimers = Array.from(this.spacetimeClient.sdkConnection.db.boss_spawn_timer.iter());
                 
                 if (bossTimers.length > 0) {
                     // Timer exists, get the first one

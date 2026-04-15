@@ -8,7 +8,7 @@ import VictoryScene from './scenes/VictoryScene';
 import CurseVictoryScene from './scenes/CurseVictoryScene';
 import LoadingScene from './scenes/LoadingScene';
 import BestaryScene from './scenes/BestaryScene';
-import { Identity } from '@clockworklabs/spacetimedb-sdk';
+import { Identity } from 'spacetimedb';
 import SpacetimeDBClient from './SpacetimeDBClient';
 import { DbConnection, ErrorContext, SubscriptionEventContext } from './autobindings';
 import { GameEvents } from './constants/GameEvents';
@@ -323,15 +323,15 @@ const onSubscriptionApplied = (ctx: SubscriptionEventContext) => {
     });
 
     // Attack event listeners
-    localDb.activeAttacks.onInsert((ctx, attack) => {
+    localDb.active_attacks.onInsert((ctx, attack) => {
         gameEvents.emit(GameEvents.ATTACK_CREATED, ctx, attack);
     });
 
-    localDb.activeAttacks.onUpdate((ctx, oldAttack, newAttack) => {
+    localDb.active_attacks.onUpdate((ctx, oldAttack, newAttack) => {
         gameEvents.emit(GameEvents.ATTACK_UPDATED, ctx, oldAttack, newAttack);
     });
 
-    localDb.activeAttacks.onDelete((ctx, attack) => {
+    localDb.active_attacks.onDelete((ctx, attack) => {
         gameEvents.emit(GameEvents.ATTACK_DELETED, ctx, attack);
     });
 

@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
-import { MonsterSpawners, EventContext } from "../autobindings";
+import { EventContext } from "../autobindings";
+import { MonsterSpawners } from "../autobindings/types";
 import SpacetimeDBClient from '../SpacetimeDBClient';
 
 // Constants for visual appearance and animation
@@ -26,8 +27,8 @@ export default class MonsterSpawnerManager {
         // Set up event handlers for monster spawner table events
         const db = this.spacetimeDBClient.sdkConnection?.db;
         if (db) {
-            db.monsterSpawners?.onInsert(this.handleSpawnerInsert.bind(this));
-            db.monsterSpawners?.onDelete(this.handleSpawnerDelete.bind(this));
+            db.monster_spawners?.onInsert(this.handleSpawnerInsert.bind(this));
+            db.monster_spawners?.onDelete(this.handleSpawnerDelete.bind(this));
         } else {
             console.error("Could not set up MonsterSpawnerManager database listeners (database not connected)");
         }

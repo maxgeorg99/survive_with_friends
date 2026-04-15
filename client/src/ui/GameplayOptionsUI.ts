@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser';
 import OptionsUI, { SliderControl } from './OptionsUI';
-import { SetPlayerPvpMode } from '../autobindings/set_player_pvp_mode_reducer';
+
 
 export default class GameplayOptionsUI extends OptionsUI {
     private pvpToggle!: Phaser.GameObjects.Container;
@@ -267,7 +267,7 @@ export default class GameplayOptionsUI extends OptionsUI {
         
         try {
             // Call the server reducer to toggle PvP mode
-            this.spacetimeDBClient.sdkConnection.reducers.setPlayerPvpMode(newPvpStatus);
+            this.spacetimeDBClient.sdkConnection.reducers.setPlayerPvpMode({ pvpEnabled: newPvpStatus });
             
             // Play sound effect
             const soundManager = (window as any).soundManager;

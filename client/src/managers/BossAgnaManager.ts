@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
-import { EventContext, AgnaMagicCircle, AgnaCandleSpawn, ActiveMonsterAttack, MonsterAttackType, Monsters, AiState, Player, AgnaSummoningCircleSpawner } from '../autobindings';
+import { EventContext } from '../autobindings';
+import { AgnaMagicCircle, AgnaCandleSpawn, ActiveMonsterAttack, MonsterAttackType, Monsters, AiState, Player, AgnaSummoningCircleSpawner } from '../autobindings/types';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 
 const MAGIC_CIRCLE_ASSET_KEY = 'agna_magic_circle';
@@ -82,19 +83,19 @@ export default class BossAgnaManager {
         // Set up event handlers for magic circle table events, candle spawn events, active attacks, monster updates, and player deletes
         const db = this.spacetimeDBClient.sdkConnection?.db;
         if (db) {
-            db.agnaMagicCircles?.onInsert(this.boundHandleCircleInsert);
-            db.agnaMagicCircles?.onUpdate(this.boundHandleCircleUpdate);
-            db.agnaMagicCircles?.onDelete(this.boundHandleCircleDelete);
-            db.agnaCandleSpawns?.onInsert(this.boundHandleCandleSpawnInsert);
-            db.agnaCandleSpawns?.onUpdate(this.boundHandleCandleSpawnUpdate);
-            db.agnaCandleSpawns?.onDelete(this.boundHandleCandleSpawnDelete);
-            db.activeMonsterAttacks?.onInsert(this.boundHandleAttackInsert);
+            db.agna_magic_circles?.onInsert(this.boundHandleCircleInsert);
+            db.agna_magic_circles?.onUpdate(this.boundHandleCircleUpdate);
+            db.agna_magic_circles?.onDelete(this.boundHandleCircleDelete);
+            db.agna_candle_spawns?.onInsert(this.boundHandleCandleSpawnInsert);
+            db.agna_candle_spawns?.onUpdate(this.boundHandleCandleSpawnUpdate);
+            db.agna_candle_spawns?.onDelete(this.boundHandleCandleSpawnDelete);
+            db.active_monster_attacks?.onInsert(this.boundHandleAttackInsert);
             db.monsters?.onUpdate(this.boundHandleMonsterUpdate);
             db.monsters?.onDelete(this.boundHandleMonsterDelete);
             db.player?.onUpdate(this.boundHandlePlayerUpdate);
             db.player?.onDelete(this.boundHandlePlayerDelete);
-            db.agnaSummoningCircleSpawner?.onInsert(this.boundHandleSummoningCircleInsert);
-            db.agnaSummoningCircleSpawner?.onDelete(this.boundHandleSummoningCircleDelete);
+            db.agna_summoning_circle_spawner?.onInsert(this.boundHandleSummoningCircleInsert);
+            db.agna_summoning_circle_spawner?.onDelete(this.boundHandleSummoningCircleDelete);
         } else {
             console.error("Could not set up BossAgnaManager database listeners (database not connected)");
         }
@@ -109,11 +110,11 @@ export default class BossAgnaManager {
 
         console.log("BossAgnaManager initializing magic circles and candle spawns");
         
-        for (const circle of ctx.db?.agnaMagicCircles?.iter() || []) {
+        for (const circle of ctx.db?.agna_magic_circles?.iter() || []) {
             this.createMagicCircle(circle);
         }
         
-        for (const candleSpawn of ctx.db?.agnaCandleSpawns?.iter() || []) {
+        for (const candleSpawn of ctx.db?.agna_candle_spawns?.iter() || []) {
             this.createCandleSpawn(candleSpawn);
         }
         
@@ -796,7 +797,7 @@ export default class BossAgnaManager {
             return;
         }
         
-        const agnaBoid = db.monstersBoid.monsterId.find(agnaBoss.monsterId);
+        const agnaBoid = db.monsters_boid.monsterId.find(agnaBoss.monsterId);
         if (!agnaBoid) {
             console.warn(`Cannot find boid for Agna boss ${agnaBoss.monsterId}`);
             return;
@@ -991,7 +992,7 @@ export default class BossAgnaManager {
             return;
         }
 
-        const agnaBoid = db.monstersBoid.monsterId.find(agnaBoss.monsterId);
+        const agnaBoid = db.monsters_boid.monsterId.find(agnaBoss.monsterId);
         if (!agnaBoid) {
             console.warn(`Cannot find boid for Agna boss ${agnaBoss.monsterId}`);
             return;
@@ -1437,19 +1438,19 @@ export default class BossAgnaManager {
     private unregisterListeners() {
         const db = this.spacetimeDBClient.sdkConnection?.db;
         if (db) {
-            db.agnaMagicCircles?.removeOnInsert(this.boundHandleCircleInsert);
-            db.agnaMagicCircles?.removeOnUpdate(this.boundHandleCircleUpdate);
-            db.agnaMagicCircles?.removeOnDelete(this.boundHandleCircleDelete);
-            db.agnaCandleSpawns?.removeOnInsert(this.boundHandleCandleSpawnInsert);
-            db.agnaCandleSpawns?.removeOnUpdate(this.boundHandleCandleSpawnUpdate);
-            db.agnaCandleSpawns?.removeOnDelete(this.boundHandleCandleSpawnDelete);
-            db.activeMonsterAttacks?.removeOnInsert(this.boundHandleAttackInsert);
+            db.agna_magic_circles?.removeOnInsert(this.boundHandleCircleInsert);
+            db.agna_magic_circles?.removeOnUpdate(this.boundHandleCircleUpdate);
+            db.agna_magic_circles?.removeOnDelete(this.boundHandleCircleDelete);
+            db.agna_candle_spawns?.removeOnInsert(this.boundHandleCandleSpawnInsert);
+            db.agna_candle_spawns?.removeOnUpdate(this.boundHandleCandleSpawnUpdate);
+            db.agna_candle_spawns?.removeOnDelete(this.boundHandleCandleSpawnDelete);
+            db.active_monster_attacks?.removeOnInsert(this.boundHandleAttackInsert);
             db.monsters?.removeOnUpdate(this.boundHandleMonsterUpdate);
             db.monsters?.removeOnDelete(this.boundHandleMonsterDelete);
             db.player?.removeOnUpdate(this.boundHandlePlayerUpdate);
             db.player?.removeOnDelete(this.boundHandlePlayerDelete);
-            db.agnaSummoningCircleSpawner?.removeOnInsert(this.boundHandleSummoningCircleInsert);
-            db.agnaSummoningCircleSpawner?.removeOnDelete(this.boundHandleSummoningCircleDelete);
+            db.agna_summoning_circle_spawner?.removeOnInsert(this.boundHandleSummoningCircleInsert);
+            db.agna_summoning_circle_spawner?.removeOnDelete(this.boundHandleSummoningCircleDelete);
             console.log("BossAgnaManager database listeners removed");
         }
     }

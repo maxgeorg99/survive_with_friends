@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser';
-import { ActiveAttack, AttackType, EventContext } from '../autobindings';
-import { AttackData } from '../autobindings';
+import { EventContext } from '../autobindings';
+import { ActiveAttack, AttackType, AttackData } from '../autobindings/types';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { GameEvents } from '../constants/GameEvents';
 
@@ -65,7 +65,7 @@ export class AttackManager {
         this.registerAttackListeners(); 
 
         // Force immediate update for all attacks with known entities
-        for (const attack of ctx.db?.activeAttacks.iter()) {
+        for (const attack of ctx.db?.active_attacks.iter()) {
             this.createOrUpdateAttackGraphic(ctx, attack);
         }
     }
@@ -588,7 +588,7 @@ export class AttackManager {
     }
 
     private findAttackDataByType(ctx: EventContext, attackType: AttackType): AttackData | undefined {
-        const attackDataItems = ctx.db?.attackData.iter();
+        const attackDataItems = ctx.db?.attack_data.iter();
         for (const data of attackDataItems) {
             if (data.attackType.tag === attackType.tag) {
                 return data;
@@ -624,7 +624,7 @@ export class AttackManager {
 
         // Update position of all attack graphics based on prediction
         for (const [attackId, attackGraphicData] of this.attackGraphics.entries()) {
-            const attack = this.spacetimeClient.sdkConnection.db.activeAttacks.activeAttackId.find(attackId);
+            const attack = this.spacetimeClient.sdkConnection.db.active_attacks.activeAttackId.find(attackId);
             if (!attack) continue;
             
             if (attackGraphicData.isShield) {

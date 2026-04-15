@@ -1,7 +1,6 @@
 import * as Phaser from 'phaser';
-import { ChosenUpgradeData } from '../autobindings/types';
+import { ChosenUpgradeData, AttackType } from '../autobindings/types';
 import SpacetimeDBClient from '../SpacetimeDBClient';
-import { AttackType } from '../autobindings';
 
 const UPGRADE_ICON_MAP: { [key: string]: string } = {
     'AttackSword': 'attack_sword',
@@ -73,9 +72,9 @@ export default class ChosenUpgradesUI {
     }
 
     private fetchUpgrades() {
-        if (this.spacetimeClient.sdkConnection?.db.chosenUpgrades?.iter) {
+        if (this.spacetimeClient.sdkConnection?.db.chosen_upgrades?.iter) {
             this.upgrades = Array.from(
-                this.spacetimeClient.sdkConnection.db.chosenUpgrades.iter()
+                this.spacetimeClient.sdkConnection.db.chosen_upgrades.iter()
             ).filter(u => u.playerId === this.localPlayerId);
         } else {
             this.upgrades = [];

@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
-import { Player, Entity, PlayerClass, Account, EventContext, ErrorContext, UpgradeOptionData } from "../autobindings";
+import { EventContext, ErrorContext } from "../autobindings";
+import { Player, Entity, PlayerClass, Account, UpgradeOptionData } from "../autobindings/types";
 import SpacetimeDBClient from '../SpacetimeDBClient'; // Path relative to client/src/managers/
 import GameScene from '../scenes/GameScene'; // Corrected import for default export
 import { AttackManager } from './AttackManager'; // Import AttackManager
@@ -71,7 +72,7 @@ export class DebugManager {
     private spawnBot(): void {
         if (this.spacetimedb && this.spacetimedb.sdkConnection) {
             console.log("DebugManager: Spawning bot...");
-            this.spacetimedb.sdkConnection.reducers.spawnBot();
+            this.spacetimedb.sdkConnection.reducers.spawnBot({});
         } else {
             console.warn("DebugManager: SpacetimeDB connection not available for spawning bot.");
         }
@@ -80,7 +81,7 @@ export class DebugManager {
     private triggerBossSpawnerTest(): void {
         if (this.spacetimedb && this.spacetimedb.sdkConnection) {
             console.log("DebugManager: Triggering boss spawner test...");
-            this.spacetimedb.sdkConnection.reducers.spawnBossForTesting();
+            this.spacetimedb.sdkConnection.reducers.spawnBossForTesting({});
         } else {
             console.warn("DebugManager: SpacetimeDB connection not available for triggering boss spawner test.");
         }
@@ -89,7 +90,7 @@ export class DebugManager {
     private spawnDebugSpecialGem(): void {
         if (this.spacetimedb && this.spacetimedb.sdkConnection) {
             console.log("DebugManager: Spawning debug special gem near player...");
-            this.spacetimedb.sdkConnection.reducers.spawnDebugSpecialGem();
+            this.spacetimedb.sdkConnection.reducers.spawnDebugSpecialGem({});
         } else {
             console.warn("DebugManager: SpacetimeDB connection or player position not available for spawning debug special gem.");
         }
@@ -98,7 +99,7 @@ export class DebugManager {
     private spawnDebugVoidChest(): void {
         if (this.spacetimedb && this.spacetimedb.sdkConnection) {
             console.log("DebugManager: Spawning debug VoidChest near player...");
-            this.spacetimedb.sdkConnection.reducers.spawnDebugVoidChest();
+            this.spacetimedb.sdkConnection.reducers.spawnDebugVoidChest({});
         } else {
             console.warn("DebugManager: SpacetimeDB connection or player position not available for spawning debug VoidChest.");
         }
@@ -107,7 +108,7 @@ export class DebugManager {
     private addRandomCurse(): void {
         if (this.spacetimedb && this.spacetimedb.sdkConnection) {
             console.log("DebugManager: Adding random curse for testing...");
-            this.spacetimedb.sdkConnection.reducers.adminAddCurse();
+            this.spacetimedb.sdkConnection.reducers.adminAddCurse({});
         } else {
             console.warn("DebugManager: SpacetimeDB connection not available for adding curse.");
         }
@@ -116,7 +117,7 @@ export class DebugManager {
     private clearAllCurses(): void {
         if (this.spacetimedb && this.spacetimedb.sdkConnection) {
             console.log("DebugManager: Clearing all curses...");
-            this.spacetimedb.sdkConnection.reducers.adminClearCurses();
+            this.spacetimedb.sdkConnection.reducers.adminClearCurses({});
         } else {
             console.warn("DebugManager: SpacetimeDB connection not available for clearing curses.");
         }
@@ -125,7 +126,7 @@ export class DebugManager {
     private spawnDebugLoreScroll(): void {
         if (this.spacetimedb && this.spacetimedb.sdkConnection) {
             console.log("DebugManager: Spawning debug Lore Scroll near player...");
-            this.spacetimedb.sdkConnection.reducers.spawnDebugLoreScroll();
+            this.spacetimedb.sdkConnection.reducers.spawnDebugLoreScroll({});
         } else {
             console.warn("DebugManager: SpacetimeDB connection or player position not available for spawning debug lore scroll.");
         }
@@ -134,7 +135,7 @@ export class DebugManager {
     private enableBotPvp(): void {
         if (this.spacetimedb && this.spacetimedb.sdkConnection) {
             console.log("DebugManager: Enabling PvP for all bots...");
-            this.spacetimedb.sdkConnection.reducers.debugEnableBotPvp();
+            this.spacetimedb.sdkConnection.reducers.debugEnableBotPvp({});
         } else {
             console.warn("DebugManager: SpacetimeDB connection not available for enabling PvP for all bots.");
         }
@@ -143,7 +144,7 @@ export class DebugManager {
     private setBossTypeEnder(): void {
         if (this.spacetimedb && this.spacetimedb.sdkConnection) {
             console.log("DebugManager: Setting boss type to Ender (client key 4)...");
-            this.spacetimedb.sdkConnection.reducers.debugSetBossType(4);
+            this.spacetimedb.sdkConnection.reducers.debugSetBossType({ clientKey: 4 });
         } else {
             console.warn("DebugManager: SpacetimeDB connection not available for setting boss type to Ender.");
         }
@@ -152,7 +153,7 @@ export class DebugManager {
     private setBossTypeAgna(): void {
         if (this.spacetimedb && this.spacetimedb.sdkConnection) {
             console.log("DebugManager: Setting boss type to Agna (client key 5)...");
-            this.spacetimedb.sdkConnection.reducers.debugSetBossType(5);
+            this.spacetimedb.sdkConnection.reducers.debugSetBossType({ clientKey: 5 });
         } else {
             console.warn("DebugManager: SpacetimeDB connection not available for setting boss type to Agna.");
         }
@@ -161,7 +162,7 @@ export class DebugManager {
     private setBossTypeSimon(): void {
         if (this.spacetimedb && this.spacetimedb.sdkConnection) {
             console.log("DebugManager: Setting boss type to Agna (client key 6)...");
-            this.spacetimedb.sdkConnection.reducers.debugSetBossType(6);
+            this.spacetimedb.sdkConnection.reducers.debugSetBossType({ clientKey: 6 });
         } else {
             console.warn("DebugManager: SpacetimeDB connection not available for setting boss type to Simon.");
         }
@@ -170,7 +171,7 @@ export class DebugManager {
     private setSuperHealth(): void {
         if (this.spacetimedb && this.spacetimedb.sdkConnection) {
             console.log("DebugManager: Setting super health (10000 HP)...");
-            this.spacetimedb.sdkConnection.reducers.debugSetSuperHealth();
+            this.spacetimedb.sdkConnection.reducers.debugSetSuperHealth({});
         } else {
             console.warn("DebugManager: SpacetimeDB connection not available for setting super health.");
         }
@@ -179,7 +180,7 @@ export class DebugManager {
     private saveBuild(): void {
         if (this.spacetimedb && this.spacetimedb.sdkConnection) {
             console.log("DebugManager: Saving current player build...");
-            this.spacetimedb.sdkConnection.reducers.saveBuild();
+            this.spacetimedb.sdkConnection.reducers.saveBuild({});
         } else {
             console.warn("DebugManager: SpacetimeDB connection not available for saving build.");
         }
@@ -188,7 +189,7 @@ export class DebugManager {
     private loadBuild(): void {
         if (this.spacetimedb && this.spacetimedb.sdkConnection) {
             console.log("DebugManager: Loading saved player build...");
-            this.spacetimedb.sdkConnection.reducers.loadBuild();
+            this.spacetimedb.sdkConnection.reducers.loadBuild({});
         } else {
             console.warn("DebugManager: SpacetimeDB connection not available for loading build.");
         }
@@ -197,7 +198,7 @@ export class DebugManager {
     private addDebugCurse(): void {
         if (this.spacetimedb && this.spacetimedb.sdkConnection) {
             console.log("DebugManager: Adding debug curse from test list...");
-            this.spacetimedb.sdkConnection.reducers.adminAddDebugCurse();
+            this.spacetimedb.sdkConnection.reducers.adminAddDebugCurse({});
         } else {
             console.warn("DebugManager: SpacetimeDB connection not available for adding debug curse.");
         }

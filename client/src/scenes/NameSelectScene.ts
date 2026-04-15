@@ -338,7 +338,7 @@ export default class NameSelectScene extends Phaser.Scene {
                 
                 // Call the reducer and catch any errors
                 try {
-                    this.spacetimeDBClient.sdkConnection.reducers.setName(name);
+                    this.spacetimeDBClient.sdkConnection.reducers.setName({ name });
                     console.log("NameSelectScene: setName reducer call completed successfully");
                     
                     // Play choose sound effect when name is set

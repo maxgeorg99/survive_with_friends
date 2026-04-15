@@ -1,7 +1,6 @@
 import * as Phaser from 'phaser';
 import SpacetimeDBClient from '../SpacetimeDBClient';
-import { Account } from '../autobindings';
-import { PlayerClass } from '../autobindings/types';
+import { Account, PlayerClass } from '../autobindings/types';
 import { GameEvents } from '../constants/GameEvents';
 import MusicManager from '../managers/MusicManager';
 import OptionsUI from '../ui/OptionsUI';
@@ -737,7 +736,7 @@ export default class ClassSelectScene extends Phaser.Scene {
                     
                     // Add error handling for the reducer call
                     try {
-                        this.spacetimeDBClient.sdkConnection.reducers.spawnPlayer(classId);
+                        this.spacetimeDBClient.sdkConnection.reducers.spawnPlayer({ classId });
                         console.log("ClassSelectScene: spawnPlayer reducer call completed");
                     } catch (reducerError) {
                         console.error("ClassSelectScene: Error calling spawnPlayer reducer:", reducerError);
@@ -885,7 +884,7 @@ export default class ClassSelectScene extends Phaser.Scene {
     private updateStatus() {
         if (!this.spacetimeDBClient.sdkConnection?.db) return;
 
-        const gameState = this.spacetimeDBClient.sdkConnection.db.gameState.id.find(0);
+        const gameState = this.spacetimeDBClient.sdkConnection.db.game_state.id.find(0);
         if (!gameState) {
             this.statusContainer.setVisible(false);
             return;
@@ -899,7 +898,7 @@ export default class ClassSelectScene extends Phaser.Scene {
         }
 
         // Check for boss spawn timer
-        const bossTimers = Array.from(this.spacetimeDBClient.sdkConnection.db.bossSpawnTimer.iter());
+        const bossTimers = Array.from(this.spacetimeDBClient.sdkConnection.db.boss_spawn_timer.iter());
         if (bossTimers.length > 0) {
             const now = Date.now();
             const timestamp = this.extractTimestampFromTimer(bossTimers[0]);
@@ -1019,7 +1018,7 @@ export default class ClassSelectScene extends Phaser.Scene {
         try {
             if (this.spacetimeDBClient.sdkConnection?.reducers) {
                 console.log("ClassSelectScene: Calling adminAddCurse reducer");
-                this.spacetimeDBClient.sdkConnection.reducers.adminAddCurse();
+                this.spacetimeDBClient.sdkConnection.reducers.adminAddCurse({});
                 console.log("ClassSelectScene: adminAddCurse reducer call completed successfully");
                 
                 // Play a sound effect to confirm the command was executed
@@ -1043,7 +1042,7 @@ export default class ClassSelectScene extends Phaser.Scene {
         try {
             if (this.spacetimeDBClient.sdkConnection?.reducers) {
                 console.log("ClassSelectScene: Calling adminClearCurses reducer");
-                this.spacetimeDBClient.sdkConnection.reducers.adminClearCurses();
+                this.spacetimeDBClient.sdkConnection.reducers.adminClearCurses({});
                 console.log("ClassSelectScene: adminClearCurses reducer call completed successfully");
                 
                 // Play a different sound effect to confirm curses were cleared
@@ -1067,7 +1066,7 @@ export default class ClassSelectScene extends Phaser.Scene {
         try {
             if (this.spacetimeDBClient.sdkConnection?.reducers) {
                 console.log("ClassSelectScene: Calling adminAddDebugCurse reducer");
-                this.spacetimeDBClient.sdkConnection.reducers.adminAddDebugCurse();
+                this.spacetimeDBClient.sdkConnection.reducers.adminAddDebugCurse({});
                 console.log("ClassSelectScene: adminAddDebugCurse reducer call completed successfully");
                 
                 // Play a sound effect to confirm the command was executed

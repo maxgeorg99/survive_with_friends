@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
-import { EventContext, LootCapsules } from "../autobindings";
+import { EventContext } from "../autobindings";
+import { LootCapsules } from "../autobindings/types";
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { GameEvents } from '../constants/GameEvents';
 
@@ -86,9 +87,9 @@ export default class LootCapsuleManager {
         const db = this.spacetimeDBClient.sdkConnection?.db;
         if (db) {
             // @ts-ignore - LootCapsules table might not be fully typed yet
-            db.lootCapsules?.onInsert(this.boundHandleCapsuleInsert);
+            db.loot_capsules?.onInsert(this.boundHandleCapsuleInsert);
             // @ts-ignore
-            db.lootCapsules?.onDelete(this.boundHandleCapsuleDelete);
+            db.loot_capsules?.onDelete(this.boundHandleCapsuleDelete);
         } else {
             console.error("Could not set up LootCapsuleManager database listeners (database not connected)");
         }
@@ -506,9 +507,9 @@ export default class LootCapsuleManager {
         const db = this.spacetimeDBClient.sdkConnection?.db;
         if (db) {
             // @ts-ignore - Remove the event listeners we registered
-            db.lootCapsules?.removeOnInsert(this.boundHandleCapsuleInsert);
+            db.loot_capsules?.removeOnInsert(this.boundHandleCapsuleInsert);
             // @ts-ignore
-            db.lootCapsules?.removeOnDelete(this.boundHandleCapsuleDelete);
+            db.loot_capsules?.removeOnDelete(this.boundHandleCapsuleDelete);
             console.log("LootCapsuleManager database listeners removed");
         }
     }

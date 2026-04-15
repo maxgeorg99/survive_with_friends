@@ -143,7 +143,7 @@ export default class GemManager {
             }
         }
         
-        const gem = ctx.db?.gems.entityId.find(entityData.entityId);
+        const gem = [...(ctx.db?.gems.iter() ?? [])].find(g => g.entityId === entityData.entityId);
                 
         if (gem) {
             // Entity belongs to a gem, update its position

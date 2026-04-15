@@ -1,6 +1,6 @@
-import { Identity, ErrorContextInterface } from '@clockworklabs/spacetimedb-sdk';
+import { Identity } from 'spacetimedb';
 // Import generated classes, including the generated DbConnection
-import { RemoteReducers, SetReducerFlags, RemoteTables, DbConnection, ErrorContext, SubscriptionEventContext } from "./autobindings"; // Removed Reducer, EventContext import as they seem unused here
+import { DbConnection, ErrorContext, SubscriptionEventContext } from "./autobindings";
 import { GameEvents } from './constants/GameEvents';
 
 // Define your SpacetimeDB connection details
@@ -171,51 +171,51 @@ class SpacetimeDBClient {
         }
 
         // Monster Boid Events
-        if (connection.db.monstersBoid) {
-            connection.db.monstersBoid.onUpdate((ctx, oldBoid, newBoid) => {
+        if (connection.db.monsters_boid) {
+            connection.db.monsters_boid.onUpdate((ctx, oldBoid, newBoid) => {
                 this.gameEvents.emit(GameEvents.MONSTER_BOID_UPDATED, ctx, oldBoid, newBoid);
             });
         }
 
         // Game State Events
-        if (connection.db.gameState) {
-            connection.db.gameState.onUpdate((ctx, oldState, newState) => {
+        if (connection.db.game_state) {
+            connection.db.game_state.onUpdate((ctx, oldState, newState) => {
                 this.gameEvents.emit(GameEvents.GAME_STATE_UPDATED, ctx, oldState, newState);
             });
         }
 
         // Boss Spawn Timer Events
-        if (connection.db.bossSpawnTimer) {
-            connection.db.bossSpawnTimer.onInsert((ctx, timer) => {
+        if (connection.db.boss_spawn_timer) {
+            connection.db.boss_spawn_timer.onInsert((ctx, timer) => {
                 this.gameEvents.emit(GameEvents.BOSS_SPAWN_TIMER_CREATED, ctx, timer);
             });
-            connection.db.bossSpawnTimer.onDelete((ctx, timer) => {
+            connection.db.boss_spawn_timer.onDelete((ctx, timer) => {
                 this.gameEvents.emit(GameEvents.BOSS_SPAWN_TIMER_DELETED, ctx, timer);
             });
         }
 
         // Attack Events
-        if (connection.db.activeAttacks) {
-            connection.db.activeAttacks.onInsert((ctx, attack) => {
+        if (connection.db.active_attacks) {
+            connection.db.active_attacks.onInsert((ctx, attack) => {
                 this.gameEvents.emit(GameEvents.ATTACK_CREATED, ctx, attack);
             });
-            connection.db.activeAttacks.onUpdate((ctx, oldAttack, newAttack) => {
+            connection.db.active_attacks.onUpdate((ctx, oldAttack, newAttack) => {
                 this.gameEvents.emit(GameEvents.ATTACK_UPDATED, ctx, oldAttack, newAttack);
             });
-            connection.db.activeAttacks.onDelete((ctx, attack) => {
+            connection.db.active_attacks.onDelete((ctx, attack) => {
                 this.gameEvents.emit(GameEvents.ATTACK_DELETED, ctx, attack);
             });
         }
 
         // Monster Attack Events
-        if (connection.db.activeMonsterAttacks) {
-            connection.db.activeMonsterAttacks.onInsert((ctx, attack) => {
+        if (connection.db.active_monster_attacks) {
+            connection.db.active_monster_attacks.onInsert((ctx, attack) => {
                 this.gameEvents.emit(GameEvents.MONSTER_ATTACK_CREATED, ctx, attack);
             });
-            connection.db.activeMonsterAttacks.onUpdate((ctx, oldAttack, newAttack) => {
+            connection.db.active_monster_attacks.onUpdate((ctx, oldAttack, newAttack) => {
                 this.gameEvents.emit(GameEvents.MONSTER_ATTACK_UPDATED, ctx, oldAttack, newAttack);
             });
-            connection.db.activeMonsterAttacks.onDelete((ctx, attack) => {
+            connection.db.active_monster_attacks.onDelete((ctx, attack) => {
                 this.gameEvents.emit(GameEvents.MONSTER_ATTACK_DELETED, ctx, attack);
             });
         }
@@ -245,17 +245,17 @@ class SpacetimeDBClient {
         // LootCapsule Events - Check if the loot_capsules table exists in the bindings
         try {
             // @ts-ignore - Ignore TS error since table might not exist in current bindings
-            if (connection.db.lootCapsules) {
+            if (connection.db.loot_capsules) {
                 // @ts-ignore
-                connection.db.lootCapsules.onInsert((ctx, capsule) => {
+                connection.db.loot_capsules.onInsert((ctx, capsule) => {
                     this.gameEvents.emit(GameEvents.LOOT_CAPSULE_CREATED, ctx, capsule);
                 });
                 // @ts-ignore
-                connection.db.lootCapsules.onUpdate((ctx, oldCapsule, newCapsule) => {
+                connection.db.loot_capsules.onUpdate((ctx, oldCapsule, newCapsule) => {
                     this.gameEvents.emit(GameEvents.LOOT_CAPSULE_UPDATED, ctx, oldCapsule, newCapsule);
                 });
                 // @ts-ignore
-                connection.db.lootCapsules.onDelete((ctx, capsule) => {
+                connection.db.loot_capsules.onDelete((ctx, capsule) => {
                     this.gameEvents.emit(GameEvents.LOOT_CAPSULE_DELETED, ctx, capsule);
                 });
                 console.log("Registered loot capsule event handlers successfully");
@@ -284,7 +284,7 @@ class SpacetimeDBClient {
     }
 
     // Subscription error callback - Correct signature using ErrorContextInterface
-    private handleSubscriptionError(ctx: ErrorContextInterface<RemoteTables, RemoteReducers, SetReducerFlags>) {
+    private handleSubscriptionError(ctx: ErrorContext) {
         console.error("SpacetimeDB Subscription Error Context:", ctx);
         // Attempt to access a potential error property (common pattern)
         const error = (ctx as any).error; // Use 'as any' as exact structure isn't known

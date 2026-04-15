@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser';
 import SpacetimeDBClient from '../SpacetimeDBClient';
-import { Monsters } from '../autobindings';
+import { Monsters } from '../autobindings/types';
 import { GameEvents } from '../constants/GameEvents';
 
 const TICK_AVG_WINDOW = 20; // Number of intervals to average

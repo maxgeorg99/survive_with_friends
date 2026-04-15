@@ -1,7 +1,6 @@
 import * as Phaser from 'phaser';
-import { UpgradeOptionData, UpgradeType } from '../autobindings';
+import { UpgradeOptionData, UpgradeType } from '../autobindings/types';
 import SpacetimeDBClient from '../SpacetimeDBClient';
-import { ChooseUpgrade } from '../autobindings';
 import { getSoundVolume } from '../managers/VolumeSettings';
 import { isMobileDevice } from '../utils/device';
 
@@ -532,10 +531,10 @@ export default class UpgradeUI {
         
         // Call the ChooseUpgrade reducer
         if (this.spacetimeClient.sdkConnection?.reducers) {
-            this.spacetimeClient.sdkConnection.reducers.chooseUpgrade(
-                this.localPlayerId,
-                option.upgradeIndex
-            );
+            this.spacetimeClient.sdkConnection.reducers.chooseUpgrade({
+                playerId: this.localPlayerId,
+                upgradeIndex: option.upgradeIndex
+            });
             console.log(`Sent ChooseUpgrade reducer call for index ${option.upgradeIndex}`);
             
             // Play upgrade applied effect

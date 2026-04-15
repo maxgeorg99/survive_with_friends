@@ -249,7 +249,7 @@ export default class LoginScene extends Phaser.Scene {
             if (this.spacetimeDBClient.sdkConnection?.reducers) 
             {
                 console.log(`Setting name to: ${name}`);
-                this.spacetimeDBClient.sdkConnection.reducers.setName(name);
+                this.spacetimeDBClient.sdkConnection.reducers.setName({ name });
                 
                 // No need for timeout logic here as that's handled by LoadingScene
             } 

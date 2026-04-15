@@ -166,7 +166,7 @@ export default class VoidChestUI {
         
         for (const chest of voidChests) {
             // Get chest position from boid data
-            const boid = this.spacetimeDBClient.sdkConnection.db.monstersBoid.monsterId.find(chest.monsterId);
+            const boid = this.spacetimeDBClient.sdkConnection.db.monsters_boid.monsterId.find(chest.monsterId);
             if (boid) {
                 const distance = Phaser.Math.Distance.Between(
                     localPlayerSprite.x, localPlayerSprite.y,

@@ -236,7 +236,7 @@ export default class Minimap {
             
             if (this.isBoss(monsterType)) {
                 // Get monster position from boid data
-                const boid = this.spacetimeDBClient.sdkConnection.db.monstersBoid.monsterId.find(monster.monsterId);
+                const boid = this.spacetimeDBClient.sdkConnection.db.monsters_boid.monsterId.find(monster.monsterId);
                 if (boid) {
                     const bossRatioX = boid.position.x / worldBounds.width;
                     const bossRatioY = boid.position.y / worldBounds.height;
@@ -263,7 +263,7 @@ export default class Minimap {
                 }
             } else if (monsterType === 'VoidChest') {
                 // Add VoidChests as purple boxes
-                const boid = this.spacetimeDBClient.sdkConnection.db.monstersBoid.monsterId.find(monster.monsterId);
+                const boid = this.spacetimeDBClient.sdkConnection.db.monsters_boid.monsterId.find(monster.monsterId);
                 if (boid) {
                     const chestRatioX = boid.position.x / worldBounds.width;
                     const chestRatioY = boid.position.y / worldBounds.height;

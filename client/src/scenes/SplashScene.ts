@@ -188,13 +188,13 @@ export default class SplashScene extends Phaser.Scene {
                             this.nextScene = 'GameScene';
                         } else {
                             // Check if player is in dead_players table
-                            if (!this.spacetimeDBClient.sdkConnection.db.deadPlayers) {
+                            if (!this.spacetimeDBClient.sdkConnection.db.dead_players) {
                                 console.log("DeadPlayers table not available yet");
                                 this.connectionChecked = false; // Try again later
                                 return;
                             }
                             
-                            const deadPlayer = this.spacetimeDBClient.sdkConnection.db.deadPlayers.playerId.find(myAccount.currentPlayerId);
+                            const deadPlayer = this.spacetimeDBClient.sdkConnection.db.dead_players.playerId.find(myAccount.currentPlayerId);
                             
                             if (deadPlayer) {
                                 console.log("Player is dead. Going to ClassSelectScene.");

@@ -1,7 +1,8 @@
 import * as Phaser from 'phaser';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { GameEvents } from '../constants/GameEvents';
-import { Player, Entity, PlayerClass, Account, EventContext, ErrorContext, UpgradeOptionData } from "../autobindings";
+import { EventContext, ErrorContext } from "../autobindings";
+import { Player, Entity, PlayerClass, Account, UpgradeOptionData } from "../autobindings/types";
 import { getPlayerShadowConfig, getPlayerClassName } from '../constants/PlayerCharacterConfig';
 import MusicManager from '../managers/MusicManager';
 import MonsterManager from '../managers/MonsterManager';
@@ -556,7 +557,7 @@ export default class GameScene extends Phaser.Scene {
         // Create minimap
         this.createMinimap();
 
-        this.spacetimeDBClient.sdkConnection?.reducers.updateLastLogin();
+        this.spacetimeDBClient.sdkConnection?.reducers.updateLastLogin({});
 
         // Initialize monster counter UI
         this.monsterCounterUI = new MonsterCounterUI(this);
@@ -621,10 +622,10 @@ export default class GameScene extends Phaser.Scene {
         // Add table event handlers for upgrade options
         if (this.spacetimeDBClient.sdkConnection) {
             // Listen for upgrade options
-            this.spacetimeDBClient.sdkConnection.db.upgradeOptions.onInsert(
+            this.spacetimeDBClient.sdkConnection.db.upgrade_options.onInsert(
                 (ctx: EventContext, upgrade: UpgradeOptionData) => this.handleUpgradeOptionCreated(ctx, upgrade)
             );
-            this.spacetimeDBClient.sdkConnection.db.upgradeOptions.onDelete(
+            this.spacetimeDBClient.sdkConnection.db.upgrade_options.onDelete(
                 (ctx: EventContext, upgrade: UpgradeOptionData) => this.handleUpgradeOptionDeleted(ctx, upgrade)
             );
         }
@@ -760,7 +761,7 @@ export default class GameScene extends Phaser.Scene {
             
             // Check for upgrade options
             if (this.upgradeUI) {
-                const playerUpgrades = Array.from(ctx.db.upgradeOptions.iter())
+                const playerUpgrades = Array.from(ctx.db.upgrade_options.iter())
                     .filter(option => option.playerId === this.localPlayerId);
                 
                 if (playerUpgrades.length > 0) {
@@ -911,7 +912,7 @@ export default class GameScene extends Phaser.Scene {
         var localPlayerData = ctx.db?.player.playerId.find(playerId);
         if (!localPlayerData) {
             // Check if player is in the dead_players table
-            var deadPlayerData = ctx.db?.deadPlayers.playerId.find(playerId);
+            var deadPlayerData = ctx.db?.dead_players.playerId.find(playerId);
             if (deadPlayerData) {
                 console.error("Local player is dead! The game scene should not have been loaded.");
                 return; // Cannot proceed with dead player
@@ -1026,7 +1027,7 @@ export default class GameScene extends Phaser.Scene {
         const playerClass = player.playerClass;
 
         // Iterate through all available class data to find a match
-        for (const data of ctx.db.classData.iter()) {
+        for (const data of ctx.db.class_data.iter()) {
             if (data.playerClass.tag === playerClass.tag) {
                 startingAttackType = data.startingAttackType;
                 break;
@@ -1228,7 +1229,7 @@ export default class GameScene extends Phaser.Scene {
 
         // Check if player has pending upgrades and initialize the upgrade UI if needed
         if (player.unspentUpgrades > 0) {
-            const playerUpgrades = Array.from(ctx.db.upgradeOptions.iter())
+            const playerUpgrades = Array.from(ctx.db.upgrade_options.iter())
                 .filter(option => option.playerId === this.localPlayerId);
                 
             if (playerUpgrades.length > 0) {
@@ -2621,7 +2622,7 @@ export default class GameScene extends Phaser.Scene {
             
             // Collect all upgrades for this player by filtering the rows manually
             if (this.upgradeUI) {
-                const playerUpgrades = Array.from(ctx.db?.upgradeOptions.iter())
+                const playerUpgrades = Array.from(ctx.db?.upgrade_options.iter())
                     .filter(option => option.playerId === this.localPlayerId);
                 
                 this.upgradeUI.setUpgradeOptions(playerUpgrades);
@@ -2636,7 +2637,7 @@ export default class GameScene extends Phaser.Scene {
     private handleUpgradeOptionDeleted(ctx: EventContext, upgrade: UpgradeOptionData): void {
         // When upgrades are deleted (usually after selection), hide the UI
         if (upgrade.playerId === this.localPlayerId && this.upgradeUI) {
-            const remainingUpgrades = Array.from(ctx.db.upgradeOptions.iter())
+            const remainingUpgrades = Array.from(ctx.db.upgrade_options.iter())
                 .filter(option => option.playerId === this.localPlayerId);
             
             if (remainingUpgrades.length === 0) {
@@ -2687,7 +2688,7 @@ export default class GameScene extends Phaser.Scene {
         }
         
         // Call the reroll reducer
-        this.spacetimeDBClient.sdkConnection.reducers.rerollUpgrades(this.localPlayerId);
+        this.spacetimeDBClient.sdkConnection.reducers.rerollUpgrades({ playerId: this.localPlayerId });
     }
     
     /**
@@ -2813,10 +2814,10 @@ export default class GameScene extends Phaser.Scene {
                         soundManager.playSound('movement_command', 0.9);
                     }
                     
-                    this.spacetimeDBClient.sdkConnection.reducers.setPlayerWaypoint(
-                        this.tapTarget.x,
-                        this.tapTarget.y
-                    );
+                    this.spacetimeDBClient.sdkConnection.reducers.setPlayerWaypoint({
+                        waypointX: this.tapTarget.x,
+                        waypointY: this.tapTarget.y
+                    });
                 }
             }
         });
@@ -2862,10 +2863,10 @@ export default class GameScene extends Phaser.Scene {
 
         // Send waypoint to server
         if (this.spacetimeDBClient?.sdkConnection?.db) {
-            this.spacetimeDBClient.sdkConnection.reducers.setPlayerWaypoint(
-                this.tapTarget.x,
-                this.tapTarget.y
-            );
+            this.spacetimeDBClient.sdkConnection.reducers.setPlayerWaypoint({
+                waypointX: this.tapTarget.x,
+                waypointY: this.tapTarget.y
+            });
         }
     }
 

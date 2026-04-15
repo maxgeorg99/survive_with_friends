@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
-import { ActiveMonsterAttack, MonsterAttackType, EventContext } from '../autobindings';
+import { EventContext } from '../autobindings';
+import { ActiveMonsterAttack, MonsterAttackType } from '../autobindings/types';
 import SpacetimeDBClient from '../SpacetimeDBClient';
 import { GameEvents } from '../constants/GameEvents';
 
@@ -60,7 +61,7 @@ export class MonsterAttackManager {
         this.registerMonsterAttackListeners(); 
 
         // Force immediate update for all active monster attacks
-        for (const attack of ctx.db?.activeMonsterAttacks.iter()) {
+        for (const attack of ctx.db?.active_monster_attacks.iter()) {
             this.createOrUpdateMonsterAttackGraphic(ctx, attack);
         }
     }
@@ -414,7 +415,7 @@ export class MonsterAttackManager {
 
         // Update position of all monster attack graphics based on prediction
         for (const [attackId, attackGraphicData] of this.attackGraphics.entries()) {
-            const attack = this.spacetimeClient.sdkConnection.db.activeMonsterAttacks.activeMonsterAttackId.find(attackId);
+            const attack = this.spacetimeClient.sdkConnection.db.active_monster_attacks.activeMonsterAttackId.find(attackId);
             if (!attack) continue;
             
             // Update fast spinning effect for EnderScythe attacks
